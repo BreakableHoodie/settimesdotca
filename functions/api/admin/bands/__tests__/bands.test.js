@@ -561,6 +561,124 @@ describe("Admin bands API - Validation", () => {
     expect(data.message).toContain("Time must be in HH:MM format");
   });
 
+  // The shape check (\d{2}:\d{2}) says nothing about RANGE, so "25:99" passes
+  // it and reaches the database as a set time that does not exist. The
+  // canonical validator in utils/validation/datetime.js has bounded hours and
+  // minutes all along -- four write paths call it (bulk, bulk-preview, import,
+  // wizard) while this one, PATCH, and bandProfileResource re-implemented the
+  // shape test inline and skipped the bounds (#1089).
+  it.each([
+    ["hours out of range", "25:99"],
+    ["hour 24", "24:00"],
+    ["minutes out of range", "12:60"],
+  ])("create validation rejects a well-shaped but impossible start time (%s)", async (_label, startTime) => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, { name: "RangeEvent", slug: "range-event" });
+    const venue = insertVenue(rawDb, { name: "Range Venue" });
+    // NO endTime, deliberately. With `endTime: "23:00"` these were rejected by
+    // the end-before-start check -- "25:99" sorts after it -- so two of the
+    // three cases passed for a reason that has nothing to do with range, and
+    // the test would have "confirmed" a range check that was never added.
+    const body = { eventId: ev.id, venueId: venue.id, name: "Impossible Time", startTime };
+
+    const request = new Request("https://example.test/api/admin/bands", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify(body),
+    });
+
+    const res = await bandsHandler.onRequestPost({ request, env, data: { user: { role: "editor" } } });
+    expect(res.status).toBe(400);
+  });
+
+  // Sibling proof: the bounds must not swallow the edges of the real range.
+  it.each([
+    ["midnight", "00:00"],
+    ["last minute of the day", "23:59"],
+  ])("create still accepts %s", async (_label, startTime) => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, { name: "EdgeEvent", slug: "edge-event" });
+    const venue = insertVenue(rawDb, { name: "Edge Venue" });
+    const body = { eventId: ev.id, venueId: venue.id, name: "Edge Time", startTime };
+
+    const request = new Request("https://example.test/api/admin/bands", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify(body),
+    });
+
+    const res = await bandsHandler.onRequestPost({ request, env, data: { user: { role: "editor" } } });
+    expect(res.status).toBe(201);
+  });
+
+  // POST is one of THREE write paths that had the shape-only check. The other
+  // two are PUT on a performance (bands/[id].js) and PUT on a profile
+  // (bandProfileResource.js), and patching one while leaving the others is the
+  // same defect one route over -- so each is asserted rather than assumed.
+  it.each([
+    ["hours out of range", "25:99"],
+    ["hour 24", "24:00"],
+    ["minutes out of range", "12:60"],
+  ])("PUT on a performance rejects an impossible start time (%s)", async (_label, startTime) => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, { name: "PutRangeEvent", slug: "put-range-event" });
+    const venue = insertVenue(rawDb, { name: "Put Range Venue" });
+    const band = insertBand(rawDb, { name: "Put Range Band", event_id: ev.id, venue_id: venue.id });
+
+    const request = new Request(`https://example.test/api/admin/bands/${band.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify({ name: "Put Range Band", startTime }),
+    });
+
+    const res = await bandIdHandler.onRequestPut({ request, env, data: { user: { role: "editor" } } });
+    expect(res.status).toBe(400);
+  });
+
+  it("PUT on a performance still accepts the edges of the day", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, { name: "PutEdgeEvent", slug: "put-edge-event" });
+    const venue = insertVenue(rawDb, { name: "Put Edge Venue" });
+    const band = insertBand(rawDb, { name: "Put Edge Band", event_id: ev.id, venue_id: venue.id });
+
+    const request = new Request(`https://example.test/api/admin/bands/${band.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify({ name: "Put Edge Band", startTime: "23:59" }),
+    });
+
+    const res = await bandIdHandler.onRequestPut({ request, env, data: { user: { role: "editor" } } });
+    expect(res.status).toBe(200);
+  });
+
+  // The THIRD write path: PUT addressed by `profile_<n>`, which routes into
+  // bandProfileResource.js rather than the performance branch above. It had
+  // its own copy of the shape-only check, so it needs its own assertion --
+  // and a REAL profile id, since an unparseable one exits before the time
+  // checks are ever reached.
+  it.each([
+    ["hours out of range", "25:99"],
+    ["hour 24", "24:00"],
+    ["minutes out of range", "12:60"],
+  ])("PUT on a profile rejects an impossible start time (%s)", async (_label, startTime) => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, { name: "ProfRangeEvent", slug: "prof-range-event" });
+    const venue = insertVenue(rawDb, { name: "Prof Range Venue" });
+    const band = insertBand(rawDb, { name: "Prof Range Band", event_id: ev.id, venue_id: venue.id });
+    const profileId = rawDb
+      .prepare("SELECT band_profile_id FROM performances WHERE id = ?")
+      .get(band.id).band_profile_id;
+
+    const request = new Request(`https://example.test/api/admin/bands/profile_${profileId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify({ name: "Prof Range Band", startTime }),
+    });
+
+    const res = await bandIdHandler.onRequestPut({ request, env, data: { user: { role: "editor" } } });
+    expect(res.status).toBe(400);
+  });
+
   it("create validation fails when end time before start time", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "editor" });
     const ev = insertEvent(rawDb, { name: "OrderEvent", slug: "order-event" });

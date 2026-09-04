@@ -215,6 +215,15 @@ export const MUTATIONS = [
     replace: 'band.end_time || "21:00"',
     tests: ["functions/api/feeds/__tests__/ical.test.js"],
   },
+  {
+    id: "time-validation-range-not-just-shape",
+    invariant:
+      "CLAUDE.md 'Time validation is shape AND range' — admin write paths bound hours/minutes via isValidTime, never an inline shape regex (#1089)",
+    file: "functions/api/admin/bands.js",
+    find: "(startTime && !isValidTime(startTime).valid)",
+    replace: "(startTime && !/^\\d{2}:\\d{2}$/.test(startTime))",
+    tests: ["functions/api/admin/bands/__tests__/bands.test.js"],
+  },
 ];
 
 // ============================================================================

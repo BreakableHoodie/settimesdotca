@@ -627,6 +627,34 @@ Three traps here, each of which was live:
 
 Failure logging records `bearerValue.slice(0, DISPLAY_PREFIX_LENGTH)` — the non-secret display prefix — so brute force is visible without the presented secret reaching a log sink.
 
+### Time validation is shape AND range — `isValidTime()` is the only home (#1089)
+
+`isValidTime()` in `functions/utils/validation/datetime.js` checks the `HH:MM`
+shape and *then* bounds hours to 0-23 and minutes to 0-59. Four write paths
+called it (`bands/bulk.js`, `bulk-preview.js`, `import.js`, `events/wizard.js`);
+three others re-implemented only the shape half inline as `/^\d{2}:\d{2}$/` and
+skipped the bounds -- `api/admin/bands.js` (POST), `api/admin/bands/[id].js`
+(PUT) and `utils/bandProfileResource.js` (profile PUT).
+
+So `"25:99"`, `"24:00"` and `"12:60"` passed validation and were **written to
+the database** as set times that do not exist. `frontend/src/utils/timeFormat.js`
+then rendered `"25:99"` as **`"1:99 PM"`** (25 % 12 = 1, minutes printed
+verbatim) -- worse than the fallback because a dash says "we do not know" while
+`1:99 PM` states a time that is not real.
+
+Nothing in production had such a value; this was a latent gap, found while
+reviewing #1088 and fixed in #1089.
+
+The frontend keeps its **own** bounds by necessity -- Pages Functions cannot be
+imported from `frontend/`, the same two-homes constraint as the after-midnight
+threshold. Keep the two in step.
+
+`functions/utils/__tests__/timeRangeValidation.test.js` scans `functions/` for
+an inline `HH:MM` shape regex outside the canonical validator, because nothing
+about writing one looks wrong at the call site. It also asserts the scan's own
+pattern still matches the shape it hunts -- a source scan whose regex has
+drifted passes while checking nothing.
+
 ### Never use numbered `?N` SQL placeholders anywhere in `functions/`
 
 D1 accepts them; **better-sqlite3, which backs the entire unit-test harness, does not** — it treats `?1`/`?2` as *named* parameters and refuses positional binding outright (`RangeError: Too many parameter values were provided`).

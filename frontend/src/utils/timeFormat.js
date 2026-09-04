@@ -93,7 +93,17 @@ export function formatTime(time24, { fallback = '—' } = {}) {
     return fallback
   }
   const [hours, minutes] = String(time24).split(':').map(Number)
-  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+  // Range, not just shape. The regex above accepts "25:99", which formatted as
+  // "1:99 PM" -- a time that does not exist, stated as fact. That is worse
+  // than the fallback: a dash says "we do not know", "1:99 PM" says something
+  // untrue. The server rejects such values on every write path (#1089), so
+  // this is defence in depth for anything already stored or hand-built.
+  //
+  // Deliberately duplicated rather than imported: Pages Functions cannot be
+  // imported from `frontend/`, so utils/validation/datetime.js's isValidTime()
+  // is unreachable here. Same two-homes constraint as the after-midnight
+  // threshold. Keep the bounds identical if either side changes.
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes) || hours > 23 || minutes > 59) {
     return fallback
   }
   const period = hours >= 12 ? 'PM' : 'AM'

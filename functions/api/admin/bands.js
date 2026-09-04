@@ -6,6 +6,7 @@ import { checkPermission } from "./_middleware.js";
 import {
   FIELD_LIMITS,
   isValidEmail,
+  isValidTime,
   safeReflectSocialLinks,
   safeReflectSocialLinksString,
   sanitizeBandSocialLinks,
@@ -434,7 +435,12 @@ export async function onRequestPost(context) {
     }
 
     // Validate time format (only if schedule is provided)
-    if ((startTime && !/^\d{2}:\d{2}$/.test(startTime)) || (endTime && !/^\d{2}:\d{2}$/.test(endTime))) {
+    // isValidTime, not a local regex: the shape test alone accepts "25:99" and
+    // "12:60", which then reach the database as set times that do not exist
+    // (#1089). The canonical validator has bounded hours and minutes all
+    // along; four write paths already call it and this one re-implemented
+    // half of it.
+    if ((startTime && !isValidTime(startTime).valid) || (endTime && !isValidTime(endTime).valid)) {
       return new Response(
         JSON.stringify({
           error: "Validation error",

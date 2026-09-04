@@ -1084,8 +1084,18 @@ expected registry, nor re-check `integrity` against what it fetches. A lockfile
 entry carries `version`, `resolved` and `integrity`; an edit repointing
 `resolved` at an attacker-controlled host while leaving the version untouched
 raises no advisory, and `npm ci` then fetches whatever `resolved` names.
-**That gap is real and currently unguarded here — do not read
-"dependency-review passed" as covering it.**
+**That gap is now GUARDED** by `scripts/__tests__/lockfileIntegrity.test.js`
+(2026-09-04). It discovers every `package-lock.json` in the repo, asserts each
+`resolved` URL points at an allowlisted registry host, and asserts every remote
+entry carries an `integrity` hash. Baseline when added: 1,295 entries across two
+lockfiles, all `registry.npmjs.org`, all hashed -- so the allowlist starts at one
+host and a second is a deliberate diff.
+
+Mutation-verified against the real attack shape: repointing one entry's
+`resolved` at another host while leaving `version` untouched -- which raises no
+advisory, so `dependency-review` stays green -- turns the guard red and names the
+package. Lockfiles are discovered rather than listed, so a new workspace is
+covered the day it appears.
 
 The practical split: routine generated churn (a Dependabot group bump, a
 transitive patch) is well served by the advisory check and needs no human diff

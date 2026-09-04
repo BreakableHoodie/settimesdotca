@@ -251,6 +251,50 @@ idea in it at the wrong half of the roster.
 Revisit only if Bandcamp ships a public catalogue API, or if a single source
 ever reaches coverage where absence stops being a lie.
 
+#### The Bandcamp Friday banner: timezone is the whole contract
+
+Bandcamp Friday runs **midnight to midnight Pacific time**, in Bandcamp's own
+words on their status page. This site is Toronto-local everywhere else, and
+Toronto is three hours ahead. Matching a date-only config value against the
+wrong clock is not cosmetic: the banner would appear three hours early and
+vanish three hours before the day ends, so the last three hours of the actual
+promotion -- the evening, when people are home and buying -- would show nothing.
+
+So the rule, stated once and shared by every consumer:
+
+- Announced dates are stored **date-only** (`YYYY-MM-DD`), exactly as Bandcamp
+  publishes them.
+- A date matches when the current **`America/Los_Angeles`** calendar date equals
+  it. Not `America/Toronto`, not UTC, not the browser's zone.
+- The API decides, and the browser renders what it is told. A client comparing
+  its own local date would show a different answer to a fan in Vancouver than to
+  one in Kitchener, for a promotion that is neither of their local days.
+
+This repo already has this bug class documented: `eventLocalToday()` exists
+because `toISOString().slice(0, 10)` flips at 8 PM Eastern and marked events
+"Happening Now" the evening before. Same shape, different timezone -- and the
+answer is the same, name the zone and put it in one place.
+
+#### Artist-submitted release data: get permission, and mean it
+
+Piece 4's contact line is the only fully-licensed release channel available.
+Treating a submission as publishable data needs that to be explicit, not assumed
+from the fact that someone emailed us.
+
+- The submission form states plainly what happens: we may **store, display and
+  update** the title, date and link on their artist page.
+- **Takedown is unconditional and needs no reason.** An artist asking for
+  something removed gets it removed, and the same contact route serves that
+  request. `/contact` already has a "Corrections & takedowns" section, so the
+  language is in place.
+- We publish what the artist sent us -- a title, a date, a link. We do not
+  reproduce cover art or copy from anywhere else, which keeps this clear of the
+  content questions that closed every other route.
+
+The asymmetry is deliberate: permission to publish is opt-in and specific,
+removal is unconditional. An artist who regrets telling us something should
+never have to argue about it.
+
 ## Explicitly out of scope
 
 - **A facet rail over genre, city or show count.** That is this spec's founding

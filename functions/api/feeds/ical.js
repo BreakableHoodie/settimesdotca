@@ -36,8 +36,17 @@ export async function onRequestGet(context) {
 
   const city = url.searchParams.get("city") || "all";
   const genre = url.searchParams.get("genre") || "all";
-  const safeCityForFilename = sanitizeFilenamePart(city);
-  const safeGenreForFilename = sanitizeFilenamePart(genre);
+  // "all" is this endpoint's sentinel for "no filter", not a value anyone
+  // chose -- so it must never reach a label a human reads. Before #1096 the
+  // unfiltered feed (the default, and the one the site links) called itself
+  // `X-WR-CALNAME:all all Shows` and downloaded as `all-all.ics`. That is the
+  // name the calendar keeps in a subscriber's sidebar for as long as they stay
+  // subscribed, and the only branding a subscription carries.
+  const activeFilters = [city, genre].filter((value) => value !== "all");
+  const calendarName = activeFilters.length > 0 ? `${activeFilters.join(" ")} Shows` : "settimes.ca";
+  // Brand rather than "Waterloo Region": the platform has hosted an event
+  // outside the region, and a calendar name is a claim that stays on screen.
+  const safeFilenameStem = activeFilters.length > 0 ? activeFilters.map(sanitizeFilenamePart).join("-") : "settimes";
 
   try {
     // Get events
@@ -85,12 +94,12 @@ export async function onRequestGet(context) {
       .all();
 
     // Generate iCal content
-    const ical = generateICal(bands, city, genre);
+    const ical = generateICal(bands, calendarName);
 
     return new Response(ical, {
       headers: {
         "Content-Type": "text/calendar; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${safeCityForFilename}-${safeGenreForFilename}.ics"`,
+        "Content-Disposition": `attachment; filename="${safeFilenameStem}.ics"`,
         "Cache-Control": "public, max-age=3600", // Cache for 1 hour
       },
     });
@@ -100,14 +109,21 @@ export async function onRequestGet(context) {
   }
 }
 
-function generateICal(bands, city, genre) {
+/**
+ * @param {object[]} bands
+ * @param {string} calendarName - the finished X-WR-CALNAME. Passed in rather
+ *   than re-derived from city/genre here: those are the caller's "all"
+ *   sentinels, and letting them travel this far is how `all all Shows` reached
+ *   subscribers' sidebars (#1096).
+ */
+function generateICal(bands, calendarName) {
   const now = new Date().toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
 
   const ical = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
     "PRODID:-//SetTimes//settimes.ca//EN",
-    `X-WR-CALNAME:${escapeIcal(`${city} ${genre} Shows`)}`,
+    `X-WR-CALNAME:${escapeIcal(calendarName)}`,
     "X-WR-TIMEZONE:America/Toronto",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",

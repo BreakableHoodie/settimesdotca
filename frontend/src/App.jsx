@@ -25,6 +25,7 @@ import { resolveRouteDiff } from './utils/routeDiff'
 import RouteDiffSection from './components/RouteDiffSection'
 import { useSharedRouteImport } from './hooks/useSharedRouteImport'
 import { fetchPublicJson } from './utils/publicApi'
+import { venueNamesFrom } from './utils/venueInfo.js'
 
 const HINT_DISMISSED_KEY = 'scheduleHintDismissed'
 const TIME_FILTERS_STORAGE_KEY = 'timeFiltersByEvent'
@@ -678,6 +679,12 @@ function App() {
   const isArchived = Boolean(eventData?.is_archived)
   const myBands = bands.filter(band => selectedBands.includes(band.id))
   const selectedVenues = useMemo(() => [...new Set(myBands.map(b => b.venue).filter(Boolean))], [myBands])
+
+  // The event's OWN venues, in the organiser's declared order, for the header
+  // walk strip. Read from venue_info rather than from the lineup: a venue is
+  // part of the crawl before any set is assigned to it, which is exactly Vol
+  // 18's state today -- four venues declared, no performances placed yet.
+  const eventVenues = useMemo(() => venueNamesFrom(eventData?.venue_info), [eventData?.venue_info])
   // The FULL event's festival-day list (#542 PR-3), not derived from `myBands`
   // — MySchedule needs this so a fan whose selections only touch Day 1 of a
   // multi-day event still sees a Day 2 tab (see the `festivalDays` prop
@@ -793,7 +800,12 @@ function App() {
           </div>
         </header>
       ) : (
-        <Header eventName={eventData?.name} eventDate={eventData?.date} selectedVenues={selectedVenues} />
+        <Header
+          eventName={eventData?.name}
+          eventDate={eventData?.date}
+          selectedVenues={selectedVenues}
+          venues={eventVenues}
+        />
       )}
       {!isArchived &&
         (nextMoveState.kind ? (

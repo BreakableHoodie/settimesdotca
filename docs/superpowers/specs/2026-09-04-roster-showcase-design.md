@@ -170,6 +170,61 @@ The server-side companion is `BAND_LINK_FIELD_KEYS` in
 `functions/utils/bandLinkFields.js`. Adding a ninth platform means both homes
 plus `sanitizeBandSocialLinks`; do not introduce a third list here.
 
+### 6. Recent releases, fetched rather than requested
+
+The owner's original discovery idea included "recent bandcamp releases". Two
+routes were evaluated and only one survives contact.
+
+**The official Bandcamp API cannot do this.** It offers three APIs -- Account,
+Sales Report, Merch Orders -- all restricted to account holders reading their
+OWN data, gated behind OAuth with per-user credentials and an eligibility check
+("labels and merchandise fulfillment partners"). Covering 183 artists would mean
+183 separate artists each granting us OAuth. Not a feature; a campaign.
+
+**Asking artists to tell us is not a plan either.** It sounds tidy and it is how
+piece 4 works for corrections, but release announcements depend on 183 people
+choosing to do admin. The owner's read is that uptake would be near zero, and
+that matches how the roster's data has actually been gathered to date: by us, not
+by submissions. Piece 4 stays valuable for corrections. It must not be the thing
+release data depends on.
+
+**So: scrape, deliberately and carefully.** `bandcamp-fetch` (MIT, actively
+maintained) reads artist discographies. The objection this spec originally
+raised -- that scraping breaches Bandcamp's terms -- was checked and does not
+hold: their Terms of Use contain no clause about crawlers, scraping or data
+mining, and `robots.txt` disallows `/api/`, `/search`, `/stream` and `/cart`
+while permitting artist and album pages. The library also ships Bottleneck rate
+limiting and caching.
+
+#### Constraints, all load-bearing
+
+**It cannot run in `functions/`.** It depends on `cheerio` and `node-fetch`;
+Pages Functions run on workerd, not Node. This runs as a scheduled GitHub Action
+writing to D1, and the public endpoint only ever reads what that job stored.
+
+**Store facts, not Content.** Title, release date and URL only. Bandcamp's terms
+DO restrict "use, reproduction... or storage of any Content" beyond personal,
+non-commercial use -- that covers artwork and descriptions. A title and a date
+are facts about a release; the art is theirs. Link out for the rest.
+
+**It will break, and it must break LOUDLY.** The library's own changelog is
+"fixes adapting to site changes": Bandcamp changes markup and the scraper stops
+working. The failure mode is silence -- the rail simply freezes with last
+month's releases and nothing goes red. So the job needs a staleness guard: fail
+when the run resolves nothing, or when the share of artists it could not parse
+crosses a threshold. A scraper without one is the "green because it did not
+look" class this repo keeps re-learning, on a nightly schedule.
+
+**This piece needs a migration**, unlike the other five: somewhere to store
+`artist_id`, `title`, `release_date`, `url`, `fetched_at`. A table rather than
+columns, so an artist can have more than one.
+
+#### Sequencing
+
+Ship pieces 1-5 first. They need no migration, no third-party dependency and no
+scheduled job, and they address the 116-never-viewed problem on their own. This
+piece is a second pass, and its staleness guard is not optional scope.
+
 ## Explicitly out of scope
 
 - **A facet rail over genre, city or show count.** That is this spec's founding

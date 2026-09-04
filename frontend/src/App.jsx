@@ -195,6 +195,10 @@ function App() {
     // guard below. A monotonic sequence number makes every response check
     // whether it is still the newest before it touches state.
     let latestRequest = 0
+    // Whether THIS effect instance has ever put a schedule on screen. It is
+    // what separates "a background poll failed over good data" (swallow it)
+    // from "nothing has ever loaded" (surface it) -- see the catch below.
+    let hasAcceptedSchedule = false
 
     // Try loading from API first, then fallback to static file
     const loadData = async (isSilent = false) => {
@@ -235,9 +239,22 @@ function App() {
         setIsOfflineError(false)
         setBands(prepareBands(bandsData))
         setEventData(eventInfo)
-        if (!isSilent) {
-          setLoading(false)
-        }
+        hasAcceptedSchedule = true
+        // Cleared even for a silent refetch: having data IS the definition of
+        // not loading, and nothing ever sets loading back to true, so only the
+        // clear could be skipped. Without this, a silent poll that resolves
+        // before the mount fetch supersedes it, the mount response is then
+        // discarded, and `loading` stays true for the life of the effect.
+        //
+        // DEFENSIVE, not a fixed bug -- stated plainly because an unfalsifiable
+        // claim in a comment is how this file grows wrong ones. Both current
+        // readers of `loading` mask that state: `shouldShowLoading` also
+        // requires `bands.length === 0`, and the ungated <Helmet> <title>
+        // covers the title effect. So no test here can fail on it today, and
+        // none was written -- a passing test would have proved nothing. The
+        // line stays because the next reader of `loading` would inherit the
+        // stuck state for free.
+        setLoading(false)
       } catch (err) {
         if (controller.signal.aborted) {
           return
@@ -249,12 +266,18 @@ function App() {
         if (requestId !== latestRequest) {
           return
         }
-        if (isSilent) {
+        if (isSilent && hasAcceptedSchedule) {
           // A background poll failing must never blank a working schedule --
           // venues have bad signal, and a fan mid-show should keep seeing the
           // last good data, not the error card (see CLAUDE.md "Pulling a band
           // from a live lineup" and issue #1081). Leave loading/error/offline
           // state untouched and let the next successful poll recover.
+          //
+          // Gated on having loaded SOMETHING, because a silent request can
+          // supersede the mount fetch before it ever returns. Swallowing that
+          // failure too would leave the page on its loading skeleton with no
+          // error and nothing in flight -- a dead end, where showing the error
+          // card is at least honest and offers a retry.
           return
         }
         if (!HAS_FALLBACK) {

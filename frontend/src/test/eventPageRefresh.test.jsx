@@ -347,6 +347,41 @@ describe('App schedule refresh (#1081)', () => {
     expect(screen.queryByRole('heading', { name: "You're offline" })).not.toBeInTheDocument()
   })
 
+  // The failure half of the same trap. Swallowing a silent failure is right
+  // ONLY once something has loaded. Before that there is nothing to protect,
+  // the superseded mount request will never update state, and staying quiet
+  // leaves a permanent skeleton with nothing in flight. An error card is at
+  // least honest and offers a retry.
+  it('surfaces a silent failure when nothing has loaded yet', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const initialPending = new Promise(() => {}) // never settles
+
+    let scheduleCallCount = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(url => {
+        const u = String(url)
+        if (u.startsWith('/api/schedule?')) {
+          scheduleCallCount += 1
+          if (scheduleCallCount === 1) {
+            return initialPending
+          }
+          return Promise.resolve(jsonResponse({ error: 'gone' }, { ok: false, status: 404 }))
+        }
+        return Promise.resolve(jsonResponse({}))
+      })
+    )
+
+    renderApp()
+    await vi.advanceTimersByTimeAsync(60000)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    await vi.advanceTimersByTimeAsync(1000)
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Oops! Something went wrong' })).toBeInTheDocument()
+    })
+  })
+
   it('refetches immediately when the tab becomes visible again', async () => {
     const { scheduleCallCount } = mockScheduleFetch([jsonResponse({ event: mockEvent, bands: [makeBand()] })])
 

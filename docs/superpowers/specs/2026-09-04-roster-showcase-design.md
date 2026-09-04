@@ -109,13 +109,29 @@ in this spec.
 
 ### 4. Artists can correct their own page
 
-A quiet line on every artist page inviting the artist to get in touch about their
-entry, routed to the existing `/contact`.
+On the individual artist profile (`/band/<slug>`) -- the page an artist lands on
+when they look themselves up, and the only one where they can see what we got
+wrong. Approved wording:
 
-Requested by the owner alongside this work. It belongs here because a showcase
-raises the stakes on the data being right, and the gaps that matter most -- a
-missing genre, a wrong city, a dead link -- are the ones only the artist can
-close.
+> **Is this your band?** Tell us if anything is wrong - genre, hometown, links.
+
+Links to `/contact`, which already has a "Corrections & takedowns" section, so
+the language matches where it sends them.
+
+Three deliberate properties:
+
+- **It self-selects in three words.** Most readers of an artist page are fans.
+  "Is this your band?" lets everyone else skip it, which is what keeps it quiet
+  rather than clutter.
+- **It names what is fixable.** A vague "let us know" gets nothing. Naming genre,
+  hometown and links steers reports at the three actual gaps -- 62 artists with
+  no genre, 46 with no city, and the dead links the href resolver silently drops
+  -- which are the same fields piece 5 is about to make visible.
+- **It promises no turnaround.** No "we will update within 48 hours". One person
+  runs this.
+
+Cheap insurance, not a data strategy: it costs one line and occasionally catches
+something only the band could know. Piece 6 is what actually fills release data.
 
 ### 5. Show what an artist is ON, and let a fan slice by it
 
@@ -262,7 +278,7 @@ Every one reads columns that exist. **No migration.**
   untouched -- it answers "is X playing?" and is the right tool for that.
 - Each roster row gains the compact link icons the admin roster already renders,
   and the list gains per-platform toggles with counts.
-- `BandProfilePage` gains "Shared a bill with" and the contact line.
+- `BandProfilePage` gains "Shared a bill with" and the approved contact line.
 
 ## Open questions for the owner
 
@@ -271,8 +287,8 @@ Every one reads columns that exist. **No migration.**
    is seen._
 2. **Does "one of one" need its own page,** or is a rotating single callout
    enough? _Recommendation: a callout first; a page only if it earns one._
-3. **The contact line's wording** is the owner's call. It is his relationship
-   with these artists, not ours.
+3. ~~The contact line's wording~~ **Decided**: option A, on the artist profile
+   page. See piece 4.
 
 ## Dependencies
 

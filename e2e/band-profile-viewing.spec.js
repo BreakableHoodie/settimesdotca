@@ -49,7 +49,7 @@ async function openProfile(page, link) {
 
 // The seeded upcoming event (database/seed-test-data.sql). Entering through its
 // card makes "which artist" deterministic instead of order-dependent.
-const SEEDED_EVENT = "Future Fest E2E";
+const SEEDED_EVENT = "Future Fest E2E Long Weekend Edition";
 
 // Opens an artist from the SEEDED event's card, so the profile under test is
 // always one of the four artists in database/seed-test-data.sql.

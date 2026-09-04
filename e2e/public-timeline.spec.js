@@ -22,7 +22,7 @@ import { test, expect } from "@playwright/test";
 // shifts positions, so a pinned index can end up addressing a different event.
 // The name filter is safe to keep live because the name stays in the card
 // whether it is collapsed or expanded.
-const SEEDED_EVENT = "Future Fest E2E";
+const SEEDED_EVENT = "Future Fest E2E Long Weekend Edition";
 
 async function seededEventCard(page) {
   const card = page.locator('[data-testid="event-card"]').filter({ hasText: SEEDED_EVENT }).first();

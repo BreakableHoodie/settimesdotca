@@ -19,7 +19,7 @@ import { loginAsAdmin } from "../utils/session";
 
 // Seeded by database/seed-test-data.sql and the only seeded event with
 // performances, so it is what makes the Lineup audit non-empty.
-const SEEDED_EVENT = "Future Fest E2E";
+const SEEDED_EVENT = "Future Fest E2E Long Weekend Edition";
 
 // A two-day event (end_date > date), which is the ONLY way LineupTab renders its
 // day filter -- `isMultiDayEvent()` gates it. Seeded by #886 for exactly this.

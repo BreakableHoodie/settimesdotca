@@ -102,6 +102,33 @@ describe('EventPosterThumbnail', () => {
       )
     })
 
+    // The inline poster sits BESIDE the title in a flex row (#666), so the row
+    // is as tall as its tallest child. At a flat h-[100px] the poster was
+    // taller than the title+summary column (~61px) and became the only thing
+    // setting that row's height -- 39px of the first screen on a 390px phone,
+    // measured against a budget saying half that screen should be lineup
+    // (#1087). Capping it below `sm` stops it driving the row; desktop keeps
+    // the larger thumbnail.
+    //
+    // This asserts the CLASS, which on its own is the weak kind of test this
+    // repo has been burned by -- class presence passes on visually broken CSS.
+    // It earns its place as the cheap half of a pair: e2e/accessibility/
+    // event-fold.spec.js measures the resulting POSITION in a real browser and
+    // is what actually proves the layout. This one fails fast, in the unit
+    // suite, if someone flattens the responsive cap back to a single value.
+    it('caps its height below sm so it cannot drive the title row (#1087)', () => {
+      render(
+        <EventPosterThumbnail posterUrl={POSTER_URL} eventName="Buddies Fest 2" onOpen={vi.fn()} variant="inline" />
+      )
+
+      const image = screen.getByRole('img', { name: 'Buddies Fest 2 poster' })
+      expect(image).toHaveClass('h-[64px]')
+      expect(image).toHaveClass('sm:h-[100px]')
+      // The mobile cap must be a real override, not a flat 100px that happens
+      // to carry an sm: duplicate.
+      expect(image.className).not.toMatch(/(^|\s)h-\[100px\]($|\s)/)
+    })
+
     it('still opens the lightbox and keeps a real button tap target', () => {
       const onOpen = vi.fn()
       render(

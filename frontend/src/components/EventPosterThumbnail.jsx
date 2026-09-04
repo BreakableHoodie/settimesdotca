@@ -41,9 +41,21 @@ import PosterImage from './PosterImage'
  *   portrait poster renders ~150px wide there, so the 200-wide 1x
  *   derivative covers it and PosterImage's 400-wide 2x candidate covers
  *   retina.
- * - `inline`'s `width={80}` is tied to its `h-[100px]` cap: a 3:4 portrait
- *   poster renders ~75px wide there, so 80 covers the 1x case with a small
- *   margin for posters slightly wider than 3:4.
+ * - `inline`'s `width={80}` is tied to its LARGEST cap, `sm:h-[100px]`: a 3:4
+ *   portrait poster renders ~75px wide there, so 80 covers the 1x case with a
+ *   small margin for posters slightly wider than 3:4. Below `sm` the cap is
+ *   `h-[64px]` and the same derivative over-covers, which is the safe
+ *   direction. Size the width from the tallest variant, never the shortest.
+ *
+ * WHY MOBILE IS SHORTER (#1087). Inline sits BESIDE the title in a flex row
+ * (#666), so the row is as tall as its tallest child, and at 100px the poster
+ * was taller than the title+summary column (~61px) -- making it the only thing
+ * setting that row's height. Measured on a 390px viewport against a
+ * representative 15-act bill: 446px to the first act name with the poster at
+ * 100px, 407px with no poster at all. The poster alone was 39px of the first
+ * screen, on the page a fan holds in the street, against a budget saying half
+ * that screen should be lineup. At 64px it no longer drives the row and is
+ * still a comfortable tap target. Desktop is unchanged.
  *
  * Resize either variant and its `width` has to move with it.
  */
@@ -70,7 +82,9 @@ function EventPosterThumbnail({ posterUrl, eventName, onOpen, variant = 'standal
           loading={isInline ? 'eager' : 'lazy'}
           fetchPriority={isInline ? 'high' : undefined}
           className={
-            isInline ? 'h-[100px] w-auto object-contain' : 'h-[140px] w-auto object-contain sm:h-[160px] md:h-[180px]'
+            isInline
+              ? 'h-[64px] w-auto object-contain sm:h-[100px]'
+              : 'h-[140px] w-auto object-contain sm:h-[160px] md:h-[180px]'
           }
         />
       </button>

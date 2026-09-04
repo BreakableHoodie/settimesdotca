@@ -184,9 +184,25 @@ function App() {
 
   useEffect(() => {
     const controller = new AbortController()
+    let pollInterval = null
+    // Requests are not individually cancellable -- the AbortController above is
+    // shared and only fires on cleanup -- so an older in-flight request can
+    // resolve AFTER a newer one and write its stale body over fresh state.
+    // Both directions of that are live bugs here: a slow poll landing after a
+    // fast one can RESURRECT a cancelled set (the precise thing this effect
+    // exists to prevent), and a superseded non-silent request failing late can
+    // replace a working schedule with the error card, bypassing the silent
+    // guard below. A monotonic sequence number makes every response check
+    // whether it is still the newest before it touches state.
+    let latestRequest = 0
+    // Whether THIS effect instance has ever put a schedule on screen. It is
+    // what separates "a background poll failed over good data" (swallow it)
+    // from "nothing has ever loaded" (surface it) -- see the catch below.
+    let hasAcceptedSchedule = false
 
     // Try loading from API first, then fallback to static file
-    const loadData = async () => {
+    const loadData = async (isSilent = false) => {
+      const requestId = ++latestRequest
       try {
         // Try API endpoint first - use slug from URL or 'current' for default
         const eventParam = slug || 'current'
@@ -209,16 +225,61 @@ function App() {
           throw new Error(validation.error)
         }
 
+        // Superseded by a newer request while this one was in flight: its body
+        // is older than what is already on screen, so writing it would move
+        // the page BACKWARDS.
+        if (requestId !== latestRequest) {
+          return
+        }
+
+        // A silent refetch recovering from a previous error is still worth
+        // reflecting — clearing it is not the part the critical constraint
+        // below guards against.
         setError(null)
         setIsOfflineError(false)
         setBands(prepareBands(bandsData))
         setEventData(eventInfo)
+        hasAcceptedSchedule = true
+        // Cleared even for a silent refetch: having data IS the definition of
+        // not loading, and nothing ever sets loading back to true, so only the
+        // clear could be skipped. Without this, a silent poll that resolves
+        // before the mount fetch supersedes it, the mount response is then
+        // discarded, and `loading` stays true for the life of the effect.
+        //
+        // DEFENSIVE, not a fixed bug -- stated plainly because an unfalsifiable
+        // claim in a comment is how this file grows wrong ones. Both current
+        // readers of `loading` mask that state: `shouldShowLoading` also
+        // requires `bands.length === 0`, and the ungated <Helmet> <title>
+        // covers the title effect. So no test here can fail on it today, and
+        // none was written -- a passing test would have proved nothing. The
+        // line stays because the next reader of `loading` would inherit the
+        // stuck state for free.
         setLoading(false)
       } catch (err) {
         if (controller.signal.aborted) {
           return
         }
         console.error('Failed to load bands:', err)
+        // Checked BEFORE the isSilent branch, deliberately: a superseded
+        // request may be the original NON-silent mount fetch, whose error path
+        // would otherwise blank a schedule a later poll had already filled.
+        if (requestId !== latestRequest) {
+          return
+        }
+        if (isSilent && hasAcceptedSchedule) {
+          // A background poll failing must never blank a working schedule --
+          // venues have bad signal, and a fan mid-show should keep seeing the
+          // last good data, not the error card (see CLAUDE.md "Pulling a band
+          // from a live lineup" and issue #1081). Leave loading/error/offline
+          // state untouched and let the next successful poll recover.
+          //
+          // Gated on having loaded SOMETHING, because a silent request can
+          // supersede the mount fetch before it ever returns. Swallowing that
+          // failure too would leave the page on its loading skeleton with no
+          // error and nothing in flight -- a dead end, where showing the error
+          // card is at least honest and offers a retry.
+          return
+        }
         if (!HAS_FALLBACK) {
           // A fetch that never reached the server (offline, or the service
           // worker's network-first strategy re-throwing after a cache miss —
@@ -235,7 +296,45 @@ function App() {
     }
 
     loadData()
-    return () => controller.abort()
+
+    // Keep the schedule live while a fan has the page open (#1081): the
+    // cancel toggle is documented to strike a set through "on every fan
+    // surface", but that was only true on a fresh load -- a phone left open
+    // in a pocket all night never saw it. Mirrors EventTimeline.jsx's
+    // visibility-gated 60s poll: skip fetching while the tab is hidden (a
+    // phone in a pocket must not burn mobile data), and refetch immediately
+    // on return to the tab rather than waiting out the rest of the interval.
+    const startPolling = () => {
+      if (pollInterval) return
+      pollInterval = setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          loadData(true)
+        }
+      }, 60000)
+    }
+    const stopPolling = () => {
+      if (pollInterval) {
+        clearInterval(pollInterval)
+        pollInterval = null
+      }
+    }
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        loadData(true)
+        startPolling()
+      } else {
+        stopPolling()
+      }
+    }
+
+    startPolling()
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      controller.abort()
+      stopPolling()
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
   }, [slug])
 
   useEffect(() => {

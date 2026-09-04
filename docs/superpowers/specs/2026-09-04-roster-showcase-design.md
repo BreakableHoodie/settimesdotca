@@ -246,6 +246,27 @@ look" class this repo keeps re-learning, on a nightly schedule.
 `artist_id`, `title`, `release_date`, `url`, `fetched_at`. A table rather than
 columns, so an artist can have more than one.
 
+#### Bandcamp Friday is the day this feature is worth the most
+
+On Bandcamp Friday, Bandcamp waives its revenue share and the artist takes
+effectively all of it. A page saying _"released recently, here is where to buy
+it"_ is worth more to an artist on that specific day than on any other, which
+makes it the strongest single moment for the "artists ways to be discovered"
+half of this work.
+
+So the release rail should be able to lead with it: a line acknowledging the day
+and pointing at the artists with recent releases.
+
+**Do not compute the date.** It is tempting to write "the first Friday of the
+month" and be done. That is wrong -- Bandcamp announces specific dates, has
+skipped months, and has changed the cadence more than once. A computed rule
+would be confidently wrong on a day when being wrong is most visible, and it
+would rot silently, which is the failure class this repo keeps re-learning.
+
+Store the announced dates as configuration the owner can set, and render the
+banner only when today matches one. An empty or stale list renders nothing,
+which is the correct failure: a missing banner costs nothing, while a banner on
+the wrong day tells every artist we are not paying attention.
 #### Sequencing
 
 Ship pieces 1-5 first. They need no migration, no third-party dependency and no

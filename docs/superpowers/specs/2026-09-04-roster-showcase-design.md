@@ -141,8 +141,16 @@ wrong. Approved wording:
 
 > **Is this your band?** Tell us if anything is wrong - genre, hometown, links.
 
-Links to `/contact`, which already has a "Corrections & takedowns" section, so
-the language matches where it sends them.
+Links to `/contact?artist=<band_profiles.id>`, which already has a "Corrections
+& takedowns" section, so the language matches where it sends them.
+
+**The id handoff is concrete, not implied.** `/contact` reads the `artist`
+query parameter, resolves it to a name, and shows which profile the correction
+is about ("Correcting: BA Johnston") so the sender can see they are on the right
+record. It travels with the submission, so a report arrives attached to a row
+rather than needing a follow-up to establish who it is about. An absent or
+unresolvable `artist` renders the ordinary contact page -- the parameter adds
+context, it never gates the form.
 
 Three deliberate properties:
 
@@ -287,9 +295,10 @@ answer is the same, name the zone and put it in one place.
 
 #### Artist-submitted release data: get permission, and mean it
 
-Piece 4's contact line is the only fully-licensed release channel available.
-Treating a submission as publishable data needs that to be explicit, not assumed
-from the fact that someone emailed us.
+Piece 4's contact line is the only channel that could carry release news at all.
+It is licensed only to the extent the terms below make it so -- treating a
+submission as publishable data has to be explicit, not assumed from the fact
+that someone emailed us.
 
 - The submission form states plainly what happens: we may **store, display and
   update** the title, date and link on their artist page.
@@ -330,8 +339,8 @@ one. No migration.
   `no-store`.
 - `GET /api/artists/one-of-one` — genres belonging to exactly one artist.
   `CACHE_BROWSE`.
-- `GET /api/bands/[name]/stage-mates` — co-performers, most-shared first.
-  `CACHE_BROWSE`.
+- `GET /api/bands/[id]/stage-mates` — co-performers, most-shared first, keyed
+  on the canonical `band_profiles.id`. `CACHE_BROWSE`.
 - `/api/artists` gains RESOLVED link presence per artist.
 
 **The resolved-link response shape, stated exactly.** Every consumer -- row
@@ -366,7 +375,8 @@ names here include `$wamp A$$` and names carrying slashes and apostrophes, and
 an artist can be renamed -- the roster has already done it once (Suplex City ->
 Suplex). A display name is not an identifier.
 
-- `stage-mates` takes the canonical **id** as its path segment. It is a new
+- `stage-mates` is keyed on the canonical **id** (`/api/bands/[id]/stage-mates`).
+  It is a new
   endpoint with no existing callers, so there is no URL contract to preserve,
   and its caller -- the artist profile page -- already has the id loaded.
 - For continuity with `functions/api/bands/[name].js`, a non-numeric segment is

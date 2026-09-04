@@ -82,9 +82,24 @@ describe("every workspace is installable from its own manifest", () => {
       `${relative} installs packages but has no .npmrc — npm does not inherit the root one`,
     ).toBe(true);
 
-    const match = readFileSync(npmrcPath, "utf8").match(/^\s*min-release-age\s*=\s*(\d+)/m);
-    expect(match, `${npmrcPath} does not set min-release-age`).not.toBeNull();
-    expect(Number(match[1]), `${npmrcPath}: min-release-age must be at least 7 days`).toBeGreaterThanOrEqual(7);
+    // Ask npm for its EFFECTIVE value rather than regexing the file. Parsing
+    // was wrong twice over, and the second way was silent:
+    //   - `min-release-age=7days` matched a `(\d+)` prefix and read as 7.
+    //   - With `7` on one line and `0` on a later one, npm honours the LAST
+    //     assignment (verified: it reports 0) while a first-match regex reads 7.
+    //     The guard would pass while no cooldown was in effect at all.
+    // `npm config get`, run in the workspace, is the same resolution npm uses to
+    // install, so it cannot disagree with it.
+    const effective = execFileSync("npm", ["config", "get", "min-release-age"], {
+      cwd: dirname(join(repoRoot, relative)),
+      encoding: "utf8",
+    }).trim();
+
+    expect(
+      /^\d+$/.test(effective),
+      `${npmrcPath}: npm resolves min-release-age to ${JSON.stringify(effective)}, not a number`,
+    ).toBe(true);
+    expect(Number(effective), `${npmrcPath}: min-release-age must be at least 7 days`).toBeGreaterThanOrEqual(7);
   });
 
   it.each(manifests)("%s has a lockfile and the lockfile satisfies it", (relative) => {

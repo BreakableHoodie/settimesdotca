@@ -9,7 +9,7 @@
     "dev": "wrangler dev"
   },
   "dependencies": {
-    "workers-mcp": "^0.1.0"
+    "workers-mcp": "0.0.13"
   },
   "devDependencies": {
     "wrangler": "^4.42.0"

@@ -59,6 +59,15 @@ describe("every workspace is installable from its own manifest", () => {
   // flags an .npmrc whose value is missing or too low, and that directory had no
   // .npmrc to flag. A rule reports on files that exist; absence is invisible to
   // it. Hence a test that iterates WORKSPACES rather than config files.
+  // Pins the semantics the check above depends on. Without this, someone
+  // "fixing" a prerelease mismatch by adding includePrerelease would get a green
+  // suite and a guard that no longer guards.
+  it("treats a prerelease as NOT satisfying a caret range, exactly as npm does", () => {
+    expect(semver.satisfies("0.1.0-3", "^0.1.0")).toBe(false);
+    expect(semver.satisfies("0.0.13", "^0.1.0")).toBe(false);
+    expect(semver.satisfies("0.0.13", "0.0.13")).toBe(true);
+  });
+
   it.each(manifests)("%s sets a package-adoption cooldown", (relative) => {
     const manifest = JSON.parse(readFileSync(join(repoRoot, relative), "utf8"));
     const declared = {
@@ -101,8 +110,14 @@ describe("every workspace is installable from its own manifest", () => {
       const entry = packages[`node_modules/${name}`];
       expect(entry, `${relative}: ${name} is declared but absent from the lockfile`).toBeDefined();
 
+      // NO includePrerelease. npm excludes prereleases from a range by default,
+      // and that default IS the bug: `^0.1.0` does not match `0.1.0-3`, which is
+      // why `npm install` returned ETARGET. Passing the flag makes this guard
+      // agree with a resolver npm is not using, so a lockfile pinning a
+      // prerelease against a caret range would sail through the very check
+      // written to catch it. Caught in review on #1109.
       expect(
-        semver.satisfies(entry.version, range, { includePrerelease: true }),
+        semver.satisfies(entry.version, range),
         `${relative}: declared ${name}@${range} but the lockfile pins ${entry.version} — ` +
           `a fresh 'npm install' cannot reproduce this tree`,
       ).toBe(true);

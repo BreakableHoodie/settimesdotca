@@ -55,8 +55,6 @@ jobs:
         with:
           python-version: "3.12"
 
-      # Pinned exactly. An unpinned scanner changes findings between runs for
-      # reasons unrelated to the diff, which is how a gate loses its meaning.
       # Keyed on THIS FILE's hash, because this file is where the Semgrep
       # version is pinned -- so bumping the version invalidates the cache by
       # construction, with no separate requirements file to drift out of step.
@@ -68,6 +66,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-semgrep-
 
+      # Pinned exactly. An unpinned scanner changes findings between runs for
+      # reasons unrelated to the diff, which is how a gate loses its meaning.
       - name: Install Semgrep
         run: pip install semgrep==1.176.0
 

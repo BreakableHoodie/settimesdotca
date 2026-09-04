@@ -224,6 +224,23 @@ export const MUTATIONS = [
     replace: "(startTime && !/^\\d{2}:\\d{2}$/.test(startTime))",
     tests: ["functions/api/admin/bands/__tests__/bands.test.js"],
   },
+  {
+    id: "time-validation-range-put-performance",
+    invariant:
+      "CLAUDE.md 'Time validation is shape AND range' — the PUT performance path bounds hours/minutes too (#1089)",
+    file: "functions/api/admin/bands/[id].js",
+    find: 'startTime !== undefined && startTime !== "" && !isValidTime(startTime).valid',
+    replace: 'startTime !== undefined && startTime !== "" && !/^\\d{2}:\\d{2}$/.test(startTime)',
+    tests: ["functions/api/admin/bands/__tests__/bands.test.js"],
+  },
+  {
+    id: "time-validation-range-put-profile",
+    invariant: "CLAUDE.md 'Time validation is shape AND range' — the profile PUT path bounds hours/minutes too (#1089)",
+    file: "functions/utils/bandProfileResource.js",
+    find: 'startTime !== undefined && startTime !== "" && !isValidTime(startTime).valid',
+    replace: 'startTime !== undefined && startTime !== "" && !/^\\d{2}:\\d{2}$/.test(startTime)',
+    tests: ["functions/api/admin/bands/__tests__/bands.test.js"],
+  },
 ];
 
 // ============================================================================

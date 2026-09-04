@@ -28,8 +28,17 @@ const FUNCTIONS_DIR = fileURLToPath(new URL("../..", import.meta.url));
 // first half of what it does.
 const ALLOWED = new Set(["utils/validation/datetime.js"]);
 
-// Matches an HH:MM shape test written as a literal regex.
-const SHAPE_REGEX = /\/\^\\d\{[12](?:,\d)?\}:\\d\{2\}\$\//;
+// Matches an HH:MM shape test written as a literal regex, in any spelling that
+// means the same thing. The first version matched only \d{2} and \d{1,2}, so
+// [0-9]{2} and \d\d -- equally common and equally range-blind -- sailed past
+// the guard that exists to catch exactly this. Normalising the spellings keeps
+// the matcher readable instead of growing one alternation per variant.
+function normalizeDigitClasses(source) {
+  return source.replace(/\[0-9\]/g, String.raw`\d`).replace(/\\d\\d/g, String.raw`\d{2}`);
+}
+
+const SHAPE_PATTERN = /\/\^\\d\{(?:2|1,2)\}:\\d\{2\}\$\//;
+const SHAPE_REGEX = { test: (source) => SHAPE_PATTERN.test(normalizeDigitClasses(source)) };
 
 function* jsFiles(dir) {
   for (const entry of readdirSync(dir)) {
@@ -67,6 +76,12 @@ describe("time validation has one canonical home (#1089)", () => {
     // silent-no-op class this repo keeps hitting.
     expect(SHAPE_REGEX.test("if (!/^\\d{2}:\\d{2}$/.test(startTime)) {")).toBe(true);
     expect(SHAPE_REGEX.test("const isValidTimeString = /^\\d{1,2}:\\d{2}$/")).toBe(true);
+    // The equivalent spellings this scan used to miss: same meaning, same
+    // range-blindness, and either would have sailed past the guard.
+    expect(SHAPE_REGEX.test("const t = /^[0-9]{2}:[0-9]{2}$/")).toBe(true);
+    expect(SHAPE_REGEX.test("const t = /^\\d\\d:\\d\\d$/")).toBe(true);
+    // Still not a blanket match on anything containing a colon or digits.
     expect(SHAPE_REGEX.test("const x = /^[0-9]+$/")).toBe(false);
+    expect(SHAPE_REGEX.test("const iso = /^\\d{4}-\\d{2}-\\d{2}$/")).toBe(false);
   });
 });

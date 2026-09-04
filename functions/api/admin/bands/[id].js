@@ -7,6 +7,7 @@ import { auditLogStatement } from "../../../utils/auditLogStatement.js";
 import {
   FIELD_LIMITS,
   isValidEmail,
+  isValidTime,
   safeReflectSocialLinks,
   sanitizeOptionalHttpUrl,
   sanitizeOptionalText,
@@ -241,7 +242,7 @@ export async function onRequestPut(context) {
     }
 
     // Validate time format (only if a non-empty time is provided; empty string = TBD)
-    if (startTime !== undefined && startTime !== "" && !/^\d{2}:\d{2}$/.test(startTime)) {
+    if (startTime !== undefined && startTime !== "" && !isValidTime(startTime).valid) {
       return new Response(
         JSON.stringify({
           error: "Validation error",
@@ -254,7 +255,7 @@ export async function onRequestPut(context) {
       );
     }
 
-    if (endTime !== undefined && endTime !== "" && !/^\d{2}:\d{2}$/.test(endTime)) {
+    if (endTime !== undefined && endTime !== "" && !isValidTime(endTime).valid) {
       return new Response(
         JSON.stringify({
           error: "Validation error",

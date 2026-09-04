@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { formatPerformanceDayLabel } from '../timeFormat'
+import { formatPerformanceDayLabel, formatTime, formatTimeRange } from '../timeFormat'
 
 // ---------------------------------------------------------------------------
 // #739 — a band playing day 2+ of a multi-day event must show a "(Day N)"
@@ -167,5 +167,38 @@ describe('formatPerformanceDayLabel — year and single-day gating (#739)', () =
       event_end_date: '2026-08-08',
     })
     expect(label).toBe('Sat, Aug 8')
+  })
+})
+
+describe('formatTime rejects impossible times (#1089)', () => {
+  // The shape regex accepts anything matching \d{1,2}:\d{2}, so an
+  // out-of-range value used to format as if real: "25:99" -> "1:99 PM"
+  // (25 % 12 = 1, minutes printed verbatim). A dash says "we do not know";
+  // "1:99 PM" states a time that does not exist.
+  test.each([
+    ['hours out of range', '25:99'],
+    ['hour 24', '24:00'],
+    ['minutes out of range', '12:60'],
+    ['both out of range', '99:99'],
+  ])('falls back for %s', (_label, value) => {
+    expect(formatTime(value)).toBe('—')
+    expect(formatTime(value, { fallback: 'TBA' })).toBe('TBA')
+  })
+
+  // Sibling proof: the bounds must not eat the real edges of the day.
+  test.each([
+    ['00:00', '12:00 AM'],
+    ['23:59', '11:59 PM'],
+    ['12:00', '12:00 PM'],
+    ['00:30', '12:30 AM'],
+  ])('still formats %s', (input, expected) => {
+    expect(formatTime(input)).toBe(expected)
+  })
+
+  // formatTime is shared, so the fallback has to propagate rather than the
+  // range check living only at the leaf.
+  test('propagates through formatTimeRange', () => {
+    expect(formatTimeRange('25:99', '26:00')).toBe('Time TBD')
+    expect(formatTimeRange('25:99', '21:00')).toBe('9:00 PM')
   })
 })

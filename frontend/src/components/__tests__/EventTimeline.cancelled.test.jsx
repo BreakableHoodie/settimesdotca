@@ -106,9 +106,15 @@ describe('EventTimeline collapsed chips — cancelled sets (#732)', () => {
  * (frontend/src/pages/VenuePage.jsx).
  *
  * The sweep for "any OTHER consumer of a band list on this page" turned up a
- * second gap: GenreDiscovery (the "Discover Bands" wall, fed the SAME
- * `allBands` list) let a fan tap a cancelled band's tile to add it to their
- * personal schedule, with no visual indication it was cancelled at all.
+ * second gap at the time: GenreDiscovery (the "Discover Bands" wall, fed the
+ * SAME `allBands` list) let a fan tap a cancelled band's tile to add it to
+ * their personal schedule, with no visual indication it was cancelled.
+ *
+ * That wall has since been REMOVED as redundant -- it duplicated a
+ * schedule-building flow the card already links to with its own button -- so
+ * that gap is now closed by construction and its test is gone with it. The
+ * consumers below are the ones that remain, and they still need asserting:
+ * deleting a component closes its gap, it does not close the class.
  */
 describe('EventTimeline expanded details render cancellation on every band-list consumer (#732)', () => {
   beforeEach(() => {
@@ -215,40 +221,5 @@ describe('EventTimeline expanded details render cancellation on every band-list 
     )
     expect(scheduledCard.querySelector('s')).toBeNull()
     expect(scheduledCard).not.toHaveTextContent('Cancelled')
-  })
-
-  it('disables the Discover Bands tile for a cancelled band, leaving a scheduled band toggleable', async () => {
-    await expandDetails()
-
-    // GenreDiscovery renders a <button> per act -- the cancelled tile's
-    // aria-label states its status rather than an Add/Remove instruction,
-    // since tapping it must do nothing.
-    const cancelledTile = await screen.findByRole(
-      'button',
-      { name: /Pulled Openers/i },
-      { timeout: DETAILS_RENDER_TIMEOUT }
-    )
-    expect(cancelledTile).toBeDisabled()
-    expect(cancelledTile.querySelector('s')).toHaveTextContent('Pulled Openers')
-    expect(cancelledTile).toHaveTextContent('Cancelled')
-
-    // Sibling proof: the scheduled band's tile is untouched -- still
-    // clickable and still flips its own Add/Remove aria-label, proving the
-    // suppression is scoped to is_cancelled rather than a global regression
-    // that freezes every tile.
-    const scheduledTile = await screen.findByRole(
-      'button',
-      { name: /Add Playing Headliner to my schedule/i },
-      { timeout: DETAILS_RENDER_TIMEOUT }
-    )
-    expect(scheduledTile).not.toBeDisabled()
-    fireEvent.click(scheduledTile)
-    expect(screen.getByRole('button', { name: /Remove Playing Headliner from my schedule/i })).toBeInTheDocument()
-
-    // Clicking the disabled cancelled tile must not toggle anything either --
-    // there is no "Remove ... from my schedule" state to flip into.
-    fireEvent.click(cancelledTile)
-    expect(screen.getByRole('button', { name: /Pulled Openers/i })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Remove Pulled Openers/i })).not.toBeInTheDocument()
   })
 })

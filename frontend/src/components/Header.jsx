@@ -48,10 +48,33 @@ function Header({ eventName, eventDate, selectedVenues, venues = [] }) {
 
   useLayoutEffect(() => {
     const el = collapseRef.current
-    // jsdom reports 0 for every layout measurement; keep the fallback there
-    // rather than collapsing the block to nothing under test.
-    const measured = el?.scrollHeight ?? 0
-    if (measured > 0) setExpandedHeight(measured)
+    if (!el) return undefined
+
+    // jsdom reports 0 for every layout measurement, and so does a block that is
+    // `display: none` -- which this one IS below `sm`. Measuring only on mount
+    // therefore leaves a phone-width render stuck on the fallback, and resizing
+    // up to desktop would never re-measure because the effect's dependencies
+    // have not changed. That reproduces the original clip on exactly the
+    // desktop viewport this fix is for.
+    //
+    // A ResizeObserver covers it: an element going from no box to a box is a
+    // resize, so the first desktop layout re-measures. Bailing on an unchanged
+    // value keeps the scroll animation -- which changes maxHeight every frame,
+    // and so fires this -- from re-rendering on every tick.
+    const measure = () => {
+      const measured = el.scrollHeight
+      if (measured > 0) setExpandedHeight(previous => (measured === previous ? previous : measured))
+    }
+
+    measure()
+
+    // Namespaced on `window` so the reference is explicit for both the linter
+    // and a reader: jsdom has no ResizeObserver, and this must degrade to the
+    // mount-time measurement there rather than throwing.
+    if (typeof window === 'undefined' || typeof window.ResizeObserver === 'undefined') return undefined
+    const observer = new window.ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
   }, [eventName, formattedDate, venues])
 
   const collapseStyle = {

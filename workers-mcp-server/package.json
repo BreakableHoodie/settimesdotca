@@ -12,7 +12,7 @@
     "workers-mcp": "0.0.13"
   },
   "devDependencies": {
-    "wrangler": "^4.42.0"
+    "wrangler": "^4.132.0"
   },
   "overrides": {
     "esbuild": "0.28.2"

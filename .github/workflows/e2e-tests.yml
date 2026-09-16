@@ -12,6 +12,12 @@ concurrency:
 
 permissions:
     contents: read
+    # dorny/paths-filter resolves the changed-file list by calling the PR files
+    # API. A public repo's restricted GITHUB_TOKEN can read that anyway; a private
+    # repo's cannot, and the step fails with "Resource not accessible by
+    # integration" in ~8s — which reads like a broken test run, not a permission
+    # gap. Surfaced the day this repo went private (2026-09-16).
+    pull-requests: read
 
 jobs:
     e2e:

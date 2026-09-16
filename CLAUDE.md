@@ -34,12 +34,22 @@ purpose**: the original lived outside the working tree, where a fresh clone,
 CI, or a delegated run would never find it — the same failure as the untracked
 `instructions/` tree in #818.
 
-**Tracked in git, deliberately excluded from the published site** (owner decision,
-2026-08-20). `docs/*.md` is published to docs.settimes.ca regardless of the mkdocs
-`nav`, so the exclusion is what keeps it internal — it is listed in `mkdocs.yml`'s
-`exclude_docs` block. The doc names past security gaps by name, which is what makes
-it useful to us and not something to serve publicly. Do not "fix" the missing nav
-entry by adding one; the file is meant to be absent from the site, not unlinked in it.
+**Tracked in git, and listed in `mkdocs.yml`'s `exclude_docs` block** (owner
+decision, 2026-08-20). Why that block matters has changed; that it matters has
+not. While the docs were published it was load-bearing: `docs/*.md` shipped to
+docs.settimes.ca regardless of the mkdocs `nav`, so `exclude_docs` — not the
+absent nav entry — was the only thing keeping this file off the public site.
+
+**Nothing is published now.** The Pages site was retired on 2026-09-16, when the
+repo went private and GitHub Pages stopped being available to it; see
+`.github/workflows/docs-site.yml`, which records the cause and the restore path.
+So the exclusion currently guards nothing.
+
+Keep it regardless, and do not drop it on the grounds that there is no site to
+exclude from — it is the control that has to be in place *before* publishing
+returns, not after, and this doc names past security gaps by name. Do not "fix"
+the missing nav entry by adding one either; the file is meant to be absent from
+the site, not merely unlinked in it.
 
 **Cadence: at the start of a release cycle, or roughly quarterly — whichever
 comes first.** It is deliberately not a per-PR gate. It reads the whole tree and

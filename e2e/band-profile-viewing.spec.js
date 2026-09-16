@@ -181,8 +181,13 @@ test.describe("Band Profile Viewing", () => {
     // .first() on the union: `or()` can resolve to several elements, and
     // isVisible() on a multi-match locator raises a strict-mode error rather
     // than returning false.
-    // Scoped to <main>: Footer.jsx contains the word "Website", so
-    // `a:has-text("Website")` matches site chrome on every page.
+    // Scoped to <main>, not the page. Footer.jsx no longer contains the word
+    // "Website" — the credit line that did was removed — but the scope stays.
+    // Site chrome lives outside <main> by construction, so an unscoped
+    // `a:has-text("Website")` would silently start matching chrome again the
+    // moment any header or footer copy uses the word, and the failure would
+    // look like a passing test. Same collision class as the instagram.com
+    // locator above, which the footer DOES still satisfy via @settimes.ca.
     const main = page.locator("main");
     const websiteLink = main
       .locator('a[data-testid="band-website"]')

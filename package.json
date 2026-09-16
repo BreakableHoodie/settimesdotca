@@ -30,7 +30,7 @@
     "@eslint/compat": "^2.1.1",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.63.0",
-    "@vitest/coverage-v8": "^5.0.0",
+    "@vitest/coverage-v8": "^4.1.11",
     "acorn": "^8.18.0",
     "baseline-browser-mapping": "^2.11.21",
     "better-sqlite3": "^13.0.3",
@@ -41,8 +41,9 @@
     "eslint-plugin-react-hooks": "7.1.1",
     "globals": "^17.12.0",
     "prettier": "^3.9.6",
+    "semver": "^7.8.5",
     "vite": "^8.2.2",
-    "vitest": "^5.0.0"
+    "vitest": "^4.1.11"
   },
   "dependencies": {
     "csrf-csrf": "^4.0.3",

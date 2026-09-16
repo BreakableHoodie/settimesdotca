@@ -329,7 +329,12 @@ Canonical active roadmap: `docs/ROADMAP.md`. Use it for handoffs between Claude,
 - **Storage**: Cloudflare R2 (band photos)
 - **Email**: Postmark/Resend/MailChannels
 - **Tests**: Vitest (unit, frontend), Playwright (E2E + a11y + visual regression)
-- **CI/CD**: GitHub Actions (13 workflows), CodeQL, Dependabot
+- **CI/CD**: GitHub Actions (9 workflows), Dependabot, Snyk, GitGuardian, CodeRabbit
+  (`codeql.yml`, `secret-scan.yml`, `semgrep.yml` and `dependency-review.yml` were
+  removed 2026-09-16. Name the **files**, not the tools: gitleaks still runs inside
+  CodeRabbit and the Semgrep GitHub App still posts a check, so "we removed gitleaks
+  and Semgrep" is false twice over — see "The security tooling this repo actually
+  has" under Security Notes)
 
 ---
 
@@ -1422,12 +1427,23 @@ The exclusion itself is correct and deliberate — `.coderabbit.yaml` sets
 message lists the pattern twice for that reason). A lockfile diff is generated
 hashes; line-level review of it is noise.
 
-**So for a dependency change, read `dependency-review`, not CodeRabbit.** That is
-the check designed for the class, and it passed on #1083 alongside gitleaks and
-GitGuardian.
+**So for a LOCKFILE-ONLY dependency change, do not read CodeRabbit — read Snyk's
+PR check and the Dependabot alerts.** The qualifier is load-bearing: CodeRabbit
+skips a PR only when **every** changed file is excluded, so a dependency bump that
+also touches `package.json`, a workflow or application code stays fully in its
+review scope, and Snyk plus Dependabot do not substitute for reading that code.
+Check what the PR actually changed before deciding CodeRabbit had nothing to say.
+This used to say `dependency-review`, which was the
+check designed for the class and which passed on #1083 alongside gitleaks and
+GitGuardian. **That workflow no longer exists** (removed 2026-09-16 — see "The
+security tooling this repo actually has"), so the advisory half of the job falls
+to Snyk and Dependabot. Both still work on a private Free-plan repo: the very
+push that made this repo private was answered with *"GitHub found 3
+vulnerabilities on BreakableHoodie/settimesdotca's default branch"*, which is
+Dependabot alerting on a private repo — verified, not assumed.
 
-**But be precise about what it covers, because two different threats hide behind
-one green badge.** `dependency-review` compares the PR's dependency changes
+**But be precise about what an advisory check covers, because two different
+threats hide behind one green badge.** It compares the PR's dependency changes
 against advisory databases and fails on a package with a *known* vulnerability at
 or above its configured severity. That is the #1083 case exactly, and it is
 genuinely covered.
@@ -1446,8 +1462,10 @@ host and a second is a deliberate diff.
 
 Mutation-verified against the real attack shape: repointing one entry's
 `resolved` at another host while leaving `version` untouched -- which raises no
-advisory, so `dependency-review` stays green -- turns the guard red and names the
-package. Lockfiles are discovered rather than listed, so a new workspace is
+advisory, so an advisory check stays green -- turns the guard red and names the
+package. That guard is now MORE load-bearing than when it was written: it is a
+plain test in the suite, so unlike the checks removed on 2026-09-16 it does not
+depend on a GitHub plan tier. Lockfiles are discovered rather than listed, so a new workspace is
 covered the day it appears.
 
 The practical split: routine generated churn (a Dependabot group bump, a
@@ -1594,6 +1612,52 @@ gh pr create --label "bug,priority:p1"   # example
 - Session invalidation: `lucia.invalidateUserSessions(userId)` must be called before `lucia.createSession(user.id, {})` on re-authentication (login, MFA verify). This kills stale sessions from prior compromised contexts. Both methods live on the object returned by `initializeLucia()` in `functions/utils/auth.js`.
 - CSRF cookie must be regenerated whenever a new session is created (see `functions/api/admin/sessions/revoke-all.js`).
 - `params.id` from Cloudflare Pages Functions URL params is a string; always run it through `validateId()` from `functions/utils/validation.js` before using it in a DB query.
+
+### The security tooling this repo actually has (2026-09-16)
+
+Four workflows were removed on 2026-09-16 — `codeql.yml`, `secret-scan.yml`
+(gitleaks), `semgrep.yml` and `dependency-review.yml`. **None of them could work
+any more, and every one had been failing on every PR.** This repository went
+private that day, and on the **Free** plan a private repo has no GitHub Advanced
+Security, which is what all four ultimately depended on: three wrote to code
+scanning, and `dependency-review` says so in its own error — *"Dependency review
+is not supported on this repository ... along with GitHub Advanced Security"*.
+
+**A permanently red check is worse than no check.** It is the mirror image of the
+green-means-did-not-look class catalogued elsewhere in this file: red that always
+means nothing teaches you to stop reading red.
+
+**What still runs, each verified on a private Free-plan repo rather than assumed:**
+
+| Concern | Covered by | How we know it works here |
+|---|---|---|
+| Secrets | GitGuardian; CodeRabbit's own gitleaks pass (`.coderabbit.yaml`) | GitGuardian passed on #1171 and #1172 after the privacy change |
+| Dependency advisories | Snyk PR check; Dependabot alerts + security updates | the push that privatised the repo was answered with *"GitHub found 3 vulnerabilities on …'s default branch"* |
+| Lockfile tampering | `scripts/__tests__/lockfileIntegrity.test.js` | a plain test in the suite — no plan tier involved, which is now the point |
+| Review | CodeRabbit | passed on both PRs |
+
+**The trap this left behind is live, and it is the reason this section exists.**
+`semgrep-cloud-platform/scan` is posted by the Semgrep **GitHub App**, not by the
+deleted workflow, so it still reports **pass** on every PR. Do not read that as
+SAST coverage. `semgrep.yml`'s header recorded precisely why it was written:
+
+> the App scans every PR and writes to semgrep.dev, but the org's rules sit in
+> the Rule Board's *Audit* column — which records to the dashboard and posts
+> nothing. The result was a green `semgrep-cloud-platform/scan` check with 0
+> annotations, 48 findings nobody had seen, and no comment from the bot in the
+> repo's entire history.
+
+Deleting the workflow restores that exact state. **So there is currently one
+green check on every PR that means nothing, and CodeQL's SAST is gone with it.**
+That is the single real hole left by this change; everything else above was
+genuinely replaced.
+
+Tracked in **#1173**, whose shape is `semgrep ci --json` failing the job on
+findings *in the repository* rather than depending on a dashboard column — the
+same reasoning that produced the original workflow. Do not close it by moving
+the Rule Board to "Comment": that is the dashboard setting the original
+deliberately refused to rely on, being not in git, not reviewable in a PR, and
+silently reversible by anyone with account access.
 
 ### Content-Security-Policy (strict, no `unsafe-inline`) — TWO sources
 

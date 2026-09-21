@@ -40,7 +40,7 @@ export E2E_ADMIN_EMAIL
 export E2E_ADMIN_PASSWORD
 
 .PHONY: coverage-drift help install build dev format format-check lint lint-md lint-sh lint-yaml lint-sql lint-json \
-	lint-all test test-backend test-frontend mutation-gate coverage-floor gate review review-wip validate-openapi schema-check \
+	lint-all check-citations test test-backend test-frontend mutation-gate coverage-floor gate review review-wip validate-openapi schema-check \
 	probe-links e2e e2e-setup e2e-serve e2e-run e2e-clean hooks delegate-stats
 
 # CodeRabbit emits PostHog telemetry errors when egress is blocked. They are
@@ -154,6 +154,9 @@ lint-json: ## assert every JSON file parses (tracked + untracked, minus gitignor
 
 lint-all: lint lint-md lint-sh lint-yaml lint-sql lint-json ## every linter, all file types
 
+check-citations: ## Fail if CLAUDE.md cites a repo path that no longer exists (fast, offline)
+	node scripts/check-claude-md-citations.mjs
+
 test-backend: ## Backend unit tests (better-sqlite3; runs fine on Apple Silicon, a few seconds)
 	npm test
 
@@ -175,7 +178,7 @@ coverage-drift: ## Fail if coverage thresholds have drifted below actual (runs b
 	npm run test:coverage --prefix frontend
 	node scripts/check-coverage-drift.mjs frontend
 
-gate: format format-check lint-all test build ## FULL pre-commit gate — run before every commit
+gate: format format-check lint-all check-citations test build ## FULL pre-commit gate — run before every commit
 
 hooks: ## Install the tracked git hooks (pre-push CodeRabbit rate-limit guard)
 	@git config core.hooksPath .githooks

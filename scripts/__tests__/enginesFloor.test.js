@@ -97,4 +97,20 @@ describe("engines.node covers the APIs the code actually uses", () => {
           .join("\n"),
     ).toBe(true);
   });
+
+  // The floor must also fit the TEST RUNNER, not just the code (#1176 review).
+  // vitest 5 requires ^22.12 || ^24 || >=26 while engines still said >=20.11:
+  // on Node 20 or 23 the suite failed to start, with no version error, and CI
+  // (Node 22) could never surface it -- the same shape as #1121. Read from the
+  // INSTALLED manifests, so a future bump that narrows support fails here.
+  it.each(["vitest", "@vitest/coverage-v8"])("engines.node fits what %s supports", (pkg) => {
+    const manifest = JSON.parse(readFileSync(join(repoRoot, "node_modules", pkg, "package.json"), "utf8"));
+    const supported = manifest.engines?.node;
+    if (!supported) return; // the package states no requirement
+    expect(
+      semver.subset(declared, supported),
+      `engines.node "${declared}" admits Node versions ${pkg}@${manifest.version} does not support ` +
+        `("${supported}"). Narrow engines.node to fit.`,
+    ).toBe(true);
+  });
 });

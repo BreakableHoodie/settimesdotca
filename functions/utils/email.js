@@ -30,7 +30,11 @@ export function isEmailConfigured(env) {
   return true;
 }
 
-export async function sendEmail(env, { to, subject, html, text }) {
+export async function sendEmail(env, { to, subject, html, text, idempotencyKey }) {
+  if (idempotencyKey !== undefined && (typeof idempotencyKey !== "string" || idempotencyKey.length > 256)) {
+    throw new Error("idempotencyKey must be a string of 256 characters or fewer");
+  }
+
   const provider = getProvider(env);
   const from = getFrom(env);
 
@@ -51,6 +55,10 @@ export async function sendEmail(env, { to, subject, html, text }) {
   }
 
   if (provider === "postmark") {
+    if (idempotencyKey !== undefined) {
+      // Postmark has no provider-side equivalent, so only Resend receives this key.
+      logger.debug("email idempotency key is unsupported by provider", { provider: "postmark" });
+    }
     const token = env?.POSTMARK_API_TOKEN;
     logger.info("email provider selected", { provider: "postmark" });
 
@@ -108,6 +116,10 @@ export async function sendEmail(env, { to, subject, html, text }) {
   }
 
   if (provider === "mailchannels") {
+    if (idempotencyKey !== undefined) {
+      // MailChannels has no provider-side equivalent, so only Resend receives this key.
+      logger.debug("email idempotency key is unsupported by provider", { provider: "mailchannels" });
+    }
     logger.info("email provider selected", { provider: "mailchannels" });
 
     const payload = {
@@ -181,6 +193,7 @@ export async function sendEmail(env, { to, subject, html, text }) {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
+          ...(idempotencyKey !== undefined ? { "Idempotency-Key": idempotencyKey } : {}),
         },
         body: JSON.stringify(payload),
       });
@@ -199,6 +212,24 @@ export async function sendEmail(env, { to, subject, html, text }) {
     });
 
     if (!response.ok) {
+      if (response.status === 409) {
+        let errorBody;
+        try {
+          errorBody = await response.json();
+        } catch {
+          errorBody = undefined;
+        }
+
+        if (errorBody?.name === "invalid_idempotent_request") {
+          logger.warn("Resend deduplicated an email", { provider: "resend", key: idempotencyKey });
+          return { delivered: true, deduplicated: true };
+        }
+
+        if (errorBody?.name === "concurrent_idempotent_requests") {
+          return { delivered: false, reason: "concurrent_idempotent_request" };
+        }
+      }
+
       logger.warn("email delivery failed", {
         provider: "resend",
         status: response.status,

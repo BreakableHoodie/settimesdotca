@@ -168,6 +168,7 @@ export async function notifySubscribers(env, DB, { eventId, kind, eventName, eve
     const result = await sendEmail(env, {
       to: sub.email,
       subject,
+      idempotencyKey: `subscriber:${eventId}:${kind}:${sub.id}`,
       text: `${lead}\n\n${eventName}: ${eventUrl}\n\nUnsubscribe: ${unsubUrl}`,
       html:
         `<p>${escapeHtml(lead)}</p>` +

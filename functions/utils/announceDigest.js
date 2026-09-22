@@ -29,6 +29,14 @@ import { getPublicBaseUrl } from "./publicUrl.js";
 
 const SEND_CONCURRENCY = 8;
 
+export async function buildAnnounceDigestIdempotencyKey(email, performanceIds) {
+  const sortedIds = performanceIds.map((id) => String(id)).sort();
+  const material = `${email}|${sortedIds.join(",")}`;
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(material));
+  const hash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `announce-digest:${hash}`;
+}
+
 export async function flushAnnounceDigest(env, DB) {
   const publicUrl = getPublicBaseUrl(env);
 
@@ -195,7 +203,17 @@ export async function flushAnnounceDigest(env, DB) {
         ? `<p><strong>${escapeHtml(bands[0])}</strong> is now on the lineup for <strong>${escapeHtml(event_name)}</strong>.</p><p><a href="${eventUrl}">View the schedule</a></p><p style="font-size:0.85em">${unsubHtml}</p>`
         : `<p><strong>${bands.length} bands you follow</strong> just joined the lineup for <strong>${escapeHtml(event_name)}</strong>:</p><ul>${bandListHtml}</ul><p><a href="${eventUrl}">View the schedule</a></p><p style="font-size:0.85em">${unsubHtml}</p>`;
 
-    sendTasks.push({ email, subject, text, html, claimed });
+    sendTasks.push({
+      email,
+      subject,
+      text,
+      html,
+      claimed,
+      idempotencyKey: await buildAnnounceDigestIdempotencyKey(
+        email,
+        claimed.map((item) => item.performance_id),
+      ),
+    });
   }
 
   // ── Phase B (bounded concurrency) ────────────────────────────────────────
@@ -221,6 +239,7 @@ export async function flushAnnounceDigest(env, DB) {
         subject: task.subject,
         text: task.text,
         html: task.html,
+        idempotencyKey: task.idempotencyKey,
       });
     } catch (sendError) {
       // A throw from sendEmail is a delivery failure like any other and must

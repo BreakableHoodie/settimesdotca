@@ -846,11 +846,13 @@ by a `try` (by brace depth, so a try block that *ended* earlier in the same
 function does not count), asserts it still finds at least three, and asserts its
 own detector can return **false** -- otherwise every case passes vacuously.
 
-The remaining window is the provider's: a send confirmed by the provider whose
-local record is lost stays retryable. **#1153** tracks the real fix, a
-provider-side idempotency key, which has to be keyed per *task* in
-`announceDigest.js` (one email covers several claimed rows) and per
-`(performance, follower)` in `bandFollowNotify.js`.
+The provider window is closed on the Resend path by an `Idempotency-Key`: band
+follow mail uses `band-follow:<performanceId>:<followerId>`, subscriber mail uses
+`subscriber:<eventId>:<kind>:<subscriptionId>`, and each digest email uses
+`announce-digest:<sha256>` over its recipient and sorted performance ids. Resend
+maps `invalid_idempotent_request` to delivered/deduplicated and
+`concurrent_idempotent_requests` to undelivered, so the lease retry remains safe.
+Postmark and MailChannels do not receive the key because they have no equivalent.
 
 ## Band Announcements
 

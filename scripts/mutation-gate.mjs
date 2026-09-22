@@ -118,6 +118,24 @@ export const MUTATIONS = [
     tests: ["functions/utils/__tests__/bandFollowNotify.test.js"],
   },
   {
+    id: "resend-idempotent-duplicate-is-delivered",
+    invariant:
+      "CLAUDE.md 'A claim is not a delivery record (#1152)' — Resend invalid_idempotent_request means the email already exists and must count as delivered",
+    file: "functions/utils/email.js",
+    find: "return { delivered: true, deduplicated: true };",
+    replace: 'return { delivered: false, reason: "resend_error" };',
+    tests: ["functions/utils/__tests__/email.test.js"],
+  },
+  {
+    id: "announce-digest-idempotency-key-sorts-performance-ids",
+    invariant:
+      "CLAUDE.md 'A claim is not a delivery record (#1152)' — a digest key is stable for the same task regardless of queue order",
+    file: "functions/utils/announceDigest.js",
+    find: "const sortedIds = performanceIds.map((id) => String(id)).sort();",
+    replace: "const sortedIds = performanceIds.map((id) => String(id));",
+    tests: ["functions/api/admin/bands/__tests__/announce-digest.test.js"],
+  },
+  {
     id: "band-follow-delivered-never-retried",
     invariant:
       "CLAUDE.md 'A claim is not a delivery record (#1152)' — a DELIVERED row is never retried, however old the claim",

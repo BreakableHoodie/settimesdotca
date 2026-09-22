@@ -18,6 +18,10 @@ const SHELL_HEADERS = {
   "Cross-Origin-Opener-Policy": "same-origin",
   "Cross-Origin-Resource-Policy": "same-origin",
   "X-Frame-Options": "DENY",
+  // Representation headers of the STATIC shell. They must NOT survive onto
+  // the rewritten body (headersForRewrittenShell).
+  ETag: '"static-shell-etag"',
+  "Last-Modified": "Tue, 01 Sep 2026 00:00:00 GMT",
 };
 
 function headOf(html) {
@@ -47,9 +51,14 @@ describe("GET / — current event links", () => {
 
     expect(html).toContain('<a href="/event/lwbc18">Long Weekend Band Crawl</a>');
     expect(headOf(html)).toBe(headOf(await asset.text()));
+    const REPRESENTATION = new Set(["etag", "last-modified", "content-length", "content-encoding"]);
     for (const [name, value] of asset.headers) {
+      if (REPRESENTATION.has(name.toLowerCase())) continue;
       expect(response.headers.get(name), name).toBe(value);
     }
+    // The body changed, so the shell's validators must not be reused.
+    expect(response.headers.get("ETag")).toBeNull();
+    expect(response.headers.get("Last-Modified")).toBeNull();
     expect(response.headers.get("Cache-Control")).toBe("public, max-age=0, must-revalidate");
   });
 

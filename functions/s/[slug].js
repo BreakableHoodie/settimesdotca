@@ -3,6 +3,7 @@
 // meta tags — React Helmet only runs client-side and crawlers won't see it.
 
 import { publicEventStatusSql } from "../utils/eventVisibility.js";
+import { headersForRewrittenShell } from "../utils/ssrMeta.js";
 
 // Pin og:url to the production host so preview deploys (*.pages.dev) don't
 // self-canonicalise — same class of bug as #443.
@@ -153,9 +154,9 @@ export async function onRequest(context) {
 
   const injected = html.replace("</head>", `    ${metaTags}\n  </head>`);
 
-  // Preserve original headers (CSP, ETag, etc.) and override content-type and cache
-  const headers = new Headers(indexResponse.headers);
-  headers.set("Content-Type", "text/html;charset=UTF-8");
+  // Preserve the shell's policy headers (CSP, etc.) but NOT its ETag and other
+  // representation headers -- the body is rewritten (headersForRewrittenShell).
+  const headers = headersForRewrittenShell(indexResponse.headers);
   headers.set("Cache-Control", "public, max-age=300");
 
   return new Response(injected, { headers });

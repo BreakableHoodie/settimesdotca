@@ -1,6 +1,6 @@
 import { eventLocalFestivalToday } from "./utils/eventDay.js";
 import { concludedEventSql, publishedEventStatusSql } from "./utils/eventVisibility.js";
-import { escapeAttr } from "./utils/ssrMeta.js";
+import { escapeAttr, headersForRewrittenShell } from "./utils/ssrMeta.js";
 
 const CURRENT_EVENT_MARKER = "<!-- current-event-links -->";
 
@@ -32,8 +32,9 @@ export async function onRequestGet(context) {
     const links = events
       .map((event) => `<li><a href="/event/${escapeAttr(event.slug)}">${escapeAttr(event.name)}</a></li>`)
       .join("");
-    const headers = new Headers(assetResponse.headers);
-    headers.set("Content-Type", "text/html;charset=UTF-8");
+    // Policy headers (CSP, Cache-Control, ...) carried over unchanged; the
+    // shell's ETag/Content-Length are NOT, because this body is different.
+    const headers = headersForRewrittenShell(assetResponse.headers);
 
     return new Response(html.replace(CURRENT_EVENT_MARKER, links), {
       status: assetResponse.status,

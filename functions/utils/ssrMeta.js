@@ -137,6 +137,26 @@ const DEFAULT_META_RE =
 // (for pages that need multiple schemas, e.g. MusicEvent + BreadcrumbList); title
 // sets <title>. Returns the rewritten HTML Response, or falls back to the raw asset
 // on failure. Existing single-object callers are unaffected.
+// Headers that describe the static shell's exact BYTES, not the page. Every
+// SSR handler rewrites the shell's body, so copying these would label the new
+// body with the old one's validators: a stale ETag/Last-Modified lets a cache
+// revalidate against content it no longer has, and a stale Content-Length or
+// Content-Encoding describes a body that is not the one being sent. Caught on
+// #1163, where the homepage served the shell's ETag with the injected links.
+const REPRESENTATION_HEADERS = ["etag", "last-modified", "content-length", "content-encoding"];
+
+/**
+ * Copy a static shell's headers (CSP, HSTS, COOP/CORP, frame options, cache
+ * policy) onto a response whose BODY has been rewritten -- minus the headers
+ * that only describe the original bytes.
+ */
+export function headersForRewrittenShell(sourceHeaders) {
+  const headers = new Headers(sourceHeaders);
+  for (const name of REPRESENTATION_HEADERS) headers.delete(name);
+  headers.set("Content-Type", "text/html;charset=UTF-8");
+  return headers;
+}
+
 export async function serveWithInjectedMeta(context, { title = null, metaTags = [], jsonLd = null } = {}) {
   const { request, env } = context;
   try {
@@ -164,9 +184,8 @@ export async function serveWithInjectedMeta(context, { title = null, metaTags = 
     }
     const injected = html.replace("</head>", `    ${headParts.join("\n    ")}\n  </head>`);
 
-    // Preserve the asset's headers (CSP, etc.); override content-type + cache.
-    const headers = new Headers(indexResponse.headers);
-    headers.set("Content-Type", "text/html;charset=UTF-8");
+    // Preserve the asset's policy headers (CSP, etc.); override cache.
+    const headers = headersForRewrittenShell(indexResponse.headers);
     headers.set("Cache-Control", "public, max-age=300");
     return new Response(injected, { headers });
   } catch (err) {

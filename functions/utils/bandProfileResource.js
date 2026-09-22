@@ -4,6 +4,7 @@ import {
   FIELD_LIMITS,
   isValidEmail,
   isValidTime,
+  normalizeOptionalVenueId,
   safeReflectSocialLinks,
   sanitizeOptionalHttpUrl,
   sanitizeOptionalText,
@@ -25,8 +26,17 @@ export async function onRequestProfilePut(context, { performanceId, body, bandPr
     // bindings that read like fields being silently dropped on save.
     const { venueId, name, startTime, endTime, contact_email, photo_url, notes } = body;
 
-    const normalizedVenueId =
-      venueId === undefined ? undefined : !venueId || Number(venueId) <= 0 ? null : Number(venueId);
+    let normalizedVenueId;
+    if (venueId !== undefined) {
+      const venueIdCheck = normalizeOptionalVenueId(venueId);
+      if (!venueIdCheck.valid) {
+        return new Response(JSON.stringify({ error: "Validation error", message: "Invalid venue ID" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      normalizedVenueId = venueIdCheck.value;
+    }
     let resolvedPhotoUrl;
     let resolvedNotes;
     try {

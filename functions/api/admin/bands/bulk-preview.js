@@ -1,6 +1,6 @@
 import { checkPermission } from "../_middleware.js";
 import { detectBulkConflicts } from "../../../utils/timeConflicts.js";
-import { validateIdArray, isValidTime } from "../../../utils/validation.js";
+import { validateId, validateIdArray, isValidTime } from "../../../utils/validation.js";
 import { parseJsonObjectBody } from "../../../utils/request.js";
 
 const MAX_BULK_PREVIEW_IDS = 200;
@@ -82,7 +82,15 @@ export async function onRequestPost(context) {
     });
 
   if (action === "move_venue") {
-    const { venue_id } = params;
+    // Same rule as bulk.js's move_venue: never bind the raw value.
+    const venueIdCheck = validateId(params.venue_id);
+    if (!venueIdCheck.valid) {
+      return new Response(JSON.stringify({ error: "Invalid venue ID" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    const venue_id = venueIdCheck.value;
     const venue = await env.DB.prepare("SELECT name FROM venues WHERE id = ?").bind(venue_id).first();
 
     if (!venue) {

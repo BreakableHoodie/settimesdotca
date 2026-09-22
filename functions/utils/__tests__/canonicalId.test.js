@@ -49,11 +49,11 @@ describe("isCanonicalPositiveId", () => {
     expect(isCanonicalPositiveId(v)).toBe(false);
   });
 
-  // The reason this helper exists rather than reusing validateId. If these ever
-  // agree, one of them has been changed and a route is silently resolving hex.
+  // The reason this helper exists rather than reusing validateId: canonical IDs
+  // also reject leading zeros, while values already meant to be IDs may not.
   it("is STRICTER than validateId, which accepts the exotic forms", () => {
-    for (const v of ["1e2", "0x10"]) {
-      expect(validateId(v).valid, `validateId should still accept ${v}`).toBe(true);
+    for (const v of ["01"]) {
+      expect(validateId(v).valid, `validateId should accept decimal ${v}`).toBe(true);
       expect(isCanonicalPositiveId(v), `isCanonicalPositiveId must reject ${v}`).toBe(false);
     }
     // And they agree on the ordinary case.

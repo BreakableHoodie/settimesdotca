@@ -74,7 +74,7 @@ describe('AuditLogTab', () => {
   })
 
   it('filters server-side, not in the browser', async () => {
-    auditLogApi.list.mockResolvedValue({ logs: [entry()], total: 1 })
+    auditLogApi.list.mockResolvedValue({ logs: [entry()], total: 1, resourceTypes: ['event'] })
     render(<AuditLogTab showToast={vi.fn()} />)
     await screen.findByRole('table')
 
@@ -88,7 +88,7 @@ describe('AuditLogTab', () => {
   })
 
   it('returns to the first page when a filter changes', async () => {
-    auditLogApi.list.mockResolvedValue({ logs: [entry()], total: 500 })
+    auditLogApi.list.mockResolvedValue({ logs: [entry()], total: 500, resourceTypes: ['venue'] })
     render(<AuditLogTab showToast={vi.fn()} />)
     await screen.findByRole('table')
 
@@ -146,6 +146,18 @@ describe('AuditLogTab — review findings (#1144)', () => {
     expect(within(select).getByRole('option', { name: 'event.archived' })).toBeInTheDocument()
   })
 
+  it('offers resource types the SERVER reports, including types outside the legacy list', async () => {
+    auditLogApi.list.mockResolvedValue({
+      logs: [entryFor({ resourceType: 'invite_code' })],
+      total: 1,
+      resourceTypes: ['band', 'invite_code'],
+    })
+    render(<AuditLogTab showToast={vi.fn()} />)
+    await screen.findByRole('table')
+
+    expect(within(screen.getByLabelText('Resource')).getByRole('option', { name: 'invite_code' })).toBeInTheDocument()
+  })
+
   it('filters by user, server-side', async () => {
     usersApi.getAll.mockResolvedValue([{ id: 7, name: 'Sam', email: 's@x.co' }])
     auditLogApi.list.mockResolvedValue({ logs: [entryFor()], total: 1, availableActions: [] })
@@ -165,13 +177,16 @@ describe('AuditLogTab — review findings (#1144)', () => {
     const first = new Promise(resolve => {
       releaseFirst = () => resolve({ logs: [entryFor({ action: 'STALE' })], total: 999, availableActions: [] })
     })
-    auditLogApi.list
-      .mockReturnValueOnce(first)
-      .mockResolvedValue({ logs: [entryFor({ action: 'CURRENT' })], total: 1, availableActions: [] })
+    auditLogApi.list.mockReturnValueOnce(first).mockResolvedValue({
+      logs: [entryFor({ action: 'CURRENT' })],
+      total: 1,
+      availableActions: [],
+      resourceTypes: ['event'],
+    })
 
     render(<AuditLogTab showToast={vi.fn()} />)
-    // Second request supersedes the first while it is still in flight.
-    fireEvent.change(screen.getByLabelText('Resource'), { target: { value: 'event' } })
+    // A refresh supersedes the first request while it is still in flight.
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
     await screen.findByRole('table')
     expect(screen.getByRole('table')).toHaveTextContent('CURRENT')
 

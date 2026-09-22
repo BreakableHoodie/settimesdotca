@@ -18,10 +18,6 @@ import { auditLogApi, usersApi } from '../utils/adminApi'
  */
 const PAGE_SIZE = 50
 
-// Resource types the log actually contains, so the filter offers real choices
-// rather than a free-text box that mostly returns nothing.
-const RESOURCE_TYPES = ['band', 'event', 'venue', 'user']
-
 // Coarse grouping for the colour of the action pill. Deliberately by VERB, not
 // by resource: when scanning for "what happened", a deletion matters more than
 // which table it happened in.
@@ -65,6 +61,7 @@ function AuditLogTab({ showToast }) {
   // selected -- and the older an action, the less selectable it was, which is
   // backwards for an audit log.
   const [availableActions, setAvailableActions] = useState([])
+  const [resourceTypes, setResourceTypes] = useState([])
 
   // Monotonic request id. Filters and paging fire overlapping requests, and
   // without this an EARLIER response arriving late overwrites a newer one --
@@ -89,6 +86,7 @@ function AuditLogTab({ showToast }) {
       setLogs(data.logs ?? [])
       setTotal(data.total ?? 0)
       if (Array.isArray(data.availableActions)) setAvailableActions(data.availableActions)
+      setResourceTypes(Array.isArray(data.resourceTypes) ? data.resourceTypes : [])
     } catch (err) {
       if (requestSeq.current !== seq) return
       // Surfaced, never swallowed: an empty table and a failed fetch look
@@ -169,7 +167,7 @@ function AuditLogTab({ showToast }) {
             className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden"
           >
             <option value="">All resources</option>
-            {RESOURCE_TYPES.map(r => (
+            {resourceTypes.map(r => (
               <option key={r} value={r}>
                 {r}
               </option>

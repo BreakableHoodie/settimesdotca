@@ -143,11 +143,15 @@ export async function onRequestGet(context) {
     // Unfiltered on purpose: these are the choices AVAILABLE, so narrowing them
     // by the active filter would let one selection erase the others.
     const { results: actionRows } = await DB.prepare("SELECT DISTINCT action FROM audit_log ORDER BY action").all();
+    const { results: resourceTypeRows } = await DB.prepare(
+      "SELECT DISTINCT resource_type FROM audit_log WHERE resource_type IS NOT NULL ORDER BY resource_type",
+    ).all();
 
     return new Response(
       JSON.stringify({
         logs: parsedLogs,
         availableActions: (actionRows || []).map((r) => r.action),
+        resourceTypes: (resourceTypeRows || []).map((r) => r.resource_type),
         total,
         limit,
         offset,

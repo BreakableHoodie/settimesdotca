@@ -7,6 +7,7 @@ import {
   FIELD_LIMITS,
   isValidEmail,
   isValidTime,
+  normalizeOptionalVenueId,
   safeReflectSocialLinks,
   safeReflectSocialLinksString,
   sanitizeBandSocialLinks,
@@ -354,7 +355,14 @@ export async function onRequestPost(context) {
     } = body;
 
     const resolvedName = sanitizeString(name || "");
-    const resolvedVenueId = venueId ? Number(venueId) : null;
+    const venueIdCheck = venueId === undefined ? { valid: true, value: null } : normalizeOptionalVenueId(venueId);
+    if (!venueIdCheck.valid) {
+      return new Response(JSON.stringify({ error: "Validation error", message: "Invalid venue ID" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    const resolvedVenueId = venueIdCheck.value ?? null;
     const resolvedDescription = description !== undefined ? sanitizeString(description) || null : null;
     const resolvedGenre = genre !== undefined ? sanitizeString(genre) || null : null;
     let resolvedPhotoUrl;

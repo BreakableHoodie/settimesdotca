@@ -64,7 +64,8 @@ describe("photo upload: the profile write and its audit row are atomic", () => {
     const res = await onRequestPost({ request: upload(profile.id), env, ...editor });
     rawDb.prepare("DROP TRIGGER block_audit").run();
 
-    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(env.BAND_PHOTOS.put).toHaveBeenCalledTimes(1);
+    expect(res.status).toBe(500);
 
     // The point. Without the batch, or without transactional batch semantics,
     // this holds the new URL.

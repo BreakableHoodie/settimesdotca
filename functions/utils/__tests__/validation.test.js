@@ -19,7 +19,54 @@ import {
   safeReflectSocialLinksString,
   sanitizeBandSocialLinks,
   validateDoorsJson,
+  validateId,
+  normalizeOptionalVenueId,
 } from "../validation.js";
+
+describe("validateId", () => {
+  it.each([1, 42, Number.MAX_SAFE_INTEGER, "1", "42", "0003", String(Number.MAX_SAFE_INTEGER)])(
+    "accepts positive safe integer %s",
+    (value) => {
+      expect(validateId(value)).toEqual({ valid: true, value: Number(value), error: undefined });
+    },
+  );
+
+  it.each([
+    true,
+    false,
+    [3],
+    {},
+    "1e0",
+    " 3",
+    "3.0",
+    "0",
+    "",
+    null,
+    undefined,
+    -1,
+    NaN,
+    Infinity,
+    1.5,
+    Number.MAX_SAFE_INTEGER + 1,
+  ])("rejects invalid ID shape %s", (value) => {
+    expect(validateId(value).valid).toBe(false);
+  });
+
+  it("rejects decimal strings whose numeric value is outside the safe integer range", () => {
+    expect(validateId("9007199254740992").valid).toBe(false);
+  });
+});
+
+describe("normalizeOptionalVenueId", () => {
+  it.each([null, "", 0, "0"])("normalizes %s to an unassigned venue", (value) => {
+    expect(normalizeOptionalVenueId(value)).toEqual({ valid: true, value: null, error: undefined });
+  });
+
+  it("delegates positive IDs to validateId", () => {
+    expect(normalizeOptionalVenueId("3")).toEqual({ valid: true, value: 3, error: undefined });
+    expect(normalizeOptionalVenueId(true).valid).toBe(false);
+  });
+});
 
 describe("Email Validation", () => {
   it("should validate correct email formats", () => {

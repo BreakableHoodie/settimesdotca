@@ -254,8 +254,9 @@ Canonical active roadmap: `docs/ROADMAP.md`. Use it for handoffs between Claude,
 - **Tests**: Vitest (unit, frontend), Playwright (E2E + a11y + visual regression)
 - **CI/CD**: GitHub Actions (10 workflows), Dependabot, Snyk, GitGuardian, CodeRabbit
   (`codeql.yml`, `secret-scan.yml` and `dependency-review.yml` were removed
-  2026-09-16; `semgrep.yml` was removed the same day and **rebuilt** without code
-  scanning in #1173. Name the **files**, not the tools: gitleaks still runs inside
+  2026-09-16; `semgrep.yml` was removed the same day and **rebuilt** in #1173 —
+  it still runs Semgrep SAST, but gates in the job itself instead of uploading
+  SARIF to GitHub code scanning. Name the **files**, not the tools: gitleaks still runs inside
   CodeRabbit — see "The security tooling this repo actually has" under Security
   Notes)
 
@@ -1219,7 +1220,7 @@ means nothing teaches you to stop reading red.
 | Dependency advisories | Snyk PR check; Dependabot alerts + security updates | the push that privatised the repo was answered with *"GitHub found 3 vulnerabilities on …'s default branch"* |
 | Lockfile tampering | `scripts/__tests__/lockfileIntegrity.test.js` | a plain test in the suite — no plan tier involved, which is now the point |
 | Review | CodeRabbit | passed on both PRs |
-| SAST | `semgrep.yml` (rebuilt in #1173, Pro ruleset via `SEMGREP_APP_TOKEN`) | a planted finding turned the PR job red and named it (see below) |
+| SAST | `semgrep.yml` (rebuilt in #1173, Pro ruleset via `SEMGREP_APP_TOKEN`) | a planted finding turned the PR job red and named it; the same PR without it went green (#1185) |
 
 **SAST is back, but read the right check.** `semgrep-cloud-platform/scan` is
 posted by the Semgrep **GitHub App** and reports **pass** on every PR no matter

@@ -94,21 +94,26 @@ jobs:
       # registry-only. So a missing secret FAILS the job rather than quietly
       # downgrading to a weaker ruleset and reporting all-clear.
       #
-      # One exception: Dependabot PRs never receive Actions secrets, so the
-      # token is always absent there. Those PRs change dependencies, not
-      # application code, so they SKIP -- loudly, with a notice and a job
-      # summary saying "not scanned", never a silent pass.
+      # Two exceptions, both events that NEVER receive Actions secrets:
+      # Dependabot PRs (dependency changes, not application code) and PRs from
+      # forks (the same rule e2e-tests.yml applies). They SKIP -- loudly, with
+      # a notice and a job summary saying "not scanned", never a silent pass.
       - name: Check for Semgrep token
         id: token
         env:
           SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
           ACTOR: ${{ github.actor }}
+          IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
         run: |
           if [ -n "$SEMGREP_APP_TOKEN" ]; then
             echo "present=true" >> "$GITHUB_OUTPUT"
           elif [ "$ACTOR" = "dependabot[bot]" ]; then
             echo "::notice::Dependabot PR: no Actions secrets, so Semgrep did NOT scan. Dependency advisories are covered by Snyk and Dependabot alerts."
             echo "## Semgrep: NOT SCANNED (Dependabot PR, no token)" >> "$GITHUB_STEP_SUMMARY"
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          elif [ "$IS_FORK_PR" = "true" ]; then
+            echo "::notice::Fork PR: no Actions secrets, so Semgrep did NOT scan. Review this diff for SAST issues by hand."
+            echo "## Semgrep: NOT SCANNED (fork PR, no token)" >> "$GITHUB_STEP_SUMMARY"
             echo "present=false" >> "$GITHUB_OUTPUT"
           else
             echo "::error::SEMGREP_APP_TOKEN is not set. An OSS-only scan would report all-clear while missing every rule that has found a real issue here."

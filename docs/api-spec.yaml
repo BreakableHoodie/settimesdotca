@@ -1923,13 +1923,66 @@ paths:
                         nullable: true
       responses:
         "200":
-          description: Schedule rows updated atomically
+          description: Every row updated in one atomic batch
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  updated:
+                    type: integer
+                  performances:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+                        startTime:
+                          type: string
+                          nullable: true
+                        endTime:
+                          type: string
+                          nullable: true
+                        venueId:
+                          type: integer
+                          nullable: true
+                        performanceDate:
+                          type: string
+                          nullable: true
         "400":
           $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
-          $ref: "#/components/responses/Conflict"
+          description: >-
+            Nothing was written. Either the final arrangement has clashing sets
+            (`conflicts` lists each pair once), or the event was archived
+            between the read and the write (no `conflicts`).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+                  conflicts:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        a:
+                          $ref: "#/components/schemas/GenericRecord"
+                        b:
+                          $ref: "#/components/schemas/GenericRecord"
         "500":
           $ref: "#/components/responses/ServerError"
 

@@ -1153,7 +1153,7 @@ Requires the CodeRabbit CLI (`brew install --cask coderabbit`, then `coderabbit 
 
 Reading CodeRabbit correctly — worked examples in `docs/field-notes/coderabbit.md`:
 
-- **A CLI "as per coding guidelines" finding is unsubstantiated by construction** (it never loaded `.github/instructions/**`). Open the applicable instruction files and grep the *cited wording* before agreeing or declining — a clean grep is a hypothesis (#1048). Passing `-c .github/instructions/*.md` was tried and is **not** adopted.
+- **An "as per coding guidelines" finding from `make review` is unsubstantiated by construction** — that invocation passes no `-c`, so it never loads `.github/instructions/**` (a CLI run given `-c` would). Open the applicable instruction files and grep the *cited wording* before agreeing or declining — a clean grep is a hypothesis (#1048). Passing `-c .github/instructions/*.md` was tried and is **not** adopted.
 - **Green can mean "did not look".** CodeRabbit skips a PR whose every file is path-excluded and still reports pass. For a **lockfile-only** bump, read Snyk and Dependabot instead; `scripts/__tests__/lockfileIntegrity.test.js` guards `resolved` hosts and `integrity` hashes, which no advisory check covers. A lockfile change *not* produced by npm on your machine deserves a human diff read.
 - **Findings are not all in threads.** "Outside diff range" comments and the collapsed "Nitpick comments" live in each review's **body** — a `reviewThreads` query misses both, and a "Trivial" nitpick was once a vacuous test. Read threads *and* bodies.
 

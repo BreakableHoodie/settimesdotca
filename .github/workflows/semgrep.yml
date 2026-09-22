@@ -206,6 +206,11 @@ jobs:
               if rows:
                   f.write("| Location | Rule | Severity |\n|---|---|---|\n" + "\n".join(rows) + "\n")
 
+          # GitHub shows at most 10 annotations per level per step (a main
+          # push with 19 findings displayed 10). The job summary above lists
+          # every finding, so say so rather than let the badge undercount.
+          if len(results) > 10:
+              print(f"::notice::{len(results)} findings; GitHub displays only 10 annotations per step. The full list is in the job summary.")
           print(f"{len(results)} finding(s) {scope}")
           if is_pr and results:
               print("::error::This PR introduces Semgrep findings. Fix them, or suppress one with a `nosemgrep: <rule-id>` comment that states why.")

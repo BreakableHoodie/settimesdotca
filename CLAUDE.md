@@ -849,9 +849,14 @@ own detector can return **false** -- otherwise every case passes vacuously.
 The provider window is closed on the Resend path by an `Idempotency-Key`: band
 follow mail uses `band-follow:<performanceId>:<followerId>`, subscriber mail uses
 `subscriber:<eventId>:<kind>:<subscriptionId>`, and each digest email uses
-`announce-digest:<sha256>` over its recipient and sorted performance ids. Resend
-maps `invalid_idempotent_request` to delivered/deduplicated and
-`concurrent_idempotent_requests` to undelivered, so the lease retry remains safe.
+`announce-digest:<sha256>` over its recipient and sorted performance ids. A
+same-payload retry gets Resend's original success back and sends nothing twice.
+**Both 409s are undelivered.** `concurrent_idempotent_requests` is a send still in
+flight. `invalid_idempotent_request` (same key, different payload) is tempting to
+read as "already sent", but Resend stores a key's first response *whatever it
+was*, so a reused key cannot prove a send; counting it delivered would silently
+drop a follower whose first attempt was rejected. It is logged at `error` and
+retried after the 24h key expiry: a possible late duplicate, never a silent drop.
 Postmark and MailChannels do not receive the key because they have no equivalent.
 
 ## Band Announcements

@@ -322,15 +322,18 @@ describe("sendEmail — Resend", () => {
     expect(result).toEqual({ delivered: false, reason: "resend_error" });
   });
 
-  it("treats Resend invalid_idempotent_request as a delivered deduplication", async () => {
+  // NOT delivered: Resend stores the first response for a key whatever it was,
+  // so a reused key cannot prove an email was sent. Counting it delivered
+  // would risk a silent drop -- the worst shape of mail bug (#1152).
+  it("never counts Resend invalid_idempotent_request as delivered", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => jsonResponse(409, { name: "invalid_idempotent_request" })),
     );
 
-    await expect(sendEmail(env, { ...PAYLOAD, idempotencyKey: "already-sent" })).resolves.toEqual({
-      delivered: true,
-      deduplicated: true,
+    await expect(sendEmail(env, { ...PAYLOAD, idempotencyKey: "reused-key" })).resolves.toEqual({
+      delivered: false,
+      reason: "idempotency_payload_mismatch",
     });
   });
 

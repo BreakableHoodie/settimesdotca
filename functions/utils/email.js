@@ -220,9 +220,20 @@ export async function sendEmail(env, { to, subject, html, text, idempotencyKey }
           errorBody = undefined;
         }
 
+        // Same key, DIFFERENT payload. It is tempting to read this as "already
+        // sent" and count it delivered -- but Resend returns "the same response"
+        // for a reused key, i.e. it stores the first response whatever it was.
+        // If that first attempt was REJECTED (never sent), counting this as
+        // delivered drops the follower permanently and silently: the exact
+        // failure #1152 removed. So it is NOT delivered: logged loudly, and
+        // retried once the 24h key expires. A same-payload retry -- the common
+        // case -- still gets the original success back and sends nothing twice.
         if (errorBody?.name === "invalid_idempotent_request") {
-          logger.warn("Resend deduplicated an email", { provider: "resend", key: idempotencyKey });
-          return { delivered: true, deduplicated: true };
+          logger.error("Resend idempotency key reused with a different payload; not counted as delivered", {
+            provider: "resend",
+            key: idempotencyKey,
+          });
+          return { delivered: false, reason: "idempotency_payload_mismatch" };
         }
 
         if (errorBody?.name === "concurrent_idempotent_requests") {

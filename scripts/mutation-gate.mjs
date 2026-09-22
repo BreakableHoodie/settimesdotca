@@ -118,12 +118,12 @@ export const MUTATIONS = [
     tests: ["functions/utils/__tests__/bandFollowNotify.test.js"],
   },
   {
-    id: "resend-idempotent-duplicate-is-delivered",
+    id: "resend-reused-key-never-counts-as-delivered",
     invariant:
-      "CLAUDE.md 'A claim is not a delivery record (#1152)' — Resend invalid_idempotent_request means the email already exists and must count as delivered",
+      "CLAUDE.md 'A claim is not a delivery record (#1152)' — a reused Resend idempotency key cannot prove a send, so it must never count as delivered",
     file: "functions/utils/email.js",
-    find: "return { delivered: true, deduplicated: true };",
-    replace: 'return { delivered: false, reason: "resend_error" };',
+    find: 'return { delivered: false, reason: "idempotency_payload_mismatch" };',
+    replace: "return { delivered: true };",
     tests: ["functions/utils/__tests__/email.test.js"],
   },
   {

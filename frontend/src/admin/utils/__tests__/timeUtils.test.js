@@ -163,6 +163,16 @@ describe('detectConflicts — overlaps vs exact conflicts', () => {
     expect(result.conflicts).toHaveLength(0)
   })
 
+  it('treats cancelled rows as free on either side, with an active positive control', () => {
+    const cancelled = { ...band(1, '21:00', '22:00'), is_cancelled: 1 }
+    const active = { ...band(2, '21:00', '22:00'), is_cancelled: 0 }
+    expect(noIssues(detectConflicts(cancelled, [cancelled, active]))).toBe(true)
+    expect(noIssues(detectConflicts(active, [cancelled, active]))).toBe(true)
+    expect(
+      detectConflicts({ ...cancelled, is_cancelled: 0 }, [{ ...cancelled, is_cancelled: 0 }, active]).conflicts
+    ).toEqual(['Band 2'])
+  })
+
   // Pins this side of a cross-boundary divergence. `normalizeEndMinutes` here
   // uses `end < start`; functions/utils/timeConflicts.js used `end <= start`,
   // which turned a zero-length set into a 24-hour interval conflicting with

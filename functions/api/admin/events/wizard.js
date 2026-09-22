@@ -26,7 +26,7 @@ import { normalizeBandName } from "../../../utils/bandName.js";
 function findConflict(bands) {
   const byVenue = {};
   for (const b of bands) {
-    if (!b.startTime || !b.endTime) continue;
+    if (b.is_cancelled || !b.startTime || !b.endTime) continue;
     (byVenue[b.venueIndex] ??= []).push(b);
   }
   for (const group of Object.values(byVenue)) {

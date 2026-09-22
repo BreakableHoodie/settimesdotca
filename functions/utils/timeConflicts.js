@@ -48,13 +48,13 @@ export function detectDraftConflicts(rows, { eventDate, changedIds }) {
 
   for (let i = 0; i < rows.length; i += 1) {
     const a = rows[i];
-    if (a.venue_id == null || !a.start_time || !a.end_time) continue;
+    if (a.is_cancelled || a.venue_id == null || !a.start_time || !a.end_time) continue;
     const aDay = festivalDayOf(a);
     const aIntervals = buildIntervals(a.start_time, a.end_time);
 
     for (let j = i + 1; j < rows.length; j += 1) {
       const b = rows[j];
-      if (b.venue_id == null || !b.start_time || !b.end_time || a.venue_id !== b.venue_id) continue;
+      if (b.is_cancelled || b.venue_id == null || !b.start_time || !b.end_time || a.venue_id !== b.venue_id) continue;
       if (!changed.has(a.id) && !changed.has(b.id)) continue;
       const bDay = festivalDayOf(b);
       if (aDay && bDay && aDay !== bDay) continue;
@@ -103,7 +103,7 @@ export async function checkConflicts(
   { eventId, venueId, startTime, endTime, excludePerformanceId = null, performanceDate = null, eventDate = null },
 ) {
   let query = `
-    SELECT p.id, p.start_time, p.end_time, p.performance_date, bp.name
+    SELECT p.id, p.start_time, p.end_time, p.performance_date, p.is_cancelled, bp.name
     FROM performances p
     JOIN band_profiles bp ON p.band_profile_id = bp.id
     WHERE p.event_id = ? AND p.venue_id = ?
@@ -128,7 +128,7 @@ export async function checkConflicts(
   const conflicts = [];
 
   for (const perf of existingPerformances) {
-    if (!perf.start_time || !perf.end_time) continue;
+    if (perf.is_cancelled || !perf.start_time || !perf.end_time) continue;
     const otherDay = perf.performance_date || eventDate;
     if (candidateDay && otherDay && candidateDay !== otherDay) continue;
     const perfIntervals = buildIntervals(perf.start_time, perf.end_time);
@@ -181,7 +181,7 @@ export async function detectBulkConflicts(env, { action, bandIds, params }) {
     // filter out archived-event rows before scheduling-conflict checks. Callers
     // that need archived-event error messages (bulk-preview) handle those separately.
     const page = await env.DB.prepare(
-      `SELECT p.id, p.start_time, p.end_time, p.venue_id, p.event_id, p.performance_date, bp.name, e.status AS event_status, e.date AS event_date
+      `SELECT p.id, p.start_time, p.end_time, p.venue_id, p.event_id, p.performance_date, p.is_cancelled, bp.name, e.status AS event_status, e.date AS event_date
        FROM performances p
        JOIN band_profiles bp ON p.band_profile_id = bp.id
        JOIN events e ON p.event_id = e.id
@@ -247,7 +247,7 @@ export async function detectBulkConflicts(env, { action, bandIds, params }) {
       const chunk = eventIds.slice(i, i + EVENT_ID_CHUNK);
       const eventPh = chunk.map(() => "?").join(", ");
       const rows = await env.DB.prepare(
-        `SELECT p.id, p.event_id, p.start_time, p.end_time, p.performance_date, bp.name, e.date AS event_date
+        `SELECT p.id, p.event_id, p.start_time, p.end_time, p.performance_date, p.is_cancelled, bp.name, e.date AS event_date
          FROM performances p
          JOIN band_profiles bp ON p.band_profile_id = bp.id
          JOIN events e ON p.event_id = e.id
@@ -263,12 +263,12 @@ export async function detectBulkConflicts(env, { action, bandIds, params }) {
 
     // Check each batch member against existing performances at the target venue.
     for (const band of bandResults) {
-      if (!band.start_time || !band.end_time) continue;
+      if (band.is_cancelled || !band.start_time || !band.end_time) continue;
       const bandIntervals = buildIntervals(band.start_time, band.end_time);
       const bandDay = festivalDayOf(band);
       const existing = venuePerformancesByEvent.get(band.event_id) || [];
       for (const other of existing) {
-        if (!other.start_time || !other.end_time) continue;
+        if (other.is_cancelled || !other.start_time || !other.end_time) continue;
         const otherDay = festivalDayOf(other);
         if (bandDay && otherDay && bandDay !== otherDay) continue;
         const otherIntervals = buildIntervals(other.start_time, other.end_time);
@@ -292,13 +292,13 @@ export async function detectBulkConflicts(env, { action, bandIds, params }) {
     // duplicates.
     for (let i = 0; i < bandResults.length; i++) {
       const bandA = bandResults[i];
-      if (!bandA.start_time || !bandA.end_time) continue;
+      if (bandA.is_cancelled || !bandA.start_time || !bandA.end_time) continue;
       const intervalsA = buildIntervals(bandA.start_time, bandA.end_time);
       const dayA = festivalDayOf(bandA);
 
       for (let j = i + 1; j < bandResults.length; j++) {
         const bandB = bandResults[j];
-        if (!bandB.start_time || !bandB.end_time) continue;
+        if (bandB.is_cancelled || !bandB.start_time || !bandB.end_time) continue;
         if (bandA.event_id !== bandB.event_id) continue;
         const dayB = festivalDayOf(bandB);
         if (dayA && dayB && dayA !== dayB) continue;
@@ -326,14 +326,14 @@ export async function detectBulkConflicts(env, { action, bandIds, params }) {
     const changeTimeCache = new Map();
 
     for (const band of bandResults) {
-      if (!band.start_time || !band.end_time || !band.venue_id) continue;
+      if (band.is_cancelled || !band.start_time || !band.end_time || !band.venue_id) continue;
 
       const newEndTime = computeNewEndTime(band.start_time, band.end_time, start_time);
       const cacheKey = changeTimeVenueKey(band.venue_id, band.event_id);
 
       if (!changeTimeCache.has(cacheKey)) {
         const rows = await env.DB.prepare(
-          `SELECT p.id, p.start_time, p.end_time, p.performance_date, bp.name, e.date AS event_date
+          `SELECT p.id, p.start_time, p.end_time, p.performance_date, p.is_cancelled, bp.name, e.date AS event_date
            FROM performances p
            JOIN band_profiles bp ON p.band_profile_id = bp.id
            JOIN events e ON p.event_id = e.id
@@ -356,7 +356,7 @@ export async function detectBulkConflicts(env, { action, bandIds, params }) {
       const bandDay = festivalDayOf(band);
 
       for (const other of existing) {
-        if (!other.start_time || !other.end_time) continue;
+        if (other.is_cancelled || !other.start_time || !other.end_time) continue;
         const otherDay = festivalDayOf(other);
         if (bandDay && otherDay && bandDay !== otherDay) continue;
         const otherIntervals = buildIntervals(other.start_time, other.end_time);
@@ -379,12 +379,12 @@ export async function detectBulkConflicts(env, { action, bandIds, params }) {
     // minimum. One entry per pair to avoid duplicates.
     for (let i = 0; i < bandResults.length; i++) {
       const bandA = bandResults[i];
-      if (!bandA.start_time || !bandA.end_time || !bandA.venue_id) continue;
+      if (bandA.is_cancelled || !bandA.start_time || !bandA.end_time || !bandA.venue_id) continue;
       const dayA = festivalDayOf(bandA);
 
       for (let j = i + 1; j < bandResults.length; j++) {
         const bandB = bandResults[j];
-        if (!bandB.start_time || !bandB.end_time || !bandB.venue_id) continue;
+        if (bandB.is_cancelled || !bandB.start_time || !bandB.end_time || !bandB.venue_id) continue;
         if (bandA.venue_id !== bandB.venue_id || bandA.event_id !== bandB.event_id) continue;
         const dayB = festivalDayOf(bandB);
         if (dayA && dayB && dayA !== dayB) continue;

@@ -296,6 +296,35 @@ export const MUTATIONS = [
     tests: ["functions/api/admin/events/__tests__/schedule.test.js"],
   },
   {
+    id: "uncancel-conflict-check",
+    invariant:
+      "CLAUDE.md 'Pulling a band from a live lineup' — un-cancelling into a slot a replacement now holds is refused, never double-booked",
+    file: "functions/api/admin/bands/[id].js",
+    find: "if (hasCancelled && isCancelled === 0 && performance.is_cancelled === 1) {",
+    replace: "if (false) {",
+    tests: ["functions/api/admin/bands/__tests__/cancel-toggle.test.js"],
+  },
+  {
+    id: "cancelled-rows-never-conflict-draft-b-side",
+    invariant:
+      "CLAUDE.md 'Multi-row schedule saves check the FINAL state (#1161)' — a cancelled row is free when it is the SECOND row of a pair, not only the first",
+    file: "functions/utils/timeConflicts.js",
+    // Survived every test until the pair was also asserted in [active,
+    // cancelled] order -- the a-side guard masked it (CodeRabbit).
+    find: "if (b.is_cancelled || b.venue_id == null || !b.start_time || !b.end_time || a.venue_id !== b.venue_id) continue;",
+    replace: "if (b.venue_id == null || !b.start_time || !b.end_time || a.venue_id !== b.venue_id) continue;",
+    tests: ["functions/utils/__tests__/timeConflicts.test.js"],
+  },
+  {
+    id: "cancelled-rows-never-conflict-draft",
+    invariant:
+      "CLAUDE.md 'Multi-row schedule saves check the FINAL state (#1161)' — cancelled rows never conflict on either side of a draft schedule check",
+    file: "functions/utils/timeConflicts.js",
+    find: "if (a.is_cancelled || a.venue_id == null || !a.start_time || !a.end_time) continue;",
+    replace: "if (a.venue_id == null || !a.start_time || !a.end_time) continue;",
+    tests: ["functions/utils/__tests__/timeConflicts.test.js"],
+  },
+  {
     id: "schedule-save-archive-race",
     invariant:
       "CLAUDE.md 'Multi-row schedule saves check the FINAL state (#1161)' — an event archived mid-request is not written to",

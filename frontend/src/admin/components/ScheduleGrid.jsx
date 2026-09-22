@@ -58,11 +58,7 @@ export default function ScheduleGrid({ bands, venues, eventDate, onSave, saving 
   const draftRows = useMemo(
     () =>
       sortedBands
-        // A cancelled set is not happening, so its slot is FREE. Leaving it in
-        // here made an active set report a conflict against a set nobody is
-        // playing -- and since the cancel toggle is the documented way to pull
-        // a band, that false clash would appear exactly when someone is
-        // rescheduling around a drop-out.
+        // A cancelled set is not happening, so its slot is free for replacements.
         .filter(band => !band.is_cancelled)
         .map(band => {
           const draft = getDraft(band)

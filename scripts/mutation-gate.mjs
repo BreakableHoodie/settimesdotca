@@ -305,6 +305,17 @@ export const MUTATIONS = [
     tests: ["functions/api/admin/bands/__tests__/cancel-toggle.test.js"],
   },
   {
+    id: "cancelled-rows-never-conflict-draft-b-side",
+    invariant:
+      "CLAUDE.md 'Multi-row schedule saves check the FINAL state (#1161)' — a cancelled row is free when it is the SECOND row of a pair, not only the first",
+    file: "functions/utils/timeConflicts.js",
+    // Survived every test until the pair was also asserted in [active,
+    // cancelled] order -- the a-side guard masked it (CodeRabbit).
+    find: "if (b.is_cancelled || b.venue_id == null || !b.start_time || !b.end_time || a.venue_id !== b.venue_id) continue;",
+    replace: "if (b.venue_id == null || !b.start_time || !b.end_time || a.venue_id !== b.venue_id) continue;",
+    tests: ["functions/utils/__tests__/timeConflicts.test.js"],
+  },
+  {
     id: "cancelled-rows-never-conflict-draft",
     invariant:
       "CLAUDE.md 'Multi-row schedule saves check the FINAL state (#1161)' — cancelled rows never conflict on either side of a draft schedule check",

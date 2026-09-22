@@ -119,6 +119,12 @@ describe("detectDraftConflicts", () => {
     expect(detectDraftConflicts([cancelled, active], { eventDate: "2026-08-01", changedIds: new Set([1, 2]) })).toEqual(
       [],
     );
+    // BOTH orders. The pair loop checks row `a` and row `b` with separate
+    // guards; with only [cancelled, active] the `b`-side guard never ran, and
+    // deleting it left every test green (CodeRabbit, cancelled-slot PR).
+    expect(detectDraftConflicts([active, cancelled], { eventDate: "2026-08-01", changedIds: new Set([1, 2]) })).toEqual(
+      [],
+    );
     expect(
       detectDraftConflicts([{ ...cancelled, is_cancelled: 0 }, active], {
         eventDate: "2026-08-01",
@@ -382,6 +388,73 @@ describe("cancelled bulk conflict rows", () => {
       (await detectBulkConflicts(env, { action: "move_venue", bandIds: [moving.id], params: { venue_id: target.id } }))
         .length,
     ).toBeGreaterThan(0);
+  });
+
+  // The pairwise and change_time loops each guard row `a` and row `b`
+  // separately. A test that only ever cancels one of them, or only exercises
+  // move_venue's stored-row loop, leaves the rest deletable with every test
+  // green -- six of twelve guards were, until this block (mutation sweep).
+  function bulkFixture() {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { name: "Bulk Pairs", slug: `bulk-pairs-${Math.random()}`, date: "2026-08-01" });
+    const v1 = insertVenue(rawDb, { name: "V1" });
+    const v2 = insertVenue(rawDb, { name: "V2" });
+    const target = insertVenue(rawDb, { name: "Target" });
+    const mk = (name, venue, start, end) =>
+      insertBand(rawDb, { name, event_id: event.id, venue_id: venue.id, start_time: start, end_time: end });
+    const setCancelled = (row, v) =>
+      rawDb.prepare("UPDATE performances SET is_cancelled = ? WHERE id = ?").run(v, row.id);
+    return { env, v1, v2, target, mk, setCancelled };
+  }
+
+  it("move_venue: a cancelled batch member never pairs, in either position", async () => {
+    const { env, v1, v2, target, mk, setCancelled } = bulkFixture();
+    const first = mk("First", v1, "20:00", "21:00");
+    const second = mk("Second", v2, "20:00", "21:00");
+    const move = () =>
+      detectBulkConflicts(env, {
+        action: "move_venue",
+        bandIds: [first.id, second.id],
+        params: { venue_id: target.id },
+      });
+    expect((await move()).length).toBeGreaterThan(0); // control: both active clash at the target
+    setCancelled(first, 1);
+    expect(await move()).toEqual([]); // cancelled row in position A
+    setCancelled(first, 0);
+    setCancelled(second, 1);
+    expect(await move()).toEqual([]); // cancelled row in position B
+  });
+
+  it("change_time: a cancelled row never conflicts with a stored set, on either side", async () => {
+    const { env, v1, mk, setCancelled } = bulkFixture();
+    const moving = mk("Moving", v1, "18:00", "19:00");
+    const stored = mk("Stored", v1, "20:00", "21:00");
+    const retime = () =>
+      detectBulkConflicts(env, { action: "change_time", bandIds: [moving.id], params: { start_time: "20:00" } });
+    expect((await retime()).length).toBeGreaterThan(0); // control
+    setCancelled(stored, 1);
+    expect(await retime()).toEqual([]); // cancelled stored occupant
+    setCancelled(stored, 0);
+    setCancelled(moving, 1);
+    expect(await retime()).toEqual([]); // cancelled batch member
+  });
+
+  it("change_time: a cancelled batch member never pairs, in either position", async () => {
+    const { env, v1, mk, setCancelled } = bulkFixture();
+    const first = mk("First", v1, "18:00", "19:00");
+    const second = mk("Second", v1, "22:00", "23:00");
+    const retime = () =>
+      detectBulkConflicts(env, {
+        action: "change_time",
+        bandIds: [first.id, second.id],
+        params: { start_time: "20:00" },
+      });
+    expect((await retime()).length).toBeGreaterThan(0); // control: both land on 20:00 at one venue
+    setCancelled(first, 1);
+    expect(await retime()).toEqual([]);
+    setCancelled(first, 0);
+    setCancelled(second, 1);
+    expect(await retime()).toEqual([]);
   });
 });
 

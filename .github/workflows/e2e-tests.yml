@@ -34,8 +34,16 @@ jobs:
                   fetch-depth: 1
                   persist-credentials: false
 
+            # PR-only. On a push every step below runs regardless (each `if:`
+            # starts with `github.event_name == 'push' ||`), so the filter's
+            # output is unused there -- but it still tries to `git fetch` the
+            # push's `before` commit, which this shallow, credential-less
+            # checkout cannot do on a private repo ("could not read Username").
+            # Every push to main failed E2E that way from 2026-09-16 until this
+            # guard; cloudflare-pages.yml's filter carries the same one.
             - name: Run affected tests (fast-path)
               id: affected
+              if: github.event_name == 'pull_request'
               uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
               with:
                   filters: |

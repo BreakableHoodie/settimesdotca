@@ -65,6 +65,7 @@ const EXPECTED_EXPORTS = {
   MAX_BULK_BAND_IDS: "number",
   validateId: "function",
   validateIdArray: "function",
+  normalizeOptionalVenueId: "function",
 
   // Schema engine and response helper
   validateEntity: "function",

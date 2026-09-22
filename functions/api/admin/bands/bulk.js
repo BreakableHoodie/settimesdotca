@@ -2,7 +2,13 @@ import { auditLog, checkPermission } from "../_middleware.js";
 import { auditLogStatement } from "../../../utils/auditLogStatement.js";
 import { getClientIP, parseJsonObjectBody, parseJsonObjectBodyStrict } from "../../../utils/request.js";
 import { computeNewEndTime, detectBulkConflicts } from "../../../utils/timeConflicts.js";
-import { isValidTime, validateIdArray, validateSetTimes, MAX_BULK_BAND_IDS } from "../../../utils/validation.js";
+import {
+  isValidTime,
+  normalizeOptionalVenueId,
+  validateIdArray,
+  validateSetTimes,
+  MAX_BULK_BAND_IDS,
+} from "../../../utils/validation.js";
 
 async function getArchivedPerformancesByPerformanceIds(DB, performanceIds) {
   if (!Array.isArray(performanceIds) || performanceIds.length === 0) {
@@ -267,7 +273,14 @@ export async function onRequestPost(context) {
     });
   }
 
-  const resolvedVenueId = venue_id ? Number(venue_id) : null;
+  const venueIdCheck = venue_id === undefined ? { valid: true, value: null } : normalizeOptionalVenueId(venue_id);
+  if (!venueIdCheck.valid) {
+    return new Response(JSON.stringify({ error: "Validation error", message: "Invalid venue ID" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  const resolvedVenueId = venueIdCheck.value ?? null;
 
   if ((start_time || end_time) && !resolvedVenueId) {
     return new Response(

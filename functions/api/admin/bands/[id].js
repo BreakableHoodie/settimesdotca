@@ -8,6 +8,7 @@ import {
   FIELD_LIMITS,
   isValidEmail,
   isValidTime,
+  normalizeOptionalVenueId,
   safeReflectSocialLinks,
   sanitizeOptionalHttpUrl,
   sanitizeOptionalText,
@@ -134,8 +135,17 @@ export async function onRequestPut(context) {
     // Normalize venueId: treat "", 0, "0" as null (no venue assigned).
     // Guards against the frontend sending Number("") = 0 when no venue is selected,
     // which would otherwise pass the !== null check and then 404 on "Venue not found".
-    const normalizedVenueId =
-      venueId === undefined ? undefined : !venueId || Number(venueId) <= 0 ? null : Number(venueId);
+    let normalizedVenueId;
+    if (venueId !== undefined) {
+      const venueIdCheck = normalizeOptionalVenueId(venueId);
+      if (!venueIdCheck.valid) {
+        return new Response(JSON.stringify({ error: "Validation error", message: "Invalid venue ID" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      normalizedVenueId = venueIdCheck.value;
+    }
     let resolvedPhotoUrl;
     let resolvedNotes;
     try {

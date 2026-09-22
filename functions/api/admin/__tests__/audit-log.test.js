@@ -28,6 +28,24 @@ describe("Admin audit log API", () => {
     expect(data.logs[0]).toHaveProperty("details");
   });
 
+  it("returns all distinct resource types sorted independently of the active filter", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const insert = rawDb.prepare(
+      "INSERT INTO audit_log (user_id, action, resource_type, resource_id) VALUES (?, ?, ?, ?)",
+    );
+    insert.run(1, "event.created", "event", 10);
+    insert.run(1, "invite.created", "invite_code", 11);
+    insert.run(1, "band.created", "band_profile", 12);
+    insert.run(1, "null.resource", null, null);
+
+    const req = new Request("https://example.test/api/admin/audit-log?resource_type=event", { headers });
+    const res = await auditLogHandler.onRequestGet({ request: req, env });
+    const data = await res.json();
+
+    expect(data.resourceTypes).toEqual(["band_profile", "event", "invite_code"]);
+    expect(data.logs).toHaveLength(1);
+  });
+
   it("filters by action and user_id", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "admin" });
 

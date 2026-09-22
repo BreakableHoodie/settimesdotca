@@ -40,12 +40,22 @@ export function validateId(id) {
     return { valid: false, error: "ID is required" };
   }
 
-  const numId = Number(id);
-  if (!Number.isInteger(numId) || numId < 1) {
+  const isValidShape =
+    (typeof id === "number" && Number.isSafeInteger(id)) || (typeof id === "string" && /^[0-9]+$/.test(id));
+  const numId = typeof id === "number" ? id : Number(id);
+  if (!isValidShape || !Number.isSafeInteger(numId) || numId < 1) {
     return { valid: false, error: "ID must be a positive integer" };
   }
 
   return { valid: true, value: numId, error: undefined };
+}
+
+export function normalizeOptionalVenueId(value) {
+  if (value === null || value === "" || value === 0 || value === "0") {
+    return { valid: true, value: null, error: undefined };
+  }
+
+  return validateId(value);
 }
 
 /**

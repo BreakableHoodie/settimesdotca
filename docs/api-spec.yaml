@@ -105,7 +105,7 @@ paths:
                       nullable: true
                       description: First of bandcamp, spotify or apple_music, else null
         "400":
-          description: '`limit` was not an integer'
+          description: "`limit` was not an integer"
         "503":
           $ref: "#/components/responses/PublicDataUnavailable"
         "500":
@@ -4973,6 +4973,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/GenericRecord"
+        resourceTypes:
+          type: array
+          description: Distinct non-null resource types in the full audit log, sorted alphabetically
+          items:
+            type: string
         total:
           type: integer
         limit:

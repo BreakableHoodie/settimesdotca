@@ -4,7 +4,13 @@
 import { checkPermission } from "../../_middleware.js";
 import { auditLogStatementForInsertedRow } from "../../../../utils/auditLogStatement.js";
 import { detectDraftConflicts } from "../../../../utils/timeConflicts.js";
-import { isValidTime, MAX_BULK_BAND_IDS, validateId, validateSetTimes } from "../../../../utils/validation.js";
+import {
+  isValidTime,
+  MAX_BULK_BAND_IDS,
+  normalizeOptionalVenueId,
+  validateId,
+  validateSetTimes,
+} from "../../../../utils/validation.js";
 import { getClientIP, parseJsonObjectBodyStrict } from "../../../../utils/request.js";
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
@@ -65,8 +71,9 @@ export async function onRequestPut(context) {
     }
     const timeCheck = validateSetTimes(startTime, endTime);
     if (!timeCheck.valid) return response({ error: "Validation error", message: timeCheck.error }, 400);
-    const venueId = !row.venueId || Number(row.venueId) <= 0 ? null : Number(row.venueId);
-    changes.push({ id, startTime, endTime, venueId });
+    const venueIdCheck = normalizeOptionalVenueId(row.venueId);
+    if (!venueIdCheck.valid) return response({ error: "Validation error", message: "Invalid venue ID" }, 400);
+    changes.push({ id, startTime, endTime, venueId: venueIdCheck.value });
   }
 
   try {

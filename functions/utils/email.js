@@ -30,6 +30,18 @@ export function isEmailConfigured(env) {
   return true;
 }
 
+/**
+ * Send one email through the configured provider (EMAIL_PROVIDER).
+ * @param {object} env
+ * @param {{ to: string, subject: string, html: string, text?: string, idempotencyKey?: string }} message
+ *   idempotencyKey (optional, <=256 chars, throws if longer or not a string) is sent as
+ *   `Idempotency-Key` on RESEND ONLY; Postmark and MailChannels have no equivalent and ignore it.
+ *   Pass it only for claim-then-send mail, never for transactional mail a user may re-request.
+ * @returns {Promise<{ delivered: boolean, reason?: string }>} Resend 409s are BOTH undelivered:
+ *   `concurrent_idempotent_requests` -> reason "concurrent_idempotent_request" (a send in flight);
+ *   `invalid_idempotent_request` -> reason "idempotency_payload_mismatch" (a reused key cannot prove
+ *   a send, so it is never counted delivered -- see CLAUDE.md "A claim is not a delivery record").
+ */
 export async function sendEmail(env, { to, subject, html, text, idempotencyKey }) {
   if (idempotencyKey !== undefined && (typeof idempotencyKey !== "string" || idempotencyKey.length > 256)) {
     throw new Error("idempotencyKey must be a string of 256 characters or fewer");

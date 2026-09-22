@@ -192,8 +192,10 @@ export async function notifySubscribers(env, DB, { eventId, kind, eventName, eve
     // recalled. A rejection escaping sendOne reaches the Promise.allSettled
     // tally below, where `r.status !== "fulfilled"` counts it as FAILED -- a
     // delivered email reported as a failure, which invites the resend that
-    // turns a lost write into a duplicate. The row stays retryable until #1153
-    // adds a provider idempotency key; the log is what makes that visible.
+    // turns a lost write into a duplicate. The row stays retryable, and on
+    // Resend the retry is deduplicated by the idempotency key; Postmark and
+    // MailChannels have no equivalent, so there the log is what makes a
+    // possible duplicate visible.
     try {
       await DB.prepare(
         "UPDATE subscription_notifications SET delivered_at = datetime('now') WHERE subscription_id = ? AND event_id = ? AND kind = ?",

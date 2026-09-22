@@ -1,0 +1,199 @@
+# Semgrep SAST, gated IN THIS REPOSITORY (#1173).
+#
+# WHY THIS EXISTS ALONGSIDE THE SEMGREP GITHUB APP: the App scans every PR and
+# writes to semgrep.dev, but the org's rules sit in the Rule Board's *Audit*
+# column -- which records to the dashboard and posts nothing. The result was a
+# green `semgrep-cloud-platform/scan` check with 0 annotations and findings
+# nobody had seen. Moving the rules to "Comment" is a dashboard setting: not in
+# git, not reviewable in a PR, and silently reversible by anyone with account
+# access. This workflow keeps the gating decision here instead.
+#
+# The previous version of this file uploaded SARIF to GitHub code scanning,
+# which needs GitHub Advanced Security on a private repo. It was deleted on
+# 2026-09-16 when the repo went private (#1174). This version needs nothing
+# beyond the Semgrep token: findings become workflow annotations, a job
+# summary, and -- on a PR -- a failed job.
+#
+# What each trigger does:
+#   pull_request   DIFF-AWARE scan: only findings the PR introduces. Any such
+#                  finding FAILS the job.
+#   push / weekly  FULL scan. Findings are REPORTED (warning annotations + job
+#                  summary) but do not fail: main carries pre-existing findings,
+#                  and a job that is red on every push is noise, not a gate.
+name: Semgrep
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
+  pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
+  schedule:
+    # Weekly, so a newly published rule finds existing code rather than waiting
+    # for someone to touch the file it matches.
+    - cron: "0 7 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    name: Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # fetch-depth: 0 because the diff-aware scan needs the PR's base commit
+      # LOCALLY: with persist-credentials: false nothing can be fetched later
+      # on a private repo (the failure that broke push-to-main E2E, #1184).
+      #
+      # On a PR, check out the PR's HEAD commit, not GitHub's synthetic merge
+      # commit. Semgrep diffs against merge-base(baseline, HEAD); from the
+      # merge commit that merge-base is the base as it was when the PR opened,
+      # so every commit landed on main since then would be scanned as if this
+      # PR had introduced it. Empty on push/schedule = the default ref.
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      # Keyed on THIS FILE's hash, because this file is where the Semgrep
+      # version is pinned -- so bumping the version invalidates the cache by
+      # construction, with no separate requirements file to drift out of step.
+      - name: Cache pip
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-semgrep-${{ hashFiles('.github/workflows/semgrep.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-semgrep-
+
+      # Pinned exactly. An unpinned scanner changes findings between runs for
+      # reasons unrelated to the diff, which is how a gate loses its meaning.
+      - name: Install Semgrep
+        run: pip install semgrep==1.176.0
+
+      # The token is what makes this worth running. Measured 2026-09-04 on this
+      # repo: WITHOUT it, `semgrep scan` uses the OSS ruleset and found 2
+      # results, both false positives. WITH it, `semgrep ci` runs the Pro
+      # ruleset -- and every rule that has produced a real finding here is
+      # registry-only. So a missing secret FAILS the job rather than quietly
+      # downgrading to a weaker ruleset and reporting all-clear.
+      #
+      # Two exceptions, both events that NEVER receive Actions secrets:
+      # Dependabot PRs (dependency changes, not application code) and PRs from
+      # forks (the same rule e2e-tests.yml applies). They SKIP -- loudly, with
+      # a notice and a job summary saying "not scanned", never a silent pass.
+      - name: Check for Semgrep token
+        id: token
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+          ACTOR: ${{ github.actor }}
+          IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+        run: |
+          if [ -n "$SEMGREP_APP_TOKEN" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          elif [ "$ACTOR" = "dependabot[bot]" ]; then
+            echo "::notice::Dependabot PR: no Actions secrets, so Semgrep did NOT scan. Dependency advisories are covered by Snyk and Dependabot alerts."
+            echo "## Semgrep: NOT SCANNED (Dependabot PR, no token)" >> "$GITHUB_STEP_SUMMARY"
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          elif [ "$IS_FORK_PR" = "true" ]; then
+            echo "::notice::Fork PR: no Actions secrets, so Semgrep did NOT scan. Review this diff for SAST issues by hand."
+            echo "## Semgrep: NOT SCANNED (fork PR, no token)" >> "$GITHUB_STEP_SUMMARY"
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::SEMGREP_APP_TOKEN is not set. An OSS-only scan would report all-clear while missing every rule that has found a real issue here."
+            exit 1
+          fi
+
+      # Do not trust semgrep's exit code in EITHER direction:
+      #   - The org's rules are in the Audit column, so they are NON-blocking
+      #     and `semgrep ci` exits 0 WITH findings (verified 2026-09-22: a
+      #     planted finding gave 1 result and exit 0). So the gate below counts
+      #     results in the JSON.
+      #   - It also exits 0 when it FAILED TO RUN ("Semgrep will succeed
+      #     because there were no blocking findings") and then writes no JSON.
+      #     Seen on this PR's first CI run. The `test -s` guard is what turned
+      #     that into a red job; without it, a scan of nothing would pass.
+      #
+      # GITHUB_ACTIONS is unset for this one command on purpose. When semgrep
+      # detects Actions it runs its own `git fetch origin <head sha>`, which
+      # fails here with "could not read Username" (no persisted credentials,
+      # private repo). In plain-git mode it diffs against SEMGREP_BASELINE_REF
+      # using the history already checked out, and fetches nothing. The
+      # SEMGREP_* metadata below restores what Actions detection would have
+      # sent to semgrep.dev.
+      - name: Run Semgrep
+        if: steps.token.outputs.present == 'true'
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+          # The PR's base COMMIT; empty on push/schedule, which means a full scan.
+          SEMGREP_BASELINE_REF: ${{ github.event.pull_request.base.sha }}
+          SEMGREP_REPO_NAME: ${{ github.repository }}
+          SEMGREP_REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+          SEMGREP_BRANCH: ${{ github.head_ref || github.ref_name }}
+          SEMGREP_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+          SEMGREP_PR_ID: ${{ github.event.pull_request.number }}
+        run: |
+          rc=0
+          env -u GITHUB_ACTIONS semgrep ci --json --output=semgrep.json || rc=$?
+          echo "semgrep exit: $rc"
+          if [ "$rc" -gt 1 ]; then
+            echo "::error::Semgrep failed to RUN (exit $rc) — this is not 'found issues'."
+            exit "$rc"
+          fi
+          test -s semgrep.json || { echo "::error::Semgrep exited $rc but wrote no JSON."; exit 1; }
+
+      - name: Report findings
+        if: steps.token.outputs.present == 'true'
+        env:
+          IS_PR: ${{ github.event_name == 'pull_request' }}
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+
+          results = json.load(open("semgrep.json"))["results"]
+          is_pr = os.environ["IS_PR"] == "true"
+          level = "error" if is_pr else "warning"
+
+          # Workflow-command escaping. A property value (file=, title=) must
+          # also escape ':' and ',' -- otherwise a path containing either can
+          # end the property early and rewrite the annotation.
+          def esc(s):
+              return str(s).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+          def esc_prop(s):
+              return esc(s).replace(":", "%3A").replace(",", "%2C")
+
+          rows = []
+          for r in results:
+              rule = r["check_id"].split(".")[-1]
+              msg = r["extra"].get("message", "").strip().splitlines()[0] if r["extra"].get("message") else rule
+              print(f"::{level} file={esc_prop(r['path'])},line={r['start']['line']},title={esc_prop('semgrep ' + rule)}::{esc(msg)}")
+              rows.append(f"| `{r['path']}:{r['start']['line']}` | `{rule}` | {r['extra'].get('severity', '')} |")
+
+          scope = "introduced by this PR" if is_pr else "in the full tree"
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
+              f.write(f"## Semgrep: {len(results)} finding(s) {scope}\n\n")
+              if rows:
+                  f.write("| Location | Rule | Severity |\n|---|---|---|\n" + "\n".join(rows) + "\n")
+
+          print(f"{len(results)} finding(s) {scope}")
+          if is_pr and results:
+              print("::error::This PR introduces Semgrep findings. Fix them, or suppress one with a `nosemgrep: <rule-id>` comment that states why.")
+              sys.exit(1)
+          PY

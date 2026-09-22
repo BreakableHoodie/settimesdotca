@@ -252,12 +252,13 @@ Canonical active roadmap: `docs/ROADMAP.md`. Use it for handoffs between Claude,
 - **Storage**: Cloudflare R2 (band photos)
 - **Email**: Postmark/Resend/MailChannels
 - **Tests**: Vitest (unit, frontend), Playwright (E2E + a11y + visual regression)
-- **CI/CD**: GitHub Actions (9 workflows), Dependabot, Snyk, GitGuardian, CodeRabbit
-  (`codeql.yml`, `secret-scan.yml`, `semgrep.yml` and `dependency-review.yml` were
-  removed 2026-09-16. Name the **files**, not the tools: gitleaks still runs inside
-  CodeRabbit and the Semgrep GitHub App still posts a check, so "we removed gitleaks
-  and Semgrep" is false twice over — see "The security tooling this repo actually
-  has" under Security Notes)
+- **CI/CD**: GitHub Actions (10 workflows), Dependabot, Snyk, GitGuardian, CodeRabbit
+  (`codeql.yml`, `secret-scan.yml` and `dependency-review.yml` were removed
+  2026-09-16; `semgrep.yml` was removed the same day and **rebuilt** in #1173 —
+  it still runs Semgrep SAST, but gates in the job itself instead of uploading
+  SARIF to GitHub code scanning. Name the **files**, not the tools: gitleaks still runs inside
+  CodeRabbit — see "The security tooling this repo actually has" under Security
+  Notes)
 
 ---
 
@@ -1219,29 +1220,41 @@ means nothing teaches you to stop reading red.
 | Dependency advisories | Snyk PR check; Dependabot alerts + security updates | the push that privatised the repo was answered with *"GitHub found 3 vulnerabilities on …'s default branch"* |
 | Lockfile tampering | `scripts/__tests__/lockfileIntegrity.test.js` | a plain test in the suite — no plan tier involved, which is now the point |
 | Review | CodeRabbit | passed on both PRs |
+| SAST | `semgrep.yml` (rebuilt in #1173, Pro ruleset via `SEMGREP_APP_TOKEN`) | a planted finding turned the PR job red and named it; the same PR without it went green (#1185) |
 
-**The trap this left behind is live, and it is the reason this section exists.**
-`semgrep-cloud-platform/scan` is posted by the Semgrep **GitHub App**, not by the
-deleted workflow, so it still reports **pass** on every PR. Do not read that as
-SAST coverage. `semgrep.yml`'s header recorded precisely why it was written:
+**SAST is back, but read the right check.** `semgrep-cloud-platform/scan` is
+posted by the Semgrep **GitHub App** and reports **pass** on every PR no matter
+what it finds: the org's rules sit in the Rule Board's *Audit* column, which
+records to semgrep.dev and posts nothing. **That check means nothing. The
+`Semgrep / Scan` job is the gate.**
 
-> the App scans every PR and writes to semgrep.dev, but the org's rules sit in
-> the Rule Board's *Audit* column — which records to the dashboard and posts
-> nothing. The result was a green `semgrep-cloud-platform/scan` check with 0
-> annotations, 48 findings nobody had seen, and no comment from the bot in the
-> repo's entire history.
+How the rebuilt `semgrep.yml` works (#1173):
 
-Deleting the workflow restores that exact state. **So there is currently one
-green check on every PR that means nothing, and CodeQL's SAST is gone with it.**
-That is the single real hole left by this change; everything else above was
-genuinely replaced.
+- **On a PR it is diff-aware and fails on any finding the PR introduces.** On
+  push and weekly it scans the full tree and *reports* (warnings plus a job
+  summary) without failing, because `main` carries pre-existing findings (19 on
+  2026-09-22, 16 of them `detect-non-literal-regexp`) and a job that is red on
+  every push is noise, not a gate.
+- **It counts results in the JSON, never the exit code.** Audit-column rules are
+  non-blocking, so `semgrep ci` exits **0 with findings**, verified with a
+  planted finding. A gate reading the exit code would pass everything.
+- **`fetch-depth: 0` is load-bearing.** The diff scan needs the PR's base commit
+  locally, and a shallow, credential-less checkout cannot fetch it on a private
+  repo (the failure that broke push-to-main E2E, #1184).
+- **Dependabot PRs skip, loudly.** They never receive Actions secrets; the job
+  posts a notice and a "NOT SCANNED" summary rather than passing silently. Any
+  other run without the token **fails**: an OSS-only scan reports all-clear while
+  missing every rule that has found a real issue here.
 
-Tracked in **#1173**, whose shape is `semgrep ci --json` failing the job on
-findings *in the repository* rather than depending on a dashboard column — the
-same reasoning that produced the original workflow. Do not close it by moving
-the Rule Board to "Comment": that is the dashboard setting the original
-deliberately refused to rely on, being not in git, not reviewable in a PR, and
-silently reversible by anyone with account access.
+Do not "fix" the App's check by moving the Rule Board to "Comment": that is a
+dashboard setting, not in git, not reviewable in a PR, and silently reversible
+by anyone with account access. The gate lives in the workflow on purpose.
+
+**Snyk Code (Snyk's SAST) is deliberately not enabled** (decided 2026-09-22).
+The Snyk PR check covers dependency manifests only. Semgrep was chosen because
+its gate is in git and its Pro ruleset is measured on this repo; Snyk Code would
+spend the Free plan's monthly Code-test allowance on every PR and keep its gate
+in Snyk's dashboard.
 
 ### Content-Security-Policy (strict, no `unsafe-inline`) — TWO sources
 

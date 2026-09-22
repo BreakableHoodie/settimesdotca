@@ -6,6 +6,14 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
+// The test runner itself calls performance.now() (vitest 5 does so while
+// loading modules). These tests replace global.performance with hand-built
+// mocks, so each mock keeps the REAL clock and the original object is restored
+// after every test -- a mock that drops now(), or leaks into the next test,
+// breaks the runner rather than the code under test (#1176).
+const ORIGINAL_PERFORMANCE = globalThis.performance
+const realNow = ORIGINAL_PERFORMANCE.now.bind(ORIGINAL_PERFORMANCE)
+
 const LISTENER_ADDED = Symbol.for('performanceListenerAdded')
 
 describe('Performance Utilities - Console Logging', () => {
@@ -25,6 +33,7 @@ describe('Performance Utilities - Console Logging', () => {
   })
 
   afterEach(() => {
+    globalThis.performance = ORIGINAL_PERFORMANCE
     consoleLogSpy.mockRestore()
     consoleTableSpy.mockRestore()
     delete globalThis.__APP_DEV__
@@ -38,6 +47,7 @@ describe('Performance Utilities - Console Logging', () => {
 
     it('should log performance metrics in dev mode', async () => {
       global.performance = {
+        now: realNow,
         timing: {
           domainLookupStart: 0,
           domainLookupEnd: 10,
@@ -101,6 +111,7 @@ describe('Performance Utilities - Console Logging', () => {
       }
 
       global.performance = {
+        now: realNow,
         timing: {
           domainLookupStart: 0,
           domainLookupEnd: 10,
@@ -143,6 +154,7 @@ describe('Performance Utilities - Console Logging', () => {
 
     it('should NOT log performance metrics in production', async () => {
       global.performance = {
+        now: realNow,
         timing: {
           domainLookupStart: 0,
           domainLookupEnd: 10,
@@ -180,6 +192,7 @@ describe('Performance Utilities - Console Logging', () => {
       }
 
       global.performance = {
+        now: realNow,
         timing: {
           domainLookupStart: 0,
           domainLookupEnd: 10,
@@ -238,6 +251,7 @@ describe('Performance Utilities - Console Logging', () => {
       vi.resetModules()
 
       global.performance = {
+        now: realNow,
         timing: {
           domainLookupStart: 100,
           domainLookupEnd: 120,
@@ -349,6 +363,7 @@ describe('Performance Utilities - Console Logging', () => {
       vi.resetModules()
 
       global.performance = {
+        now: realNow,
         timing: {
           domainLookupStart: 0,
           domainLookupEnd: 10,

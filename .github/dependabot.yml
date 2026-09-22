@@ -17,14 +17,6 @@ updates:
       - "npm"
     commit-message:
       prefix: "deps"
-    # vitest 5 is HELD (#1176): it instruments coverage differently, so the
-    # same code scores 1.6-5 points lower and fails the ratchet. Remove this
-    # ignore in the PR that re-baselines the thresholds.
-    ignore:
-      - dependency-name: "vitest"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "@vitest/*"
-        update-types: ["version-update:semver-major"]
     groups:
       root-npm-all:
         patterns:
@@ -47,14 +39,6 @@ updates:
       - "npm"
     commit-message:
       prefix: "deps"
-    # vitest 5 is HELD (#1176): it instruments coverage differently, so the
-    # same code scores 1.6-5 points lower and fails the ratchet. Remove this
-    # ignore in the PR that re-baselines the thresholds.
-    ignore:
-      - dependency-name: "vitest"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "@vitest/*"
-        update-types: ["version-update:semver-major"]
     groups:
       frontend-npm-all:
         patterns:

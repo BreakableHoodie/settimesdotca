@@ -3,6 +3,7 @@ import { auditLogStatement } from "../../../utils/auditLogStatement.js";
 import { getClientIP, parseJsonObjectBody, parseJsonObjectBodyStrict } from "../../../utils/request.js";
 import { computeNewEndTime, detectBulkConflicts } from "../../../utils/timeConflicts.js";
 import {
+  validateId,
   isValidTime,
   normalizeOptionalVenueId,
   validateIdArray,
@@ -495,7 +496,18 @@ export async function onRequestPatch(context) {
     let rowsAffected = 0;
 
     if (action === "move_venue") {
-      const { venue_id } = params;
+      // Validated here and REBOUND under the same name, so every later use in
+      // this branch (lookup, conflict check, UPDATE) gets the checked number.
+      // The raw value used to be bound straight into SQL: `venue_id: true`
+      // binds as 1 and moved the whole selection to venue 1.
+      const venueIdCheck = validateId(params.venue_id);
+      if (!venueIdCheck.valid) {
+        return new Response(JSON.stringify({ error: "Validation error", message: "Invalid venue ID" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const venue_id = venueIdCheck.value;
 
       const venueExists = await env.DB.prepare("SELECT id FROM venues WHERE id = ?").bind(venue_id).first();
       if (!venueExists) {

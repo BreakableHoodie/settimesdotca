@@ -8,7 +8,8 @@ vi.mock("../../_middleware.js", () => ({
 import { onRequestPut as onRequestSchedule } from "../../events/[id]/schedule.js";
 import { onRequestPost as onRequestCreate } from "../../bands.js";
 import { onRequestPut as onRequestBandPut } from "../[id].js";
-import { onRequestPost as onRequestBulkAdd } from "../bulk.js";
+import { onRequestPost as onRequestBulkAdd, onRequestPatch as onRequestBulkPatch } from "../bulk.js";
+import { onRequestPost as onRequestBulkPreview } from "../bulk-preview.js";
 import { createTestEnv, insertBand, insertEvent, insertVenue } from "../../../test-utils.js";
 
 function request(url, method, body) {
@@ -103,5 +104,42 @@ describe("venue ID validation at admin write boundaries", () => {
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "Validation error", message: "Invalid venue ID" });
     expect(rawDb.prepare("SELECT venue_id FROM performances WHERE id = ?").get(performance.id)).toEqual(before);
+  });
+
+  // move_venue bound the raw venue_id straight into SQL, so `true` bound as 1
+  // and moved the selection to venue 1 (CodeRabbit on #1188; bulk-preview is
+  // the sibling it did not name).
+  it.each([[true], ["abc"], [[2]]])("bulk PATCH move_venue rejects venue_id %j and moves nothing", async (bad) => {
+    const { env, rawDb, performance } = fixture();
+    insertVenue(rawDb, { name: "Venue One Decoy" });
+    const before = rawDb.prepare("SELECT venue_id FROM performances WHERE id = ?").get(performance.id);
+    const res = await onRequestBulkPatch(
+      context(
+        env,
+        request("https://example.test/api/admin/bands/bulk", "PATCH", {
+          band_ids: [performance.id],
+          action: "move_venue",
+          venue_id: bad,
+          ignore_conflicts: true,
+        }),
+      ),
+    );
+    expect(res.status).toBe(400);
+    expect(rawDb.prepare("SELECT venue_id FROM performances WHERE id = ?").get(performance.id)).toEqual(before);
+  });
+
+  it("bulk-preview move_venue rejects a boolean venue_id", async () => {
+    const { env, performance } = fixture();
+    const res = await onRequestBulkPreview(
+      context(
+        env,
+        request("https://example.test/api/admin/bands/bulk-preview", "POST", {
+          band_ids: [performance.id],
+          action: "move_venue",
+          venue_id: true,
+        }),
+      ),
+    );
+    expect(res.status).toBe(400);
   });
 });

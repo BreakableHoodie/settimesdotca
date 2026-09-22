@@ -150,13 +150,30 @@ jobs:
           SEMGREP_PR_ID: ${{ github.event.pull_request.number }}
         run: |
           rc=0
-          env -u GITHUB_ACTIONS semgrep ci --json --output=semgrep.json || rc=$?
+          # Capture to a file and cat it, NOT `| tee ... || true`: under pipefail
+          # the `|| true` runs and resets PIPESTATUS to (0), recording a failure
+          # as success (CLAUDE.md, "Verify guards against the failure...").
+          env -u GITHUB_ACTIONS semgrep ci --json --output=semgrep.json >semgrep.log 2>&1 || rc=$?
+          cat semgrep.log
           echo "semgrep exit: $rc"
+          # The outage signature is checked FIRST, whatever the exit code: seen
+          # 2026-09-22 as exit 0 + no JSON, but nothing guarantees an outage
+          # stays exit 0, and a generic "failed to RUN" would hide the one
+          # useful hint (it is Semgrep's service, not this workflow).
+          if grep -q "Could not start scan" semgrep.log 2>/dev/null; then
+            echo "::error::Semgrep could not start: semgrep.dev refused the scan. Likely a Semgrep service incident — check https://status.semgrep.dev and re-run. NOT a clean scan."
+            exit 1
+          fi
           if [ "$rc" -gt 1 ]; then
             echo "::error::Semgrep failed to RUN (exit $rc) — this is not 'found issues'."
             exit "$rc"
           fi
-          test -s semgrep.json || { echo "::error::Semgrep exited $rc but wrote no JSON."; exit 1; }
+          # exit 0/1 with no JSON is still "did not scan" -- semgrep's own git
+          # fetch failing produced exactly that on #1185.
+          if [ ! -s semgrep.json ]; then
+            echo "::error::Semgrep exited $rc but wrote no JSON — it did not complete a scan. NOT a clean scan."
+            exit 1
+          fi
 
       - name: Report findings
         if: steps.token.outputs.present == 'true'
@@ -192,6 +209,11 @@ jobs:
               if rows:
                   f.write("| Location | Rule | Severity |\n|---|---|---|\n" + "\n".join(rows) + "\n")
 
+          # GitHub shows at most 10 annotations per level per step (a main
+          # push with 19 findings displayed 10). The job summary above lists
+          # every finding, so say so rather than let the badge undercount.
+          if len(results) > 10:
+              print(f"::notice::{len(results)} findings; GitHub displays only 10 annotations per step. The full list is in the job summary.")
           print(f"{len(results)} finding(s) {scope}")
           if is_pr and results:
               print("::error::This PR introduces Semgrep findings. Fix them, or suppress one with a `nosemgrep: <rule-id>` comment that states why.")

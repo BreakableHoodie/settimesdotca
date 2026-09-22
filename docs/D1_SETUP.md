@@ -13,7 +13,7 @@ The current app uses a single top-level `DB` binding in `wrangler.toml`. Do not 
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 22.12+ (or 24.x / 26+; the `engines` range in `package.json`)
 - npm
 - `sqlite3` CLI for local bootstrap scripts
 - Cloudflare account and `wrangler` access only when working with remote D1 databases

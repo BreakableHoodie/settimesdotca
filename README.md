@@ -26,7 +26,7 @@ no longer is, and what restoring it would take.
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 22.12+ (or 24.x / 26+; the `engines` range in `package.json`)
 - npm
 - `sqlite3` CLI for the local database bootstrap scripts
 - A Cloudflare account only if you need remote D1 or Pages deployment

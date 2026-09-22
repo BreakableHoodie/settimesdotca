@@ -103,6 +103,22 @@ describe("engines.node covers the APIs the code actually uses", () => {
   // on Node 20 or 23 the suite failed to start, with no version error, and CI
   // (Node 22) could never surface it -- the same shape as #1121. Read from the
   // INSTALLED manifests, so a future bump that narrows support fails here.
+  // Prerequisite lines in the docs drifted the moment engines changed (#1176
+  // review: four docs still said "Node.js 20+"). Each stated minimum must equal
+  // the floor engines.node actually admits.
+  const PREREQ_DOCS = ["README.md", "CONTRIBUTING.md", "docs/D1_SETUP.md", "docs/DEPLOYMENT.md"];
+  it.each(PREREQ_DOCS)("%s states the same Node minimum as engines.node", (doc) => {
+    const text = readFileSync(join(repoRoot, doc), "utf8");
+    const stated = [...text.matchAll(/Node\.js (\d+(?:\.\d+)?)\+/g)].map((m) => m[1]);
+    expect(stated.length, `${doc} should state a Node.js minimum ("Node.js X.Y+")`).toBeGreaterThan(0);
+    const floor = semver.minVersion(declared);
+    for (const s of stated) {
+      expect(semver.coerce(s).version, `${doc} says "Node.js ${s}+" but engines.node admits ${floor.version}`).toBe(
+        floor.version,
+      );
+    }
+  });
+
   it.each(["vitest", "@vitest/coverage-v8"])("engines.node fits what %s supports", (pkg) => {
     const manifest = JSON.parse(readFileSync(join(repoRoot, "node_modules", pkg, "package.json"), "utf8"));
     const supported = manifest.engines?.node;

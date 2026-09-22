@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 22.12+ (or 24.x / 26+; the `engines` range in `package.json`)
 - [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/) (installed via `npm ci` in the frontend)
 - A Cloudflare account with a D1 database bound for local dev (or use the local SQLite emulator)
 

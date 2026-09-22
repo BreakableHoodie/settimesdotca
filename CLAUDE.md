@@ -200,90 +200,13 @@ The check is deliberately tool-agnostic — it wraps agy, OpenCode's relay, or a
 
 ### Delegating to OpenCode
 
-A third implementer, on a separate subscription: the `opencode-delegate` skill.
+A third implementer on a separate subscription, via the `opencode-delegate` skill. **Full notes, measurements and history: `docs/field-notes/opencode-delegation.md`** — read it before your first delegation in a session.
 
-**It is not in this repo and a fresh clone will not have it.** It is an external prerequisite, installed per-machine into the gitignored `.agents/skills/` (see `.gitignore`), which is why `relay.mjs` will not appear in `git ls-files`:
-
-```bash
-npx skills add amElnagdy/delegate-skills --skill opencode-delegate
-# lands in .agents/skills/opencode-delegate/, symlinked to .claude/skills/
-```
-
-It also needs the `opencode` CLI on PATH and an authenticated provider (`opencode auth list`).
-
-Use it for well-specified work that would otherwise consume this session's context. **The relay does NOT commit.** It edits the working tree and stops; whoever dispatched it reads the diff, re-runs `make gate`, and commits. `relay.mjs --help` states it outright ("Committing is always the orchestrator's job"), the run prints "relay does not commit" on completion, and a delegation on 2026-09-01 left nine modified files uncommitted exactly as described. Both are checkable from this repo: run `--help`, or read `result.json`, which lists `touchedFiles` and no commit.
-
-This paragraph previously claimed the opposite — that OpenCode "works issues end to end: it branches, commits, and opens a PR" — while the numbered rule four lines below it said the relay "never commits". Both were in this section at once, so whichever a reader reached first was the one they believed. Corrected against the installed relay's behaviour, which is the only authority here.
-
-Because it does not commit, **dispatch it only from a CLEAN working tree on its own branch.** A new branch does not separate work that is already uncommitted — `git checkout -b` carries those changes along, so relay edits and your in-progress work end up in one tree and get committed together. Commit or stash first, or give it a separate `git worktree`. Verify with `git status --porcelain` before dispatching; `scripts/delegate-verify.mjs` reports what changed afterwards but cannot tell your edits from the relay's. The invariant is unchanged either way: **nothing lands on `main` unreviewed.**
-
-Four rules, each learned by something breaking:
-
-1. **Always go through `relay.mjs`; never a raw `opencode run`.** Not for permissions — `opencode run` auto-approves by default, and a raw run *did* edit files headlessly in testing, so `--auto` is belt-and-braces rather than load-bearing. The relay earns its place for three other reasons: it feeds the brief over **stdin** (rule 3), it writes a structured `result.json` carrying `cost`, `touchedFiles` and the session id, and it never commits. A raw run gives up all three.
-2. **Always pass `--model` explicitly, and pick from the flat-rate provider.** Not because a bare run fails — with a valid `model` in `opencode.json` it resolves and runs fine. Pass it for **reproducibility**: the config default can change under you, and a delegation you cannot attribute to a model is a cost figure you cannot learn from. **Which prefix is flat-rate vs metered is a lookup, not a memory** (see the staleness note below); routing paid work through a metered gateway by assumption is the mistake this rule prevents. A `claude-*` entry from any provider is redundant with the orchestrator regardless.
-3. **The brief goes in a file (`--brief`), never on the command line.** Large content in argv hangs the CLI; the relay feeds it via stdin for exactly this reason.
-4. **`opencode.json` is the tooling surface** — its `instructions` array feeds OpenCode this `CLAUDE.md` and the repo's instruction files, and it also declares the MCP servers, agents and commands a delegated run can reach. That is why a delegated diff can respect invariants nobody restated in the brief. **Read the file for the current inventory rather than trusting a count written here**, and keep `model`/`small_model` pointing at *authenticated* providers — a stale entry there fails every run that relies on the config default (see the dated anecdotes for the instance of this that actually happened).
-
-   **The `instructions` array is a floor on every run's cost — keep it to invariants, not reference docs.** Every listed file is loaded before the brief is even read, on *every* delegation. It once held 18 entries totalling ~310 KB (~77k tokens), which is why a trivial one-file read still cost $0.246 (measured 2026-08-13). It is now five entries (~18k tokens), a ~77% cut.
-
-   **Every path in the array must be tracked in git** (`functions/__tests__/opencodeInstructions.test.js` enforces it). Until #818 the array pointed at `instructions/`, which `.gitignore` excludes — so the committed config named three files that existed on one machine and nowhere else. A fresh clone, CI, or a clean Otto checkout resolved none of them, and **OpenCode says nothing when an instruction file is missing**; the run just proceeds with less context than the brief assumed. The tracked tree is `.github/instructions/`.
-
-   The rule that decides membership: **OpenCode can already read any file in the repo on demand.** So the array is for things a delegated run must not violate *but would never know to look up* — `CLAUDE.md`'s invariants, the security defaults, and the conventions that shape *every* diff regardless of what the task touches. That last category is why `.github/instructions/nodejs-javascript-vitest.instructions.md` and `…/self-explanatory-code-commenting.instructions.md` are in the array: this repo is JavaScript and Vitest end to end, so those govern every delegation rather than a subset of them.
-
-   Everything else stays out, including the rest of `.github/instructions/`. Reference material (`docs/DATABASE.md`, `docs/API_DOCUMENTATION.md`, `docs/BACKEND_FRAMEWORK.md`) and the per-domain instruction files (`a11y`, `playwright-typescript`, `tailwind-v4-vite`, `shell`, …) are **not** loaded, because a run that needs the schema can open the schema.
-
-   The tradeoff is real and is handled in the brief: **a task that needs a domain instruction file must name it.** An a11y fix says, "read `.github/instructions/a11y.instructions.md` first"; a Playwright change names the Playwright one. That is one line in a brief, paid only by the runs that need it, instead of ~5.7k tokens charged to every backend fix that does not. Before adding an entry back, ask whether *every* delegation needs it — if not, name it in the brief instead.
-
-**Cost is the throughput constraint, not the bill.** The subscription is flat-rate but capped in usage-dollar terms, so an expensive model buys fewer delegations per window rather than a larger invoice. Read the cost after **every delegated run** — but read it with `make delegate-stats`, NOT from `result.json`, whose `cost` field reports `$0.0000` on a free model and invites the conclusion that the run consumed nothing (see below). A raw `opencode run` writes no `result.json` at all, which is a separate reason to go through the relay.
-
-**`make delegate-stats` is how you read the cost — not `result.json`.** The relay
-writes a `cost` field, and on a free model it reads `$0.0000`, which invites the
-conclusion that a delegation consumed nothing. It did not: measured 2026-09-02,
-four dispatches on `opencode/big-pickle` came to **314 messages and 3.1M input
-tokens** in this project alone. Counting *dispatches* understates the work by
-roughly two orders of magnitude.
-
-`opencode stats --days N --models --project ""` is the real view, wrapped as
-`make delegate-stats` (override the window with `DAYS=30 make delegate-stats`).
-The `--project ""` is load-bearing: the default is EVERY project on the machine.
-
-Three limits on what it can tell you, all worth knowing before relying on it:
-
-- It reads **local session history**, so it reports consumption, not entitlement,
-  and cannot see runs from another machine.
-- **There is no quota endpoint to ask.** `opencode.ai/v2/docs/api` is the local
-  *server* API — sessions, filesystem, shell, MCP, 140 operations — and documents
-  nothing for usage, billing or limits. An MCP server would not help; there is
-  nothing account-shaped to expose.
-- A **$0.00 model is free FOR NOW, not free by contract.** OpenCode's own Zen
-  page describes Big Pickle as "a stealth model that's free on OpenCode for a
-  limited time". A community GitHub comment claiming a ~200-request cap does not
-  match the vendor's page and is four months old — the catalog has already
-  rotated since (it named one Minimax; there are now three). If a delegation
-  starts reporting a non-zero cost, that window closed.
-
-**Model names, prices and caps go stale — look them up rather than trusting this file.** Providers rename, deprecate and reprice constantly; a doctrine that caches those values becomes confidently wrong, which is the failure mode the guards in this file exist to prevent elsewhere. Re-derive:
-
-```bash
-opencode auth list    # which providers are actually authenticated here
-opencode models       # the live catalog, grouped by provider prefix
-```
-
-Then confirm from the vendor's current docs which prefix is the flat-rate subscription and which is metered. **Never infer it from the model name**, and ask rather than guess.
-
-The durable part is the method:
-
-- Cost is **tokens consumed × current price**. Tier labels predict neither: a "pro"/"max" model can consume fewer tokens by exploring less, and prices change independently of names. So never rank by tier label alone — and never ignore a price change either. Compare **token usage and reported cost together**.
-- The only trustworthy comparison is **the same brief, on the same repository state, run per model**. Different tasks produce different exploration, so their costs are not comparable at all.
-- Treat any model you have not run that way as unmeasured, and say so rather than implying a ranking.
-
-> **Dated anecdotes — 2026-08-12** (OpenCode CLI 1.18.16, `opencode-delegate` 0.4.2, this repo). Three delegations, each a *different* task: a 2-file task on `deepseek-v4-pro` reported $0.125; a 3-file task on `glm-5.2` reported $0.65; a 10-file task on `glm-5.2` reported $2.14.
->
-> **These do not compare the models.** Different briefs, different repository states, no token counts captured — the numbers reflect task size at least as much as model choice. They are recorded only as order-of-magnitude evidence that delegation cost varies enough to matter, and as a reminder that a "pro" tier is not automatically the expensive one. A real comparison needs the same brief run per model; none has been done.
->
-> Also environment-specific and dated to this same day, both measured on **raw `opencode run`**, not through the relay: a ~1.5 KB brief passed in argv hung past 180s, while the identical text attached with `opencode run -f <file>` returned in 11s; and `opencode.json` named `anthropic/*` models while only OpenCode's own providers were authenticated, so every run falling back to the config default failed (rule 4).
->
-> Note the flags belong to different tools and are not interchangeable: `-f` is a raw `opencode run` flag, whereas the relay takes `--brief <file>` and feeds it over **stdin**. So the 11s figure shows that *getting the brief out of argv* fixes the hang — it is not a measurement of the relay's own path, which was never argv-based. Rule 3 holds either way; only the mechanism differs. Re-verify rather than assume.
+- **Not in this repo.** Installed per-machine into gitignored `.agents/skills/` (`npx skills add amElnagdy/delegate-skills --skill opencode-delegate`); needs `opencode` on PATH and an authenticated provider (`opencode auth list`).
+- **The relay does NOT commit.** It edits the tree and stops; the dispatcher reads the diff, re-runs `make gate`, and commits. So **dispatch only from a CLEAN tree on its own branch** (or a separate `git worktree`) — verify with `git status --porcelain` first.
+- **Rules:** (1) always go through `relay.mjs`, never raw `opencode run`; (2) always pass `--model` explicitly, from the flat-rate provider — which prefix is flat-rate is a *lookup* (`opencode models`, vendor docs), never inferred from a name; (3) the brief goes in a file (`--brief`), never argv; (4) `opencode.json`'s `instructions` array is a cost floor on every run — invariants only, every path tracked in git (`functions/__tests__/opencodeInstructions.test.js` enforces it). A task needing a domain instruction file names it in the brief.
+- **Read cost with `make delegate-stats`, not `result.json`** — a free model reports `$0.0000` while consuming millions of tokens. A $0 model is free *for now*, not by contract.
+- **Model names, prices and caps go stale** — re-derive them; compare models only by the same brief on the same repo state.
 
 ---
 
@@ -929,64 +852,9 @@ Requires a running wrangler dev server or uses it automatically via `playwright.
 
 ### Testing Safari/WebKit locally — `upgrade-insecure-requests` breaks it, silently
 
-`npx playwright install webkit` then pointing it at `http://localhost:8788`
-renders a **blank page**. No page error, no failed assertion — `document.title`
-is set, `#root` is empty, and the only signal is in the network log:
+Playwright WebKit against `http://localhost:8788` renders a **blank page** with no error: the `/*` document CSP in `frontend/public/_headers` carries `upgrade-insecure-requests`, so WebKit rewrites every subresource to `https://`, where the dev server has no TLS. Chromium treats `localhost` as trustworthy and skips the upgrade, which is why this only shows up in Safari. **It is not HSTS** (RFC 6797 §7.2 ignores STS over http — verified by experiment). **Production is unaffected; do not weaken the directive or HSTS.**
 
-```text
-REQFAIL https://localhost:8788/assets/index-*.js
-  A TLS error caused the secure connection to fail.
-```
-
-**The cause is the `upgrade-insecure-requests` directive** at the end of the
-**document** CSP — the `/*` rule in `frontend/public/_headers`, which is what
-`/admin/login` matches. It tells the browser to rewrite every `http://`
-subresource request to `https://`, where the dev server has no TLS listener, so
-React never mounts.
-
-Be precise about *which* CSP, because two different pairs are in play and the
-words collide. "TWO sources" elsewhere in this file means `_headers` (documents)
-versus `functions/_middleware.js` (API/Functions responses) — and it is the
-`_headers` one that matters here, since this is about a document load.
-Separately, `_headers` itself carries two CSP rules: `/*` and an `/embed/*`
-override that unsets and replaces it. The directive appears in both `_headers`
-rules, but `/*` is the one that produces this failure.
-
-**It is NOT HSTS, and the difference matters.** The first version of this
-section blamed `Strict-Transport-Security`, which is wrong on the spec and wrong
-on the evidence. RFC 6797 §7.2 requires a UA to **ignore** an STS header
-received over non-secure transport, so the header this page sends over http was
-never going to register a policy. Caught by CodeRabbit on #1134; the mechanism
-had been asserted from plausibility, never tested.
-
-The experiment that settles it — strip exactly one header, rewrite nothing, and
-count upgraded requests:
-
-| variant | React mounted | upgraded requests |
-|---|---|---|
-| baseline | no | 12 |
-| strip HSTS only | **no** | **12** |
-| strip CSP only | **yes** | **0** |
-| strip both | yes | 0 |
-
-And the engine split, with headers untouched:
-
-| engine | mounted | upgraded |
-|---|---|---|
-| Chromium | yes | 0 |
-| WebKit (Playwright 1.62.1 / WebKit 26.5) | no | 12 |
-
-Chromium treats `localhost` as a potentially-trustworthy origin and skips the
-upgrade; this WebKit build does not. That engine difference is the whole reason
-the trap is invisible until someone tries Safari.
-
-**Production is unaffected and this is not a bug to "fix".** Production is
-genuinely https, so the directive is doing its job there. Do not weaken it, and
-do not weaken HSTS either (see the Cloudflare table — HSTS is application-served
-on purpose, and the zone toggle reading "off" is expected).
-
-Strip the CSP in-flight for the test instead. Nothing on disk changes, and **no
-URL rewriting is needed** once the right header is removed:
+For layout/rendering tests only, strip the CSP in-flight (no URL rewriting needed) and use `waitUntil: 'domcontentloaded'`, never `'networkidle'`, which never fired in WebKit here (likely the service worker's background requests; cause inferred, not measured):
 
 ```js
 await ctx.route('**/*', async (route) => {
@@ -997,127 +865,15 @@ await ctx.route('**/*', async (route) => {
 })
 ```
 
-Also use `waitUntil: 'domcontentloaded'`, never `'networkidle'` — the service
-worker keeps a connection open and networkidle never fires in WebKit.
-
-Note what this costs: the page then runs **without** CSP, so this harness cannot
-test anything CSP governs. It is for layout and rendering questions only.
-
-Results from 2026-09-09, stated with the exact conditions rather than a summary
-of them. All runs used the standard local setup — `wrangler pages dev
-frontend/dist --port 8788` against a seeded local D1, origin
-`http://localhost:8788`, same build — and differ only in the header mutation:
-
-| run | mutation | WebKit edge |
-|---|---|---|
-| A | delete `strict-transport-security`; rewrite the upgraded `https://` request URL back to `http://` before fetching. **CSP served and enforced.** | rgb(113,116,123), **3.75:1** |
-| B | delete `content-security-policy`; no URL rewriting (the recipe above). **CSP absent.** | rgb(113,116,123), **3.74:1** |
-
-Run A came first and its mutation was chosen for the wrong reason — the HSTS
-delete did nothing, and the URL rewrite was what made it load. It is still a
-valid measurement, and "CSP enforced" there is verified rather than assumed:
-re-running run A's exact interception showed the header on **17** responses,
-**18** upgraded requests (so `upgrade-insecure-requests` was live), and an
-injected inline `<script>` **refused** to execute —
-
-```text
-Refused to execute a script because its hash, its nonce, or 'unsafe-inline'
-does not appear in the script-src
-```
-
-which is enforcement, not mere presence. The 0.01 gap from run B is sampling
-noise on the same pixel.
-
-**Two runs under opposite CSP conditions agreeing is the useful part** — it says
-CSP does not govern this rendering, which is what makes run B's simpler recipe
-safe to recommend for layout questions.
-
-Chromium measured rgb(113,115,123), **3.71:1**, unmutated, and sticky held at
-the same offsets across scroll in both engines. So the `border-collapse` +
-sticky interaction documented under the roster edges is a spec behaviour both
-engines share, not a Chromium quirk.
+The page then runs without CSP, so this harness cannot test anything CSP governs. Experiments, measurements and the roster-edge contrast results: `docs/field-notes/webkit-local-testing.md`.
 
 ### Lighthouse CI performance assertion (#728, #854, #851)
 
-**The harness measures a served app, not a static build (#869).** Until then,
-`lighthouserc.json` ran `npx serve dist` — static assets only, no Pages Functions,
-no D1 — so every homepage API call failed in CI. `EventTimeline` rendered its tall
-`EventsPageSkeleton`, the fetch failed fast, the skeleton collapsed into a short
-error state, and `<Footer />` (its sibling in `EventsPage`'s `<main>`) moved.
-Lighthouse scored that as a **total CLS of 0.2011**, of which **0.2007** was
-the footer element's own shift score — an artefact of that static-build harness,
-not of the wrangler-served app. Production measured 0.0004 on 2026-08-18 (3 runs,
-same Lighthouse version and flags), so the shift did not reproduce there; that is
-one dated measurement of one page, not a claim about every user's experience.
+`lighthouserc.json` measures the **served app** (`http://localhost:8788`, wrangler + seeded D1 via `.github/actions/e2e-env`), never a static `dist` — the static harness produced a fake 0.2 CLS and a ~0.10 perf deficit that drove two unjustified budget cuts (#869). Measurements and history: `docs/field-notes/lighthouse-ci.md`.
 
-It now points at `http://localhost:8788`, served by `.github/actions/e2e-env`
-(wrangler + a seeded D1 — the same environment E2E uses). Measured 2026-08-18,
-Lighthouse 12.8.2, mobile, `--throttling-method=simulate`, 3 runs each:
-
-| harness | perf (raw runs) | CLS (raw runs) |
-|---|---|---|
-| static `dist` (old) | 0.86 / 0.86 / 0.96 | 0.2011 / 0.2011 / 0.0000 |
-| `https://settimes.ca` | 0.90 / 0.90 | 0.0004 / 0.0004 |
-| wrangler + D1 (current) | CI **median** 0.94 | CI **median** 0.0008 |
-
-Three runs each. The `settimes.ca` row lists only two: its first run was a
-contended outlier (LCP 8.3 s, TBT 21 s) and is excluded rather than averaged in.
-The current row reports CI's **uploaded median LHR** — which is what gets
-published for humans to read, and is *not* what the assertions compare against:
-performance aggregates `optimistic` (best run) and CLS `pessimistic` (worst),
-so neither gated value is the median. Read the median for a sense of the page;
-read the assert step's output for what actually passed or failed.
-
-The old column is the whole story: the one run recording **zero** shift scored
-**0.96**; the two recording 0.2011 scored 0.86. The shift and the ~0.10 deficit
-were one phenomenon. **So #851's question is answered — ~0.84 was never a
-regression**, and CLS was never a real defect (#854).
-
-**The budget is back to 0.90**, restored on 2026-08-18 from five CI runs on the
-fixed harness: **0.94 / 0.95 / 0.95 / 0.95 / 0.96** (median LHRs; the gate
-asserts `optimistic`, so the gated value is at or above these). Both past
-reductions — 0.90 → 0.85 in #532/#534, → 0.80 in #728 — were absorbing the
-static-build artifact, not a real regression, so this is a restoration rather
-than a raise.
-
-**0.90, not 0.95, is deliberate.** A floor at the observed ceiling flakes with
-no code cause; ~5 points of headroom matches the ±2–3 point runner noise
-documented below.
-
-**Never move this floor from a local number.** `lhci` collects all four
-categories, while an ad-hoc `lighthouse --only-categories=performance` does
-not, so the two are not comparable. On 2026-08-18 the same commit measured
-**0.94–0.96** raw, **0.94–0.96** in CI, and **0.74 / 0.84** through local
-`lhci` on a busy machine. Only CI samples count.
-
-**`cumulative-layout-shift` is asserted at ≤ 0.1 with
-`aggregationMethod: "pessimistic"`** so the artifact cannot return silently — it
-sat at 2× the failing threshold for months with nothing going red, because only
-the four category scores were gated. Current value is 0.0008, a ~125× margin.
-
-**The `pessimistic` there is load-bearing, and differs deliberately from the
-performance assertion's `optimistic`.** `optimistic` picks the most favourable
-run *before* comparing, so against the old `0.2011 / 0.2011 / 0.0000` it would
-aggregate to `0.0000` and pass — the guard would not have caught the very
-artifact it exists to prevent. `pessimistic` takes the worst run, so any single
-run above 0.1 fails the gate. That is safe here precisely because CLS is stable
-under load (see below); do **not** copy it onto the performance assertion.
-
-The assertion pins **`aggregationMethod: "optimistic"` (best of 3)** — the most
-lenient option. **Do not switch it to `median`:** median ≤ max, so that only ever
-makes the gate stricter and would re-introduce the flake (#728's original proposed
-"fix" was exactly this, caught in the issue's own follow-up). Accessibility,
-best-practices and seo stay at 0.90 on default aggregation; they have not been
-observed to flake here. That is an observation, not a guarantee — if one starts
-flaking, measure it before moving it.
-
-**Performance numbers look contention-sensitive; CLS did not.** Across one
-session's measurements (2026-08-18) CLS stayed within 0.0000–0.0008 while the
-perf score ranged 0.63 → 0.96 on identical code, **correlating with** host load
-— the runs were not controlled for other variables, so treat this as an observed
-correlation rather than a demonstrated cause. It is still enough to act on:
-measure perf on an idle host or take CI's number, and never re-baseline it from
-a laptop doing other work.
+- **Performance floor 0.90, `aggregationMethod: "optimistic"`.** Do not switch to `median` (only ever stricter → flakes) and do not raise it to the observed ceiling (~5 points of headroom absorbs runner noise).
+- **`cumulative-layout-shift` ≤ 0.1 with `"pessimistic"`** — load-bearing: `optimistic` would have passed the very artifact it guards against. Safe because CLS is stable under load; do **not** copy `pessimistic` onto performance.
+- **Never move a floor from a local number.** Perf is contention-sensitive (0.63 → 0.96 on identical code); local `lhci` is not comparable to CI. Only CI samples count.
 
 ### The mutation gate — documented invariants, proven executable
 
@@ -1393,195 +1149,21 @@ Requires the CodeRabbit CLI (`brew install --cask coderabbit`, then `coderabbit 
 
 **`make review` is a strict subset of the PR review, and the gap is structural — not flake.** The CLI does not load `.github/instructions/**`; the PR bot does. That is why `coderabbit review` has a `-c, --config <files...>` flag for "additional instructions" at all. Three findings on 2026-08-19 (#866, #873 ×2) appeared only post-open and every one cited *"As per coding guidelines"*, tracing to rules in that directory — e.g. `nodejs-javascript-vitest.instructions.md`'s "Write tests for all new features and bug fixes". **So a post-open `Minor` is expected, not a sign the pre-PR gate failed.** The CLI *does* read `.coderabbit.yaml` and the `knowledge_base.learnings` (its output says "Based on learnings"); only the instruction files are missing.
 
-**When the CLI cites a "coding guideline", look it up yourself — it is the one
-claim it structurally cannot substantiate.** The CLI raises guideline findings it
-inherited from the shared model but cannot point at the file, because it never
-loaded `.github/instructions/**`. The PR bot raises the same finding *with* the
-citation. Treating the uncited version as unfounded is how you end up reversing
-yourself post-open.
-
-Worked example, #1048 (2026-09-01). The CLI said "return `undefined`, not
-`null`, per coding guideline". I grepped `.github/instructions/` for
-`prefer.*undefined` and `return undefined`, found nothing, and declined it **in
-the PR body**. The rule is real — `nodejs-javascript-vitest.instructions.md:16`,
-"Never use `null`, always use `undefined` for optional values" — and my patterns
-simply did not match its wording. The PR bot then raised it with the file and
-line, and the decline had to be publicly retracted.
-
-Two lessons, and the second is the general one: grep the *cited wording*, not a
-paraphrase of it; and **a clean grep is a hypothesis, not a finding** (the same
-trap as #996). The cheap habit that avoids the whole round trip: when a CLI
-finding says "as per coding guidelines", open the five files in that directory
-that apply to the changed file type before agreeing or disagreeing.
-
-**Passing `-c .github/instructions/*.md` was tried and is NOT adopted.** In the one run measured, it failed to reproduce the PR's actual finding and instead emitted a false **critical** — claiming Vitest could not parse a file that parsed and passed 3/3 — on a run whose log was full of `fetchWithRetry` errors. A gate that emits false criticals trains you to skim the actionable bucket, which is the same "signal drowns" failure the streaming-link audit hit in #871. One degraded trial is not proof the flag is broken; it is enough not to wire it into a standing gate unmeasured. Re-test properly (several runs, good network) before revisiting.
-
 `make gate` deliberately does **not** include it — `gate` must stay fast and offline-capable; `review` needs the network and takes minutes.
 
-**A green CodeRabbit check does not NECESSARILY mean the diff was reviewed.** When every
-changed file is excluded by a path filter, CodeRabbit posts *"Review skipped"*
-and the status check still reports **pass**. Measured on #1083, a security bump
-whose only change was `package-lock.json`: the badge was green and nothing had
-been read.
+Reading CodeRabbit correctly — worked examples in `docs/field-notes/coderabbit.md`:
 
-The exclusion itself is correct and deliberate — `.coderabbit.yaml` sets
-`!**/package-lock.json` and CodeRabbit ignores it by default too (the skip
-message lists the pattern twice for that reason). A lockfile diff is generated
-hashes; line-level review of it is noise.
-
-**So for a LOCKFILE-ONLY dependency change, do not read CodeRabbit — read Snyk's
-PR check and the Dependabot alerts.** The qualifier is load-bearing: CodeRabbit
-skips a PR only when **every** changed file is excluded, so a dependency bump that
-also touches `package.json`, a workflow or application code stays fully in its
-review scope, and Snyk plus Dependabot do not substitute for reading that code.
-Check what the PR actually changed before deciding CodeRabbit had nothing to say.
-This used to say `dependency-review`, which was the
-check designed for the class and which passed on #1083 alongside gitleaks and
-GitGuardian. **That workflow no longer exists** (removed 2026-09-16 — see "The
-security tooling this repo actually has"), so the advisory half of the job falls
-to Snyk and Dependabot. Both still work on a private Free-plan repo: the very
-push that made this repo private was answered with *"GitHub found 3
-vulnerabilities on BreakableHoodie/settimesdotca's default branch"*, which is
-Dependabot alerting on a private repo — verified, not assumed.
-
-**But be precise about what an advisory check covers, because two different
-threats hide behind one green badge.** It compares the PR's dependency changes
-against advisory databases and fails on a package with a *known* vulnerability at
-or above its configured severity. That is the #1083 case exactly, and it is
-genuinely covered.
-
-It does **not** verify that a lockfile's `resolved` URLs still point at the
-expected registry, nor re-check `integrity` against what it fetches. A lockfile
-entry carries `version`, `resolved` and `integrity`; an edit repointing
-`resolved` at an attacker-controlled host while leaving the version untouched
-raises no advisory, and `npm ci` then fetches whatever `resolved` names.
-**That gap is now GUARDED** by `scripts/__tests__/lockfileIntegrity.test.js`
-(2026-09-04). It discovers every `package-lock.json` in the repo, asserts each
-`resolved` URL points at an allowlisted registry host, and asserts every remote
-entry carries an `integrity` hash. Baseline when added: 1,295 entries across two
-lockfiles, all `registry.npmjs.org`, all hashed -- so the allowlist starts at one
-host and a second is a deliberate diff.
-
-Mutation-verified against the real attack shape: repointing one entry's
-`resolved` at another host while leaving `version` untouched -- which raises no
-advisory, so an advisory check stays green -- turns the guard red and names the
-package. That guard is now MORE load-bearing than when it was written: it is a
-plain test in the suite, so unlike the checks removed on 2026-09-16 it does not
-depend on a GitHub plan tier. Lockfiles are discovered rather than listed, so a new workspace is
-covered the day it appears.
-
-The practical split: routine generated churn (a Dependabot group bump, a
-transitive patch) is well served by the advisory check and needs no human diff
-read. A lockfile change *not* produced by npm on your own machine deserves one,
-whatever the checks say.
-
-This is the same shape as `lint-md` missing from `.PHONY` (make reported "up to
-date" having linted nothing), the Lighthouse artifact that uploaded nothing while
-only warning, and axe reporting `incomplete` rather than a violation on a
-gradient: **green meaning "did not look", not "looked and found nothing."** When
-a gate goes green on a change you expected it to have opinions about, check
-whether it ran at all.
-
-**A review's findings are not all in its threads.** CodeRabbit posts
-"outside diff range" comments in the review BODY, because GitHub cannot anchor
-an inline comment to a line the diff does not touch. A GraphQL query over
-`reviewThreads` -- the obvious way to enumerate findings, and the one used here
-for a long time -- returns every inline thread and **none** of those. They are
-invisible unless the body is read.
-
-Missed one on #1105 (2026-09-04): `--match --color-accent-500` set
-`flags.match = true` and died with "--match <pattern> is required", an error
-about a flag that WAS supplied. Not hypothetical -- `--color-accent-500` is a
-theme token used throughout the CSS and every SQL comment in `migrations/`
-begins with `--`. The owner spotted it in the PR; the tooling had not.
-
-So enumerate BOTH: the threads, and each review's `body`. An audit of #1097
-through #1104 afterwards found no others, so this was a first occurrence rather
-than a backlog -- but nothing in the thread query would have said so either way.
-
-Same family as the rest of this section: a green-looking read that quietly saw
-less than it appeared to.
-**Nitpicks hide in the same place, and are not always nits.** Alongside
-outside-diff findings, CodeRabbit collapses a "Nitpick comments" section into a
-`<details>` block in that same body. On #1105 the one nitpick was that a test
-asserting "a `--with-file` operand starting with `--` is still read as a path"
-passed an ABSOLUTE path -- `/var/.../--repl.txt`, which does not begin with
-`--` as an operand at all. The test could not fail for the reason it claimed,
-and did pass against the broken parser. Labelled Trivial; it was a vacuous test,
-which is the defect class this file cares most about.
-
-So read the body for BOTH sections. Judge a finding by what it says, not by the
-bucket it arrived in.
-Related, and why the push-budget hook is not "wrong": it counts **pushes**, and a
-skipped review consumes none of the hourly allowance. The count is therefore
-conservative — you sometimes have more budget than it thinks. Do not "fix" that
-by having the hook query the API; it is deliberately POSIX `sh` with no `gh`,
-`jq` or network call, because a hook that fails open when a tool is missing is
-worse than no hook.
+- **An "as per coding guidelines" finding from `make review` is unsubstantiated by construction** — that invocation passes no `-c`, so it never loads `.github/instructions/**` (a CLI run given `-c` would). Open the applicable instruction files and grep the *cited wording* before agreeing or declining — a clean grep is a hypothesis (#1048). Passing `-c .github/instructions/*.md` was tried and is **not** adopted.
+- **Green can mean "did not look".** CodeRabbit skips a PR whose every file is path-excluded and still reports pass. For a **lockfile-only** bump, read Snyk and Dependabot instead; `scripts/__tests__/lockfileIntegrity.test.js` guards `resolved` hosts and `integrity` hashes, which no advisory check covers. A lockfile change *not* produced by npm on your machine deserves a human diff read.
+- **Findings are not all in threads.** "Outside diff range" comments and the collapsed "Nitpick comments" live in each review's **body** — a `reviewThreads` query misses both, and a "Trivial" nitpick was once a vacuous test. Read threads *and* bodies.
 
 ### CodeRabbit costs money past the included allowance — batch your pushes
 
-**Every push to a PR branch triggers a review.** Past the included allowance
-reviews are **not paused, they are billed** (this account has the usage-based
-add-on). There is no natural brake; the discipline has to come from the workflow.
+**Every push to a PR branch that changes at least one review-eligible file triggers a review** (a push touching only path-excluded files, such as a lockfile, is skipped and uses no allowance), **and past the included allowance reviews are billed, not paused.** The allowance is **dynamic** (it has read 1, 4, 3 and 5 reviews/hour on Essentials) — read it from a *current* review footer, never from memory or this file. History: `docs/field-notes/coderabbit.md`.
 
-**The allowance is DYNAMIC — read it from a current footer, never recall it.**
-This section twice stated a static figure and was twice wrong. It first said
-"CodeRabbit Pro allows 5 PR reviews per developer per rolling hour", with the
-hook encoding `LIMIT=5`; the plan is **Essentials**, so the Pro figure never
-applied here at all. It was then corrected to a flat "1 review/hour", which was
-right on the day and wrong five days later. CodeRabbit states the real figure
-in the footer of every review it posts, and this account has been observed at
-two values:
-
-> 2026-09-04, #1113 — **Included review availability:** 0 reviews are currently
-> available. Your included PR review attempts over the past 7 days set your
-> current allowance at **1 review per hour**. **Plan**: Essentials
-
-<!-- two separate quotes, five days apart -->
-
-> 2026-09-09, #1134 — **Included review availability:** 3 reviews are currently
-> available. Your included PR review attempts over the past 7 days set your
-> current allowance at **4 reviews per hour**. **Plan**: Essentials
-
-<!-- a third quote, one day later -->
-
-> 2026-09-10, #1154 — **Included review availability:** 0 reviews are currently
-> available. Your included PR review attempts over the past 7 days set your
-> current allowance at **3 reviews per hour**. **Plan**: Essentials
-
-Three readings, three different numbers — 1, then 4, then 3. It **recovers** as
-7-day usage falls and **falls** as usage rises, so it moves in both directions.
-That is the durable fact, and it is why no number written here stays true —
-including these three. `.githooks/pre-push` tracks the most recent observed
-footer (`LIMIT=3` as of 2026-09-10) and records both observations in its own comments, so a stale
-value is visible as a stale date rather than as a bare constant. Move it only
-against a CURRENT footer.
-
-**Erring low is not free, which the 2026-09-09 session demonstrated.** With the
-hook at `LIMIT=1` while the real allowance was 4, a ready PR sat unpushed for
-~30 minutes waiting on a budget that had already refilled. A guard that blocks
-when three reviews are genuinely available teaches you to reach for
-`CODERABBIT_OVERAGE=1` by reflex — and an override you always use is not a
-guard. The hook still cannot ask (deliberately POSIX `sh`, no `gh`, no `jq`, no
-network), so the only correction available is reading a footer and updating it.
-
-**The expensive failure is concentration, not volume.** The same number of pushes spread across a day costs nothing, because the window keeps refilling. PR #998 burned **4 reviews in ~25 minutes on a two-line change** — which, with #997's review already inside the same rolling hour, is what reached the limit of 5. Fixes went out one at a time instead of batched — a stale comment, then an E2E failure, then an incomplete sweep of that same failure, then a nit on prose added two pushes earlier. Three of the four were avoidable by reading the diff and running the right suite locally first.
-
-`make hooks` installs a tracked `pre-push` guard (`.githooks/pre-push`, wired via `core.hooksPath`). It warns at the first review in the window and **blocks at the allowance**, reporting how many minutes until the budget refills. Run it once per clone — hooks are not cloned with the repo.
-
-**The rule for overriding is urgency to land, NOT issue priority.** Priority is the wrong axis: a p1 fixed correctly costs one review, while a p3 botched four times costs four — overage comes from *rework*, not importance, and a "p1 only" rule would license sloppiness exactly where correctness matters most.
-
-**Waiting is free.** The window is rolling, so the budget refills on its own. Ask only whether this must land *before it refills*:
-
-- show day, a production incident, or someone blocked on you → override
-- everything else → batch the remaining fixes and push once
-
-```bash
-CODERABBIT_OVERAGE=1 git push   # emergencies only; it bills
-```
-
-The hook is deliberately POSIX `sh` with no `gh`, `jq`, or network call — one that fails open when a tool is missing is worse than none, and it runs on every push. `lint-sh` globs `*.sh`, which would have skipped it silently, so that target now lists `.githooks/*` explicitly.
+- **Concentration is the expensive failure, not volume** — #998 burned 4 reviews in ~25 min on a two-line change. Read your own diff and run the right suite locally, then push once.
+- `make hooks` installs `.githooks/pre-push`, which warns at the first review in the window and blocks at `LIMIT` (update it only against a current footer; erring low blocks pushes the budget would allow). Deliberately POSIX `sh`, no `gh`/`jq`/network.
+- **Override on urgency to land, not issue priority:** show day, a production incident, or someone blocked → `CODERABBIT_OVERAGE=1 git push`. Everything else: waiting is free, the window refills.
 
 ### Before every push (including follow-up commits during PR review)
 

@@ -60,6 +60,7 @@ exclude_docs: |
   superpowers/
   adr/adr-*.md
   REPORT_CARD_REVIEW.md
+  field-notes/
   SETTIMES_V2_IMPLEMENTATION_PLAN.md
   SETTIMES_V2_UX_BRIEF.md
   SETTIMES_V2_WIREFRAMES.md

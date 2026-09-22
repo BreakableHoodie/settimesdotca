@@ -35,12 +35,12 @@
     "@tiptap/starter-kit": "^3.31.3",
     "dompurify": "^3.4.15",
     "jspdf": "^4.2.1",
-    "lucide-react": "^1.43.0",
-    "marked": "^18.0.12",
+    "lucide-react": "^1.46.0",
+    "marked": "^18.0.13",
     "prop-types": "^15.8.1",
     "qrcode.react": "^4.2.0",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "react-helmet-async": "^3.0.0",
     "react-router-dom": "^7.18.3"
   },
@@ -51,15 +51,15 @@
     "@lhci/cli": "^0.15.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@tailwindcss/typography": "^0.5.20",
-    "@testing-library/dom": "^10.0.0",
+    "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
-    "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.7",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
     "@vitest/coverage-v8": "^4.1.11",
     "axe-core": "^4.13.0",
-    "baseline-browser-mapping": "^2.11.21",
+    "baseline-browser-mapping": "^2.11.23",
     "eslint": "^10.10.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-jsx-a11y": "^6.10.2",
@@ -73,10 +73,10 @@
     "prettier": "^3.9.5",
     "tailwindcss": "^4.2.2",
     "terser": "^5.51.2",
-    "vite": "^8.2.2",
+    "vite": "^8.3.0",
     "vite-bundle-visualizer": "^1.0.0",
     "vitest": "^4.1.11",
-    "wrangler": "^4.130.0"
+    "wrangler": "^4.131.2"
   },
   "overrides": {
     "@lhci/cli": {
@@ -100,8 +100,11 @@
     "@puppeteer/browsers": "3.2.0",
     "basic-ftp": "5.3.1",
     "esbuild": "0.28.1",
-    "sharp": "0.35.3",
+    "sharp": "0.35.4",
     "js-yaml": "^4.3.2",
-    "ajv": "^6.14.0"
+    "ajv": "^6.14.0",
+    "body-parser": {
+      "qs": "6.16.0"
+    }
   }
 }

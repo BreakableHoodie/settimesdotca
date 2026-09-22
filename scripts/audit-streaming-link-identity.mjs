@@ -174,10 +174,19 @@ export function classify(dbName, platformName) {
 const DECISIONS = new Set(["same-artist", "different-artist"]);
 const PLATFORMS = new Set(["spotify", "apple"]);
 
+/** Uniqueness key for a register entry: profile, platform ("spotify"|"apple"), and the platform name as observed. */
 export function decisionKey(bandProfileId, platform, platformName) {
   return `${bandProfileId}|${platform}|${platformName}`;
 }
 
+/**
+ * Validate the decision register's shape and return it unchanged.
+ * @param {unknown} register - parsed contents of streaming-link-decisions.json
+ * @returns {Array<object>} the same array
+ * @throws {Error} naming the first bad entry: not an array, a non-object entry, a bad bandProfileId /
+ *   platform / platformName / decision / reason / decidedOn (YYYY-MM-DD), or a duplicate key. main() maps
+ *   any throw to exit 2 -- a register that silently failed to load would make every decision vanish.
+ */
 export function validateDecisionRegister(register) {
   if (!Array.isArray(register)) throw new Error("Streaming-link decision register must be an array");
 
@@ -213,6 +222,10 @@ export function validateDecisionRegister(register) {
   return register;
 }
 
+/**
+ * Read and validate the register (defaults to scripts/streaming-link-decisions.json).
+ * @throws {Error} if the file is missing, is not JSON, or fails validateDecisionRegister().
+ */
 export async function loadDecisionRegister(filePath = decisionRegisterPath) {
   let parsed;
   try {
@@ -227,6 +240,13 @@ function platformKey(platform) {
   return platform === "apple_music" ? "apple" : platform;
 }
 
+/**
+ * Apply a recorded human decision to classify()'s verdict.
+ * Matches on profile id, platform (apple_music rows map to "apple") and the platform name AS OBSERVED,
+ * so a link repointed to a different artist never inherits an old decision.
+ * @returns {{ verdict: string, decision: object|undefined }} same-artist -> "OK_DECIDED";
+ *   different-artist -> "MISMATCH"; no matching decision -> classify()'s verdict unchanged.
+ */
 export function resolveDecision(classified, check, register) {
   const decision = register.find(
     (entry) =>
@@ -241,6 +261,13 @@ export function resolveDecision(classified, check, register) {
   };
 }
 
+/**
+ * The single place buckets and the exit code are decided (main() only fetches and prints).
+ * @param {Array<{id:number,name:string,platform:string,platformName:string|undefined,url:string}>} checks
+ * @param {Array<object>} register - a validated decision register
+ * @returns {{ buckets: {OK:[],OK_DECIDED:[],REVIEW:[],MISMATCH:[],UNRESOLVED:[]}, exitCode: 0|1|3 }}
+ *   exitCode: 1 if any MISMATCH, else 3 if any undecided REVIEW, else 0. UNRESOLVED never fails the run.
+ */
 export function evaluateChecks(checks, register) {
   validateDecisionRegister(register);
   const buckets = { OK: [], OK_DECIDED: [], REVIEW: [], MISMATCH: [], UNRESOLVED: [] };

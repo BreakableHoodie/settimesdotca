@@ -305,6 +305,15 @@ export const MUTATIONS = [
     tests: ["functions/api/admin/events/__tests__/schedule.test.js"],
   },
   {
+    id: "schedule-save-audit-predicate",
+    invariant:
+      "CLAUDE.md 'Multi-row schedule saves check the FINAL state (#1161)' — the audit row shares the UPDATE's status predicate, so a concurrent publish toggle cannot leave a change unattributed",
+    file: "functions/api/admin/events/[id]/schedule.js",
+    find: 'where: { id: eventId, status: ["draft", "published"] }',
+    replace: "where: { id: eventId, status: event.status }",
+    tests: ["functions/api/admin/events/__tests__/schedule.test.js"],
+  },
+  {
     id: "schedule-save-absent-meta",
     invariant:
       "CLAUDE.md 'Multi-row schedule saves check the FINAL state (#1161)' — only an explicit meta.changes === 0 means not applied",

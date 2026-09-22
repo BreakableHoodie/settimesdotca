@@ -581,16 +581,19 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
       )
       return { failedIds: [] }
     } catch (error) {
+      // The save is ALL-OR-NOTHING, so on any error every submitted row is
+      // unsaved -- including rows that are not in a clash pair. ScheduleGrid
+      // clears the draft of every row NOT in failedIds, so returning only the
+      // clashing ids would silently discard a third, non-clashing edit that
+      // never reached the server (Vera, #1161 review).
+      const failedIds = changedRows.map(row => row.id)
       const conflicts = error.status === 409 ? error.details?.conflicts || [] : []
-      const failedIds = conflicts.length
-        ? [...new Set(conflicts.flatMap(conflict => [conflict.a?.id, conflict.b?.id].filter(id => id != null)))]
-        : changedRows.map(row => row.id)
       if (conflicts.length > 0) {
         const [first] = conflicts
         const more =
           conflicts.length > 1 ? ` (and ${conflicts.length - 1} more clash${conflicts.length > 2 ? 'es' : ''})` : ''
         showToast(
-          `Not saved: ${first.a.name} overlaps ${first.b.name} at the same venue${more}. Nothing was saved — fix the highlighted rows and save again.`,
+          `Not saved: ${first.a.name} overlaps ${first.b.name} at the same venue${more}. Nothing was saved — fix the clash and save again.`,
           'error'
         )
       } else {

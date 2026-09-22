@@ -172,6 +172,24 @@ describe("PUT /api/admin/events/:id/schedule", () => {
     ).toBe(0);
   });
 
+  it("still writes the audit row when the event is published between the read and the batch", async () => {
+    const { env, rawDb, event, venue, first, second } = setup("draft");
+    const realBatch = env.DB.batch.bind(env.DB);
+    env.DB.batch = async (statements) => {
+      rawDb.prepare("UPDATE events SET status = 'published' WHERE id = ?").run(event.id);
+      return realBatch(statements);
+    };
+    const res = await call(env, event.id, [
+      { id: first.id, startTime: "21:00", endTime: "22:00", venueId: venue.id },
+      { id: second.id, startTime: "20:00", endTime: "21:00", venueId: venue.id },
+    ]);
+    expect(res.status).toBe(200);
+    expect(stored(rawDb, first.id).start_time).toBe("21:00");
+    expect(
+      rawDb.prepare("SELECT COUNT(*) AS count FROM audit_log WHERE action = 'event.schedule_updated'").get().count,
+    ).toBe(1);
+  });
+
   it("reports success when D1 omits meta.changes, because only an explicit 0 means not applied", async () => {
     const { env, rawDb, event, venue, first, second } = setup();
     const realBatch = env.DB.batch.bind(env.DB);

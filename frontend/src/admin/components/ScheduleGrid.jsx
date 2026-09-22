@@ -27,11 +27,12 @@ function isDirty(draft, original) {
  * whole bill.
  *
  * Ownership split: this component owns DRAFT state and the dirty/conflict
- * computation; the parent (LineupTab) owns the actual `bandsApi.update`
- * calls, the reload, and the toast. `onSave` is handed only the rows that
- * actually changed and resolves to `{ failedIds }` so a partial failure can
- * leave exactly the failed rows marked unsaved for a retry, rather than
- * losing every edit or silently dropping the failures.
+ * computation; the parent (LineupTab) owns the save request (one atomic
+ * `PUT /api/admin/events/:id/schedule`, #1161), the reload, and the toast.
+ * `onSave` is handed only the rows that actually changed and resolves to
+ * `{ failedIds }`. A row NOT in failedIds is treated as saved and its draft is
+ * cleared -- so because the save is all-or-nothing, the parent must return
+ * EVERY submitted id on any failure, never just the clashing ones.
  *
  * `edits` intentionally holds an entry only for rows a user has touched.
  * Dirty-ness is always recomputed against the CURRENT `bands` prop, so once

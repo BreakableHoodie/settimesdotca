@@ -950,13 +950,30 @@ describe('LineupTab — schedule mode', () => {
 
     await waitFor(() =>
       expect(showToast).toHaveBeenCalledWith(
-        'Not saved: Headliner overlaps Support at the same venue. Nothing was saved — fix the highlighted rows and save again.',
+        'Not saved: Headliner overlaps Support at the same venue. Nothing was saved — fix the clash and save again.',
         'error'
       )
     )
     expect(screen.getByTestId('failed-ids')).toHaveTextContent('1,2')
   })
-  it('counts every clash and reports each conflicting id once', async () => {
+  // The data-loss case: row 2 is in NO clash pair (row 1 clashes with an
+  // untouched stored row, 99), but the save is all-or-nothing, so row 2 was not
+  // saved either. It must come back as failed, or ScheduleGrid clears its draft
+  // and the edit is silently lost.
+  it('fails every submitted row on a 409, including rows outside any clash', async () => {
+    const conflictError = new Error('This time overlaps another set at the same venue.')
+    conflictError.status = 409
+    conflictError.details = { conflicts: [{ a: { id: 1, name: 'Headliner' }, b: { id: 99, name: 'Untouched' } }] }
+    eventsApi.updateSchedule.mockRejectedValue(conflictError)
+    render(<LineupTab selectedEventId={37} selectedEvent={makeEvent()} events={[makeEvent()]} showToast={showToast} />)
+    fireEvent.click(await screen.findByRole('button', { name: /Schedule/i }))
+    await screen.findByTestId('schedule-grid')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Trigger schedule save' }))
+
+    await waitFor(() => expect(screen.getByTestId('failed-ids')).toHaveTextContent(/^1,2$/))
+  })
+  it('counts every clash and fails every submitted row', async () => {
     const conflictError = new Error('This time overlaps another set at the same venue.')
     conflictError.status = 409
     conflictError.details = {
@@ -976,6 +993,6 @@ describe('LineupTab — schedule mode', () => {
     await waitFor(() =>
       expect(showToast).toHaveBeenCalledWith(expect.stringContaining('(and 2 more clashes)'), 'error')
     )
-    expect(screen.getByTestId('failed-ids')).toHaveTextContent(/^1,2,3$/)
+    expect(screen.getByTestId('failed-ids')).toHaveTextContent(/^1,2$/)
   })
 })

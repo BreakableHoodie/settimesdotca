@@ -143,7 +143,11 @@ export async function onRequestPut(context) {
         permCheck.user.userId,
         "event.schedule_updated",
         "event",
-        { table: "events", where: { id: eventId, status: event.status } },
+        // The SAME status predicate as the UPDATEs above. Pinning the status read
+        // at request start (`status = ?`) meant a concurrent draft<->published
+        // toggle let every UPDATE commit while this insert matched nothing:
+        // a schedule change with no audit row (Vera, #1161 review).
+        { table: "events", where: { id: eventId, status: ["draft", "published"] } },
         {
           changes: changes.map((change) => {
             const previous = performanceById.get(change.id);

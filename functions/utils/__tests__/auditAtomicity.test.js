@@ -312,6 +312,29 @@ describe("bulk PATCH audit atomicity", () => {
 });
 
 describe("auditLogStatementForInsertedRow", () => {
+  it("renders an array value as IN (...) so the audit row can share its UPDATE's predicate", () => {
+    const bind = vi.fn(() => ({ run: vi.fn() }));
+    const env = { DB: { prepare: vi.fn(() => ({ bind })) } };
+    auditLogStatementForInsertedRow(
+      env,
+      2,
+      "event.schedule_updated",
+      "event",
+      { table: "events", where: { id: 37, status: ["draft", "published"] } },
+      {},
+      null,
+    );
+    expect(env.DB.prepare.mock.calls[0][0]).toContain("FROM events WHERE id = ? AND status IN (?, ?)");
+    expect(bind.mock.calls[0].slice(-3)).toEqual([37, "draft", "published"]);
+  });
+
+  it("refuses an empty array rather than rendering `IN ()`", () => {
+    const env = { DB: { prepare: vi.fn(() => ({ bind: vi.fn() })) } };
+    expect(() =>
+      auditLogStatementForInsertedRow(env, 2, "x", "event", { table: "events", where: { status: [] } }, {}, null),
+    ).toThrow(/empty array/);
+  });
+
   it("resolves resource_id by lookup and binds every other value", () => {
     const bind = vi.fn(() => ({ run: vi.fn() }));
     const env = { DB: { prepare: vi.fn(() => ({ bind })) } };

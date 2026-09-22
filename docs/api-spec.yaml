@@ -1877,6 +1877,62 @@ paths:
         "500":
           $ref: "#/components/responses/ServerError"
 
+  /api/admin/events/{id}/schedule:
+    put:
+      tags:
+        - Admin - Events
+      summary: Atomically update multiple performance schedule rows
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - changes
+              properties:
+                changes:
+                  type: array
+                  minItems: 1
+                  maxItems: 200
+                  items:
+                    type: object
+                    required:
+                      - id
+                      - startTime
+                      - endTime
+                      - venueId
+                    properties:
+                      id:
+                        type: integer
+                      startTime:
+                        type: string
+                        nullable: true
+                        description: HH:MM or null/empty string for TBD
+                      endTime:
+                        type: string
+                        nullable: true
+                        description: HH:MM or null/empty string for TBD
+                      venueId:
+                        type: integer
+                        nullable: true
+      responses:
+        "200":
+          description: Schedule rows updated atomically
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
   /api/admin/events/{id}/metrics:
     get:
       tags:

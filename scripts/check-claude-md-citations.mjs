@@ -41,6 +41,10 @@ const KNOWN_ABSENT = new Map([
   ["dist/index.html", "build output; produced by `npm run build`, never committed"],
   ["sessions/", "a directory fragment inside a table cell, not a full path"],
   ["admin/", "a directory fragment inside a table cell, not a full path"],
+  [".claude/settings.local.json", "machine-local Claude settings; intentionally not committed"],
+  ["instructions/", "legacy path; the tracked instruction files live under .github/instructions/"],
+  [".agents/skills/", "per-machine delegated skills directory; intentionally gitignored"],
+  ["coverage/coverage-final.json", "produced by `npm run test:coverage`, never committed; absent in a fresh clone"],
 ]);
 
 /**

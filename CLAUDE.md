@@ -275,6 +275,36 @@ Bands starting before 6 AM are "after-midnight" sets that belong to the *previou
 - Logic: `prepareBands()` adds `MS_PER_DAY` to `startMs`/`endMs` for times below this threshold
 - **Never remove or lower this threshold.** Any sort, filter, or conflict-detection that touches performance times must apply the same offset or delegate to `prepareBands`.
 
+### Multi-row schedule saves check the FINAL state (#1161)
+
+The schedule grid saves every changed row in ONE request, `PUT
+/api/admin/events/:id/schedule` (`functions/api/admin/events/[id]/schedule.js`).
+It merges the changes into the event's stored performances, runs
+`detectDraftConflicts()` (`functions/utils/timeConflicts.js`) over that merged
+arrangement, and commits every UPDATE plus one audit row in a single
+`DB.batch()`. A conflict is a 409 listing the clashing pairs, and nothing is
+written.
+
+**Why it exists:** saving rows one at a time through `PUT
+/api/admin/bands/:id` checks each new time against the others' STORED times,
+so swapping two sets 409s both halves — no order makes each step valid. Do not
+route multi-row edits back through the per-row PUT, and do not "simplify"
+`detectDraftConflicts` to compare a changed row against stored rows: that is
+exactly the regression, and the mutation gate reproduces it.
+
+Three things are load-bearing:
+
+- **Only pairs touching a changed row are reported**, matching the per-row PUT.
+  A pre-existing clash between two untouched rows must not block an unrelated
+  save.
+- **Cancelled sets still count**, as they do in `checkConflicts`. Changing that
+  is a separate decision, not a side effect.
+- **The batch re-checks the event is still `draft`/`published`** (an `EXISTS`
+  on every UPDATE and a status-conditioned audit insert). A concurrent archive
+  makes every statement match nothing, and the handler answers 409. Only an
+  **explicit** `meta.changes === 0` counts as "not applied" — an absent `meta`
+  must not turn a committed save into a false "not saved".
+
 ### Public event visibility is `status`, never `is_published` (#800) — history, guards still live
 
 `events.is_published INTEGER` was deprecated by migration 0005 and, for years, never dropped (0036 even added a fresh index on it). Until #799, **`functions/api/admin/events/[id]/archive.js` wrote `status = 'archived', is_published = 0`** — archiving unpublished under the old column. On 2026-08-10 archiving the last un-archived event dropped 13 public read paths to zero rows simultaneously and took the public site dark.

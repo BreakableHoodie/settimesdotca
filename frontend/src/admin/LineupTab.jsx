@@ -567,60 +567,35 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
     }
   }
 
-  // Schedule mode (#1157): one row per set, saved in a single action instead
-  // of the 15-round-trip Edit -> form -> Save loop. ScheduleGrid hands back
-  // only the rows the admin actually touched; this is the one place that
-  // calls bandsApi.update for them. Promise.allSettled is required, not
-  // Promise.all — a partial failure (one bad venue among 12 saves) must not
-  // discard the 11 that succeeded, and the settled results are what let us
-  // report exactly which ids failed so ScheduleGrid can keep those rows
-  // dirty for a retry instead of losing the edit.
+  // Schedule mode (#1157): changed rows are validated against one final draft
+  // and committed atomically, so swaps do not need an intermediate free slot.
   const handleScheduleSave = async changedRows => {
     setScheduleSaving(true)
     try {
-      const results = await Promise.allSettled(
-        changedRows.map(row =>
-          bandsApi.update(row.id, { startTime: row.startTime, endTime: row.endTime, venueId: row.venueId })
-        )
-      )
-      const failedIds = results
-        .map((result, index) => (result.status === 'rejected' ? changedRows[index].id : null))
-        .filter(id => id != null)
-
-      // Rows are saved independently, and the PUT rejects a conflicting time
-      // with 409. So SWAPPING two sets' times fails both halves: each new time
-      // clashes with the other row, which still holds it. Running them in
-      // parallel does not help and neither would ordering them.
-      //
-      // Saying so is the point. A bare "2 failed" on a reorder reads as a bug;
-      // naming the conflict tells the operator to move one set to a free slot
-      // first. The real fix is an atomic multi-row endpoint that validates the
-      // whole draft at once — filed rather than smuggled in here (#1161).
-      const anyConflict = results.some(
-        result => result.status === 'rejected' && /conflict/i.test(result.reason?.message ?? '')
-      )
-
+      await eventsApi.updateSchedule(selectedEventId, changedRows)
       const reloaded = await loadData()
-
-      const succeededCount = changedRows.length - failedIds.length
-      const summary = `Saved ${succeededCount} of ${changedRows.length} change${changedRows.length === 1 ? '' : 's'}`
-      // A failed reload is reported, never folded into the failure count. The
-      // rows DID save; calling them failed would be a lie that invites a
-      // pointless re-save. What the operator actually needs to know is that
-      // the list on screen is now stale.
-      const caveats = [
-        failedIds.length > 0
-          ? `${failedIds.length} failed — retry the highlighted rows.${
-              anyConflict ? ' Swapping two set times needs one moved to a free slot first.' : ''
-            }`
-          : '',
-        reloaded ? '' : 'Could not refresh the list, so it may show stale times — reload the page.',
-      ].filter(Boolean)
+      const caveat = reloaded ? '' : '. Could not refresh the list, so it may show stale times — reload the page.'
       showToast(
-        caveats.length > 0 ? `${summary}. ${caveats.join(' ')}` : summary,
-        failedIds.length > 0 || !reloaded ? 'error' : 'success'
+        `Saved ${changedRows.length} change${changedRows.length === 1 ? '' : 's'}${caveat}`,
+        reloaded ? 'success' : 'error'
       )
-
+      return { failedIds: [] }
+    } catch (error) {
+      const conflicts = error.status === 409 ? error.details?.conflicts || [] : []
+      const failedIds = conflicts.length
+        ? [...new Set(conflicts.flatMap(conflict => [conflict.a?.id, conflict.b?.id].filter(id => id != null)))]
+        : changedRows.map(row => row.id)
+      if (conflicts.length > 0) {
+        const [first] = conflicts
+        const more =
+          conflicts.length > 1 ? ` (and ${conflicts.length - 1} more clash${conflicts.length > 2 ? 'es' : ''})` : ''
+        showToast(
+          `Not saved: ${first.a.name} overlaps ${first.b.name} at the same venue${more}. Nothing was saved — fix the highlighted rows and save again.`,
+          'error'
+        )
+      } else {
+        showToast(error.message || 'Failed to save schedule', 'error')
+      }
       return { failedIds }
     } finally {
       setScheduleSaving(false)

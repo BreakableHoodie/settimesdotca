@@ -7,6 +7,7 @@ import {
   computeNewEndTime,
   checkConflicts,
   detectBulkConflicts,
+  detectDraftConflicts,
 } from "../timeConflicts.js";
 import { createTestEnv, insertBand, insertEvent, insertVenue } from "../../api/test-utils.js";
 
@@ -71,6 +72,38 @@ describe("intervalsOverlap", () => {
 
   it("returns false for completely separate intervals", () => {
     expect(intervalsOverlap([0, 30], [60, 90])).toBe(false);
+  });
+});
+
+describe("detectDraftConflicts", () => {
+  const options = { eventDate: "2026-08-01", changedIds: new Set([1]) };
+
+  it("reports only changed-row conflicts and preserves pair shape", () => {
+    expect(
+      detectDraftConflicts(
+        [
+          { id: 1, name: "Changed", venue_id: 4, start_time: "20:00", end_time: "21:00" },
+          { id: 2, name: "Other", venue_id: 4, start_time: "20:30", end_time: "21:30" },
+        ],
+        options,
+      ),
+    ).toEqual([
+      {
+        a: { id: 1, name: "Changed", startTime: "20:00", endTime: "21:00" },
+        b: { id: 2, name: "Other", startTime: "20:30", endTime: "21:30" },
+      },
+    ]);
+  });
+
+  it("handles after-midnight intervals, festival days, and TBD rows", () => {
+    const rows = [
+      { id: 1, name: "Late", venue_id: 4, start_time: "23:30", end_time: "00:30" },
+      { id: 2, name: "Early", venue_id: 4, start_time: "00:00", end_time: "01:30" },
+      { id: 3, name: "Other Day", venue_id: 4, performance_date: "2026-08-02", start_time: "23:45", end_time: "00:15" },
+      { id: 4, name: "TBD", venue_id: 4, start_time: null, end_time: null },
+    ];
+    expect(detectDraftConflicts(rows, { eventDate: "2026-08-01", changedIds: new Set([1, 2, 3, 4]) })).toHaveLength(1);
+    expect(detectDraftConflicts(rows, { eventDate: "2026-08-01", changedIds: new Set([3]) })).toEqual([]);
   });
 });
 

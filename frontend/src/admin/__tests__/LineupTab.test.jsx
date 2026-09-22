@@ -29,6 +29,7 @@ vi.mock('../../utils/adminApi', () => ({
   },
   eventsApi: {
     getMetrics: vi.fn(),
+    updateSchedule: vi.fn(),
   },
   venuesApi: {
     getAll: vi.fn(),
@@ -58,24 +59,33 @@ vi.mock('../components/BandForm', () => ({
 // Stubbed for the same reason as BandForm: this file tests LineupTab's WIRING,
 // and ScheduleGrid's internals have their own file. The stub exposes onSave so
 // a test can drive the exact payload shape the real grid produces.
-vi.mock('../components/ScheduleGrid', () => ({
-  default: ({ onSave, saving, readOnly }) => (
-    <div data-testid="schedule-grid">
-      <span data-testid="schedule-saving">{String(saving)}</span>
-      <span data-testid="schedule-readonly">{String(readOnly)}</span>
-      <button
-        onClick={() =>
-          onSave([
-            { id: 1, startTime: '20:00', endTime: '21:00', venueId: 2 },
-            { id: 2, startTime: '22:00', endTime: '23:00', venueId: 3 },
-          ])
-        }
-      >
-        Trigger schedule save
-      </button>
-    </div>
-  ),
-}))
+vi.mock('../components/ScheduleGrid', () => {
+  const ScheduleGridStub = ({ onSave, saving, readOnly }) => {
+    const [failedIds, setFailedIds] = React.useState([])
+    return (
+      <div data-testid="schedule-grid">
+        <span data-testid="schedule-saving">{String(saving)}</span>
+        <span data-testid="schedule-readonly">{String(readOnly)}</span>
+        <span data-testid="failed-ids">{failedIds.join(',')}</span>
+        <button
+          onClick={async () =>
+            setFailedIds(
+              (
+                await onSave([
+                  { id: 1, startTime: '20:00', endTime: '21:00', venueId: 2 },
+                  { id: 2, startTime: '22:00', endTime: '23:00', venueId: 3 },
+                ])
+              ).failedIds
+            )
+          }
+        >
+          Trigger schedule save
+        </button>
+      </div>
+    )
+  }
+  return { default: ScheduleGridStub }
+})
 
 vi.mock('../components/ArtistPicker', () => ({
   default: ({ onSelect, onCancel }) => (
@@ -865,44 +875,43 @@ describe('LineupTab — schedule mode', () => {
 
   beforeEach(() => {
     showToast.mockReset()
-    bandsApi.update.mockReset()
+    eventsApi.updateSchedule.mockReset()
     bandsApi.getByEvent.mockReset()
     bandsApi.getByEvent.mockResolvedValue(twoBands)
     venuesApi.getAll.mockResolvedValue([{ id: 2, name: 'Blue Room' }])
   })
 
-  it('sends camelCase keys to bandsApi.update, one call per changed row', async () => {
-    bandsApi.update.mockResolvedValue({ success: true })
+  it('sends the changed rows in one atomic schedule call', async () => {
+    eventsApi.updateSchedule.mockResolvedValue({ success: true })
     await openSchedule()
 
     fireEvent.click(screen.getByRole('button', { name: 'Trigger schedule save' }))
 
-    await waitFor(() => expect(bandsApi.update).toHaveBeenCalledTimes(2))
-    // camelCase is load-bearing: the PUT handler updates only the keys it
-    // recognises, so snake_case here writes nothing and reports success.
-    expect(bandsApi.update).toHaveBeenCalledWith(1, { startTime: '20:00', endTime: '21:00', venueId: 2 })
-    expect(bandsApi.update).toHaveBeenCalledWith(2, { startTime: '22:00', endTime: '23:00', venueId: 3 })
+    await waitFor(() => expect(eventsApi.updateSchedule).toHaveBeenCalledTimes(1))
+    expect(eventsApi.updateSchedule).toHaveBeenCalledWith(37, [
+      { id: 1, startTime: '20:00', endTime: '21:00', venueId: 2 },
+      { id: 2, startTime: '22:00', endTime: '23:00', venueId: 3 },
+    ])
+    expect(showToast).toHaveBeenCalledWith('Saved 2 changes', 'success')
   })
 
-  it('reports a partial save as an error naming how many failed', async () => {
-    // A partial save is a normal outcome here, not an exception -- one bad row
-    // must not discard the rows that saved.
-    bandsApi.update.mockResolvedValueOnce({ success: true }).mockRejectedValueOnce(new Error('venue required'))
+  it('marks every row failed when the atomic request fails', async () => {
+    eventsApi.updateSchedule.mockRejectedValueOnce(new Error('venue required'))
     await openSchedule()
 
     fireEvent.click(screen.getByRole('button', { name: 'Trigger schedule save' }))
 
-    await waitFor(() => expect(showToast).toHaveBeenCalledWith(expect.stringContaining('Saved 1 of 2'), 'error'))
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith('venue required', 'error'))
   })
 
   it('toasts success and reloads the lineup when every row saves', async () => {
-    bandsApi.update.mockResolvedValue({ success: true })
+    eventsApi.updateSchedule.mockResolvedValue({ success: true })
     await openSchedule()
     const loadsBefore = bandsApi.getByEvent.mock.calls.length
 
     fireEvent.click(screen.getByRole('button', { name: 'Trigger schedule save' }))
 
-    await waitFor(() => expect(showToast).toHaveBeenCalledWith('Saved 2 of 2 changes', 'success'))
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith('Saved 2 changes', 'success'))
     // Without the reload the grid keeps comparing drafts against stale
     // originals, so saved rows would stay marked unsaved.
     expect(bandsApi.getByEvent.mock.calls.length).toBeGreaterThan(loadsBefore)
@@ -911,7 +920,7 @@ describe('LineupTab — schedule mode', () => {
     // The rows DID save. Folding a reload failure into the failure count would
     // be a lie that invites a pointless re-save; what the operator needs to
     // know is that the times on screen are no longer what the server holds.
-    bandsApi.update.mockResolvedValue({ success: true })
+    eventsApi.updateSchedule.mockResolvedValue({ success: true })
     bandsApi.getByEvent.mockResolvedValueOnce(twoBands).mockRejectedValueOnce(new Error('network down'))
     render(<LineupTab selectedEventId={37} selectedEvent={makeEvent()} events={[makeEvent()]} showToast={showToast} />)
     fireEvent.click(await screen.findByRole('button', { name: /Schedule/i }))
@@ -921,24 +930,52 @@ describe('LineupTab — schedule mode', () => {
 
     await waitFor(() =>
       expect(showToast).toHaveBeenCalledWith(
-        expect.stringContaining('Saved 2 of 2 changes. Could not refresh the list'),
+        expect.stringContaining('Saved 2 changes. Could not refresh the list'),
         'error'
       )
     )
   })
-  it('explains a conflict failure instead of just counting it', async () => {
-    // The PUT rejects a conflicting time with 409, so swapping two sets' times
-    // fails BOTH halves — each new time clashes with the other row, which
-    // still holds it. A bare "2 failed" on a reorder reads as a bug; naming
-    // the conflict tells the operator what to do about it (#1161).
-    const conflictError = new Error('Time conflict detected')
-    bandsApi.update.mockRejectedValue(conflictError)
+  it('reports conflicting ids and makes the atomic failure explicit', async () => {
+    const conflictError = new Error('This time overlaps another set at the same venue.')
+    conflictError.status = 409
+    conflictError.details = {
+      conflicts: [{ a: { id: 1, name: 'Headliner' }, b: { id: 2, name: 'Support' } }],
+    }
+    eventsApi.updateSchedule.mockRejectedValue(conflictError)
     render(<LineupTab selectedEventId={37} selectedEvent={makeEvent()} events={[makeEvent()]} showToast={showToast} />)
     fireEvent.click(await screen.findByRole('button', { name: /Schedule/i }))
     await screen.findByTestId('schedule-grid')
 
     fireEvent.click(screen.getByRole('button', { name: 'Trigger schedule save' }))
 
-    await waitFor(() => expect(showToast).toHaveBeenCalledWith(expect.stringContaining('free slot first'), 'error'))
+    await waitFor(() =>
+      expect(showToast).toHaveBeenCalledWith(
+        'Not saved: Headliner overlaps Support at the same venue. Nothing was saved — fix the highlighted rows and save again.',
+        'error'
+      )
+    )
+    expect(screen.getByTestId('failed-ids')).toHaveTextContent('1,2')
+  })
+  it('counts every clash and reports each conflicting id once', async () => {
+    const conflictError = new Error('This time overlaps another set at the same venue.')
+    conflictError.status = 409
+    conflictError.details = {
+      conflicts: [
+        { a: { id: 1, name: 'Headliner' }, b: { id: 2, name: 'Support' } },
+        { a: { id: 1, name: 'Headliner' }, b: { id: 3, name: 'Opener' } },
+        { a: { id: 2, name: 'Support' }, b: { id: 3, name: 'Opener' } },
+      ],
+    }
+    eventsApi.updateSchedule.mockRejectedValue(conflictError)
+    render(<LineupTab selectedEventId={37} selectedEvent={makeEvent()} events={[makeEvent()]} showToast={showToast} />)
+    fireEvent.click(await screen.findByRole('button', { name: /Schedule/i }))
+    await screen.findByTestId('schedule-grid')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Trigger schedule save' }))
+
+    await waitFor(() =>
+      expect(showToast).toHaveBeenCalledWith(expect.stringContaining('(and 2 more clashes)'), 'error')
+    )
+    expect(screen.getByTestId('failed-ids')).toHaveTextContent(/^1,2,3$/)
   })
 })

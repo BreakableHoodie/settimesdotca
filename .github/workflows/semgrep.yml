@@ -150,13 +150,27 @@ jobs:
           SEMGREP_PR_ID: ${{ github.event.pull_request.number }}
         run: |
           rc=0
-          env -u GITHUB_ACTIONS semgrep ci --json --output=semgrep.json || rc=$?
+          # Capture to a file and cat it, NOT `| tee ... || true`: under pipefail
+          # the `|| true` runs and resets PIPESTATUS to (0), recording a failure
+          # as success (CLAUDE.md, "Verify guards against the failure...").
+          env -u GITHUB_ACTIONS semgrep ci --json --output=semgrep.json >semgrep.log 2>&1 || rc=$?
+          cat semgrep.log
           echo "semgrep exit: $rc"
           if [ "$rc" -gt 1 ]; then
             echo "::error::Semgrep failed to RUN (exit $rc) — this is not 'found issues'."
             exit "$rc"
           fi
-          test -s semgrep.json || { echo "::error::Semgrep exited $rc but wrote no JSON."; exit 1; }
+          if [ ! -s semgrep.json ]; then
+            # Seen twice: semgrep's own git fetch failing, and a semgrep.dev
+            # outage ("Could not start scan", 2026-09-22). Name the likely
+            # cause so an outage does not read as a bug in this workflow.
+            if grep -q "Could not start scan" semgrep.log 2>/dev/null; then
+              echo "::error::Semgrep could not start: semgrep.dev refused the scan. Likely a Semgrep service incident — check https://status.semgrep.dev and re-run. NOT a clean scan."
+            else
+              echo "::error::Semgrep exited $rc but wrote no JSON — it did not complete a scan. NOT a clean scan."
+            fi
+            exit 1
+          fi
 
       - name: Report findings
         if: steps.token.outputs.present == 'true'

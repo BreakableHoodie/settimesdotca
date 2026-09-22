@@ -75,8 +75,28 @@ export function auditLogStatementForInsertedRow(
   if (!isIdentifier(table) || columns.length === 0 || !columns.every(isIdentifier)) {
     throw new Error("auditLogStatementForInsertedRow: table and where keys must be bare SQL identifiers");
   }
-  const predicate = columns.map((c) => (where[c] === null ? `${c} IS NULL` : `${c} = ?`)).join(" AND ");
-  const values = columns.filter((c) => where[c] !== null).map((c) => where[c]);
+  // A value may be null (IS NULL), a scalar (= ?), or a non-empty array
+  // (IN (?, ...)) -- the last so a conditional change can give its audit row
+  // the SAME predicate as its UPDATE (e.g. status IN ('draft','published')).
+  // An empty array would render `IN ()`, which is a syntax error at best, so
+  // it is refused here rather than at execution time.
+  for (const c of columns) {
+    if (Array.isArray(where[c]) && where[c].length === 0) {
+      throw new Error(`auditLogStatementForInsertedRow: where.${c} must not be an empty array`);
+    }
+  }
+  const predicate = columns
+    .map((c) =>
+      where[c] === null
+        ? `${c} IS NULL`
+        : Array.isArray(where[c])
+          ? `${c} IN (${where[c].map(() => "?").join(", ")})`
+          : `${c} = ?`,
+    )
+    .join(" AND ");
+  const values = columns
+    .filter((c) => where[c] !== null)
+    .flatMap((c) => (Array.isArray(where[c]) ? where[c] : [where[c]]));
   const [type, , detailsJson, ip, keyId] = normalize(resourceType, null, details, ipAddress, apiKeyId);
   return env.DB.prepare(
     `

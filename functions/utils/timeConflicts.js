@@ -37,6 +37,43 @@ export function intervalsOverlap(a, b) {
   return a[0] < b[1] && b[0] < a[1];
 }
 
+/**
+ * Compare an event's already-merged schedule against itself. Only conflicts
+ * touching a changed row are reported, preserving the single-row PUT's scope.
+ */
+export function detectDraftConflicts(rows, { eventDate, changedIds }) {
+  const conflicts = [];
+  const changed = changedIds instanceof Set ? changedIds : new Set(changedIds || []);
+  const festivalDayOf = (row) => row.performance_date || eventDate;
+
+  for (let i = 0; i < rows.length; i += 1) {
+    const a = rows[i];
+    if (a.venue_id == null || !a.start_time || !a.end_time) continue;
+    const aDay = festivalDayOf(a);
+    const aIntervals = buildIntervals(a.start_time, a.end_time);
+
+    for (let j = i + 1; j < rows.length; j += 1) {
+      const b = rows[j];
+      if (b.venue_id == null || !b.start_time || !b.end_time || a.venue_id !== b.venue_id) continue;
+      if (!changed.has(a.id) && !changed.has(b.id)) continue;
+      const bDay = festivalDayOf(b);
+      if (aDay && bDay && aDay !== bDay) continue;
+      const bIntervals = buildIntervals(b.start_time, b.end_time);
+      if (!aIntervals.some((left) => bIntervals.some((right) => intervalsOverlap(left, right)))) continue;
+
+      const format = (row) => ({
+        id: row.id,
+        name: row.name,
+        startTime: row.start_time,
+        endTime: row.end_time,
+      });
+      conflicts.push({ a: format(a), b: format(b) });
+    }
+  }
+
+  return conflicts;
+}
+
 // Shifts start_time while preserving set duration. Handles midnight crossing.
 export function computeNewEndTime(oldStart, oldEnd, newStart) {
   const fromMins = (m) => `${String(Math.floor(m / 60) % 24).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;

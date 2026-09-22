@@ -2,9 +2,7 @@ import { auditLog, checkPermission } from "../_middleware.js";
 import { auditLogStatement } from "../../../utils/auditLogStatement.js";
 import { getClientIP, parseJsonObjectBody, parseJsonObjectBodyStrict } from "../../../utils/request.js";
 import { computeNewEndTime, detectBulkConflicts } from "../../../utils/timeConflicts.js";
-import { isValidTime, validateIdArray, validateSetTimes } from "../../../utils/validation.js";
-
-const MAX_BULK_BAND_IDS = 200;
+import { isValidTime, validateIdArray, validateSetTimes, MAX_BULK_BAND_IDS } from "../../../utils/validation.js";
 
 async function getArchivedPerformancesByPerformanceIds(DB, performanceIds) {
   if (!Array.isArray(performanceIds) || performanceIds.length === 0) {

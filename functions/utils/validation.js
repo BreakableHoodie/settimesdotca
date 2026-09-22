@@ -41,5 +41,6 @@ export {
   validateDoorsJson,
 } from "./validation/datetime.js";
 export { validateId, validateIdArray } from "./validation/ids.js";
+export { MAX_BULK_BAND_IDS } from "./validation/limits.js";
 export { validateEntity, VALIDATION_SCHEMAS } from "./validation/schema.js";
 export { validationErrorResponse } from "./validation/response.js";

@@ -528,6 +528,16 @@ export const eventsApi = {
     return handleResponse(response)
   },
 
+  async updateSchedule(eventId, changes) {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/events/${eventId}/schedule`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ changes }),
+    })
+    return handleResponse(response)
+  },
+
   // Mail the general subscriber list about this event (#1149/#1150).
   //
   // `kind` is an allowlist on the server (`lineup_announced`, `schedule_announced`)

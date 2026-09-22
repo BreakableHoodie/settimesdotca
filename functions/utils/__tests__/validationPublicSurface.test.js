@@ -62,6 +62,7 @@ const EXPECTED_EXPORTS = {
   validateSetTimes: "function",
 
   // Identifiers
+  MAX_BULK_BAND_IDS: "number",
   validateId: "function",
   validateIdArray: "function",
 

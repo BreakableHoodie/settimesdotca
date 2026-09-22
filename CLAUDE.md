@@ -275,6 +275,39 @@ Bands starting before 6 AM are "after-midnight" sets that belong to the *previou
 - Logic: `prepareBands()` adds `MS_PER_DAY` to `startMs`/`endMs` for times below this threshold
 - **Never remove or lower this threshold.** Any sort, filter, or conflict-detection that touches performance times must apply the same offset or delegate to `prepareBands`.
 
+### Multi-row schedule saves check the FINAL state (#1161)
+
+The schedule grid saves every changed row in ONE request, `PUT
+/api/admin/events/:id/schedule` (`functions/api/admin/events/[id]/schedule.js`).
+It merges the changes into the event's stored performances, runs
+`detectDraftConflicts()` (`functions/utils/timeConflicts.js`) over that merged
+arrangement, and commits every UPDATE plus one audit row in a single
+`DB.batch()`. A conflict is a 409 listing the clashing pairs, and nothing is
+written.
+
+**Why it exists:** saving rows one at a time through `PUT
+/api/admin/bands/:id` checks each new time against the others' STORED times,
+so swapping two sets 409s both halves — no order makes each step valid. Do not
+route multi-row edits back through the per-row PUT, and do not "simplify"
+`detectDraftConflicts` to compare a changed row against stored rows: that is
+exactly the regression, and the mutation gate reproduces it.
+
+Three things are load-bearing:
+
+- **Only pairs touching a changed row are reported**, matching the per-row PUT.
+  A pre-existing clash between two untouched rows must not block an unrelated
+  save.
+- **Cancelled sets still count on the server**, as they do in `checkConflicts`.
+  The admin grid's own preview (`ScheduleGrid.jsx`) treats a cancelled slot as
+  free, so the two disagree: the grid can show no clash and the server still
+  409s. That split predates #1161 (the per-row PUT had it too) and is **not
+  settled** — resolving it means picking one rule and changing both together.
+- **The batch re-checks the event is still `draft`/`published`** (an `EXISTS`
+  on every UPDATE and a status-conditioned audit insert). A concurrent archive
+  makes every statement match nothing, and the handler answers 409. Only an
+  **explicit** `meta.changes === 0` counts as "not applied" — an absent `meta`
+  must not turn a committed save into a false "not saved".
+
 ### Public event visibility is `status`, never `is_published` (#800) — history, guards still live
 
 `events.is_published INTEGER` was deprecated by migration 0005 and, for years, never dropped (0036 even added a fresh index on it). Until #799, **`functions/api/admin/events/[id]/archive.js` wrote `status = 'archived', is_published = 0`** — archiving unpublished under the old column. On 2026-08-10 archiving the last un-archived event dropped 13 public read paths to zero rows simultaneously and took the public site dark.
@@ -696,7 +729,7 @@ Repeat the value positionally instead. `functions/utils/__tests__/rateLimitPlace
 
 **`api_key.request` is the one audit row not written in a batch, and it has its own retention tier.** It records a *request*, not a change, and is written before `next()` runs — so there is nothing to batch it with, and it captures requests that then 403 or 404. Do not read it as precedent for writing audit rows standalone. Because it is one row per mutating key request against a 60/min ceiling (~31.5M rows/year from a single saturated key), `retention.js` prunes `action = 'api_key.request'` at **90 days** while the rest of `audit_log` stays at 1 year; the two predicates are deliberately disjoint (`=` vs `!=`) so they cannot double-count.
 
-Audit rows for the API-key routes otherwise go in the **same `DB.batch`** as the change. **That is a statement about this feature, not a repo-wide rule** — measured 2026-08-31, only 5 of the 26 admin handlers calling `auditLog` batch it with their write (`bands/[id].js`, `bands/bulk.js`, `events/[id].js`, `events/wizard.js`, `venues/[id].js`); the other 21 issue the change and the audit row as separate statements, so a failed audit write leaves an unattributed change. Whether that should be tightened repo-wide is an open question, not a settled invariant — read this sentence as scoped before citing it. It was previously unqualified and was read as universal while briefing work on `events/[id]/edit.js`, which does not batch. Creation is the awkward case — the key's id does not exist until the INSERT runs — so `auditLogStatementForInsertedRow()` (`functions/utils/auditLogStatement.js`) resolves `resource_id` with an `INSERT … SELECT … FROM <table> WHERE <col> = ?`. It takes a table and column **identifier**, not a SQL string, and validates both with an explicit `typeof value === "string"` check: `RegExp.prototype.test` coerces its argument, so a bare `/^[A-Za-z_]\w*$/.test(undefined)` tests the string `"undefined"` and **passes**. Note also that `INSERT … SELECT` over zero rows inserts nothing and does not error — only ever pass a value the preceding INSERT just wrote.
+Audit rows for the API-key routes otherwise go in the **same `DB.batch`** as the change. **That is a statement about this feature, not a repo-wide rule** — measured 2026-08-31, only 5 of the 26 admin handlers calling `auditLog` batch it with their write (`bands/[id].js`, `bands/bulk.js`, `events/[id].js`, `events/wizard.js`, `venues/[id].js`); the other 21 issue the change and the audit row as separate statements, so a failed audit write leaves an unattributed change. Whether that should be tightened repo-wide is an open question, not a settled invariant — read this sentence as scoped before citing it. It was previously unqualified and was read as universal while briefing work on `events/[id]/edit.js`, which does not batch. Creation is the awkward case — the key's id does not exist until the INSERT runs — so `auditLogStatementForInsertedRow()` (`functions/utils/auditLogStatement.js`) resolves `resource_id` with an `INSERT … SELECT … FROM <table> WHERE <col> = ?`. It takes a table and column **identifier**, not a SQL string, and validates both with an explicit `typeof value === "string"` check: `RegExp.prototype.test` coerces its argument, so a bare `/^[A-Za-z_]\w*$/.test(undefined)` tests the string `"undefined"` and **passes**. Note also that `INSERT … SELECT` over zero rows inserts nothing and does not error — so pass either a value the preceding INSERT just wrote, or **exactly the same predicate** the conditional UPDATE in the batch uses (an array value renders `IN (…)` for that). A *narrower* predicate than the UPDATE's commits the change with no audit row: `schedule.js` first pinned `status = <status read at request start>`, so a concurrent publish toggle left a schedule change unattributed (#1161 review).
 
 ---
 

@@ -281,6 +281,47 @@ export const MUTATIONS = [
     replace: 'startTime !== undefined && startTime !== "" && !/^\\d{2}:\\d{2}$/.test(startTime)',
     tests: ["functions/api/admin/bands/__tests__/bands.test.js"],
   },
+  {
+    id: "schedule-save-final-state",
+    invariant:
+      "CLAUDE.md 'Multi-row schedule saves check the FINAL state (#1161)' — a swap is validated against the merged draft, not each row against stored times",
+    file: "functions/api/admin/events/[id]/schedule.js",
+    // Reproduces the ORIGINAL bug: each changed row checked against the
+    // others' stored values. A plain "check the stored rows" mutation is NOT
+    // caught by the swap test (stored-vs-stored is always clean for a swap);
+    // this per-row form is what the swap test exists to catch.
+    find: "const conflicts = detectDraftConflicts(finalRows, { eventDate: event.date, changedIds: ids });",
+    replace:
+      "const conflicts = changes.flatMap((c) => detectDraftConflicts(performances.map((p) => (p.id === c.id ? { ...p, start_time: c.startTime, end_time: c.endTime, venue_id: c.venueId } : p)), { eventDate: event.date, changedIds: new Set([c.id]) }));",
+    tests: ["functions/api/admin/events/__tests__/schedule.test.js"],
+  },
+  {
+    id: "schedule-save-archive-race",
+    invariant:
+      "CLAUDE.md 'Multi-row schedule saves check the FINAL state (#1161)' — an event archived mid-request is not written to",
+    file: "functions/api/admin/events/[id]/schedule.js",
+    find: "result?.meta?.changes === 0",
+    replace: "result?.meta?.changes === -1",
+    tests: ["functions/api/admin/events/__tests__/schedule.test.js"],
+  },
+  {
+    id: "schedule-save-audit-predicate",
+    invariant:
+      "CLAUDE.md 'Multi-row schedule saves check the FINAL state (#1161)' — the audit row shares the UPDATE's status predicate, so a concurrent publish toggle cannot leave a change unattributed",
+    file: "functions/api/admin/events/[id]/schedule.js",
+    find: 'where: { id: eventId, status: ["draft", "published"] }',
+    replace: "where: { id: eventId, status: event.status }",
+    tests: ["functions/api/admin/events/__tests__/schedule.test.js"],
+  },
+  {
+    id: "schedule-save-absent-meta",
+    invariant:
+      "CLAUDE.md 'Multi-row schedule saves check the FINAL state (#1161)' — only an explicit meta.changes === 0 means not applied",
+    file: "functions/api/admin/events/[id]/schedule.js",
+    find: "updateResults.some((result) => result?.meta?.changes === 0)",
+    replace: "updateResults.some((result) => !result?.meta?.changes)",
+    tests: ["functions/api/admin/events/__tests__/schedule.test.js"],
+  },
 ];
 
 // ============================================================================

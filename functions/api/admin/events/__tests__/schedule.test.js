@@ -86,6 +86,14 @@ describe("PUT /api/admin/events/:id/schedule", () => {
     ).toBe(0);
   });
 
+  it("lets a replacement take a cancelled set's exact slot", async () => {
+    const { env, rawDb, event, venue, first, second } = setup();
+    rawDb.prepare("UPDATE performances SET is_cancelled = 1 WHERE id = ?").run(first.id);
+    const res = await call(env, event.id, [{ id: second.id, startTime: "20:00", endTime: "21:00", venueId: venue.id }]);
+    expect(res.status).toBe(200);
+    expect(stored(rawDb, second.id)).toEqual({ start_time: "20:00", end_time: "21:00", venue_id: venue.id });
+  });
+
   it("keeps after-midnight swaps valid", async () => {
     const { env, rawDb, event, venue, first, second } = setup();
     rawDb.prepare("UPDATE performances SET start_time = '23:30', end_time = '00:30' WHERE id = ?").run(first.id);

@@ -83,7 +83,7 @@ export async function onRequestPut(context) {
     }
 
     const performanceResult = await env.DB.prepare(
-      `SELECT p.id, p.start_time, p.end_time, p.venue_id, p.performance_date, bp.name
+      `SELECT p.id, p.start_time, p.end_time, p.venue_id, p.performance_date, p.is_cancelled, bp.name
        FROM performances p JOIN band_profiles bp ON p.band_profile_id = bp.id WHERE p.event_id = ?`,
     )
       .bind(eventId)

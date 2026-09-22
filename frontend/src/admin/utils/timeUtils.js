@@ -146,7 +146,7 @@ export const detectConflicts = (candidateBand, bands, eventDate = null) => {
   const conflicts = []
 
   for (const other of bands) {
-    if (!other) continue
+    if (!other || candidateBand.is_cancelled || other.is_cancelled) continue
     if (id != null && other.id === id) continue
     if (!other.event_id || !other.venue_id) continue
     if (Number(other.event_id) !== Number(eventId) || Number(other.venue_id) !== Number(venueId)) continue

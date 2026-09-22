@@ -59,6 +59,41 @@ describe("Admin bands API - CRUD operations", () => {
     expect(data.band.name).toBe("New Name");
   });
 
+  it("PUT /api/admin/bands/{id} lets a cancelled set move into an occupied slot", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, { name: "Cancelled Update Event", slug: "cancelled-update-event" });
+    const venue = insertVenue(rawDb, { name: "Cancelled Update Venue" });
+    const cancelled = insertBand(rawDb, {
+      name: "Cancelled Set",
+      event_id: ev.id,
+      venue_id: venue.id,
+      start_time: "18:00",
+      end_time: "19:00",
+    });
+    insertBand(rawDb, {
+      name: "Occupied Set",
+      event_id: ev.id,
+      venue_id: venue.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+    rawDb.prepare("UPDATE performances SET is_cancelled = 1 WHERE id = ?").run(cancelled.id);
+
+    const request = new Request(`https://example.test/api/admin/bands/${cancelled.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify({ startTime: "20:00", endTime: "21:00", venueId: venue.id }),
+    });
+    const res = await bandIdHandler.onRequestPut({ request, env, data: { user: { role: "editor" } } });
+    expect(res.status).toBe(200);
+    expect(rawDb.prepare("SELECT start_time, end_time FROM performances WHERE id = ?").get(cancelled.id)).toMatchObject(
+      {
+        start_time: "20:00",
+        end_time: "21:00",
+      },
+    );
+  });
+
   it("DELETE /api/admin/bands/{id} removes band", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "editor" });
     const ev = insertEvent(rawDb, { name: "DeleteEvent", slug: "delete-event" });

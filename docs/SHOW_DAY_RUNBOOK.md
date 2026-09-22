@@ -12,6 +12,8 @@ Written 2026-08-05, before Buddies Fest 2 (event 36, Aug 7–9). Everything here
 
 Admin → the event's **Lineup** tab → find the set → **Cancel**. It is reversible; **Restore** puts it back.
 
+**Replacing the act:** a cancelled set frees its slot, so the replacement can be booked at the exact same venue and time. Once it is, **Restore** on the pulled act is refused ("now holds this slot") rather than double-booking it — move one of the two sets first if the original act is back on.
+
 What that does for fans:
 
 - the set stays visible, struck through, with a "Cancelled" label — on the schedule, the artist page, the venue page and the event page

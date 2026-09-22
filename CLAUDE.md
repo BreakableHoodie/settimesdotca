@@ -297,11 +297,12 @@ Three things are load-bearing:
 - **Only pairs touching a changed row are reported**, matching the per-row PUT.
   A pre-existing clash between two untouched rows must not block an unrelated
   save.
-- **Cancelled sets still count on the server**, as they do in `checkConflicts`.
-  The admin grid's own preview (`ScheduleGrid.jsx`) treats a cancelled slot as
-  free, so the two disagree: the grid can show no clash and the server still
-  409s. That split predates #1161 (the per-row PUT had it too) and is **not
-  settled** — resolving it means picking one rule and changing both together.
+- **Cancelled sets never conflict on any check**, server or admin client.
+  `checkConflicts`, `detectDraftConflicts`, and `detectBulkConflicts` skip
+  cancelled rows on both sides, and the single-row update caller skips the
+  check when the edited row is cancelled. `detectConflicts` and
+  `ScheduleGrid.jsx` enforce the same rule in the admin UI, so a replacement
+  act can take a pulled act's exact slot. Owner decision: 2026-09-22.
 - **The batch re-checks the event is still `draft`/`published`** (an `EXISTS`
   on every UPDATE and a status-conditioned audit insert). A concurrent archive
   makes every statement match nothing, and the handler answers 409. Only an
@@ -753,7 +754,7 @@ Deleting the performance row does hide it, but it is lossy: a fan who already sa
 
 Since #732 the correct action is the reversible cancel toggle in LineupTab (`PATCH /api/admin/bands/:id` with `is_cancelled: true`, `editor` role or above). It keeps the set visible and struck through with a "Cancelled" label on every fan surface, suppresses it from "up next" routing and live/starting-soon time math, makes it unselectable, emits `STATUS:CANCELLED` to calendar subscribers, and **blocks the announcement email** — a cancelled performance can neither queue nor send a follower notification.
 
-**Un-cancelling does not resend anything.** The announce path fires only on an `is_announced` `0 → 1` transition (`hasAnnounced && newValue === 1 && isCancelled === 0 && performance.is_announced === 0 && !performance.band_follow_notified`). Restoring a set leaves `is_announced` untouched, so a performance that was already announced before being cancelled produces no new transition, no `band_announce_queue` rows, and no follower email. Un-cancel restores visibility and selectability only.
+**Un-cancelling does not resend anything.** The announce path fires only on an `is_announced` `0 → 1` transition (`hasAnnounced && newValue === 1 && isCancelled === 0 && performance.is_announced === 0 && !performance.band_follow_notified`). Restoring a set leaves `is_announced` untouched, so a performance that was already announced before being cancelled produces no new transition, no `band_announce_queue` rows, and no follower email. Un-cancel restores visibility and selectability only. **It is also the one transition that can double-book**, because a cancelled set frees its slot (decided 2026-09-22): the PATCH runs `checkConflicts` on a `1 → 0` `is_cancelled` change and answers 409 naming whoever now holds the slot, never auto-resolving which act keeps it. Keep `docs/SHOW_DAY_RUNBOOK.md` in step.
 
 Operational detail: cancelling is scoped to *one performance*. A band playing two sets (ALL and Kepi Ghoulie each play twice at BF2) needs each set cancelled separately.
 

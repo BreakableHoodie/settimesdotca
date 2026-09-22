@@ -330,7 +330,7 @@ export async function onRequestPut(context) {
 
     // Check for conflicts only if we have all required scheduling fields
     let conflicts = [];
-    if (actualVenueId && actualStartTime && actualEndTime && performance?.event_id) {
+    if (!performance?.is_cancelled && actualVenueId && actualStartTime && actualEndTime && performance?.event_id) {
       conflicts = await checkConflicts(DB, {
         eventId: performance?.event_id,
         venueId: actualVenueId,
@@ -588,7 +588,7 @@ export async function onRequestPatch(context) {
     }
 
     const performance = await DB.prepare(
-      "SELECT id, is_announced, is_cancelled, band_follow_notified FROM performances WHERE id = ?",
+      "SELECT id, event_id, venue_id, start_time, end_time, performance_date, is_announced, is_cancelled, band_follow_notified FROM performances WHERE id = ?",
     )
       .bind(performanceId)
       .first();
@@ -618,6 +618,36 @@ export async function onRequestPatch(context) {
     // Reversible by design (#732): un-cancelling restores the set, which is
     // the entire reason this is a column and not a DELETE.
     const isCancelled = hasCancelled ? (body.is_cancelled ? 1 : 0) : performance.is_cancelled;
+
+    // A cancelled set frees its slot (owner decision 2026-09-22), so a
+    // replacement may already be booked there. Un-cancelling is therefore the
+    // one transition that can double-book: it has to pass the same conflict
+    // check as any other write, or restoring a pulled act silently puts two
+    // active sets in one slot. Refused, never auto-resolved -- which set keeps
+    // the slot is the admin's call.
+    if (hasCancelled && isCancelled === 0 && performance.is_cancelled === 1) {
+      if (performance.venue_id && performance.start_time && performance.end_time) {
+        const conflicts = await checkConflicts(DB, {
+          eventId: performance.event_id,
+          venueId: performance.venue_id,
+          startTime: performance.start_time,
+          endTime: performance.end_time,
+          excludePerformanceId: performanceId,
+          performanceDate: performance.performance_date,
+          eventDate: linkedEvent?.date,
+        });
+        if (conflicts.length > 0) {
+          return new Response(
+            JSON.stringify({
+              error: "Time conflict detected",
+              message: `Cannot restore: ${conflicts.map((c) => c.name).join(", ")} now holds this slot. Move one of the sets first.`,
+              conflicts,
+            }),
+            { status: 409, headers: { "Content-Type": "application/json" } },
+          );
+        }
+      }
+    }
 
     const updates = ["updated_at = datetime('now')"];
     const params = [];

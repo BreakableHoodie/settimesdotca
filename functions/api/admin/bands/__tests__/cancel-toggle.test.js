@@ -61,6 +61,44 @@ describe("admin single-band handler — is_cancelled", () => {
   // handler then coerces it with a bare truthy check (`body.is_cancelled ? 1
   // : 0`), so `1`, `"false"` (a non-empty string, truthy), and `{}` all
   // silently become is_cancelled = 1 in the DB instead of being rejected.
+  // A cancelled set frees its slot (owner decision 2026-09-22), so restoring
+  // one is the transition that can double-book. Both halves are needed: the
+  // control proves the refusal is about the CLASH, not about un-cancelling.
+  describe("un-cancelling into a slot a replacement now holds", () => {
+    async function withReplacement(replacementStart, replacementEnd) {
+      const ctx = await seedEditorContext();
+      const { db, eventId, performanceId, patch } = ctx;
+      const { venue_id } = db.prepare("SELECT venue_id FROM performances WHERE id = ?").get(performanceId);
+      db.prepare("UPDATE performances SET start_time = '20:00', end_time = '21:00' WHERE id = ?").run(performanceId);
+      expect((await patch({ is_cancelled: true })).status).toBe(200);
+      insertBand(db, {
+        name: "Replacement Act",
+        event_id: eventId,
+        venue_id,
+        start_time: replacementStart,
+        end_time: replacementEnd,
+      });
+      return ctx;
+    }
+    const isCancelled = (db, id) =>
+      db.prepare("SELECT is_cancelled FROM performances WHERE id = ?").get(id).is_cancelled;
+
+    it("refuses to restore, names the replacement, and leaves the set cancelled", async () => {
+      const { db, performanceId, patch } = await withReplacement("20:00", "21:00");
+      const res = await patch({ is_cancelled: false });
+      expect(res.status).toBe(409);
+      expect((await res.json()).message).toContain("Replacement Act");
+      expect(isCancelled(db, performanceId)).toBe(1);
+    });
+
+    it("restores normally when the replacement is in a different slot (control)", async () => {
+      const { db, performanceId, patch } = await withReplacement("22:00", "23:00");
+      const res = await patch({ is_cancelled: false });
+      expect(res.status).toBe(200);
+      expect(isCancelled(db, performanceId)).toBe(0);
+    });
+  });
+
   it("rejects a non-boolean is_cancelled value", async () => {
     const { db, performanceId, patch } = await seedEditorContext();
     const read = () => db.prepare("SELECT is_cancelled FROM performances WHERE id = ?").get(performanceId).is_cancelled;

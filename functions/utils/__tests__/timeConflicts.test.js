@@ -105,6 +105,27 @@ describe("detectDraftConflicts", () => {
     expect(detectDraftConflicts(rows, { eventDate: "2026-08-01", changedIds: new Set([1, 2, 3, 4]) })).toHaveLength(1);
     expect(detectDraftConflicts(rows, { eventDate: "2026-08-01", changedIds: new Set([3]) })).toEqual([]);
   });
+
+  it("treats cancelled rows as free on either side, while active rows still conflict", () => {
+    const cancelled = {
+      id: 1,
+      name: "Cancelled",
+      venue_id: 4,
+      start_time: "20:00",
+      end_time: "21:00",
+      is_cancelled: 1,
+    };
+    const active = { id: 2, name: "Active", venue_id: 4, start_time: "20:00", end_time: "21:00", is_cancelled: 0 };
+    expect(detectDraftConflicts([cancelled, active], { eventDate: "2026-08-01", changedIds: new Set([1, 2]) })).toEqual(
+      [],
+    );
+    expect(
+      detectDraftConflicts([{ ...cancelled, is_cancelled: 0 }, active], {
+        eventDate: "2026-08-01",
+        changedIds: new Set([1, 2]),
+      }),
+    ).toHaveLength(1);
+  });
 });
 
 describe("computeNewEndTime", () => {
@@ -288,6 +309,79 @@ describe("checkConflicts", () => {
     });
 
     expect(conflicts).toHaveLength(1);
+  });
+
+  it("treats a cancelled stored set as a free slot, with an active positive control", async () => {
+    const { env, rawDb, event, venue } = fixture();
+    const existing = insertBand(rawDb, {
+      name: "Cancelled Set",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+    rawDb.prepare("UPDATE performances SET is_cancelled = 1 WHERE id = ?").run(existing.id);
+    expect(
+      await checkConflicts(env.DB, {
+        eventId: event.id,
+        venueId: venue.id,
+        startTime: "20:00",
+        endTime: "21:00",
+        eventDate: event.date,
+      }),
+    ).toEqual([]);
+    rawDb.prepare("UPDATE performances SET is_cancelled = 0 WHERE id = ?").run(existing.id);
+    expect(
+      await checkConflicts(env.DB, {
+        eventId: event.id,
+        venueId: venue.id,
+        startTime: "20:00",
+        endTime: "21:00",
+        eventDate: event.date,
+      }),
+    ).toHaveLength(1);
+  });
+});
+
+describe("cancelled bulk conflict rows", () => {
+  it("treats cancelled stored and batch rows as free, with active positive controls", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { name: "Bulk Cancel Event", slug: "bulk-cancel-event", date: "2026-08-01" });
+    const source = insertVenue(rawDb, { name: "Bulk Source" });
+    const target = insertVenue(rawDb, { name: "Bulk Target" });
+    const moving = insertBand(rawDb, {
+      name: "Moving",
+      event_id: event.id,
+      venue_id: source.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+    const occupant = insertBand(rawDb, {
+      name: "Occupant",
+      event_id: event.id,
+      venue_id: target.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
+    rawDb.prepare("UPDATE performances SET is_cancelled = 1 WHERE id = ?").run(occupant.id);
+    expect(
+      await detectBulkConflicts(env, { action: "move_venue", bandIds: [moving.id], params: { venue_id: target.id } }),
+    ).toEqual([]);
+    rawDb.prepare("UPDATE performances SET is_cancelled = 0 WHERE id = ?").run(occupant.id);
+    expect(
+      (await detectBulkConflicts(env, { action: "move_venue", bandIds: [moving.id], params: { venue_id: target.id } }))
+        .length,
+    ).toBeGreaterThan(0);
+
+    rawDb.prepare("UPDATE performances SET is_cancelled = 1 WHERE id = ?").run(moving.id);
+    expect(
+      await detectBulkConflicts(env, { action: "move_venue", bandIds: [moving.id], params: { venue_id: target.id } }),
+    ).toEqual([]);
+    rawDb.prepare("UPDATE performances SET is_cancelled = 0 WHERE id = ?").run(moving.id);
+    expect(
+      (await detectBulkConflicts(env, { action: "move_venue", bandIds: [moving.id], params: { venue_id: target.id } }))
+        .length,
+    ).toBeGreaterThan(0);
   });
 });
 

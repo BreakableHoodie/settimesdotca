@@ -156,19 +156,22 @@ jobs:
           env -u GITHUB_ACTIONS semgrep ci --json --output=semgrep.json >semgrep.log 2>&1 || rc=$?
           cat semgrep.log
           echo "semgrep exit: $rc"
+          # The outage signature is checked FIRST, whatever the exit code: seen
+          # 2026-09-22 as exit 0 + no JSON, but nothing guarantees an outage
+          # stays exit 0, and a generic "failed to RUN" would hide the one
+          # useful hint (it is Semgrep's service, not this workflow).
+          if grep -q "Could not start scan" semgrep.log 2>/dev/null; then
+            echo "::error::Semgrep could not start: semgrep.dev refused the scan. Likely a Semgrep service incident — check https://status.semgrep.dev and re-run. NOT a clean scan."
+            exit 1
+          fi
           if [ "$rc" -gt 1 ]; then
             echo "::error::Semgrep failed to RUN (exit $rc) — this is not 'found issues'."
             exit "$rc"
           fi
+          # exit 0/1 with no JSON is still "did not scan" -- semgrep's own git
+          # fetch failing produced exactly that on #1185.
           if [ ! -s semgrep.json ]; then
-            # Seen twice: semgrep's own git fetch failing, and a semgrep.dev
-            # outage ("Could not start scan", 2026-09-22). Name the likely
-            # cause so an outage does not read as a bug in this workflow.
-            if grep -q "Could not start scan" semgrep.log 2>/dev/null; then
-              echo "::error::Semgrep could not start: semgrep.dev refused the scan. Likely a Semgrep service incident — check https://status.semgrep.dev and re-run. NOT a clean scan."
-            else
-              echo "::error::Semgrep exited $rc but wrote no JSON — it did not complete a scan. NOT a clean scan."
-            fi
+            echo "::error::Semgrep exited $rc but wrote no JSON — it did not complete a scan. NOT a clean scan."
             exit 1
           fi
 

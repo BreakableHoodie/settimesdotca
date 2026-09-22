@@ -38,6 +38,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { access, readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
+import { validateDate } from "../functions/utils/validation/datetime.js";
 import path from "node:path";
 
 const execFileAsync = promisify(execFile);
@@ -210,7 +211,9 @@ export function validateDecisionRegister(register) {
     if (typeof entry.reason !== "string" || !entry.reason) {
       throw new Error(`Streaming-link decision ${index + 1} has an invalid reason`);
     }
-    if (typeof entry.decidedOn !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(entry.decidedOn)) {
+    // validateDate() checks the calendar, not just the shape: 2026-02-31 and a
+    // non-leap Feb 29 are rejected. Reused rather than re-implemented.
+    if (typeof entry.decidedOn !== "string" || !validateDate(entry.decidedOn).valid) {
       throw new Error(`Streaming-link decision ${index + 1} has an invalid decidedOn`);
     }
 

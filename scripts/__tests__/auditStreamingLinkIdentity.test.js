@@ -133,4 +133,17 @@ describe("streaming-link decisions", () => {
       validateDecisionRegister([decision(31, "Name", "same-artist"), decision(31, "Name", "different-artist")]),
     ).toThrow("duplicates");
   });
+
+  // Shape alone is not a date: these all match YYYY-MM-DD (CodeRabbit, #1191).
+  it.each(["2026-02-31", "2026-02-29", "2026-13-01", "2026-00-10"])("rejects the impossible decidedOn %s", (bad) => {
+    expect(() => validateDecisionRegister([{ ...decision(40, "Name", "same-artist"), decidedOn: bad }])).toThrow(
+      "invalid decidedOn",
+    );
+  });
+
+  it("accepts a real leap day", () => {
+    expect(() =>
+      validateDecisionRegister([{ ...decision(41, "Name", "same-artist"), decidedOn: "2024-02-29" }]),
+    ).not.toThrow();
+  });
 });

@@ -159,7 +159,10 @@ describe("staticPageMeta — durable guard: every static _routes.json include ac
     expect(staticIncludes.length).toBeGreaterThan(0); // guard against an empty/renamed include list going unnoticed
 
     for (const routePath of staticIncludes) {
-      const handlerFile = path.join(FUNCTIONS_DIR, `${routePath.replace(/^\//, "")}.js`);
+      const handlerFile = path.join(
+        FUNCTIONS_DIR,
+        routePath === "/" ? "index.js" : `${routePath.replace(/^\//, "")}.js`,
+      );
       let handlerExists = true;
       try {
         readFileSync(handlerFile, "utf8");
@@ -167,13 +170,16 @@ describe("staticPageMeta — durable guard: every static _routes.json include ac
         handlerExists = false;
       }
 
-      expect(handlerExists, `expected functions${routePath}.js to exist for _routes.json include "${routePath}"`).toBe(
-        true,
-      );
       expect(
-        Object.prototype.hasOwnProperty.call(STATIC_PAGES, routePath),
-        `expected STATIC_PAGES["${routePath}"] to exist for _routes.json include "${routePath}"`,
+        handlerExists,
+        `expected functions${routePath === "/" ? "/index.js" : `${routePath}.js`} to exist for _routes.json include "${routePath}"`,
       ).toBe(true);
+      if (routePath !== "/") {
+        expect(
+          Object.prototype.hasOwnProperty.call(STATIC_PAGES, routePath),
+          `expected STATIC_PAGES["${routePath}"] to exist for _routes.json include "${routePath}"`,
+        ).toBe(true);
+      }
     }
   });
 
@@ -184,19 +190,31 @@ describe("staticPageMeta — durable guard: every static _routes.json include ac
   // the response's own canonical + og:url match CANONICAL_HOST + that exact
   // route path — proving the file is wired to the path it's registered for,
   // not merely present on disk.
-  it("every non-exempt include path's handler actually injects canonical + og:url for ITS OWN path", async () => {
+  it("every non-exempt include path's handler actually serves the route it is registered for", async () => {
     const routesJson = loadRoutesJson();
     const staticIncludes = routesJson.include.filter((p) => !isExempt(p));
 
     for (const routePath of staticIncludes) {
-      const handlerFile = path.join(FUNCTIONS_DIR, `${routePath.replace(/^\//, "")}.js`);
+      const handlerFile = path.join(
+        FUNCTIONS_DIR,
+        routePath === "/" ? "index.js" : `${routePath.replace(/^\//, "")}.js`,
+      );
       const mod = await import(pathToFileURL(handlerFile).href);
 
-      expect(typeof mod.onRequestGet, `expected functions${routePath}.js to export onRequestGet`).toBe("function");
+      expect(
+        typeof mod.onRequestGet,
+        `expected functions${routePath === "/" ? "/index.js" : `${routePath}.js`} to export onRequestGet`,
+      ).toBe("function");
 
       const expectedUrl = `${CANONICAL_HOST}${routePath}`;
       const res = await mod.onRequestGet(makeContext(expectedUrl));
       const html = await res.text();
+
+      if (routePath === "/") {
+        expect(html).toContain("<noscript>");
+        expect(html).toContain("current-event-links");
+        continue;
+      }
 
       const canonicalMatch = html.match(/<link rel="canonical" href="([^"]+)"/);
       const ogUrlMatch = html.match(/<meta property="og:url" content="([^"]+)"/);

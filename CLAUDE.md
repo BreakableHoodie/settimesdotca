@@ -1235,16 +1235,27 @@ How the rebuilt `semgrep.yml` works (#1173):
   summary) without failing, because `main` carries pre-existing findings (19 on
   2026-09-22, 16 of them `detect-non-literal-regexp`) and a job that is red on
   every push is noise, not a gate.
-- **It counts results in the JSON, never the exit code.** Audit-column rules are
-  non-blocking, so `semgrep ci` exits **0 with findings**, verified with a
-  planted finding. A gate reading the exit code would pass everything.
-- **`fetch-depth: 0` is load-bearing.** The diff scan needs the PR's base commit
-  locally, and a shallow, credential-less checkout cannot fetch it on a private
-  repo (the failure that broke push-to-main E2E, #1184).
-- **Dependabot PRs skip, loudly.** They never receive Actions secrets; the job
-  posts a notice and a "NOT SCANNED" summary rather than passing silently. Any
-  other run without the token **fails**: an OSS-only scan reports all-clear while
-  missing every rule that has found a real issue here.
+- **Findings come from the JSON; the exit code only ever signals a failure to
+  run — and not reliably.** `semgrep ci` exits **0 with findings** (Audit-column
+  rules are non-blocking; verified with a planted finding), so the job counts
+  results in the JSON. Exit **1** means blocking findings and goes on to that
+  count. Exit **> 1** means "could not run" and fails the job. But semgrep also
+  exits **0 when it could not run** ("will succeed because there were no
+  blocking findings") and writes no JSON: seen twice on #1185, once from its own
+  `git fetch` and once in a semgrep.dev outage. The `test -s semgrep.json` guard
+  is what makes both red. Never remove it as redundant.
+- **It runs in plain-git mode, and needs full history.** When semgrep detects
+  GitHub Actions it runs its own `git fetch`, which fails with "could not read
+  Username" on a private repo with no persisted credentials (the #1184 trap).
+  So `semgrep ci` runs under `env -u GITHUB_ACTIONS`, diffing against
+  `SEMGREP_BASELINE_REF` using history that `fetch-depth: 0` already checked
+  out; `SEMGREP_*` variables restore the metadata. On a PR it checks out the
+  **head** commit, not GitHub's merge commit, so commits landed on `main` after
+  the PR opened are not scanned as this PR's.
+- **Dependabot and fork PRs skip, loudly.** Neither receives Actions secrets;
+  the job posts a notice and a "NOT SCANNED" summary rather than passing
+  silently. Any other run without the token **fails**: an OSS-only scan reports
+  all-clear while missing every rule that has found a real issue here.
 
 Do not "fix" the App's check by moving the Rule Board to "Comment": that is a
 dashboard setting, not in git, not reviewable in a PR, and silently reversible

@@ -351,6 +351,15 @@ export const MUTATIONS = [
     replace: "updateResults.some((result) => !result?.meta?.changes)",
     tests: ["functions/api/admin/events/__tests__/schedule.test.js"],
   },
+  {
+    id: "homepage-links-only-current-events",
+    invariant:
+      "CLAUDE.md 'The sitemap is the event-discovery signal — spend it (#1158)' — the homepage links only published events that have not concluded",
+    file: "functions/index.js",
+    find: "WHERE ${publishedEventStatusSql()} AND NOT ${concludedEventSql()}",
+    replace: "WHERE ${publishedEventStatusSql()} AND (? IS NOT NULL)",
+    tests: ["functions/__tests__/homepage.test.js"],
+  },
 ];
 
 // ============================================================================

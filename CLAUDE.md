@@ -471,7 +471,7 @@ The rejected alternative was marking SSR-injected tags `data-rh="true"` so Helme
 
   `functions/venue/[id].js` carries the identical numeric guard and is safe only because every venue link is id-built. Adding a `/venue/<slug>` link builder without also adding the redirect reintroduces the whole class — there is a comment in that file saying so.
 - **Before deleting a tag from a page's `<Helmet>`, confirm SSR emits an equivalent** — the ownership sweep isn't just "delete the client copy." `og:site_name` existed only in two pages' old client Helmet (`SubscribePage.jsx`, `App.jsx`'s `/event/:slug`) and had no SSR equivalent anywhere; deleting it outright would have silently dropped the tag rather than de-duplicating it. Two other disagreements surfaced the same way on `/event/:slug`: the old client `og:type="event"` (invalid without Facebook's required `event:start_time`/`event:end_time` properties, which this route never emitted) and `twitter:card="summary"` (no image) lost to SSR's already-established, spec-valid `og:type="website"` / `twitter:card="summary_large_image"` — the more complete value wins once there's only one.
-- **`/` is deliberately excluded.** `index.html`'s baked-in defaults *are* the homepage's correct meta, and `EventsPage` keeps full client-side ownership of its identity meta there — the only route in the app that does.
+- **`/` has a dedicated Function for body links only.** `index.html`'s baked-in defaults *are* the homepage's correct meta, and `EventsPage` keeps full client-side ownership of its identity meta there. `functions/index.js` injects current-event links into the existing `<noscript>` nav. It preserves the shell's `<head>` byte-for-byte and its **policy** headers (CSP, HSTS, COOP/CORP, frame options, `Cache-Control`), sets `Content-Type`, and **drops the representation headers** that describe only the original bytes: `ETag`, `Last-Modified`, `Content-Length`, `Content-Encoding`. Every handler that rewrites the shell uses `headersForRewrittenShell()` (`functions/utils/ssrMeta.js`) for this. Copying the shell's `ETag` onto a rewritten body labels new content with old validators, and production hides that only because the edge strips the header (#1163 review).
 - **The singular/plural prefix split is deliberate — do not "unify" it.** `/event/:slug` is the live event page; `/events/:slug/recap` is the archive recap, a *different resource*. Both are SSR-injected, listed in `_routes.json`, and emitted into `sitemap.xml`, so both are indexed. Anything that constructs an event URL — digest emails, share links, structured data — must pick the right prefix; building the wrong one is how #562 shipped broken links in digest emails, and it reads as an oversight precisely because nothing said otherwise. It is not one: an indexed URL is an external contract in the same way the public API paths and the `band_profiles` table name are, and migrating it would cost permanent 301s, a sitemap change, an SSR handler move and `_routes.json` surgery to buy guessability on the least-trafficked public surface we have. Declined deliberately in #910.
 
 - **Build every URL from `CANONICAL_HOST`, never `request.url`** — preview deploys must not self-canonicalise.
@@ -505,12 +505,11 @@ things about it are load-bearing:
   linking a 404 spends a discovery signal on a dead end.
 - **Only parameterless routes.** A static shell cannot know a slug.
 
-**The event-specific link is still missing, and it is the valuable one.** The
-homepage cannot link the current edition without a Pages Function for `/`, and
-`/` is deliberately excluded from `_routes.json` (see the SSR ownership section
-— `index.html`'s defaults *are* the homepage's correct meta). So the sitemap
-remains the only thing telling Google which *event* matters; the nav only
-establishes the site's spine.
+**The event-specific link is now injected by the homepage Function.** It links
+current public events in the existing raw-HTML `<noscript>` nav and changes
+body links only: the shell's `<head>` and response headers remain the static
+asset's values. The sitemap remains the primary event-discovery signal; the
+homepage link is the strongest internal signal for which edition matters now.
 
 So `functions/sitemap.xml.js` is still the primary signal, and the only one that
 speaks about events.
@@ -543,12 +542,11 @@ test that only checked "the URL is present" passed with the priorities
 identical, which is how the flat rate survived this long. Both halves are in the
 mutation gate.
 
-**#1159 narrowed this, it did not close it.** The shell now carries a crawlable
-nav, so the site has a link *spine* — but a static shell cannot know a slug, so
-nothing links the current edition. The sitemap is still the only thing that
-speaks about **events**, which is why its priorities are worth this much
-attention. **#1163** tracks the homepage link that would change that, and it is
-gated on giving `/` a Pages Function without disturbing its meta ownership.
+**#1159 narrowed this, and #1163 closes the missing event link.** The shell now
+carries a crawlable link *spine*, and `functions/index.js` adds current public
+event links at request time without disturbing homepage meta ownership. The
+sitemap remains the event-specific discovery signal and its priorities are still
+worth this much attention.
 
 ## Theming
 

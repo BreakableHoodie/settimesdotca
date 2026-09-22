@@ -165,10 +165,16 @@ two values:
 > available. Your included PR review attempts over the past 7 days set your
 > current allowance at **3 reviews per hour**. **Plan**: Essentials
 
-Three readings, three different numbers — 1, then 4, then 3. It **recovers** as
+<!-- a fourth quote, twelve days later -->
+
+> 2026-09-22, #1182 — **Included review availability:** 3 reviews are currently
+> available. Your included PR review attempts over the past 7 days set your
+> current allowance at **5 reviews per hour**. **Plan**: Essentials
+
+Four readings, four different numbers — 1, then 4, then 3, then 5. It **recovers** as
 7-day usage falls and **falls** as usage rises, so it moves in both directions.
 That is the durable fact, and it is why no number written here stays true —
-including these three. `.githooks/pre-push` tracks the most recent observed
+including these four. `.githooks/pre-push` tracks the most recent observed
 footer (`LIMIT=5` as of 2026-09-22) and records each dated observation in its own comments, so a stale
 value is visible as a stale date rather than as a bare constant. Move it only
 against a CURRENT footer.

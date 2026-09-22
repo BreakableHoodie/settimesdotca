@@ -1159,7 +1159,7 @@ Reading CodeRabbit correctly — worked examples in `docs/field-notes/coderabbit
 
 ### CodeRabbit costs money past the included allowance — batch your pushes
 
-**Every push to a PR branch that changes at least one review-eligible file triggers a review** (a push touching only path-excluded files, such as a lockfile, is skipped and uses no allowance), **and past the included allowance reviews are billed, not paused.** The allowance is **dynamic** (it has read 1, 4 and 3 reviews/hour on Essentials) — read it from a *current* review footer, never from memory or this file. History: `docs/field-notes/coderabbit.md`.
+**Every push to a PR branch that changes at least one review-eligible file triggers a review** (a push touching only path-excluded files, such as a lockfile, is skipped and uses no allowance), **and past the included allowance reviews are billed, not paused.** The allowance is **dynamic** (it has read 1, 4, 3 and 5 reviews/hour on Essentials) — read it from a *current* review footer, never from memory or this file. History: `docs/field-notes/coderabbit.md`.
 
 - **Concentration is the expensive failure, not volume** — #998 burned 4 reviews in ~25 min on a two-line change. Read your own diff and run the right suite locally, then push once.
 - `make hooks` installs `.githooks/pre-push`, which warns at the first review in the window and blocks at `LIMIT` (update it only against a current footer; erring low blocks pushes the budget would allow). Deliberately POSIX `sh`, no `gh`/`jq`/network.

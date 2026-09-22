@@ -47,8 +47,8 @@ four dispatches on `opencode/big-pickle` came to **314 messages and 3.1M input
 tokens** in this project alone. Counting *dispatches* understates the work by
 roughly two orders of magnitude.
 
-`opencode stats --days N --models --project ""` is the real view, wrapped as
-`make delegate-stats` (override the window with `DAYS=30 make delegate-stats`).
+`opencode stats --days 7 --models --project ""` is the real view, wrapped as
+`make delegate-stats` (7 days by default; override the window with `DAYS=30 make delegate-stats`).
 The `--project ""` is load-bearing: the default is EVERY project on the machine.
 
 Three limits on what it can tell you, all worth knowing before relying on it:

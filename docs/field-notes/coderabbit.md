@@ -134,7 +134,9 @@ worse than no hook.
 
 ## CodeRabbit costs money past the included allowance — batch your pushes
 
-**Every push to a PR branch triggers a review.** Past the included allowance
+**Every push to a PR branch that changes at least one review-eligible file
+triggers a review.** A push touching only path-excluded files (a lockfile, say)
+is skipped and uses none of the allowance. Past the included allowance
 reviews are **not paused, they are billed** (this account has the usage-based
 add-on). There is no natural brake; the discipline has to come from the workflow.
 

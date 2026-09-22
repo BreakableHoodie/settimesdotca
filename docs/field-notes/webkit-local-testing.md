@@ -72,8 +72,10 @@ await ctx.route('**/*', async (route) => {
 })
 ```
 
-Also use `waitUntil: 'domcontentloaded'`, never `'networkidle'` — the service
-worker keeps a connection open and networkidle never fires in WebKit.
+Also use `waitUntil: 'domcontentloaded'`, never `'networkidle'`. In this harness
+networkidle never fired in WebKit (observed 2026-09-09). It requires 500 ms
+with no network activity, and the service worker's background requests are the
+likely reason that window never arrives — the cause is inferred, not measured.
 
 Note what this costs: the page then runs **without** CSP, so this harness cannot
 test anything CSP governs. It is for layout and rendering questions only.

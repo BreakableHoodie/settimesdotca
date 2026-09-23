@@ -32,7 +32,7 @@
     "@playwright/test": "^1.63.0",
     "@vitest/coverage-v8": "^5.0.1",
     "acorn": "^8.18.0",
-    "baseline-browser-mapping": "^2.11.23",
+    "baseline-browser-mapping": "^2.11.24",
     "better-sqlite3": "^13.0.3",
     "eslint": "^10.10.0",
     "eslint-config-prettier": "^10.1.5",

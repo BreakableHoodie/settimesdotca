@@ -59,7 +59,7 @@
     "@vitejs/plugin-react": "^6.1.1",
     "@vitest/coverage-v8": "^5.0.1",
     "axe-core": "^4.13.0",
-    "baseline-browser-mapping": "^2.11.23",
+    "baseline-browser-mapping": "^2.11.24",
     "eslint": "^10.10.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-jsx-a11y": "^6.10.2",

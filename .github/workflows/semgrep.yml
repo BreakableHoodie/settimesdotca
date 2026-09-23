@@ -48,9 +48,10 @@ jobs:
   scan:
     name: Scan
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
-    # Full-tree scans (push, weekly) are the long ones: 480-546s on GitHub-hosted
-    # runners, 736s on the self-hosted runner (2 CPUs per job). 15 min left
-    # ~11% headroom there. Diff-aware PR scans are far shorter.
+    # Full-tree scans (push, weekly) are the long ones: the scan step took
+    # 480-546s on GitHub-hosted runners and 736s on the self-hosted runner
+    # (2 CPUs per job). That job's end-to-end duration was 803s, ~11% under the
+    # old 15-min limit. Diff-aware PR scans are far shorter.
     timeout-minutes: 25
     steps:
       # fetch-depth: 0 because the diff-aware scan needs the PR's base commit

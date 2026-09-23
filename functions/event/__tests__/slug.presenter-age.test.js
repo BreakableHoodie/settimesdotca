@@ -48,6 +48,10 @@ function seedEvent(rawDb, slug, overrides = {}) {
     cols.push("presented_by = ?");
     vals.push(overrides.presented_by);
   }
+  if (overrides.presented_by_url !== undefined) {
+    cols.push("presented_by_url = ?");
+    vals.push(overrides.presented_by_url);
+  }
   if (cols.length) {
     rawDb.prepare(`UPDATE events SET ${cols.join(", ")} WHERE id = ?`).run(...vals, ev.id);
   }
@@ -72,6 +76,28 @@ describe("/event/[slug] JSON-LD — presenter & age restriction (#1063)", () => 
     expect(res.status).toBe(200);
     expect(musicEvent.organizer).toEqual({ "@type": "Organization", name: "Oktoberfest KW" });
     expect(musicEvent.organizer.name).not.toBe("SetTimes");
+  });
+
+  test("presented_by includes a valid URL and omits unsafe or absent URLs", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    seedEvent(rawDb, "organizer-url", {
+      presented_by: "Oktoberfest KW",
+      presented_by_url: "https://oktoberfest.ca/?utm_source=test",
+    });
+    const first = await fetchMusicEvent(makeContext({ env, slug: "organizer-url" }));
+    expect(first.musicEvent.organizer.url).toBe("https://oktoberfest.ca/");
+
+    rawDb.prepare("UPDATE events SET presented_by_url = NULL WHERE slug = ?").run("organizer-url");
+    const absent = await fetchMusicEvent(makeContext({ env, slug: "organizer-url" }));
+    expect(absent.musicEvent.organizer).not.toHaveProperty("url");
+
+    rawDb
+      .prepare("UPDATE events SET presented_by_url = ? WHERE slug = ?")
+      // eslint-disable-next-line no-script-url -- fixture intentionally exercises the JSON-LD read-path sanitizer
+      .run("javascript:alert(1)", "organizer-url");
+    const unsafe = await fetchMusicEvent(makeContext({ env, slug: "organizer-url" }));
+    expect(unsafe.musicEvent.organizer).not.toHaveProperty("url");
   });
 
   test("age_restriction emits audience.requiredMinAge and no organizer change", async () => {

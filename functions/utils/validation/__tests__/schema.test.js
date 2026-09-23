@@ -282,6 +282,33 @@ describe("event schema — age_restriction/presented_by free-text boundaries (#1
   });
 });
 
+describe("event schema — ticket_price (#1196)", () => {
+  it.each([
+    ["0", 0],
+    [0, 0],
+    ["25.50", 25.5],
+    [10000, 10000],
+  ])("accepts %j as %j -- 0 is a real price (a free show), not a blank", (input, expected) => {
+    const result = validateEntity({ ...validEventBase, ticket_price: input }, VALIDATION_SCHEMAS.event);
+    expect(result.valid).toBe(true);
+    expect(result.sanitized.ticket_price).toBe(expected);
+  });
+
+  it.each([[""], [null], [undefined]])("treats %j as unknown (null), never as 0", (input) => {
+    const result = validateEntity({ ...validEventBase, ticket_price: input }, VALIDATION_SCHEMAS.event);
+    expect(result.valid).toBe(true);
+    expect(result.sanitized.ticket_price).toBeNull();
+  });
+
+  // Number() turns each of these into 0 or 1. Accepting them would publish a
+  // price in the JSON-LD that nobody entered.
+  it.each([[true], ["   "], [[]], ["abc"], [-1], [10000.01], ["Infinity"]])("rejects %j", (input) => {
+    const result = validateEntity({ ...validEventBase, ticket_price: input }, VALIDATION_SCHEMAS.event);
+    expect(result.valid).toBe(false);
+    expect(result.errors.ticket_price).toMatch(/^Ticket price must/);
+  });
+});
+
 describe("user schema — password policy (each axis individually)", () => {
   it("no uppercase letter is invalid with the exact policy error", () => {
     const result = validateEntity({ ...validUserBase, password: PW_NO_UPPERCASE }, VALIDATION_SCHEMAS.user);

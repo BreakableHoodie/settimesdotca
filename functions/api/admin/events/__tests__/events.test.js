@@ -347,6 +347,8 @@ describe("Event API - handler integration", () => {
       date: "2099-10-11",
       age_restriction: "19+",
       presented_by: "Downtown Waterloo BIA",
+      presented_by_url: "https://downtownwaterloo.ca",
+      ticket_price: "25.50",
     };
     const request = new Request("https://example.test/api/admin/events", {
       method: "POST",
@@ -359,10 +361,16 @@ describe("Event API - handler integration", () => {
     const data = await res.json();
     expect(data.event.age_restriction).toBe("19+");
     expect(data.event.presented_by).toBe("Downtown Waterloo BIA");
+    expect(data.event.presented_by_url).toBe("https://downtownwaterloo.ca/");
+    expect(data.event.ticket_price).toBe(25.5);
 
-    const stored = rawDb.prepare("SELECT age_restriction, presented_by FROM events WHERE id = ?").get(data.event.id);
+    const stored = rawDb
+      .prepare("SELECT age_restriction, presented_by, presented_by_url, ticket_price FROM events WHERE id = ?")
+      .get(data.event.id);
     expect(stored.age_restriction).toBe("19+");
     expect(stored.presented_by).toBe("Downtown Waterloo BIA");
+    expect(stored.presented_by_url).toBe("https://downtownwaterloo.ca/");
+    expect(stored.ticket_price).toBe(25.5);
   });
 
   it("onRequestPatch persists age_restriction and presented_by", async () => {
@@ -370,7 +378,12 @@ describe("Event API - handler integration", () => {
     const env = { DB: createDBEnv(rawDb) };
     const ev = insertEvent(rawDb, { name: "Old Name", slug: "old-name" });
 
-    const body = { age_restriction: "All Ages", presented_by: "Kitchener-Waterloo Oktoberfest" };
+    const body = {
+      age_restriction: "All Ages",
+      presented_by: "Kitchener-Waterloo Oktoberfest",
+      presented_by_url: "https://oktoberfest.ca",
+      ticket_price: 0,
+    };
     const request = new Request(`https://example.test/api/admin/events/${ev.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", "x-test-role": "editor" },
@@ -382,10 +395,60 @@ describe("Event API - handler integration", () => {
     const data = await res.json();
     expect(data.event.age_restriction).toBe("All Ages");
     expect(data.event.presented_by).toBe("Kitchener-Waterloo Oktoberfest");
+    expect(data.event.presented_by_url).toBe("https://oktoberfest.ca/");
+    expect(data.event.ticket_price).toBe(0);
 
-    const stored = rawDb.prepare("SELECT age_restriction, presented_by FROM events WHERE id = ?").get(ev.id);
+    const stored = rawDb
+      .prepare("SELECT age_restriction, presented_by, presented_by_url, ticket_price FROM events WHERE id = ?")
+      .get(ev.id);
     expect(stored.age_restriction).toBe("All Ages");
     expect(stored.presented_by).toBe("Kitchener-Waterloo Oktoberfest");
+    expect(stored.presented_by_url).toBe("https://oktoberfest.ca/");
+    expect(stored.ticket_price).toBe(0);
+  });
+
+  it.each([
+    [{ ticket_price: -1 }, "Ticket price"],
+    [{ ticket_price: "abc" }, "Ticket price"],
+    // Number() coerces each of these to 0 or 1 -- a stated price the admin
+    // never entered. They must be refused, not stored.
+    [{ ticket_price: true }, "Ticket price"],
+    [{ ticket_price: "   " }, "Ticket price"],
+    [{ ticket_price: [] }, "Ticket price"],
+    // eslint-disable-next-line no-script-url -- fixture intentionally exercises URL validation
+    [{ presented_by_url: "javascript:alert(1)" }, "Presented by URL"],
+  ])("onRequestPatch rejects invalid event JSON-LD field input %#", async (body, fieldLabel) => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+    const ev = insertEvent(rawDb, { name: "Invalid JSON-LD", slug: `invalid-jsonld-${Math.random()}` });
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify(body),
+    });
+
+    const res = await eventIdHandler.onRequestPatch({ request, env });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ message: expect.stringContaining(fieldLabel) });
+  });
+
+  it("onRequestPatch clears both JSON-LD fields with null and empty string", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+    const ev = insertEvent(rawDb, { name: "Clear JSON-LD", slug: "clear-jsonld" });
+    rawDb
+      .prepare("UPDATE events SET presented_by_url = ?, ticket_price = ? WHERE id = ?")
+      .run("https://example.com", 25, ev.id);
+
+    const request = new Request(`https://example.test/api/admin/events/${ev.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify({ presented_by_url: "", ticket_price: null }),
+    });
+    const res = await eventIdHandler.onRequestPatch({ request, env });
+    expect(res.status).toBe(200);
+    const stored = rawDb.prepare("SELECT presented_by_url, ticket_price FROM events WHERE id = ?").get(ev.id);
+    expect(stored).toEqual({ presented_by_url: null, ticket_price: null });
   });
 
   it("onRequestPost rejects an age_restriction over 40 chars", async () => {
@@ -1024,6 +1087,39 @@ describe("Event API - handler integration", () => {
 
     const stored = rawDb.prepare("SELECT doors_json FROM events WHERE id = ?").get(data.event.id);
     expect(stored.doors_json).toBeNull();
+  });
+
+  it("duplicate copies the series-level presenter fields but NOT the edition-specific ticket_price (#1196)", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+
+    const original = insertEvent(rawDb, { name: "Series Source", slug: "series-source" });
+    rawDb
+      .prepare(
+        "UPDATE events SET presented_by = ?, presented_by_url = ?, age_restriction = ?, ticket_price = ? WHERE id = ?",
+      )
+      .run("Fat Scheid & Pink Lemonade Records", "https://presenter.example/", "19+", 25, original.id);
+
+    const request = new Request(`https://example.test/api/admin/events/${original.id}/duplicate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify({ name: "Series Next", date: "2100-01-01", slug: "series-next" }),
+    });
+    const res = await duplicateHandler.onRequestPost({ request, env, params: { id: String(original.id) } });
+    expect(res.status).toBe(201);
+    const data = await res.json();
+
+    const stored = rawDb
+      .prepare("SELECT presented_by, presented_by_url, age_restriction, ticket_price FROM events WHERE id = ?")
+      .get(data.event.id);
+    // A copy without the presenter would name SetTimes as the JSON-LD organizer.
+    expect(stored).toEqual({
+      presented_by: "Fat Scheid & Pink Lemonade Records",
+      presented_by_url: "https://presenter.example/",
+      age_restriction: "19+",
+      // Each edition sets its own price; a copied one would publish a stale fact.
+      ticket_price: null,
+    });
   });
 
   it("duplicate endpoint does NOT copy poster_url to the new event (#616 — edition-specific, like doors_json)", async () => {

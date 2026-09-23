@@ -119,6 +119,8 @@ export async function onRequestPatch(context) {
       doors_json,
       age_restriction,
       presented_by,
+      presented_by_url,
+      ticket_price,
     } = body;
 
     // Build update query dynamically based on provided fields
@@ -510,6 +512,54 @@ export async function onRequestPatch(context) {
       }
       updates.push("presented_by = ?");
       params.push(sanitized || null);
+    }
+
+    if (presented_by_url !== undefined) {
+      if (presented_by_url !== null && typeof presented_by_url !== "string") {
+        return new Response(
+          JSON.stringify({ error: "Validation error", message: "Presented by URL must be a string" }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      const trimmed = presented_by_url ? presented_by_url.trim() : "";
+      if (trimmed && !isValidURL(trimmed)) {
+        return new Response(
+          JSON.stringify({ error: "Validation error", message: "Presented by URL must be a valid URL" }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (trimmed.length > FIELD_LIMITS.eventPresentedByUrl.max) {
+        return new Response(
+          JSON.stringify({
+            error: "Validation error",
+            message: `Presented by URL must be no more than ${FIELD_LIMITS.eventPresentedByUrl.max} characters`,
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      updates.push("presented_by_url = ?");
+      params.push(trimmed ? normalizeHttpUrl(trimmed) : null);
+    }
+
+    if (ticket_price !== undefined) {
+      if (ticket_price === null || ticket_price === "") {
+        updates.push("ticket_price = ?");
+        params.push(null);
+      } else {
+        // Same guard as validateEntity's number branch: Number() would turn
+        // true, [] or "   " into a price, and a price is a public claim.
+        const isNumeric =
+          typeof ticket_price === "number" || (typeof ticket_price === "string" && ticket_price.trim() !== "");
+        const numericPrice = isNumeric ? Number(ticket_price) : NaN;
+        if (!Number.isFinite(numericPrice) || numericPrice < 0 || numericPrice > 10000) {
+          return new Response(
+            JSON.stringify({ error: "Validation error", message: "Ticket price must be a number from 0 to 10000" }),
+            { status: 400, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        updates.push("ticket_price = ?");
+        params.push(numericPrice);
+      }
     }
 
     // Always update updated_by_user_id

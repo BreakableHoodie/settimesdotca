@@ -57,6 +57,7 @@ export const FIELD_LIMITS = {
   eventSocialLinks: { min: 0, max: 2000 },
   eventAgeRestriction: { min: 0, max: 40 },
   eventPresentedBy: { min: 0, max: 200 },
+  eventPresentedByUrl: { min: 0, max: 500 },
 
   // Generic
   url: { min: 0, max: 2000 },

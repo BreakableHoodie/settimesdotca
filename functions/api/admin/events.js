@@ -152,6 +152,8 @@ export async function onRequestPost(context) {
       doors_json,
       age_restriction,
       presented_by,
+      presented_by_url,
+      ticket_price,
     } = validation.sanitized;
 
     let sanitizedVenueInfo;
@@ -276,9 +278,11 @@ export async function onRequestPost(context) {
         doors_json,
         age_restriction,
         presented_by,
+        presented_by_url,
+        ticket_price,
         created_by_user_id
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING *
     `,
     )
@@ -298,6 +302,8 @@ export async function onRequestPost(context) {
         sanitizedDoorsJson,
         age_restriction,
         presented_by,
+        presented_by_url,
+        ticket_price,
         currentUser.userId,
       )
       .first();

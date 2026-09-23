@@ -272,7 +272,13 @@ jobs:
 
   lighthouse:
     name: Lighthouse CI
-    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    # Deliberately NOT vars.RUNS_ON. The performance floor (0.90) was
+    # calibrated on GitHub-hosted hardware, and Lighthouse's main-thread timing
+    # is the one check that is truly contention-sensitive: the same app scored
+    # 0.93 on one self-hosted host and 0.80 (TBT 150ms -> 510ms) on another that
+    # shares its CPU with other services. A shared runner would make the floor
+    # measure the neighbours, not the code.
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Checkout

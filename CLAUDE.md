@@ -256,12 +256,17 @@ Canonical active roadmap: `docs/ROADMAP.md`. Use it for handoffs between Claude,
   - **Runners are self-hosted** (2026-09-23): every job reads
     `runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}`, and the repo variable
     `RUNS_ON=self-hosted` routes it to ephemeral Ubuntu 24.04 containers on
-    Dre's Proxmox host (`pickles`, CT 108, one fresh container per job).
+    Dre's homelab (host `lenny`; `pickles` CT 108 is a cold standby), one fresh
+    container per job.
     **Kill switch:** `gh variable delete RUNS_ON` returns every job to
-    GitHub-hosted runners with no code change. `zap-baseline.yml` is the one
-    exception and stays hosted (it needs Docker; job containers have no socket).
-    Lighthouse scores and visual snapshots are now measured on that runner, so
-    compare them only against other self-hosted runs.
+    GitHub-hosted runners with no code change. **Two jobs stay hosted on
+    purpose:** `zap-baseline.yml` (needs Docker; job containers have no socket)
+    and `quality.yml`'s **Lighthouse CI** (its 0.90 floor was calibrated on
+    hosted hardware; on a shared self-hosted box it scored 0.80 against 0.93 for
+    identical code). Visual snapshots do run self-hosted, and the runner image
+    matches `ubuntu-latest` fonts, so compare them only against self-hosted runs.
+    Runner setup, hosts and the failback procedure live in the private
+    `BreakableHoodie/gh-runner` repo.
   (`codeql.yml`, `secret-scan.yml` and `dependency-review.yml` were removed
   2026-09-16; `semgrep.yml` was removed the same day and **rebuilt** in #1173 —
   it still runs Semgrep SAST, but gates in the job itself instead of uploading

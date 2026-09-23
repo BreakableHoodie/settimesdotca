@@ -351,8 +351,30 @@ describe("sendEmail — Resend", () => {
 
   it("throws rather than truncating an overlong idempotency key", async () => {
     await expect(sendEmail(env, { ...PAYLOAD, idempotencyKey: "x".repeat(257) })).rejects.toThrow(
-      "idempotencyKey must be a string of 256 characters or fewer",
+      "idempotencyKey must be a string of 1 to 256 characters",
     );
+  });
+
+  // An empty key passed every old check (a string, and 0 <= 256) and would
+  // reach Resend as an empty Idempotency-Key header (#1192 review).
+  it.each([[""], [42], [null]])("rejects the malformed idempotencyKey %j before any request", async (bad) => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    await expect(sendEmail(env, { ...PAYLOAD, idempotencyKey: bad })).rejects.toThrow(
+      "idempotencyKey must be a string of 1 to 256 characters",
+    );
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("accepts keys of exactly 1 and 256 characters", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse(200, { id: "ok" })),
+    );
+    await expect(sendEmail(env, { ...PAYLOAD, idempotencyKey: "k" })).resolves.toMatchObject({ delivered: true });
+    await expect(sendEmail(env, { ...PAYLOAD, idempotencyKey: "k".repeat(256) })).resolves.toMatchObject({
+      delivered: true,
+    });
   });
 
   it("a network-level fetch rejection yields delivered: false, never a rejected promise", async () => {

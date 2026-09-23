@@ -74,6 +74,7 @@ export async function notifyBandFollowers(env, DB, { performanceId, bandProfileI
       const result = await sendEmail(env, {
         to: follower.email,
         subject: `${bandName} just joined the lineup for ${eventName}!`,
+        idempotencyKey: `band-follow:${performanceId}:${follower.id}`,
         text: `${bandName} is now on the lineup for ${eventName}.\n\nUnfollow: ${unsubUrl}`,
         html: `<p><strong>${escapeHtml(bandName)}</strong> is now on the lineup for <strong>${escapeHtml(eventName)}</strong>.</p><p><a href="${unsubUrl}">Unfollow this band</a></p>`,
       });
@@ -89,9 +90,9 @@ export async function notifyBandFollowers(env, DB, { performanceId, bandProfileI
         // its lease expires, and a later resend mails the person a second time.
         // That is deliberate. The alternative it replaces was a permanent,
         // silent DROP -- and a visible duplicate is recoverable where silence
-        // is not. Closing the window properly needs a provider-side
-        // idempotency key on sendEmail (#1153), which is a change to every
-        // caller, not to this one.
+        // is not. On Resend the window is closed by the idempotency key passed
+        // below (a same-payload retry sends nothing); Postmark and MailChannels
+        // have no equivalent, so there it stays open.
         //
         // Counting it as SENT is the point of the catch: it was sent. Reporting
         // it failed would invite an operator to resend, which is the single

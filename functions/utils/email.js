@@ -30,7 +30,26 @@ export function isEmailConfigured(env) {
   return true;
 }
 
-export async function sendEmail(env, { to, subject, html, text }) {
+/**
+ * Send one email through the configured provider (EMAIL_PROVIDER).
+ * @param {object} env
+ * @param {{ to: string, subject: string, html: string, text?: string, idempotencyKey?: string }} message
+ *   idempotencyKey (optional, 1-256 chars; throws if empty, longer, or not a string) is sent as
+ *   `Idempotency-Key` on RESEND ONLY; Postmark and MailChannels have no equivalent and ignore it.
+ *   Pass it only for claim-then-send mail, never for transactional mail a user may re-request.
+ * @returns {Promise<{ delivered: boolean, reason?: string }>} Resend 409s are BOTH undelivered:
+ *   `concurrent_idempotent_requests` -> reason "concurrent_idempotent_request" (a send in flight);
+ *   `invalid_idempotent_request` -> reason "idempotency_payload_mismatch" (a reused key cannot prove
+ *   a send, so it is never counted delivered -- see CLAUDE.md "A claim is not a delivery record").
+ */
+export async function sendEmail(env, { to, subject, html, text, idempotencyKey }) {
+  if (
+    idempotencyKey !== undefined &&
+    (typeof idempotencyKey !== "string" || idempotencyKey.length === 0 || idempotencyKey.length > 256)
+  ) {
+    throw new Error("idempotencyKey must be a string of 1 to 256 characters");
+  }
+
   const provider = getProvider(env);
   const from = getFrom(env);
 
@@ -51,6 +70,10 @@ export async function sendEmail(env, { to, subject, html, text }) {
   }
 
   if (provider === "postmark") {
+    if (idempotencyKey !== undefined) {
+      // Postmark has no provider-side equivalent, so only Resend receives this key.
+      logger.debug("email idempotency key is unsupported by provider", { provider: "postmark" });
+    }
     const token = env?.POSTMARK_API_TOKEN;
     logger.info("email provider selected", { provider: "postmark" });
 
@@ -108,6 +131,10 @@ export async function sendEmail(env, { to, subject, html, text }) {
   }
 
   if (provider === "mailchannels") {
+    if (idempotencyKey !== undefined) {
+      // MailChannels has no provider-side equivalent, so only Resend receives this key.
+      logger.debug("email idempotency key is unsupported by provider", { provider: "mailchannels" });
+    }
     logger.info("email provider selected", { provider: "mailchannels" });
 
     const payload = {
@@ -181,6 +208,7 @@ export async function sendEmail(env, { to, subject, html, text }) {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
+          ...(idempotencyKey !== undefined ? { "Idempotency-Key": idempotencyKey } : {}),
         },
         body: JSON.stringify(payload),
       });
@@ -199,6 +227,35 @@ export async function sendEmail(env, { to, subject, html, text }) {
     });
 
     if (!response.ok) {
+      if (response.status === 409) {
+        let errorBody;
+        try {
+          errorBody = await response.json();
+        } catch {
+          errorBody = undefined;
+        }
+
+        // Same key, DIFFERENT payload. It is tempting to read this as "already
+        // sent" and count it delivered -- but Resend returns "the same response"
+        // for a reused key, i.e. it stores the first response whatever it was.
+        // If that first attempt was REJECTED (never sent), counting this as
+        // delivered drops the follower permanently and silently: the exact
+        // failure #1152 removed. So it is NOT delivered: logged loudly, and
+        // retried once the 24h key expires. A same-payload retry -- the common
+        // case -- still gets the original success back and sends nothing twice.
+        if (errorBody?.name === "invalid_idempotent_request") {
+          logger.error("Resend idempotency key reused with a different payload; not counted as delivered", {
+            provider: "resend",
+            key: idempotencyKey,
+          });
+          return { delivered: false, reason: "idempotency_payload_mismatch" };
+        }
+
+        if (errorBody?.name === "concurrent_idempotent_requests") {
+          return { delivered: false, reason: "concurrent_idempotent_request" };
+        }
+      }
+
       logger.warn("email delivery failed", {
         provider: "resend",
         status: response.status,

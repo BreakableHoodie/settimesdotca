@@ -36,7 +36,9 @@ describe("notifyBandFollowers", () => {
       .run("b@example.com", bandProfileId, "tok-b").lastInsertRowid;
 
     // First delivers, second fails.
-    sendEmail.mockImplementation((_env, { to }) => Promise.resolve({ delivered: to === "a@example.com" }));
+    sendEmail.mockImplementation((_env, { to }) =>
+      Promise.resolve(to === "a@example.com" ? { delivered: true, deduplicated: true } : { delivered: false }),
+    );
 
     const result = await notifyBandFollowers(env, env.DB, {
       performanceId: perf.id,
@@ -50,11 +52,17 @@ describe("notifyBandFollowers", () => {
     });
 
     expect(result).toEqual({ sent: 1, failed: 1 });
+    expect(sendEmail.mock.calls[0][1].idempotencyKey).toBe(`band-follow:${perf.id}:${f1}`);
 
     const notified = rawDb
       .prepare("SELECT band_follow_id FROM band_follow_notifications WHERE performance_id = ? ORDER BY band_follow_id")
       .all(perf.id);
     expect(notified.map((r) => r.band_follow_id)).toEqual([f1]);
+    expect(
+      rawDb
+        .prepare("SELECT delivered_at FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?")
+        .get(perf.id, f1).delivered_at,
+    ).not.toBeNull();
   });
 
   test("skips followers already claimed by another concurrent request", async () => {

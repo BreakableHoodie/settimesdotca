@@ -29,6 +29,27 @@ import { getPublicBaseUrl } from "./publicUrl.js";
 
 const SEND_CONCURRENCY = 8;
 
+/**
+ * One idempotency key per digest EMAIL, derived from its contents.
+ * @param {string} email - the recipient
+ * @param {Array<number|string>} performanceIds - the performances this digest covers
+ * @returns {Promise<string>} `announce-digest:<sha256 hex>` of `email|<ids>`
+ *
+ * The ids are sorted as STRINGS ("10" before "9"). That is deliberate and
+ * sufficient: any deterministic order makes the key order-independent. Do not
+ * switch to a numeric sort -- it would change every key, and an in-flight retry
+ * across a deploy would then no longer deduplicate. A recipient-only key would
+ * wrongly dedupe a genuinely NEW digest within Resend's 24h window; a per-row key
+ * would send the same email once per row.
+ */
+export async function buildAnnounceDigestIdempotencyKey(email, performanceIds) {
+  const sortedIds = performanceIds.map((id) => String(id)).sort();
+  const material = `${email}|${sortedIds.join(",")}`;
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(material));
+  const hash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `announce-digest:${hash}`;
+}
+
 export async function flushAnnounceDigest(env, DB) {
   const publicUrl = getPublicBaseUrl(env);
 
@@ -195,7 +216,17 @@ export async function flushAnnounceDigest(env, DB) {
         ? `<p><strong>${escapeHtml(bands[0])}</strong> is now on the lineup for <strong>${escapeHtml(event_name)}</strong>.</p><p><a href="${eventUrl}">View the schedule</a></p><p style="font-size:0.85em">${unsubHtml}</p>`
         : `<p><strong>${bands.length} bands you follow</strong> just joined the lineup for <strong>${escapeHtml(event_name)}</strong>:</p><ul>${bandListHtml}</ul><p><a href="${eventUrl}">View the schedule</a></p><p style="font-size:0.85em">${unsubHtml}</p>`;
 
-    sendTasks.push({ email, subject, text, html, claimed });
+    sendTasks.push({
+      email,
+      subject,
+      text,
+      html,
+      claimed,
+      idempotencyKey: await buildAnnounceDigestIdempotencyKey(
+        email,
+        claimed.map((item) => item.performance_id),
+      ),
+    });
   }
 
   // ── Phase B (bounded concurrency) ────────────────────────────────────────
@@ -221,6 +252,7 @@ export async function flushAnnounceDigest(env, DB) {
         subject: task.subject,
         text: task.text,
         html: task.html,
+        idempotencyKey: task.idempotencyKey,
       });
     } catch (sendError) {
       // A throw from sendEmail is a delivery failure like any other and must
@@ -242,8 +274,10 @@ export async function flushAnnounceDigest(env, DB) {
       // recalled. Letting a rejection escape sendOne would hand it to
       // Promise.allSettled, which counts it as a FAILED send -- reporting a
       // delivered email as failed, and inviting the resend that turns a lost
-      // write into a duplicate. The row does stay retryable until #1153 adds a
-      // provider idempotency key; the log is what makes that visible.
+      // write into a duplicate. The row stays retryable, and on Resend the
+      // retry is deduplicated by this digest's idempotency key; Postmark and
+      // MailChannels have no equivalent, so there the log is what makes a
+      // possible duplicate visible.
       try {
         await DB.batch(
           task.claimed.map((item) =>

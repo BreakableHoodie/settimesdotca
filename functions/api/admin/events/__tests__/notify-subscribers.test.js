@@ -64,6 +64,7 @@ describe("POST /api/admin/events/[id]/notify-subscribers", () => {
 
     const to = sendEmail.mock.calls.map((c) => c[1].to);
     expect(to).toEqual(["yes@example.com"]);
+    expect(sendEmail.mock.calls[0][1].idempotencyKey).toBe(`subscriber:${ev.id}:schedule_announced:1`);
   });
 
   it("is idempotent — a second call mails nobody twice", async () => {

@@ -129,7 +129,7 @@ describe("sendEmail — preconditions", () => {
     vi.stubGlobal("fetch", fetchSpy);
     const env = { EMAIL_PROVIDER: "postmark", EMAIL_FROM: "noreply@settimes.ca" };
 
-    const result = await sendEmail(env, PAYLOAD);
+    const result = await sendEmail(env, { ...PAYLOAD, idempotencyKey: "unsupported-postmark-key" });
 
     expect(result).toEqual({ delivered: false, reason: "missing_postmark_token" });
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -158,7 +158,7 @@ describe("sendEmail — Postmark", () => {
     const fetchSpy = vi.fn(async () => jsonResponse(200));
     vi.stubGlobal("fetch", fetchSpy);
 
-    const result = await sendEmail(env, PAYLOAD);
+    const result = await sendEmail(env, { ...PAYLOAD, idempotencyKey: "unsupported-postmark-key" });
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     const [url, options] = fetchSpy.mock.calls[0];
@@ -168,6 +168,7 @@ describe("sendEmail — Postmark", () => {
     expect(options.headers["X-Postmark-Server-Token"]).toBe("postmark-test-token");
     // No bearer/auth header of a DIFFERENT shape should leak in.
     expect(options.headers.Authorization).toBeUndefined();
+    expect(options.headers["Idempotency-Key"]).toBeUndefined();
 
     const body = JSON.parse(options.body);
     expect(body).toEqual({
@@ -221,7 +222,7 @@ describe("sendEmail — MailChannels", () => {
     const fetchSpy = vi.fn(async () => jsonResponse(202));
     vi.stubGlobal("fetch", fetchSpy);
 
-    const result = await sendEmail(env, PAYLOAD);
+    const result = await sendEmail(env, { ...PAYLOAD, idempotencyKey: "unsupported-mailchannels-key" });
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     const [url, options] = fetchSpy.mock.calls[0];
@@ -230,6 +231,7 @@ describe("sendEmail — MailChannels", () => {
     // MailChannels needs no bearer/API-key header at all — pin that absence.
     expect(Object.keys(options.headers)).toEqual(["Content-Type"]);
     expect(options.headers["Content-Type"]).toBe("application/json");
+    expect(options.headers["Idempotency-Key"]).toBeUndefined();
 
     const body = JSON.parse(options.body);
     expect(body).toEqual({
@@ -287,7 +289,7 @@ describe("sendEmail — Resend", () => {
     const fetchSpy = vi.fn(async () => jsonResponse(200));
     vi.stubGlobal("fetch", fetchSpy);
 
-    const result = await sendEmail(env, PAYLOAD);
+    const result = await sendEmail(env, { ...PAYLOAD, idempotencyKey: "digest-key" });
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     const [url, options] = fetchSpy.mock.calls[0];
@@ -295,6 +297,7 @@ describe("sendEmail — Resend", () => {
     expect(options.method).toBe("POST");
     expect(options.headers["Content-Type"]).toBe("application/json");
     expect(options.headers.Authorization).toBe("Bearer resend-test-key");
+    expect(options.headers["Idempotency-Key"]).toBe("digest-key");
     // Never the Postmark-shaped header on this provider.
     expect(options.headers["X-Postmark-Server-Token"]).toBeUndefined();
 
@@ -317,6 +320,61 @@ describe("sendEmail — Resend", () => {
     );
     const result = await sendEmail(env, PAYLOAD);
     expect(result).toEqual({ delivered: false, reason: "resend_error" });
+  });
+
+  // NOT delivered: Resend stores the first response for a key whatever it was,
+  // so a reused key cannot prove an email was sent. Counting it delivered
+  // would risk a silent drop -- the worst shape of mail bug (#1152).
+  it("never counts Resend invalid_idempotent_request as delivered", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse(409, { name: "invalid_idempotent_request" })),
+    );
+
+    await expect(sendEmail(env, { ...PAYLOAD, idempotencyKey: "reused-key" })).resolves.toEqual({
+      delivered: false,
+      reason: "idempotency_payload_mismatch",
+    });
+  });
+
+  it("leaves a concurrent Resend idempotency request undelivered", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse(409, { name: "concurrent_idempotent_requests" })),
+    );
+
+    await expect(sendEmail(env, { ...PAYLOAD, idempotencyKey: "in-flight" })).resolves.toEqual({
+      delivered: false,
+      reason: "concurrent_idempotent_request",
+    });
+  });
+
+  it("throws rather than truncating an overlong idempotency key", async () => {
+    await expect(sendEmail(env, { ...PAYLOAD, idempotencyKey: "x".repeat(257) })).rejects.toThrow(
+      "idempotencyKey must be a string of 1 to 256 characters",
+    );
+  });
+
+  // An empty key passed every old check (a string, and 0 <= 256) and would
+  // reach Resend as an empty Idempotency-Key header (#1192 review).
+  it.each([[""], [42], [null]])("rejects the malformed idempotencyKey %j before any request", async (bad) => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    await expect(sendEmail(env, { ...PAYLOAD, idempotencyKey: bad })).rejects.toThrow(
+      "idempotencyKey must be a string of 1 to 256 characters",
+    );
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("accepts keys of exactly 1 and 256 characters", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse(200, { id: "ok" })),
+    );
+    await expect(sendEmail(env, { ...PAYLOAD, idempotencyKey: "k" })).resolves.toMatchObject({ delivered: true });
+    await expect(sendEmail(env, { ...PAYLOAD, idempotencyKey: "k".repeat(256) })).resolves.toMatchObject({
+      delivered: true,
+    });
   });
 
   it("a network-level fetch rejection yields delivered: false, never a rejected promise", async () => {

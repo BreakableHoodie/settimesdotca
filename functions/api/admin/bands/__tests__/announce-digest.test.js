@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../../test-utils.js";
-import { flushAnnounceDigest } from "../../../../utils/announceDigest.js";
+import { buildAnnounceDigestIdempotencyKey, flushAnnounceDigest } from "../../../../utils/announceDigest.js";
 import { getPublicBaseUrl } from "../../../../utils/publicUrl.js";
 import { logger } from "../../../../utils/logger.js";
 
@@ -14,6 +14,16 @@ import { sendEmail } from "../../../../utils/email.js";
 describe("flushAnnounceDigest", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("builds an order-independent key from the recipient and sorted performance ids", async () => {
+    const first = await buildAnnounceDigestIdempotencyKey("fan@example.com", [12, 3, 8]);
+    const reordered = await buildAnnounceDigestIdempotencyKey("fan@example.com", [8, 12, 3]);
+    const different = await buildAnnounceDigestIdempotencyKey("fan@example.com", [12, 3, 9]);
+
+    expect(first).toBe(reordered);
+    expect(first).not.toBe(different);
+    expect(first).toMatch(/^announce-digest:[0-9a-f]{64}$/);
   });
 
   it("sends a single-band email when only one band is queued for a fan+event", async () => {
@@ -45,6 +55,9 @@ describe("flushAnnounceDigest", () => {
     expect(sendEmail).toHaveBeenCalledOnce();
     const [, { subject, text, html }] = sendEmail.mock.calls[0];
     expect(subject).toBe("The Band just joined the lineup for Fest!");
+    expect(sendEmail.mock.calls[0][1].idempotencyKey).toBe(
+      await buildAnnounceDigestIdempotencyKey("fan@example.com", [perf.id]),
+    );
 
     // Regression: the "View the schedule" link must point at the singular
     // /event/:slug route (frontend/src/main.jsx), not the plural /events/

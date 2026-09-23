@@ -166,7 +166,7 @@ export async function onRequest(context) {
   let event;
   try {
     event = await env.DB.prepare(
-      `SELECT id, name, date, end_date, slug, description, city, ticket_url, poster_url, created_at, reveal_mode, age_restriction, presented_by
+      `SELECT id, name, date, end_date, slug, description, city, ticket_url, ticket_price, poster_url, created_at, reveal_mode, age_restriction, presented_by, presented_by_url
        FROM events
        WHERE slug = ? AND ${publicEventStatusSql()}`,
     )
@@ -268,6 +268,14 @@ export async function onRequest(context) {
           },
         };
 
+  // Read-path sanitize (#504 convention, #616): a pre-validation legacy
+  // poster_url must never be reflected into og:image/twitter:image or the
+  // MusicEvent JSON-LD image — normalizeHttpUrl returns null for anything
+  // that isn't a real http(s) URL, which drops the JSON-LD image and falls
+  // the og:image/twitter:image back to the branded default below (#644).
+  // Computed here, above subEvent, because every festival-day node reuses it.
+  const safePosterUrl = normalizeHttpUrl(event.poster_url);
+
   // Per-day subEvent (#542 PR-4): MULTI-DAY events only (end_date > date).
   // One MusicEvent per festival day in the event's own span, each carrying
   // that day's performers (bucketed via festivalDayForPerformance, which
@@ -275,6 +283,54 @@ export async function onRequest(context) {
   // this — `subEvent` stays an empty array and the conditional spread below
   // omits the key entirely, keeping their JSON-LD byte-identical to before.
   const isMultiDay = Boolean(event.end_date && event.end_date > event.date);
+  // The organizer / offers / image values are built once and shared by the
+  // top-level MusicEvent and every subEvent (#1196), so a festival-day node
+  // can never disagree with its parent about who runs it or what it costs.
+  //
+  // Read-path sanitize (#504): a pre-validation legacy ticket_url (e.g. a
+  // javascript: scheme) must never be reflected into the Offer.url —
+  // normalizeHttpUrl returns null for anything that isn't a real http(s)
+  // URL, which drops the offers block entirely. presented_by_url gets the
+  // same treatment and, when it fails, the organizer simply has no url.
+  const safeTicketUrl = normalizeHttpUrl(event.ticket_url);
+  const safePresentedByUrl = normalizeHttpUrl(event.presented_by_url);
+  // When a presenter is set, the presenting org takes the organizer slot;
+  // otherwise it defaults to SetTimes. presented_by_url is ignored without a
+  // presenter — it describes the presenter, not SetTimes.
+  const organizer = event.presented_by
+    ? {
+        "@type": "Organization",
+        name: event.presented_by,
+        ...(safePresentedByUrl ? { url: safePresentedByUrl } : {}),
+      }
+    : {
+        "@type": "Organization",
+        name: "SetTimes",
+        url: CANONICAL_HOST,
+        sameAs: ["https://www.instagram.com/settimes.ca"],
+      };
+  // created_at is stored as SQLite `YYYY-MM-DD HH:MM:SS` (see CLAUDE.md); take
+  // just the date part for the Offer.validFrom date literal. Guard against a
+  // null/malformed value so the field is omitted rather than emitting garbage.
+  // Kept deliberately: #617 added it to clear a GSC "missing validFrom" warning.
+  const validFromDate =
+    typeof event.created_at === "string" && /^\d{4}-\d{2}-\d{2}/.test(event.created_at)
+      ? event.created_at.slice(0, 10)
+      : null;
+  const offers = safeTicketUrl
+    ? {
+        "@type": "Offer",
+        url: safeTicketUrl,
+        priceCurrency: "CAD",
+        availability: "https://schema.org/InStock",
+        ...(validFromDate ? { validFrom: validFromDate } : {}),
+        // Only a price an admin actually entered (#1196) — never a fallback.
+        // Number.isFinite, not truthiness: 0 is a real price (a free show),
+        // and dropping it would erase a true fact rather than omit an unknown.
+        ...(Number.isFinite(event.ticket_price) ? { price: event.ticket_price } : {}),
+      }
+    : undefined;
+  const image = safePosterUrl ? [safePosterUrl] : undefined;
   let subEvent = [];
   if (isMultiDay) {
     const festivalDays = eachCalendarDay(event.date, event.end_date);
@@ -298,8 +354,13 @@ export async function onRequest(context) {
         endDate: day,
         eventStatus: "https://schema.org/EventScheduled",
         eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
-        // Google requires `location` on every Event node, subEvents included.
+        // Google requires `location` on every Event node, subEvents included;
+        // organizer / offers / image are recommended, and without them each
+        // festival day draws its own "missing field" warnings (#1196).
         location,
+        organizer,
+        ...(offers ? { offers } : {}),
+        ...(image ? { image } : {}),
         ...(performers.length > 0
           ? {
               performer: performers.map((b) => ({
@@ -320,13 +381,6 @@ export async function onRequest(context) {
   const dateLabel = eventDateRangeLabel(event.date, event.end_date);
   const description =
     plainDesc || `${event.name} — live music in ${where} on SetTimes.${dateLabel ? ` ${dateLabel}.` : ""}`;
-
-  // Read-path sanitize (#504 convention, #616): a pre-validation legacy
-  // poster_url must never be reflected into og:image/twitter:image or the
-  // MusicEvent JSON-LD image — normalizeHttpUrl returns null for anything
-  // that isn't a real http(s) URL, which drops the JSON-LD image and falls
-  // the og:image/twitter:image back to the branded default below (#644).
-  const safePosterUrl = normalizeHttpUrl(event.poster_url);
 
   const metaTags = [
     `<meta name="description" content="${escapeAttr(description)}" />`,
@@ -349,20 +403,6 @@ export async function onRequest(context) {
   metaTags.push(`<meta name="twitter:image" content="${escapeAttr(ogImageUrl)}" />`);
   metaTags.push(`<meta name="twitter:card" content="summary_large_image" />`);
 
-  // Read-path sanitize (#504): a pre-validation legacy ticket_url (e.g. a
-  // javascript: scheme) must never be reflected into the Offer.url of the
-  // MusicEvent JSON-LD — normalizeHttpUrl returns null for anything that
-  // isn't a real http(s) URL, which drops the offers block entirely below.
-  const safeTicketUrl = normalizeHttpUrl(event.ticket_url);
-
-  // created_at is stored as SQLite `YYYY-MM-DD HH:MM:SS` (see CLAUDE.md); take
-  // just the date part for the Offer.validFrom date literal. Guard against a
-  // null/malformed value so the field is omitted rather than emitting garbage.
-  const validFromDate =
-    typeof event.created_at === "string" && /^\d{4}-\d{2}-\d{2}/.test(event.created_at)
-      ? event.created_at.slice(0, 10)
-      : null;
-
   const musicEvent = {
     "@context": "https://schema.org",
     "@type": "MusicEvent",
@@ -378,20 +418,8 @@ export async function onRequest(context) {
     ...(event.date ? { endDate: event.end_date || event.date } : {}),
     location,
     ...(plainDesc ? { description: plainDesc } : {}),
-    ...(safePosterUrl ? { image: [safePosterUrl] } : {}),
-    // When a presenter is set, the presenting org takes the organizer slot;
-    // otherwise it defaults to SetTimes (the original owner keeps its own
-    // `organizer` default below).
-    ...(event.presented_by
-      ? { organizer: { "@type": "Organization", name: event.presented_by } }
-      : {
-          organizer: {
-            "@type": "Organization",
-            name: "SetTimes",
-            url: CANONICAL_HOST,
-            sameAs: ["https://www.instagram.com/settimes.ca"],
-          },
-        }),
+    ...(image ? { image } : {}),
+    organizer,
     // `audience.requiredMinAge`, NOT `typicalAgeRange`. schema.org defines
     // typicalAgeRange as "the typical expected age range, e.g. '7-9', '11-'"
     // -- a statement about who a thing is FOR, the sort of value that belongs
@@ -411,17 +439,7 @@ export async function onRequest(context) {
           },
         }
       : {}),
-    ...(safeTicketUrl
-      ? {
-          offers: {
-            "@type": "Offer",
-            url: safeTicketUrl,
-            priceCurrency: "CAD",
-            availability: "https://schema.org/InStock",
-            ...(validFromDate ? { validFrom: validFromDate } : {}),
-          },
-        }
-      : {}),
+    ...(offers ? { offers } : {}),
     ...(bands.length > 0
       ? {
           performer: bands.map((b) => ({

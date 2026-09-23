@@ -87,6 +87,22 @@ describe('EventFormModal publication routing', () => {
 
     await waitFor(() => expect(eventsApi.create).toHaveBeenCalledTimes(1))
     expect(eventsApi.create.mock.calls[0][0]).toHaveProperty('status', 'draft')
+    expect(eventsApi.create.mock.calls[0][0]).toMatchObject({ presented_by_url: null, ticket_price: null })
     expect(publishWithLineupConfirm).not.toHaveBeenCalled()
+  })
+
+  it('sends a presenter URL and preserves a zero ticket price', async () => {
+    renderModal({ ...baseEvent, status: 'draft' })
+    fireEvent.change(screen.getByLabelText(/presented by url/i), {
+      target: { value: 'https://organizer.example' },
+    })
+    fireEvent.change(screen.getByLabelText(/ticket price \(cad\)/i), { target: { value: '0' } })
+    fireEvent.submit(screen.getByRole('button', { name: /update event/i }).closest('form'))
+
+    await waitFor(() => expect(eventsApi.update).toHaveBeenCalledTimes(1))
+    expect(eventsApi.update.mock.calls[0][1]).toMatchObject({
+      presented_by_url: 'https://organizer.example',
+      ticket_price: 0,
+    })
   })
 })

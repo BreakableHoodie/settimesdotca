@@ -107,7 +107,7 @@ describe("SSR /event/[slug] — MusicEvent JSON-LD enrichment (#615)", () => {
     });
   });
 
-  test("offers includes validFrom (from created_at) and priceCurrency, but never price", async () => {
+  test("offers includes validFrom (from created_at) and priceCurrency, and no price when none is stored", async () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
     const event = insertEvent(rawDb, {
@@ -130,6 +130,29 @@ describe("SSR /event/[slug] — MusicEvent JSON-LD enrichment (#615)", () => {
     expect(musicEvent.offers.priceCurrency).toBe("CAD");
     expect(musicEvent.offers.validFrom).toBe(expectedValidFrom);
     expect(musicEvent.offers).not.toHaveProperty("price");
+  });
+
+  // #1196: a price appears only when an admin entered one. Stored 0 is a real
+  // price (a free show) and must survive -- a truthiness guard would drop it,
+  // which is exactly what the mutation gate's event-jsonld-price-zero checks.
+  test.each([
+    [25, 25],
+    [12.5, 12.5],
+    [0, 0],
+  ])("offers.price is emitted from a stored ticket_price of %j", async (stored, expected) => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const slug = `slug-1196-price-${String(stored).replace(".", "-")}`;
+    const event = insertEvent(rawDb, { name: "Priced Event", slug, date: "2026-10-11" });
+    rawDb
+      .prepare("UPDATE events SET status = 'published', ticket_url = ?, ticket_price = ? WHERE id = ?")
+      .run("https://tickets.example.com/crawl", stored, event.id);
+
+    const response = await onRequest(makeContext({ env, slug }));
+    expect(response.status).toBe(200);
+    const [musicEvent] = extractJsonLd(await response.text());
+    expect(musicEvent.offers.price).toBe(expected);
+    expect(musicEvent.offers.priceCurrency).toBe("CAD");
   });
 
   test("omits offers (and therefore validFrom) entirely when ticket_url is absent", async () => {
@@ -243,6 +266,18 @@ describe("SSR /event/[slug] — per-day subEvent JSON-LD (#542 PR-4)", () => {
       date: "2026-08-01",
     });
     rawDb.prepare("UPDATE events SET status = 'published', end_date=? WHERE id=?").run("2026-08-02", event.id);
+    rawDb
+      .prepare(
+        "UPDATE events SET presented_by = ?, presented_by_url = ?, ticket_url = ?, ticket_price = ?, poster_url = ? WHERE id = ?",
+      )
+      .run(
+        "Multi-Day Organizer",
+        "https://organizer.example",
+        "https://tickets.example",
+        0,
+        "https://images.example/poster.jpg",
+        event.id,
+      );
     const venue = insertVenue(rawDb, { name: "Main Stage" });
 
     const day1Band = insertBand(rawDb, {
@@ -270,6 +305,12 @@ describe("SSR /event/[slug] — per-day subEvent JSON-LD (#542 PR-4)", () => {
     const [musicEvent] = extractJsonLd(html);
     expect(musicEvent.subEvent).toHaveLength(2);
 
+    // Pin the shared values to literals first: comparing each subEvent to the
+    // parent alone is vacuous, since both drop a field together when the
+    // shared builder breaks (the price-zero mutant survived exactly that way).
+    expect(musicEvent.offers.price).toBe(0);
+    expect(musicEvent.organizer.url).toBe("https://organizer.example/");
+
     const [subDay1, subDay2] = musicEvent.subEvent;
     expect(subDay1["@type"]).toBe("MusicEvent");
     expect(subDay1.name).toBe(musicEvent.name + " — Saturday, August 1");
@@ -278,6 +319,9 @@ describe("SSR /event/[slug] — per-day subEvent JSON-LD (#542 PR-4)", () => {
     // location is a Google-required Event property on every node, subEvents
     // included — it must match the top-level MusicEvent's location (#542 PR-4).
     expect(subDay1.location).toEqual(musicEvent.location);
+    expect(subDay1.organizer).toEqual(musicEvent.organizer);
+    expect(subDay1.offers).toEqual(musicEvent.offers);
+    expect(subDay1.image).toEqual(musicEvent.image);
     expect(subDay1.eventStatus).toBe("https://schema.org/EventScheduled");
     expect(subDay1.performer).toEqual([
       { "@type": "MusicGroup", name: "Day One Band", url: expect.stringContaining("/band/") },
@@ -288,6 +332,9 @@ describe("SSR /event/[slug] — per-day subEvent JSON-LD (#542 PR-4)", () => {
     expect(subDay2.performer).toEqual([
       { "@type": "MusicGroup", name: "Day Two Band", url: expect.stringContaining("/band/") },
     ]);
+    expect(subDay2.organizer).toEqual(musicEvent.organizer);
+    expect(subDay2.offers).toEqual(musicEvent.offers);
+    expect(subDay2.image).toEqual(musicEvent.image);
 
     // Existing top-level performer list is unchanged — still both bands, not
     // just one day's worth (subEvent is additive, not a replacement).

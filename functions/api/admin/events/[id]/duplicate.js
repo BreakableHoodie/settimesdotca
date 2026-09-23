@@ -78,13 +78,20 @@ export async function onRequestPost(context) {
     // would fail validateDoorsJson on the next edit anyway (#569). poster_url
     // is excluded for the same "edition-specific" reasoning (#616) — a new
     // edition gets its own poster, not the source event's. Leaving both out
-    // of INSERT defaults the columns to NULL — start clean.
+    // of INSERT defaults the columns to NULL — start clean. ticket_price is
+    // excluded on the same grounds (#1196): each edition sets its own price,
+    // and a copied one is published as a stated fact in the JSON-LD offer.
+    //
+    // The presenter, its URL and the age restriction ARE copied: they describe
+    // the series (who runs it, what the venues' licence requires), not one
+    // night, and a copy without them would name SetTimes as the organizer.
     const newEvent = await DB.prepare(
       `INSERT INTO events (
          name, date, slug, status, description, city,
-         ticket_url, venue_info, social_links, theme_colors, created_by_user_id
+         ticket_url, presented_by, presented_by_url, age_restriction,
+         venue_info, social_links, theme_colors, created_by_user_id
        )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        RETURNING *`,
     )
       .bind(
@@ -95,6 +102,9 @@ export async function onRequestPost(context) {
         originalEvent.description || null,
         originalEvent.city || null,
         normalizeHttpUrl(originalEvent.ticket_url || null),
+        originalEvent.presented_by || null,
+        normalizeHttpUrl(originalEvent.presented_by_url || null),
+        originalEvent.age_restriction || null,
         originalEvent.venue_info || null,
         safeReflectSocialLinksString(originalEvent.social_links || null, ["instagram", "x", "tiktok"]),
         originalEvent.theme_colors || null,
@@ -115,6 +125,7 @@ export async function onRequestPost(context) {
     // through this response.
     newEvent.social_links = safeReflectSocialLinksString(newEvent.social_links, ["instagram", "x", "tiktok"]);
     newEvent.ticket_url = normalizeHttpUrl(newEvent.ticket_url);
+    newEvent.presented_by_url = normalizeHttpUrl(newEvent.presented_by_url);
     // Always NULL here (poster_url is excluded from INSERT above, #616) —
     // sanitized anyway for consistency with every other admin read path.
     newEvent.poster_url = normalizeHttpUrl(newEvent.poster_url);

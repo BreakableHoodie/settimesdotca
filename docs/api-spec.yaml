@@ -3644,6 +3644,23 @@ components:
             Free-text presenting organization, shown as a chip on the event's
             schedule page and used as the JSON-LD organizer when set, replacing
             the default SetTimes organizer (#1063).
+        presented_by_url:
+          type: string
+          format: uri
+          pattern: '^[Hh][Tt][Tt][Pp][Ss]?://'
+          nullable: true
+          maxLength: 500
+          description: >-
+            Presenting organization's website, http(s) only. Emitted as the
+            JSON-LD organizer url, and only when presented_by is set (#1196).
+        ticket_price:
+          type: number
+          minimum: 0
+          maximum: 10000
+          nullable: true
+          description: >-
+            Lowest ticket price in CAD. Emitted as the JSON-LD offers.price
+            only when set; 0 means free, null means unknown (#1196).
         social_links:
           nullable: true
           oneOf:
@@ -4008,6 +4025,23 @@ components:
           type: string
           nullable: true
           maxLength: 200
+        presented_by_url:
+          type: string
+          format: uri
+          pattern: '^[Hh][Tt][Tt][Pp][Ss]?://'
+          nullable: true
+          maxLength: 500
+          description: >-
+            Presenting organization's website, http(s) only. Emitted as the
+            JSON-LD organizer url, and only when presented_by is set (#1196).
+        ticket_price:
+          type: number
+          minimum: 0
+          maximum: 10000
+          nullable: true
+          description: >-
+            Lowest ticket price in CAD. Emitted as the JSON-LD offers.price
+            only when set; 0 means free, null means unknown (#1196).
 
     EventPatchInput:
       type: object
@@ -4061,6 +4095,23 @@ components:
           type: string
           nullable: true
           maxLength: 200
+        presented_by_url:
+          type: string
+          format: uri
+          pattern: '^[Hh][Tt][Tt][Pp][Ss]?://'
+          nullable: true
+          maxLength: 500
+          description: >-
+            Presenting organization's website, http(s) only. Emitted as the
+            JSON-LD organizer url, and only when presented_by is set (#1196).
+        ticket_price:
+          type: number
+          minimum: 0
+          maximum: 10000
+          nullable: true
+          description: >-
+            Lowest ticket price in CAD. Emitted as the JSON-LD offers.price
+            only when set; 0 means free, null means unknown (#1196).
 
     EventEditInput:
       type: object

@@ -70,6 +70,8 @@ export default function EventFormModal({
     social_bandcamp: '',
     age_restriction: '',
     presented_by: '',
+    presented_by_url: '',
+    ticket_price: '',
     reveal_mode: false,
   })
   const [doorsForm, setDoorsForm] = useState({})
@@ -134,6 +136,8 @@ export default function EventFormModal({
         social_bandcamp: socialLinks.bandcamp || '',
         age_restriction: event.age_restriction || '',
         presented_by: event.presented_by || '',
+        presented_by_url: event.presented_by_url || '',
+        ticket_price: event.ticket_price ?? '',
         reveal_mode: event?.reveal_mode === 1 || event?.reveal_mode === true,
       })
       setDoorsForm(parseDoorsJsonToForm(event.doors_json, enumerateFestivalDays(event.date, event.end_date)))
@@ -158,6 +162,8 @@ export default function EventFormModal({
         social_bandcamp: '',
         age_restriction: '',
         presented_by: '',
+        presented_by_url: '',
+        ticket_price: '',
         reveal_mode: false,
       })
       setDoorsForm({})
@@ -302,6 +308,24 @@ export default function EventFormModal({
       return false
     }
 
+    const presentedByUrlTrimmed = formData.presented_by_url.trim()
+    if (presentedByUrlTrimmed && !/^https?:\/\//i.test(presentedByUrlTrimmed)) {
+      setError('Presented by URL must start with http:// or https://')
+      return false
+    }
+    if (presentedByUrlTrimmed.length > FIELD_LIMITS.eventPresentedByUrl.max) {
+      setError(`Presented by URL must be no more than ${FIELD_LIMITS.eventPresentedByUrl.max} characters`)
+      return false
+    }
+
+    if (formData.ticket_price !== '') {
+      const ticketPrice = Number(formData.ticket_price)
+      if (!Number.isFinite(ticketPrice) || ticketPrice < 0 || ticketPrice > 10000) {
+        setError('Ticket price must be a number from 0 to 10000')
+        return false
+      }
+    }
+
     return true
   }
 
@@ -332,6 +356,8 @@ export default function EventFormModal({
         doors_json: serializeDoorsForm(doorsForm, currentDays),
         age_restriction: formData.age_restriction || null,
         presented_by: formData.presented_by || null,
+        presented_by_url: formData.presented_by_url || null,
+        ticket_price: formData.ticket_price === '' ? null : Number(formData.ticket_price),
       }
 
       if (isEditing && formData.status === 'archived') {
@@ -662,6 +688,23 @@ export default function EventFormModal({
               </p>
             </div>
 
+            {/* Presented By URL */}
+            <div>
+              <label htmlFor="event-presented-by-url" className="block text-white mb-2 text-sm font-medium">
+                Presented By URL <span className="text-white/50 text-xs">(optional)</span>
+              </label>
+              <input
+                id="event-presented-by-url"
+                type="url"
+                name="presented_by_url"
+                value={formData.presented_by_url}
+                onChange={handleInputChange}
+                className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden focus:ring-1 focus:ring-accent-500"
+                maxLength={FIELD_LIMITS.eventPresentedByUrl.max}
+                placeholder="https://example.com"
+              />
+            </div>
+
             {/* City */}
             <div>
               <label htmlFor="event-city" className="block text-white mb-2 text-sm font-medium">
@@ -679,6 +722,27 @@ export default function EventFormModal({
               />
               <p className="text-xs text-white/50 mt-1">
                 {formData.city.length}/{FIELD_LIMITS.eventCity.max}
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="event-ticket-price" className="block text-white mb-2 text-sm font-medium">
+                Ticket price (CAD) <span className="text-white/50 text-xs">(optional)</span>
+              </label>
+              <input
+                id="event-ticket-price"
+                type="number"
+                name="ticket_price"
+                value={formData.ticket_price}
+                onChange={handleInputChange}
+                min="0"
+                max="10000"
+                step="any"
+                className="w-full min-h-[44px] px-4 py-2 rounded bg-bg-navy text-white border border-gray-600 focus:border-accent-500 focus:outline-hidden focus:ring-1 focus:ring-accent-500"
+                aria-describedby="event-ticket-price-hint"
+              />
+              <p id="event-ticket-price-hint" className="text-xs text-white/50 mt-1">
+                Lowest price. Leave blank if unknown; 0 means free.
               </p>
             </div>
 

@@ -378,6 +378,24 @@ export const MUTATIONS = [
     replace: "WHERE ${publishedEventStatusSql()} AND (? IS NOT NULL)",
     tests: ["functions/__tests__/homepage.test.js"],
   },
+  {
+    id: "event-jsonld-price-zero",
+    invariant:
+      "CLAUDE.md 'SSR owns identity meta and JSON-LD' — a stored free-event price is emitted as 0 rather than omitted by a truthiness check",
+    file: "functions/event/[slug].js",
+    find: "...(Number.isFinite(event.ticket_price) ? { price: event.ticket_price } : {}),",
+    replace: "...(event.ticket_price ? { price: event.ticket_price } : {}),",
+    tests: ["functions/event/__tests__/slug.test.js"],
+  },
+  {
+    id: "event-jsonld-organizer-url-omission",
+    invariant:
+      "CLAUDE.md 'SSR owns identity meta and JSON-LD' — a presenter URL is included only when the presenter exists and the URL sanitizes",
+    file: "functions/event/[slug].js",
+    find: "...(safePresentedByUrl ? { url: safePresentedByUrl } : {}),",
+    replace: "url: safePresentedByUrl,",
+    tests: ["functions/event/__tests__/slug.presenter-age.test.js"],
+  },
 ];
 
 // ============================================================================

@@ -140,8 +140,16 @@ export function validateEntity(data, schema) {
     } else if (rules.type === "boolean") {
       sanitized[field] = Boolean(value);
     } else if (rules.type === "number") {
+      // Number() coerces too eagerly to trust on its own: true -> 1, [] -> 0,
+      // "   " -> 0. For a field like ticket_price (#1196) that turns junk
+      // input into a stated fact ("this show is free"), so only a real number
+      // or a non-blank numeric string gets through.
+      if (typeof value !== "number" && (typeof value !== "string" || value.trim() === "")) {
+        errors[field] = `${rules.label || field} must be a number`;
+        continue;
+      }
       const numValue = Number(value);
-      if (isNaN(numValue)) {
+      if (!Number.isFinite(numValue)) {
         errors[field] = `${rules.label || field} must be a number`;
         continue;
       }
@@ -480,6 +488,19 @@ export const VALIDATION_SCHEMAS = {
       label: "Presented by",
       min: FIELD_LIMITS.eventPresentedBy.min,
       max: FIELD_LIMITS.eventPresentedBy.max,
+    },
+    presented_by_url: {
+      type: "url",
+      required: false,
+      label: "Presented by URL",
+      max: FIELD_LIMITS.eventPresentedByUrl.max,
+    },
+    ticket_price: {
+      type: "number",
+      required: false,
+      label: "Ticket price",
+      min: 0,
+      max: 10000,
     },
   },
 

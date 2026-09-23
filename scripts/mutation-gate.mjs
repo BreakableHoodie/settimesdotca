@@ -383,8 +383,8 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'SSR owns identity meta and JSON-LD' — a stored free-event price is emitted as 0 rather than omitted by a truthiness check",
     file: "functions/event/[slug].js",
-    find: "...(Number.isFinite(event.ticket_price) ? { price: event.ticket_price } : {}),",
-    replace: "...(event.ticket_price ? { price: event.ticket_price } : {}),",
+    find: "const hasTicketPrice = Number.isFinite(event.ticket_price);",
+    replace: "const hasTicketPrice = Boolean(event.ticket_price);",
     tests: ["functions/event/__tests__/slug.test.js"],
   },
   {

@@ -155,6 +155,29 @@ describe("SSR /event/[slug] — MusicEvent JSON-LD enrichment (#615)", () => {
     expect(musicEvent.offers.priceCurrency).toBe("CAD");
   });
 
+  // #1197 review: a price stored without a ticket link is still published --
+  // as an Offer with no url -- rather than silently dropped. 0 is the case a
+  // truthiness gate on either condition would lose.
+  test.each([
+    [0, 0],
+    [15, 15],
+  ])("a stored ticket_price of %j with no ticket_url still yields a url-less Offer", async (stored, expected) => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const slug = `slug-1197-price-only-${stored}`;
+    const event = insertEvent(rawDb, { name: "Door Price Event", slug, date: "2026-10-11" });
+    rawDb
+      .prepare("UPDATE events SET status = 'published', ticket_url = NULL, ticket_price = ? WHERE id = ?")
+      .run(stored, event.id);
+
+    const response = await onRequest(makeContext({ env, slug }));
+    expect(response.status).toBe(200);
+    const [musicEvent] = extractJsonLd(await response.text());
+    expect(musicEvent.offers.price).toBe(expected);
+    expect(musicEvent.offers.priceCurrency).toBe("CAD");
+    expect(musicEvent.offers).not.toHaveProperty("url");
+  });
+
   test("omits offers (and therefore validFrom) entirely when ticket_url is absent", async () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";

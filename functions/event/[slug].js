@@ -317,19 +317,26 @@ export async function onRequest(context) {
     typeof event.created_at === "string" && /^\d{4}-\d{2}-\d{2}/.test(event.created_at)
       ? event.created_at.slice(0, 10)
       : null;
-  const offers = safeTicketUrl
-    ? {
-        "@type": "Offer",
-        url: safeTicketUrl,
-        priceCurrency: "CAD",
-        availability: "https://schema.org/InStock",
-        ...(validFromDate ? { validFrom: validFromDate } : {}),
-        // Only a price an admin actually entered (#1196) — never a fallback.
-        // Number.isFinite, not truthiness: 0 is a real price (a free show),
-        // and dropping it would erase a true fact rather than omit an unknown.
-        ...(Number.isFinite(event.ticket_price) ? { price: event.ticket_price } : {}),
-      }
-    : undefined;
+  // An Offer exists when there is a ticket link OR a stored price (#1197
+  // review): a price entered without a link -- a free show, pay at the door
+  // -- is still a true, useful fact, and gating it on the link dropped it
+  // silently. Google then warns "missing offers.url" instead of "missing
+  // offers": no worse, and the price reaches search.
+  const hasTicketPrice = Number.isFinite(event.ticket_price);
+  const offers =
+    safeTicketUrl || hasTicketPrice
+      ? {
+          "@type": "Offer",
+          ...(safeTicketUrl ? { url: safeTicketUrl } : {}),
+          priceCurrency: "CAD",
+          availability: "https://schema.org/InStock",
+          ...(validFromDate ? { validFrom: validFromDate } : {}),
+          // Only a price an admin actually entered (#1196) — never a fallback.
+          // Number.isFinite, not truthiness: 0 is a real price (a free show),
+          // and dropping it would erase a true fact rather than omit an unknown.
+          ...(hasTicketPrice ? { price: event.ticket_price } : {}),
+        }
+      : undefined;
   const image = safePosterUrl ? [safePosterUrl] : undefined;
   let subEvent = [];
   if (isMultiDay) {

@@ -28,6 +28,9 @@ permissions:
 
 jobs:
   zap-baseline:
+    # Deliberately NOT vars.RUNS_ON: the ZAP action shells out to `docker run`,
+    # and the self-hosted job containers have no Docker socket (mounting it
+    # would give every job root on the runner host). Weekly, so cheap to host.
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Serialize with smoke checks: both disable BFM at zone level and must not

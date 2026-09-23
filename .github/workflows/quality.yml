@@ -28,7 +28,7 @@ concurrency:
 jobs:
   openapi-validation:
     name: OpenAPI Validation
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
       - name: Checkout
@@ -52,7 +52,7 @@ jobs:
 
   format-check:
     name: Format Check
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     timeout-minutes: 10
     defaults:
       run:
@@ -79,7 +79,7 @@ jobs:
 
   format-check-backend:
     name: Format Check (backend)
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
       - name: Checkout
@@ -103,7 +103,7 @@ jobs:
 
   lint-backend:
     name: ESLint (backend)
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
       - name: Checkout
@@ -127,7 +127,7 @@ jobs:
 
   mutation-gate:
     name: Mutation Gate
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
       - name: Checkout
@@ -165,7 +165,7 @@ jobs:
 
   schema-drift:
     name: Schema Drift Check
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
       - name: Checkout
@@ -189,7 +189,7 @@ jobs:
 
   coverage:
     name: Coverage
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
       - name: Checkout
@@ -245,7 +245,7 @@ jobs:
 
   accessibility-tests:
     name: Accessibility Tests
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     timeout-minutes: 10
     defaults:
       run:
@@ -272,7 +272,7 @@ jobs:
 
   lighthouse:
     name: Lighthouse CI
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
       - name: Checkout

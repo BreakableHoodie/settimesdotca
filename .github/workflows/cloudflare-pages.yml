@@ -25,7 +25,7 @@ env:
 jobs:
   ci:
     name: Test and build
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     timeout-minutes: 20
     # dorny/paths-filter detects PR changes via the GitHub REST API, which needs
     # pull-requests: read (the workflow default of contents-only leaves it at
@@ -133,7 +133,7 @@ jobs:
 
   resolve-release:
     name: Resolve release target
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     outputs:
       should_deploy: ${{ steps.target.outputs.should_deploy }}
       environment_name: ${{ steps.target.outputs.environment_name }}
@@ -185,7 +185,7 @@ jobs:
 
   migrate-and-verify-d1:
     name: Migrate and verify remote D1
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     timeout-minutes: 15
     needs:
       - ci
@@ -225,7 +225,7 @@ jobs:
 
   deploy:
     name: Deploy to Cloudflare Pages
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     timeout-minutes: 15
     needs:
       - migrate-and-verify-d1
@@ -274,7 +274,7 @@ jobs:
 
   smoke:
     name: Post-deploy smoke checks
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     timeout-minutes: 10
     # Serialize across all branches: disable_bot_fight_mode operates at zone
     # level, so concurrent smoke jobs from main+dev would race to restore it.

@@ -253,6 +253,15 @@ Canonical active roadmap: `docs/ROADMAP.md`. Use it for handoffs between Claude,
 - **Email**: Postmark/Resend/MailChannels
 - **Tests**: Vitest (unit, frontend), Playwright (E2E + a11y + visual regression)
 - **CI/CD**: GitHub Actions (10 workflows), Dependabot, Snyk, GitGuardian, CodeRabbit
+  - **Runners are self-hosted** (2026-09-23): every job reads
+    `runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}`, and the repo variable
+    `RUNS_ON=self-hosted` routes it to ephemeral Ubuntu 24.04 containers on
+    Dre's Proxmox host (`pickles`, CT 108, one fresh container per job).
+    **Kill switch:** `gh variable delete RUNS_ON` returns every job to
+    GitHub-hosted runners with no code change. `zap-baseline.yml` is the one
+    exception and stays hosted (it needs Docker; job containers have no socket).
+    Lighthouse scores and visual snapshots are now measured on that runner, so
+    compare them only against other self-hosted runs.
   (`codeql.yml`, `secret-scan.yml` and `dependency-review.yml` were removed
   2026-09-16; `semgrep.yml` was removed the same day and **rebuilt** in #1173 —
   it still runs Semgrep SAST, but gates in the job itself instead of uploading

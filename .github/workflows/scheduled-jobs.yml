@@ -21,7 +21,7 @@ permissions:
 jobs:
   run-scheduled:
     name: Run scheduled handler
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
       - name: Invoke /api/internal/run-scheduled

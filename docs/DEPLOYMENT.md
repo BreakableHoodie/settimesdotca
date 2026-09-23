@@ -53,7 +53,7 @@ SetTimes is deployed as a full-stack application on Cloudflare's edge network:
 - [ ] **Cloudflare Account** (with Pages enabled)
 - [ ] **GitHub Account** (with repo access)
 - [ ] **Domain** (e.g., settimes.ca) managed by Cloudflare DNS
-- [ ] **Node.js 20+** installed locally
+- [ ] **Node.js 22.12+** installed locally (or 24.x / 26+; the `engines` range in `package.json`)
 - [ ] **Wrangler CLI** installed (`npm install -g wrangler`)
 
 ### Install Wrangler

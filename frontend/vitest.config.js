@@ -34,6 +34,9 @@ export default defineConfig({
       // and testing a small unit over importing a 1,000-line tab component.
       // Raised 2026-09-09 from 66/60/68/66 by scripts/check-coverage-drift.mjs,
       // which now FAILS when actual outruns these by more than 3 points.
+      // vitest 5 (#1176), measured 2026-09-22: the frontend scored HIGHER under
+      // v5 (v4 72.39/67.36/73.87/73.13 -> v5 72.71/67.57/74.08/73.47 for
+      // statements/branches/functions/lines), so these stay as they were.
       thresholds: {
         statements: 70,
         branches: 65,

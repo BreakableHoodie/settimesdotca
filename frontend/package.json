@@ -57,7 +57,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
-    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/coverage-v8": "^5.0.1",
     "axe-core": "^4.13.0",
     "baseline-browser-mapping": "^2.11.23",
     "eslint": "^10.10.0",
@@ -75,7 +75,7 @@
     "terser": "^5.51.2",
     "vite": "^8.3.0",
     "vite-bundle-visualizer": "^1.0.0",
-    "vitest": "^4.1.11",
+    "vitest": "^5.0.1",
     "wrangler": "^4.132.0"
   },
   "overrides": {
@@ -106,5 +106,8 @@
     "body-parser": {
       "qs": "6.16.0"
     }
+  },
+  "engines": {
+    "node": "^22.12.0 || ^24.0.0 || >=26.0.0"
   }
 }

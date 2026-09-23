@@ -26,11 +26,23 @@ export default defineConfig({
       // Raised 2026-09-09 from 75/68/84/76 by scripts/check-coverage-drift.mjs,
       // which now FAILS when actual outruns these by more than 3 points -- so
       // this block cannot silently decay a third time.
+      // Re-baselined for @vitest/coverage-v8 5 (#1176), measured 2026-09-22 on
+      // IDENTICAL source and tests. Read the denominators, not the percentages:
+      // v5 instruments more of the same code, and every COVERED count went up.
+      //
+      //   metric      v4                    v5                    old  new
+      //   statements  86.89% (5564/6403)    85.30% (5723/6709)     85   84
+      //   branches    79.14% (3959/5002)    77.60% (4076/5252)     77   76
+      //   functions   96.39%  (641/665)     91.52%  (680/743)      94   90
+      //   lines       87.36% (5351/6125)    85.82% (5492/6399)     85   84
+      //
+      // Headroom is kept at the previous ~1.3-1.8 points, so the ratchet is as
+      // strict as before. A lower number here is NOT a coverage regression.
       thresholds: {
-        statements: 85,
-        branches: 77,
-        functions: 94,
-        lines: 85,
+        statements: 84,
+        branches: 76,
+        functions: 90,
+        lines: 84,
       },
       exclude: [
         "node_modules/",

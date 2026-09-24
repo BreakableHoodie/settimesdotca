@@ -210,7 +210,7 @@ Four readings, four different numbers — 1, then 4, then 3, then 5. It **recove
 7-day usage falls and **falls** as usage rises, so it moves in both directions.
 That is the durable fact, and it is why no number written here stays true —
 including these four. `.githooks/pre-push` tracks the most recent observed
-footer (`LIMIT=5` as of 2026-09-22) and records each dated observation in its own comments, so a stale
+footer (`LIMIT=2` as of 2026-09-24, the first reading after usage billing was switched off; `5` on 2026-09-22) and records each dated observation in its own comments, so a stale
 value is visible as a stale date rather than as a bare constant. Move it only
 against a CURRENT footer.
 

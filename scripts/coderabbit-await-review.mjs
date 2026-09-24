@@ -167,8 +167,17 @@ export async function awaitReview(deps, opts = {}) {
   let head = pr.head;
   let requests = 0;
   let headSeenAt = deps.now();
-  let lastReported = "";
   let skippedSince = null;
+  // Every piece of PER-HEAD state resets here and only here. The three
+  // head-change paths each once reset it by hand, and one forgot the skip
+  // timer (#1200 review), letting an old head's skip time shorten the new
+  // head's settle period. Add new per-head state to this function.
+  const switchHead = (newHead) => {
+    head = newHead;
+    headSeenAt = deps.now();
+    skippedSince = null;
+  };
+  let lastReported = "";
 
   for (;;) {
     const status = deps.getStatus(head);
@@ -188,8 +197,7 @@ export async function awaitReview(deps, opts = {}) {
       pr = deps.getPr();
       if (pr.head !== head) {
         deps.log(`head moved ${short} -> ${pr.head.slice(0, 8)} before it could count; watching the new head.`);
-        head = pr.head;
-        headSeenAt = deps.now();
+        switchHead(pr.head);
         continue;
       }
       deps.log(`head ${short} reviewed ("${status.description}").`);
@@ -227,8 +235,7 @@ export async function awaitReview(deps, opts = {}) {
       pr = deps.getPr();
       if (pr.head !== head) {
         deps.log(`head moved ${short} -> ${pr.head.slice(0, 8)} during the wait; watching the new head.`);
-        head = pr.head;
-        headSeenAt = deps.now();
+        switchHead(pr.head);
         continue;
       }
       deps.requestReview();
@@ -260,8 +267,7 @@ export async function awaitReview(deps, opts = {}) {
     pr = deps.getPr();
     if (pr.head !== head) {
       deps.log(`head moved ${short} -> ${pr.head.slice(0, 8)}; watching the new head.`);
-      head = pr.head;
-      headSeenAt = deps.now();
+      switchHead(pr.head);
     }
   }
 }

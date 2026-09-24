@@ -158,6 +158,19 @@ describe("awaitReview", () => {
     expect(deps.calls.statusShas).toEqual(["old00000", "new00000", "new00000"]);
   });
 
+  it("gives each new head its own skip settle period (#1200 review)", async () => {
+    // Old head skipped for 4 min, then a new head is skipped too. Without a
+    // per-head reset the new head inherits the old timer and returns 3 at
+    // once; with it, the new head waits and then gets its review.
+    const SKIPPED = { state: "success", description: "Review skipped" };
+    const deps = fakeDeps({
+      statuses: [SKIPPED, SKIPPED, SKIPPED, SKIPPED, SKIPPED, SKIPPED, COMPLETED],
+      heads: ["old00000", "old00000", "old00000", "old00000", "old00000", "new00000"],
+    });
+    expect(await awaitReview(deps, { pollMs: 60_000 })).toBe(0);
+    expect(deps.calls.statusShas.at(-1)).toBe("new00000");
+  });
+
   it("refuses a draft PR, which CodeRabbit never reviews automatically", async () => {
     const deps = fakeDeps({ statuses: [COMPLETED], isDraft: true });
     expect(await awaitReview(deps)).toBe(4);

@@ -147,6 +147,23 @@ refills**. Someone has to comment `@coderabbitai review`; until then the PR's
 head commit is unreviewed while every other check reads green. Check remaining
 capacity with `@coderabbitai rate limit`.
 
+**The monitor: `make await-review PR=<n>`** (`scripts/coderabbit-await-review.mjs`).
+Two tempting signals are both wrong, and the script exists because of that:
+
+- **The CodeRabbit check being green.** CodeRabbit's docs say the rate-limited
+  check *passes* by design so it never blocks a merge. Green is green either way.
+- **A review object on the head commit.** Of 32 merged PRs checked on
+  2026-09-24, 13 had `CodeRabbit: success — Review completed` on the head but
+  no review object for it. A clean review posts only the summary comment.
+
+What works is the `CodeRabbit` **commit status description** on the head SHA:
+`Review in progress` → `Review completed`. The rate-limited description
+(`Review rate limited`) comes from the docs. It had not been seen on this repo
+when the script was written, since billing had absorbed every overage, so the
+match is deliberately loose (`/rate.?limit/i`). Any unrecognised description is
+treated as *not* reviewed. Record the real wording here the first time it
+appears.
+
 **The allowance is DYNAMIC — read it from a current footer, never recall it.**
 This section twice stated a static figure and was twice wrong. It first said
 "CodeRabbit Pro allows 5 PR reviews per developer per rolling hour", with the
@@ -206,7 +223,7 @@ network), so the only correction available is reading a footer and updating it.
 - everything else → batch the remaining fixes and push once
 
 ```bash
-CODERABBIT_OVERAGE=1 git push   # emergencies only; the review is rate-limited — re-request it
+CODERABBIT_OVERAGE=1 git push   # emergencies only; then `make await-review PR=<n>` before merging
 ```
 
 The hook is deliberately POSIX `sh` with no `gh`, `jq`, or network call — one that fails open when a tool is missing is worse than none, and it runs on every push. `lint-sh` globs `*.sh`, which would have skipped it silently, so that target now lists `.githooks/*` explicitly.

@@ -40,7 +40,7 @@ export E2E_ADMIN_EMAIL
 export E2E_ADMIN_PASSWORD
 
 .PHONY: coverage-drift help install build dev format format-check lint lint-md lint-sh lint-yaml lint-sql lint-json \
-	lint-all check-citations test test-backend test-frontend mutation-gate coverage-floor gate review review-wip validate-openapi schema-check \
+	lint-all check-citations test test-backend test-frontend mutation-gate coverage-floor gate review review-wip await-review validate-openapi schema-check \
 	probe-links e2e e2e-setup e2e-serve e2e-run e2e-clean hooks delegate-stats
 
 # CodeRabbit emits PostHog telemetry errors when egress is blocked. They are
@@ -204,6 +204,11 @@ review-wip: ## AI code review of uncommitted changes — run before committing
 		echo "Not signed in. Run: coderabbit auth login"; exit 1; }
 	@out=$$(mktemp); coderabbit review --type uncommitted >"$$out" 2>&1; status=$$?; \
 		grep -aivE '$(CR_NOISE)' "$$out" || true; rm -f "$$out"; exit $$status
+
+await-review: ## Wait until CodeRabbit has reviewed PR=<n>'s HEAD commit; re-requests after a rate-limit cooldown
+	@[ -n "$(PR)" ] || { echo "usage: make await-review PR=<number>"; exit 4; }
+	@command -v gh >/dev/null 2>&1 || { echo "gh CLI not found. Install: brew install gh"; exit 4; }
+	@node scripts/coderabbit-await-review.mjs "$(PR)"
 
 delegate-stats: ## Token usage and cost for delegated (OpenCode) runs on this project
 	@command -v opencode >/dev/null 2>&1 || { \

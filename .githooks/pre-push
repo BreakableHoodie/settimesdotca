@@ -5,7 +5,8 @@
 # below). Every push to a PR branch is a review. Past the allowance the review
 # is RATE-LIMITED: CodeRabbit posts a notice instead of reviewing, and nothing
 # re-runs it when the window refills -- the head commit stays unreviewed until
-# someone comments `@coderabbitai review`. (Until 2026-09-24 the usage-based
+# someone comments `@coderabbitai review` -- which `make await-review PR=<n>`
+# does after the cooldown. (Until 2026-09-24 the usage-based
 # add-on was enabled and an over-limit review BILLED instead; it is now off.)
 #
 # The expensive failure is CONCENTRATION, not volume: five pushes across a day
@@ -128,8 +129,8 @@ if [ $((count + eligible)) -gt "$LIMIT" ]; then
 
     if [ "${CODERABBIT_OVERAGE:-}" = "1" ]; then
         printf '\n  ⚠  CodeRabbit: %s reviews already used this hour — this review will be RATE-LIMITED.\n' "$count" >&2
-        printf '     Overriding because CODERABBIT_OVERAGE=1. Once the window refills,\n' >&2
-        printf '     comment @coderabbitai review on the PR -- nothing re-runs it for you.\n\n' >&2
+        printf '     Overriding because CODERABBIT_OVERAGE=1. Nothing re-runs the review for\n' >&2
+        printf '     you: run  make await-review PR=<n>  and merge only when it exits 0.\n\n' >&2
     else
         printf '\n  ✋ Push blocked: %s CodeRabbit reviews used in the last hour (limit %s).\n\n' "$count" "$LIMIT" >&2
         printf '     The next review would exceed the window and be RATE-LIMITED (skipped).\n' >&2

@@ -142,11 +142,19 @@ export async function awaitReview(deps, opts = {}) {
   let head = pr.head;
   let requests = 0;
   let headSeenAt = deps.now();
+  let lastReported = "";
 
   for (;;) {
     const status = deps.getStatus(head);
     const state = classifyStatus(status);
     const short = head.slice(0, 8);
+    // Report each state change once, so a long wait is visibly alive rather
+    // than indistinguishable from a hang, without a line per poll.
+    const report = `${short}:${state}`;
+    if (!once && report !== lastReported) {
+      deps.log(`head ${short}: ${state}${status ? ` ("${status.description}")` : ""}`);
+      lastReported = report;
+    }
 
     if (state === "reviewed") {
       deps.log(`head ${short} reviewed ("${status.description}").`);

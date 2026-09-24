@@ -21,7 +21,7 @@ function fakeDeps({ statuses, heads = ["aaaaaaaa1"], isDraft = false, comment = 
   let t = 0;
   let si = 0;
   let hi = 0;
-  const calls = { requests: 0, sleeps: [], statusShas: [] };
+  const calls = { requests: 0, sleeps: [], statusShas: [], logs: [] };
   return {
     calls,
     getPr: () => ({ head: heads[Math.min(hi++, heads.length - 1)], isDraft, state: "OPEN" }),
@@ -38,7 +38,7 @@ function fakeDeps({ statuses, heads = ["aaaaaaaa1"], isDraft = false, comment = 
       t += ms;
     },
     now: () => t,
-    log: () => {},
+    log: (m) => calls.logs.push(m),
   };
 }
 
@@ -120,6 +120,13 @@ describe("awaitReview", () => {
   it("returns 3 for a skipped head instead of waiting forever", async () => {
     const deps = fakeDeps({ statuses: [{ state: "success", description: "Review skipped" }] });
     expect(await awaitReview(deps, { pollMs: 1000 })).toBe(3);
+  });
+
+  it("logs each state change once, so a long wait is visibly alive but not one line per poll", async () => {
+    const deps = fakeDeps({ statuses: [IN_PROGRESS, IN_PROGRESS, IN_PROGRESS, COMPLETED] });
+    await awaitReview(deps, { pollMs: 1000 });
+    const progress = deps.calls.logs.filter((m) => m.includes("in_progress"));
+    expect(progress).toHaveLength(1);
   });
 
   it("refuses a draft PR, which CodeRabbit never reviews automatically", async () => {

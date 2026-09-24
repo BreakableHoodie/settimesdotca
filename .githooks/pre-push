@@ -106,8 +106,16 @@ done
 # branch, or an invocation with no ref updates at all.
 [ "$eligible" -eq 0 ] && exit 0
 
-git_dir=$(git rev-parse --git-dir)
-log="$git_dir/coderabbit-push-log"
+# The log is deliberately NOT in $GIT_DIR. CodeRabbit's allowance is per
+# DEVELOPER, not per repository, so a per-repo counter under-counts the moment
+# a second repo adopts this hook: three pushes here and three in another repo
+# is six reviews against one shared budget, with neither hook noticing.
+# Under-counting is the failure this guard exists to prevent, so the counter
+# lives where the budget does -- one file for the whole account. This path is
+# shared with BreakableHoodie/wrhn-mcp's hook, which fixed it first; keep the
+# two identical or they stop seeing each other's pushes.
+log="${XDG_CACHE_HOME:-$HOME/.cache}/coderabbit/push-log"
+mkdir -p "$(dirname "$log")"
 now=$(date +%s)
 cutoff=$((now - WINDOW_SECONDS))
 

@@ -17,7 +17,7 @@ const RL_COMMENT = "Rate limit exceeded. Please wait **21 minutes and 50 seconds
  * Fake GitHub. `statuses` is consumed one entry per getStatus() call (the last
  * entry repeats), so a test scripts exactly what CodeRabbit reports over time.
  */
-function fakeDeps({ statuses, heads = ["aaaaaaaa1"], isDraft = false, comment = RL_COMMENT }) {
+function fakeDeps({ statuses, heads = ["aaaaaaaa1"], isDraft = false, comment = RL_COMMENT, busy = () => false }) {
   let t = 0;
   let si = 0;
   let hi = 0;
@@ -30,6 +30,7 @@ function fakeDeps({ statuses, heads = ["aaaaaaaa1"], isDraft = false, comment = 
       return statuses[Math.min(si++, statuses.length - 1)];
     },
     getLatestRateLimitComment: () => comment,
+    reviewInProgressElsewhere: () => busy(),
     requestReview: () => {
       calls.requests += 1;
     },
@@ -127,6 +128,19 @@ describe("awaitReview", () => {
     await awaitReview(deps, { pollMs: 1000 });
     const progress = deps.calls.logs.filter((m) => m.includes("in_progress"));
     expect(progress).toHaveLength(1);
+  });
+
+  it("does not request while an earlier commit's review is still running, however long it takes", async () => {
+    // #1200: the second push had no status for minutes because the first
+    // review was still in progress. Requesting then wastes a review.
+    let polls = 0;
+    const deps = fakeDeps({
+      statuses: [null, null, null, null, null, COMPLETED],
+      busy: () => ++polls < 5,
+    });
+    const code = await awaitReview(deps, { pollMs: 60_000, noStatusGraceMs: 90_000 });
+    expect(code).toBe(0);
+    expect(deps.calls.requests).toBe(0);
   });
 
   it("refuses a draft PR, which CodeRabbit never reviews automatically", async () => {

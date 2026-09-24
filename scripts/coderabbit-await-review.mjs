@@ -105,6 +105,19 @@ export function ghDeps(pr) {
       ]);
       return out.trim() || null;
     },
+    reviewInProgressElsewhere(head) {
+      // A review still running on an EARLIER commit means the head's review is
+      // queued behind it, not lost. Seen on #1200: the second push had no
+      // status at all for minutes while the first review was still running.
+      const shas = JSON.parse(gh(["pr", "view", String(pr), "--json", "commits", "-q", "[.commits[].oid]"]))
+        .filter((s) => s !== head)
+        .slice(-5);
+      return shas.some((sha) => {
+        const list = JSON.parse(gh(["api", `repos/{owner}/{repo}/commits/${sha}/statuses`]));
+        const cr = list.find((s) => s.context === "CodeRabbit");
+        return classifyStatus(cr) === "in_progress";
+      });
+    },
     requestReview() {
       gh(["pr", "comment", String(pr), "--body", "@coderabbitai review"]);
     },
@@ -126,7 +139,7 @@ export async function awaitReview(deps, opts = {}) {
     pollMs = 60_000,
     timeoutMs = 3 * 3_600_000,
     maxRequests = 6,
-    noStatusGraceMs = 10 * 60_000,
+    noStatusGraceMs = 30 * 60_000,
   } = opts;
   const start = deps.now();
   let pr = deps.getPr();
@@ -200,7 +213,11 @@ export async function awaitReview(deps, opts = {}) {
       continue;
     }
 
-    if (state === "none" && deps.now() - headSeenAt > noStatusGraceMs) {
+    if (state === "none" && deps.reviewInProgressElsewhere(head)) {
+      // Queued behind an earlier review: the grace clock only starts once
+      // nothing else is running, or a slow review costs a wasted request.
+      headSeenAt = deps.now();
+    } else if (state === "none" && deps.now() - headSeenAt > noStatusGraceMs) {
       deps.log(
         `no CodeRabbit status on ${short} after ${Math.round(noStatusGraceMs / 60_000)} min; requesting a review.`,
       );

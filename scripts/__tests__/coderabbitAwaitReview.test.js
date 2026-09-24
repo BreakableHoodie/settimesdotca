@@ -118,9 +118,15 @@ describe("awaitReview", () => {
     expect(deps.calls.requests).toBe(0);
   });
 
-  it("returns 3 for a skipped head instead of waiting forever", async () => {
+  it("returns 3 for a head that STAYS skipped, instead of waiting forever", async () => {
     const deps = fakeDeps({ statuses: [{ state: "success", description: "Review skipped" }] });
-    expect(await awaitReview(deps, { pollMs: 1000 })).toBe(3);
+    expect(await awaitReview(deps, { pollMs: 60_000 })).toBe(3);
+  });
+
+  it("treats a skip as transient: #1200 went skipped -> in progress -> completed", async () => {
+    const SKIPPED = { state: "success", description: "Review skipped" };
+    const deps = fakeDeps({ statuses: [SKIPPED, IN_PROGRESS, COMPLETED] });
+    expect(await awaitReview(deps, { pollMs: 25_000 })).toBe(0);
   });
 
   it("logs each state change once, so a long wait is visibly alive but not one line per poll", async () => {
@@ -141,6 +147,15 @@ describe("awaitReview", () => {
     const code = await awaitReview(deps, { pollMs: 60_000, noStatusGraceMs: 90_000 });
     expect(code).toBe(0);
     expect(deps.calls.requests).toBe(0);
+  });
+
+  it("does not report success for a head that moved after the status was read", async () => {
+    // A push during the post-request sleep: the OLD head reads "Review
+    // completed", but the PR's head is now a commit nobody has reviewed.
+    const deps = fakeDeps({ statuses: [COMPLETED, IN_PROGRESS, COMPLETED], heads: ["old00000", "new00000"] });
+    const code = await awaitReview(deps, { pollMs: 1000 });
+    expect(code).toBe(0);
+    expect(deps.calls.statusShas).toEqual(["old00000", "new00000", "new00000"]);
   });
 
   it("refuses a draft PR, which CodeRabbit never reviews automatically", async () => {

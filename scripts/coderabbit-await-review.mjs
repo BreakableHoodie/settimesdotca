@@ -40,6 +40,14 @@ export const DEFAULT_COOLDOWN_MS = 10 * 60_000;
 // and a request landing a few seconds early is rate-limited all over again.
 export const COOLDOWN_SLACK_MS = 60_000;
 export const MAX_COOLDOWN_MS = 65 * 60_000;
+// A review superseded by a newer push never finishes: its commit keeps
+// "Review in progress" forever (#1200's first commit still did hours later).
+// Past this age an in-progress status is treated as abandoned, not running.
+export const STALE_IN_PROGRESS_MS = 20 * 60_000;
+// "Review skipped" is NOT final: on #1200 the head read skipped, then in
+// progress 25 s later, then completed. Only a skip that persists this long is
+// taken as CodeRabbit's answer.
+export const SKIP_SETTLE_MS = 5 * 60_000;
 
 /**
  * Map the latest `CodeRabbit` commit status on a SHA to a state.
@@ -83,6 +91,15 @@ function gh(args) {
   return execFileSync("gh", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 }
 
+/**
+ * Every page of a REST list, as one flat array. `--paginate` alone joins pages
+ * as `[...][...]`, which JSON.parse rejects, and a `-q` filter runs once PER
+ * PAGE -- so `last` would pick the last match of each page, not overall.
+ */
+function ghList(path) {
+  return JSON.parse(gh(["api", path, "--paginate", "--slurp"])).flat();
+}
+
 /** Real GitHub access through `gh`. Tests inject fakes with the same shape. */
 export function ghDeps(pr) {
   return {
@@ -92,18 +109,14 @@ export function ghDeps(pr) {
     },
     getStatus(sha) {
       // Newest first; the first CodeRabbit entry is the current one.
-      const list = JSON.parse(gh(["api", `repos/{owner}/{repo}/commits/${sha}/statuses`, "--paginate"]));
-      return list.find((s) => s.context === "CodeRabbit") || null;
+      return ghList(`repos/{owner}/{repo}/commits/${sha}/statuses`).find((s) => s.context === "CodeRabbit") || null;
     },
     getLatestRateLimitComment() {
-      const out = gh([
-        "api",
-        `repos/{owner}/{repo}/issues/${pr}/comments`,
-        "--paginate",
-        "-q",
-        '[.[] | select(.user.login=="coderabbitai[bot]") | select(.body|test("rate.?limit";"i")) | .body] | last // ""',
-      ]);
-      return out.trim() || null;
+      // Oldest first, so the newest rate-limit comment is the last match.
+      const hits = ghList(`repos/{owner}/{repo}/issues/${pr}/comments`).filter(
+        (c) => c.user?.login === "coderabbitai[bot]" && /rate.?limit/i.test(c.body || ""),
+      );
+      return hits.at(-1)?.body || null;
     },
     reviewInProgressElsewhere(head) {
       // A review still running on an EARLIER commit means the head's review is
@@ -113,9 +126,8 @@ export function ghDeps(pr) {
         .filter((s) => s !== head)
         .slice(-5);
       return shas.some((sha) => {
-        const list = JSON.parse(gh(["api", `repos/{owner}/{repo}/commits/${sha}/statuses`]));
-        const cr = list.find((s) => s.context === "CodeRabbit");
-        return classifyStatus(cr) === "in_progress";
+        const cr = ghList(`repos/{owner}/{repo}/commits/${sha}/statuses`).find((s) => s.context === "CodeRabbit");
+        return classifyStatus(cr) === "in_progress" && Date.now() - Date.parse(cr.updated_at) < STALE_IN_PROGRESS_MS;
       });
     },
     requestReview() {
@@ -156,6 +168,7 @@ export async function awaitReview(deps, opts = {}) {
   let requests = 0;
   let headSeenAt = deps.now();
   let lastReported = "";
+  let skippedSince = null;
 
   for (;;) {
     const status = deps.getStatus(head);
@@ -170,12 +183,26 @@ export async function awaitReview(deps, opts = {}) {
     }
 
     if (state === "reviewed") {
+      // A push during the last sleep leaves `head` stale: this review is of a
+      // commit that is no longer the PR's head, so it proves nothing.
+      pr = deps.getPr();
+      if (pr.head !== head) {
+        deps.log(`head moved ${short} -> ${pr.head.slice(0, 8)} before it could count; watching the new head.`);
+        head = pr.head;
+        headSeenAt = deps.now();
+        continue;
+      }
       deps.log(`head ${short} reviewed ("${status.description}").`);
       return 0;
     }
     if (state === "skipped") {
-      deps.log(`head ${short} was SKIPPED by CodeRabbit ("${status.description}"). No review will come.`);
-      return 3;
+      skippedSince ??= deps.now();
+      if (once || deps.now() - skippedSince >= SKIP_SETTLE_MS) {
+        deps.log(`head ${short} was SKIPPED by CodeRabbit ("${status.description}"). No review will come.`);
+        return 3;
+      }
+    } else {
+      skippedSince = null;
     }
     if (once) {
       deps.log(`head ${short} is NOT reviewed: ${state}${status ? ` ("${status.description}")` : ""}.`);

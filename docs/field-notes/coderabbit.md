@@ -164,6 +164,17 @@ match is deliberately loose (`/rate.?limit/i`). Any unrecognised description is
 treated as *not* reviewed. Record the real wording here the first time it
 appears.
 
+Two more status behaviours, both first seen on #1200 (2026-09-24), both of
+which the first version of the monitor got wrong:
+
+- **"Review skipped" is not final.** The head read `Review skipped` at
+  15:37:42, `Review in progress` 25 s later, then `Review completed`. The
+  monitor only accepts a skip that persists for 5 minutes.
+- **A superseded review never finishes.** The PR's first commit still read
+  `Review in progress` hours after the next push replaced its review. An
+  in-progress status older than 20 minutes is treated as abandoned. Without
+  that, "wait while an earlier review is running" waits forever.
+
 **The allowance is DYNAMIC — read it from a current footer, never recall it.**
 This section twice stated a static figure and was twice wrong. It first said
 "CodeRabbit Pro allows 5 PR reviews per developer per rolling hour", with the

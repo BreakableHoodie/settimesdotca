@@ -1,13 +1,15 @@
 #!/bin/sh
 # Guard against CodeRabbit rate-limit overage.
 #
-# CodeRabbit Pro allows 5 PR reviews per developer per ROLLING HOUR. Past that,
-# the usage-based add-on (enabled on this account) processes the review and
-# BILLS for it rather than pausing -- so there is no natural brake. Every push
-# to a PR branch is a review.
+# CodeRabbit allows a dynamic number of PR reviews per ROLLING HOUR (see LIMIT
+# below). Every push to a PR branch is a review. Past the allowance the review
+# is RATE-LIMITED: CodeRabbit posts a notice instead of reviewing, and nothing
+# re-runs it when the window refills -- the head commit stays unreviewed until
+# someone comments `@coderabbitai review`. (Until 2026-09-24 the usage-based
+# add-on was enabled and an over-limit review BILLED instead; it is now off.)
 #
 # The expensive failure is CONCENTRATION, not volume: five pushes across a day
-# cost nothing, four in half an hour bills. PR #998 burned 4 reviews in ~25
+# cost nothing, four in half an hour leaves a commit unreviewed. PR #998 burned 4 reviews in ~25
 # minutes on a two-line change, because fixes were pushed one at a time instead
 # of batched.
 #
@@ -125,11 +127,12 @@ if [ $((count + eligible)) -gt "$LIMIT" ]; then
     [ "$wait_min" -lt 1 ] && wait_min=1
 
     if [ "${CODERABBIT_OVERAGE:-}" = "1" ]; then
-        printf '\n  ⚠  CodeRabbit: %s reviews already used this hour — this one BILLS.\n' "$count" >&2
-        printf '     Overriding because CODERABBIT_OVERAGE=1.\n\n' >&2
+        printf '\n  ⚠  CodeRabbit: %s reviews already used this hour — this review will be RATE-LIMITED.\n' "$count" >&2
+        printf '     Overriding because CODERABBIT_OVERAGE=1. Once the window refills,\n' >&2
+        printf '     comment @coderabbitai review on the PR -- nothing re-runs it for you.\n\n' >&2
     else
         printf '\n  ✋ Push blocked: %s CodeRabbit reviews used in the last hour (limit %s).\n\n' "$count" "$LIMIT" >&2
-        printf '     The next review would exceed the window and BILL via the usage add-on.\n' >&2
+        printf '     The next review would exceed the window and be RATE-LIMITED (skipped).\n' >&2
         printf '     Waiting is free — the budget refills in ~%s min.\n\n' "$wait_min" >&2
         printf '     Batch your remaining fixes and push once.\n' >&2
         printf '     If this genuinely must land now (show day, incident, someone blocked):\n\n' >&2
@@ -138,7 +141,7 @@ if [ $((count + eligible)) -gt "$LIMIT" ]; then
     fi
 elif [ $((count + eligible)) -ge "$WARN_AT" ]; then
     remaining=$((LIMIT - count))
-    printf '\n  ⚠  CodeRabbit: %s reviews used this hour, %s left before pushes bill.\n' "$count" "$remaining" >&2
+    printf '\n  ⚠  CodeRabbit: %s reviews used this hour, %s left before reviews are rate-limited.\n' "$count" "$remaining" >&2
     printf '     Batch what is left rather than pushing per fix.\n\n' >&2
 fi
 
@@ -150,8 +153,9 @@ fi
 # becomes unreachable after the next force-push.
 #
 # Over-counting costs an occasional spurious block, cleared for free by waiting
-# or by CODERABBIT_OVERAGE=1. Under-counting costs money. Given the hook exists
-# only to prevent the second, it errs toward the first on purpose.
+# or by CODERABBIT_OVERAGE=1. Under-counting leaves a commit unreviewed. Given
+# the hook exists only to prevent the second, it errs toward the first on
+# purpose.
 # One entry per branch actually updated -- pushing two PR branches costs two.
 for ref in $eligible_refs; do
     echo "$now $ref" >> "$log"

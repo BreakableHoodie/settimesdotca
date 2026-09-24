@@ -132,13 +132,20 @@ by having the hook query the API; it is deliberately POSIX `sh` with no `gh`,
 `jq` or network call, because a hook that fails open when a tool is missing is
 worse than no hook.
 
-## CodeRabbit costs money past the included allowance — batch your pushes
+## CodeRabbit has a hard review budget — batch your pushes
 
 **Every push to a PR branch that changes at least one review-eligible file
 triggers a review.** A push touching only path-excluded files (a lockfile, say)
-is skipped and uses none of the allowance. Past the included allowance
-reviews are **not paused, they are billed** (this account has the usage-based
-add-on). There is no natural brake; the discipline has to come from the workflow.
+is skipped and uses none of the allowance.
+
+**Past the allowance, reviews are rate-limited, not billed — since
+2026-09-24.** Before that date the account had the usage-based add-on, so an
+over-limit review was processed and billed. The add-on was switched off that
+day. The cost of overshooting moved from money to coverage: CodeRabbit posts a
+rate-limit notice in place of a review, and **does not re-run it when the window
+refills**. Someone has to comment `@coderabbitai review`; until then the PR's
+head commit is unreviewed while every other check reads green. Check remaining
+capacity with `@coderabbitai rate limit`.
 
 **The allowance is DYNAMIC — read it from a current footer, never recall it.**
 This section twice stated a static figure and was twice wrong. It first said
@@ -199,7 +206,7 @@ network), so the only correction available is reading a footer and updating it.
 - everything else → batch the remaining fixes and push once
 
 ```bash
-CODERABBIT_OVERAGE=1 git push   # emergencies only; it bills
+CODERABBIT_OVERAGE=1 git push   # emergencies only; the review is rate-limited — re-request it
 ```
 
 The hook is deliberately POSIX `sh` with no `gh`, `jq`, or network call — one that fails open when a tool is missing is worse than none, and it runs on every push. `lint-sh` globs `*.sh`, which would have skipped it silently, so that target now lists `.githooks/*` explicitly.

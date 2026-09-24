@@ -1211,13 +1211,16 @@ Reading CodeRabbit correctly — worked examples in `docs/field-notes/coderabbit
 - **Green can mean "did not look".** CodeRabbit skips a PR whose every file is path-excluded and still reports pass. For a **lockfile-only** bump, read Snyk and Dependabot instead; `scripts/__tests__/lockfileIntegrity.test.js` guards `resolved` hosts and `integrity` hashes, which no advisory check covers. A lockfile change *not* produced by npm on your machine deserves a human diff read.
 - **Findings are not all in threads.** "Outside diff range" comments and the collapsed "Nitpick comments" live in each review's **body** — a `reviewThreads` query misses both, and a "Trivial" nitpick was once a vacuous test. Read threads *and* bodies.
 
-### CodeRabbit costs money past the included allowance — batch your pushes
+### CodeRabbit has a hard review budget — batch your pushes
 
-**Every push to a PR branch that changes at least one review-eligible file triggers a review** (a push touching only path-excluded files, such as a lockfile, is skipped and uses no allowance), **and past the included allowance reviews are billed, not paused.** The allowance is **dynamic** (it has read 1, 4, 3 and 5 reviews/hour on Essentials) — read it from a *current* review footer, never from memory or this file. History: `docs/field-notes/coderabbit.md`.
+**Every push to a PR branch that changes at least one review-eligible file triggers a review** (a push touching only path-excluded files, such as a lockfile, is skipped and uses no allowance). The allowance is **dynamic** (it has read 1, 3, 4 and 5 reviews/hour on Essentials) — read it from a *current* review footer or comment `@coderabbitai rate limit` on the PR, never from memory or this file. History: `docs/field-notes/coderabbit.md`.
 
-- **Concentration is the expensive failure, not volume** — #998 burned 4 reviews in ~25 min on a two-line change. Read your own diff and run the right suite locally, then push once.
+**Usage-based billing was switched OFF on 2026-09-24.** Past the allowance a review is now **rate-limited, not billed** — so the failure changed shape from a bill to an **unreviewed commit**. CodeRabbit posts a rate-limit notice instead of a review, and nothing re-runs it when the window refills. A PR merged in that state ships a head commit no reviewer looked at, while every other check is green. That is the green-means-did-not-look class, and it is worse than the bill was, because nothing surfaces it.
+
+- **After a rate-limited push, comment `@coderabbitai review` once the window refills**, and do not merge until that review has posted against the current head.
+- **Concentration is the failure, not volume** — #998 burned 4 reviews in ~25 min on a two-line change. Read your own diff and run the right suite locally, then push once. Iterate as a **draft** PR (`auto_review.drafts: false`, so drafts cost nothing) and `gh pr ready` at the final state.
 - `make hooks` installs `.githooks/pre-push`, which warns at the first review in the window and blocks at `LIMIT` (update it only against a current footer; erring low blocks pushes the budget would allow). Deliberately POSIX `sh`, no `gh`/`jq`/network.
-- **Override on urgency to land, not issue priority:** show day, a production incident, or someone blocked → `CODERABBIT_OVERAGE=1 git push`. Everything else: waiting is free, the window refills.
+- **Override on urgency to land, not issue priority:** show day, a production incident, or someone blocked → `CODERABBIT_OVERAGE=1 git push`. It no longer bills; it accepts a rate-limited review, which you then owe a manual `@coderabbitai review`. Everything else: waiting is free, the window refills.
 
 ### Before every push (including follow-up commits during PR review)
 

@@ -179,9 +179,9 @@ reviews:
     - label: admin
       instructions: Apply when the PR changes frontend/src/admin/** or functions/api/admin/** admin tooling.
     - label: priority:p1
-      instructions: Apply when the PR blocks Long Weekend Band Crawl Vol. 17 (Aug 2, 2026) or fixes a production-breaking bug.
+      instructions: Apply when the PR blocks the next scheduled edition (see CLAUDE.md "Mission & Scope" for which one) or fixes a production-breaking bug.
     - label: priority:p2
-      instructions: Apply to important work that is not blocking Vol. 17 or production.
+      instructions: Apply to important work that is not blocking the next edition or production.
     - label: priority:p3
       instructions: Apply to lower-priority polish, nice-to-haves, or deferred cleanup.
 
@@ -235,6 +235,19 @@ reviews:
       enabled: true
     sqlfluff:
       enabled: true
+    # Default-on in the schema; pinned here because the repo relies on them.
+    # shellcheck mirrors `make lint-sh` (.githooks/* and scripts/*.sh).
+    # zizmor is the only Actions-security analyser left since codeql.yml was
+    # removed (2026-09-16) — it complements the SHA-pinning rule above.
+    shellcheck:
+      enabled: true
+    zizmor:
+      enabled: true
+    # Disabled on evidence: across the 25 PRs before 2026-09-24 it raised two
+    # findings, both false positives (demanding a capital H in the literal path
+    # `.github/`). Prose is already reviewed by the model and by markdownlint.
+    languagetool:
+      enabled: false
 
 knowledge_base:
   code_guidelines:

@@ -1250,7 +1250,7 @@ gh pr create --label "bug,priority:p1"   # example
 - CSRF cookie must be regenerated whenever a new session is created (see `functions/api/admin/sessions/revoke-all.js`).
 - `params.id` from Cloudflare Pages Functions URL params is a string; always run it through `validateId()` from `functions/utils/validation.js` before using it in a DB query.
 
-### The security tooling this repo actually has (2026-09-16)
+### The security tooling this repo actually has
 
 **Restored 2026-09-25, when the repo went public again:** `codeql.yml`,
 `secret-scan.yml` (gitleaks) and `dependency-review.yml`, unchanged from their

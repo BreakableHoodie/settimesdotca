@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  symlinkSync,
   rmSync,
   writeFileSync,
   existsSync,
@@ -22,6 +23,10 @@ import { join, resolve } from "node:path";
 const HOOK = resolve(__dirname, "../../.githooks/pre-push");
 const SHA = "a".repeat(40);
 const ZERO = "0".repeat(40);
+// Everything the hook runs that is not a shell builtin. PATH is built from
+// these alone, so a real `gh` in /usr/bin (standard on Ubuntu runners) can
+// never answer a test that means "gh is not installed".
+const TOOLS = ["awk", "cat", "cut", "date", "dirname", "head", "mkdir", "mktemp", "mv", "rm", "sleep", "tr", "wc"];
 
 let dir;
 let bin;
@@ -32,6 +37,12 @@ beforeEach(() => {
   tmp = join(dir, "tmp");
   mkdirSync(bin);
   mkdirSync(tmp);
+  mkdirSync(join(dir, "tools"));
+  for (const t of TOOLS) {
+    const found = spawnSync("/bin/sh", ["-c", `command -v ${t}`], { encoding: "utf8" }).stdout.trim();
+    if (!found) throw new Error(`test setup: ${t} not found on this host`);
+    symlinkSync(found, join(dir, "tools", t));
+  }
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -55,13 +66,13 @@ function seed(n) {
 function push(branch = "feat") {
   const t0 = Date.now();
   // HOOK_SHELL=dash reproduces Ubuntu CI, whose /bin/sh is dash, from a Mac.
-  const r = spawnSync(process.env.HOOK_SHELL || "sh", [HOOK, "origin", "git@example:x.git"], {
+  const r = spawnSync(process.env.HOOK_SHELL || "/bin/sh", [HOOK, "origin", "git@example:x.git"], {
     input: `refs/heads/${branch} ${SHA} refs/heads/${branch} ${ZERO}\n`,
     encoding: "utf8",
-    // /usr/bin:/bin carries the POSIX tools but no real gh, so "no gh" is
-    // simply the fake bin being empty.
+    // Only the fake bin and the TOOLS symlinks: "no gh" is the fake bin
+    // being empty, whatever the host has installed.
     env: {
-      PATH: `${bin}:/usr/bin:/bin`,
+      PATH: `${bin}:${join(dir, "tools")}`,
       HOME: dir,
       XDG_CACHE_HOME: dir,
       TMPDIR: tmp,
@@ -78,6 +89,12 @@ describe("pre-push draft lookup", () => {
     expect(r.status).toBe(0);
     expect(logLines()).toHaveLength(0);
     expect(r.stderr).toMatch(/draft PR -- not counted/);
+  });
+
+  it("counts the push when gh prints true but then FAILS", () => {
+    fakeGh("echo true; exit 1");
+    expect(push().status).toBe(0);
+    expect(logLines()).toHaveLength(1);
   });
 
   it("counts a push to a ready PR", () => {

@@ -254,8 +254,11 @@ Canonical active roadmap: `docs/ROADMAP.md`. Use it for handoffs between Claude,
 - **Tests**: Vitest (unit, frontend), Playwright (E2E + a11y + visual regression)
 - **CI/CD**: GitHub Actions (13 workflows), Dependabot, Snyk, GitGuardian, CodeRabbit
   - **Runners are GitHub-hosted again** (2026-09-25, when the repo went public).
-    Every job still reads `runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}`,
-    and the repo variable `RUNS_ON` is **deleted**. From 2026-09-23 to
+    Every job reads `runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}` except
+    two that pin `ubuntu-latest` on purpose: `zap-baseline.yml` (needs Docker,
+    which self-hosted job containers lack) and `quality.yml`'s **Lighthouse CI**
+    (its 0.90 floor was calibrated on hosted hardware). The repo variable
+    `RUNS_ON` is **deleted**. From 2026-09-23 to
     2026-09-25, while the repo was private, `RUNS_ON=self-hosted` routed jobs to
     ephemeral containers on Dre's homelab; setup and failback live in the private
     `BreakableHoodie/gh-runner` repo.

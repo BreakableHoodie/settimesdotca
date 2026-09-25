@@ -195,6 +195,9 @@ export async function awaitReview(deps, opts = {}) {
   for (;;) {
     try {
       const code = await step();
+      // Reset only after a WHOLE pass succeeds: resetting on the status read
+      // alone let a call later in the pass fail forever without ever giving up.
+      ghFailures = 0;
       if (code !== undefined) return code;
     } catch (err) {
       ghFailures += 1;
@@ -208,7 +211,6 @@ export async function awaitReview(deps, opts = {}) {
   /** One poll. Returns an exit code to stop, or undefined to poll again. */
   async function step() {
     const status = deps.getStatus(head);
-    ghFailures = 0;
     let state = classifyStatus(status);
     if (state === "in_progress" && deps.now() - Date.parse(status.updated_at) > STALE_IN_PROGRESS_MS) {
       // The head's own review hung. Waiting on it only runs out the timeout.

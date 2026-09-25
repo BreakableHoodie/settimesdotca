@@ -202,6 +202,16 @@ describe("awaitReview", () => {
     expect(deps.calls.sleeps).toHaveLength(MAX_CONSECUTIVE_GH_FAILURES - 1);
   });
 
+  it("gives up when a LATER call in the pass keeps failing, even though the status read succeeds", async () => {
+    const deps = fakeDeps({ statuses: [IN_PROGRESS] });
+    let n = 0;
+    deps.getPr = () => {
+      if (n++ === 0) return { head: "aaaaaaaa1", isDraft: false, state: "OPEN" };
+      throw new Error("HTTP 502");
+    };
+    await expect(awaitReview(deps, { pollMs: 1000 })).rejects.toThrow("HTTP 502");
+  });
+
   it("--once does not retry a gh failure", async () => {
     const deps = fakeDeps({ statuses: [new Error("HTTP 502")] });
     await expect(awaitReview(deps, { once: true })).rejects.toThrow();

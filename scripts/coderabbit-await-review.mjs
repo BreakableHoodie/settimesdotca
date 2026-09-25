@@ -259,9 +259,17 @@ export async function awaitReview(deps, opts = {}) {
     // Re-check the PR at the moment of giving up: two sleeps (after a review
     // request, and after a gh failure) are not followed by refreshPr(), so a
     // PR closed during one must still report 4, not 1.
-    const giveUp = (message) => {
+    // A budget exit on a head that has since moved is not a failure: the new
+    // head gets CodeRabbit's automatic review, so watch it instead. The
+    // timeout exit does not do this -- it bounds the whole run, not one head.
+    const giveUp = (message, { watchMovedHead = false } = {}) => {
       const gone = refreshPr();
       if (gone !== null) return gone;
+      if (watchMovedHead && pr.head !== head) {
+        deps.log(`head moved ${short} -> ${pr.head.slice(0, 8)}; watching the new head.`);
+        switchHead(pr.head);
+        return undefined;
+      }
       deps.log(message);
       return 1;
     };
@@ -271,7 +279,9 @@ export async function awaitReview(deps, opts = {}) {
 
     if (state === "rate_limited" || state === "failed" || state === "stalled") {
       if (requests >= maxRequests) {
-        return giveUp(`re-requested ${requests} times and head ${short} is still ${state}; giving up.`);
+        return giveUp(`re-requested ${requests} times and head ${short} is still ${state}; giving up.`, {
+          watchMovedHead: true,
+        });
       }
       const wait =
         (state === "rate_limited" && parseCooldownMs(deps.getLatestRateLimitComment()?.body)) || DEFAULT_COOLDOWN_MS;
@@ -305,6 +315,7 @@ export async function awaitReview(deps, opts = {}) {
       if (requests >= maxRequests) {
         return giveUp(
           `no CodeRabbit status on ${short} and the re-request budget (${maxRequests}) is spent; giving up.`,
+          { watchMovedHead: true },
         );
       }
       deps.log(

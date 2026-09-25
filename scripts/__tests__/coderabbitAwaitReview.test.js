@@ -257,6 +257,18 @@ describe("awaitReview", () => {
     expect(deps.calls.requests).toBe(1);
   });
 
+  it("follows a head that moved during the post-request sleep instead of failing on the budget", async () => {
+    // getPr: initial, before the request (old head), then at the budget exit
+    // the head has moved. The new head gets CodeRabbit's automatic review.
+    const deps = fakeDeps({
+      statuses: [RATE_LIMITED, RATE_LIMITED, COMPLETED],
+      heads: ["old00000", "old00000", "new00000"],
+    });
+    expect(await awaitReview(deps, { pollMs: 1000, maxRequests: 1 })).toBe(0);
+    expect(deps.calls.requests).toBe(1);
+    expect(deps.calls.statusShas.at(-1)).toBe("new00000");
+  });
+
   it("gives up with a reason, not silently, when no status appears and the budget is spent", async () => {
     const deps = fakeDeps({ statuses: [null] });
     expect(await awaitReview(deps, { pollMs: 60_000, noStatusGraceMs: 90_000, maxRequests: 1 })).toBe(1);

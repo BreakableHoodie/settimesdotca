@@ -127,10 +127,9 @@ So read the body for BOTH sections. Judge a finding by what it says, not by the
 bucket it arrived in.
 Related, and why the push-budget hook is not "wrong": it counts **pushes**, and a
 skipped review consumes none of the hourly allowance. The count is therefore
-conservative — you sometimes have more budget than it thinks. Do not "fix" that
-by having the hook query the API; it is deliberately POSIX `sh` with no `gh`,
-`jq` or network call, because a hook that fails open when a tool is missing is
-worse than no hook.
+conservative — you sometimes have more budget than it thinks. Its one network
+call (below) exists only to stop counting **draft** pushes, and it is built to
+fail toward counting.
 
 ## CodeRabbit has a hard review budget — batch your pushes
 
@@ -219,8 +218,8 @@ hook at `LIMIT=1` while the real allowance was 4, a ready PR sat unpushed for
 ~30 minutes waiting on a budget that had already refilled. A guard that blocks
 when three reviews are genuinely available teaches you to reach for
 `CODERABBIT_OVERAGE=1` by reflex — and an override you always use is not a
-guard. The hook still cannot ask (deliberately POSIX `sh`, no `gh`, no `jq`, no
-network), so the only correction available is reading a footer and updating it.
+guard. The hook cannot read the allowance itself, so the only correction
+available is reading a footer and updating it.
 
 **The expensive failure is concentration, not volume.** The same number of pushes spread across a day costs nothing, because the window keeps refilling. PR #998 burned **4 reviews in ~25 minutes on a two-line change** — which, with #997's review already inside the same rolling hour, is what reached the limit of 5. Fixes went out one at a time instead of batched — a stale comment, then an E2E failure, then an incomplete sweep of that same failure, then a nit on prose added two pushes earlier. Three of the four were avoidable by reading the diff and running the right suite locally first.
 
@@ -237,4 +236,8 @@ network), so the only correction available is reading a footer and updating it.
 CODERABBIT_OVERAGE=1 git push   # emergencies only; then `make await-review PR=<n>` before merging
 ```
 
-The hook is deliberately POSIX `sh` with no `gh`, `jq`, or network call — one that fails open when a tool is missing is worse than none, and it runs on every push. `lint-sh` globs `*.sh`, which would have skipped it silently, so that target now lists `.githooks/*` explicitly.
+The hook is POSIX `sh` and makes exactly one optional network call: `gh pr view --json isDraft` per pushed branch, so a push to a **draft** PR is not counted (CodeRabbit never reviews drafts, and CLAUDE.md says to iterate as one). With `LIMIT=2`, counting drafts blocked that workflow on the third push of the hour.
+
+It used to make no network call at all, on the grounds that a hook which fails open when a tool is missing is worse than none. That rule still holds; the lookup respects it by only ever *removing* a push on an explicit `true`. No `gh`, no network, no PR yet, an error, or a lookup slower than 5 s all count the push as before. The bound uses a SIGTERM-then-SIGKILL watchdog, not `timeout` (macOS does not ship it). `scripts/__tests__/prePushDraftLookup.test.js` runs the real hook against a fake `gh` in each of those failure modes; run it with `HOOK_SHELL=dash` to reproduce Ubuntu CI's `/bin/sh`. Two things changed the calculus (2026-09-25): `make await-review` is now the merge gate, so an undercount costs a wait rather than an unreviewed merge, and `LIMIT=2` made the false blocks frequent.
+
+`lint-sh` globs `*.sh`, which would have skipped the hook silently, so that target now lists `.githooks/*` explicitly.

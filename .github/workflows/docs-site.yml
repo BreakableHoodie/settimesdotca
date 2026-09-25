@@ -30,8 +30,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -69,6 +67,11 @@ jobs:
   deploy:
     name: Deploy
     needs: build
+    # Only the deploy job gets these, so the build job's pip install runs
+    # without any Pages or OIDC rights.
+    permissions:
+      pages: write
+      id-token: write
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     timeout-minutes: 5
     environment:

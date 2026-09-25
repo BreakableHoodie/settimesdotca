@@ -1,34 +1,41 @@
-# Docs build — validation only. This workflow no longer publishes anything.
+# Builds the MkDocs site and publishes it to GitHub Pages at docs.settimes.ca.
 #
-# docs.settimes.ca was a GitHub Pages site served from this repo. GitHub Pages
-# is not available for private repositories on the Free plan, so when this repo
-# went private (2026-09-16) the Pages site was disabled and the domain began
-# serving GitHub's own 404. The `deploy` job and the Pages artifact upload went
-# with it — `actions/deploy-pages` cannot succeed against a disabled Pages site,
-# so keeping them would have meant a permanently red check, which is worse than
-# no check: it trains you to ignore red.
+# History: Pages is unavailable to private repos on the Free plan, so this site
+# was retired on 2026-09-16 when the repo went private (#1172). It was restored
+# on 2026-09-25 when the repo went public again.
 #
-# The zone's `docs.settimes.ca` CNAME (-> breakablehoodie.github.io) was deleted
-# at the same time, both because it pointed at nothing and because an unclaimed
-# custom domain aimed at GitHub Pages is a subdomain-takeover vector.
+# If the repo goes private again, retire the site in the SAME change: drop the
+# `deploy` job, delete `docs/CNAME`, and delete the zone's `docs.settimes.ca`
+# CNAME. A custom domain left pointing at a disabled Pages site can be claimed
+# by someone else (subdomain takeover).
 #
-# What is left is `mkdocs build --strict`, which still catches broken internal
-# links and bad nav entries. It is `workflow_dispatch` only: Actions minutes are
-# metered on a private Free-plan repo, and a build whose output is never
-# published does not earn a run on every docs push. Run it on demand, or locally
-# (see the mkdocs venv recipe) when the docs tree changes shape.
+# DNS: CNAME docs.settimes.ca -> breakablehoodie.github.io, unproxied, TTL auto.
 #
-# To restore publishing: re-enable Pages (needs a plan where private-repo Pages
-# is available, or a public repo), re-add the `deploy` job with `pages: write`
-# and `id-token: write`, restore `docs/CNAME`, and recreate the DNS record as
-# CNAME docs.settimes.ca -> breakablehoodie.github.io, unproxied, TTL auto.
-name: Docs Build
+# Everything under docs/ is published unless mkdocs.yml's `exclude_docs` names
+# it; leaving a file out of `nav` does not keep it off the site.
+name: Docs Site
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - ".github/workflows/docs-site.yml"
+      # Symlinked into docs/ (single-source); edits land on the root paths,
+      # so watch them too or the site drifts until the next docs/** push.
+      - "CONTRIBUTING.md"
+      - "SECURITY.md"
   workflow_dispatch:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -53,3 +60,21 @@ jobs:
 
       - name: Build site
         run: mkdocs build --strict
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

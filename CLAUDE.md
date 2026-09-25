@@ -40,14 +40,15 @@ not. While the docs were published it was load-bearing: `docs/*.md` shipped to
 docs.settimes.ca regardless of the mkdocs `nav`, so `exclude_docs` — not the
 absent nav entry — was the only thing keeping this file off the public site.
 
-**Nothing is published now.** The Pages site was retired on 2026-09-16, when the
-repo went private and GitHub Pages stopped being available to it; see
-`.github/workflows/docs-site.yml`, which records the cause and the restore path.
-So the exclusion currently guards nothing.
+**The site is published again** (restored 2026-09-25, when the repo went
+public). It was retired from 2026-09-16 while the repo was private, because
+GitHub Pages is unavailable to private repos on the Free plan; see
+`.github/workflows/docs-site.yml` for the history and the retirement steps. So
+the exclusion is load-bearing again: `docs/*.md` ships to docs.settimes.ca
+whatever the `nav` says.
 
-Keep it regardless, and do not drop it on the grounds that there is no site to
-exclude from — it is the control that has to be in place *before* publishing
-returns, not after, and this doc names past security gaps by name. Do not "fix"
+Keep it even if the site is ever retired again. It has to be in place *before*
+publishing returns, not after, because this doc names past security gaps. Do not "fix"
 the missing nav entry by adding one either; the file is meant to be absent from
 the site, not merely unlinked in it.
 

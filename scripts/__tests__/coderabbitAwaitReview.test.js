@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   COOLDOWN_SLACK_MS,
   DEFAULT_COOLDOWN_MS,
+  MAX_CONSECUTIVE_GH_FAILURES,
   MAX_COOLDOWN_MS,
+  STALE_IN_PROGRESS_MS,
   awaitReview,
   classifyStatus,
   parseCooldownMs,
@@ -17,19 +19,32 @@ const RL_COMMENT = "Rate limit exceeded. Please wait **21 minutes and 50 seconds
  * Fake GitHub. `statuses` is consumed one entry per getStatus() call (the last
  * entry repeats), so a test scripts exactly what CodeRabbit reports over time.
  */
-function fakeDeps({ statuses, heads = ["aaaaaaaa1"], isDraft = false, comment = RL_COMMENT, busy = () => false }) {
+function fakeDeps({
+  statuses,
+  heads = ["aaaaaaaa1"],
+  isDraft = false,
+  prState = () => "OPEN",
+  comment = RL_COMMENT,
+  commentAt = "1970-01-01T00:00:00Z",
+  busy = () => false,
+}) {
   let t = 0;
   let si = 0;
   let hi = 0;
   const calls = { requests: 0, sleeps: [], statusShas: [], logs: [] };
   return {
     calls,
-    getPr: () => ({ head: heads[Math.min(hi++, heads.length - 1)], isDraft, state: "OPEN" }),
+    getPr: () => {
+      const i = hi++;
+      return { head: heads[Math.min(i, heads.length - 1)], isDraft, state: prState(i) };
+    },
     getStatus: (sha) => {
       calls.statusShas.push(sha);
-      return statuses[Math.min(si++, statuses.length - 1)];
+      const s = statuses[Math.min(si++, statuses.length - 1)];
+      if (s instanceof Error) throw s;
+      return s;
     },
-    getLatestRateLimitComment: () => comment,
+    getLatestRateLimitComment: () => (comment === null ? null : { body: comment, at: commentAt }),
     reviewInProgressElsewhere: () => busy(),
     requestReview: () => {
       calls.requests += 1;
@@ -174,6 +189,91 @@ describe("awaitReview", () => {
   it("refuses a draft PR, which CodeRabbit never reviews automatically", async () => {
     const deps = fakeDeps({ statuses: [COMPLETED], isDraft: true });
     expect(await awaitReview(deps)).toBe(4);
+  });
+
+  it("survives a transient gh failure mid-wait instead of exiting 4", async () => {
+    const deps = fakeDeps({ statuses: [IN_PROGRESS, new Error("HTTP 502"), IN_PROGRESS, COMPLETED] });
+    expect(await awaitReview(deps, { pollMs: 1000 })).toBe(0);
+  });
+
+  it("gives up (throws, so main exits 4) after consecutive gh failures", async () => {
+    const deps = fakeDeps({ statuses: [new Error("HTTP 502")] });
+    await expect(awaitReview(deps, { pollMs: 1000 })).rejects.toThrow("HTTP 502");
+    expect(deps.calls.sleeps).toHaveLength(MAX_CONSECUTIVE_GH_FAILURES - 1);
+  });
+
+  it("gives up when a LATER call in the pass keeps failing, even though the status read succeeds", async () => {
+    const deps = fakeDeps({ statuses: [IN_PROGRESS] });
+    let n = 0;
+    deps.getPr = () => {
+      if (n++ === 0) return { head: "aaaaaaaa1", isDraft: false, state: "OPEN" };
+      throw new Error("HTTP 502");
+    };
+    await expect(awaitReview(deps, { pollMs: 1000 })).rejects.toThrow("HTTP 502");
+  });
+
+  it("--once does not retry a gh failure", async () => {
+    const deps = fakeDeps({ statuses: [new Error("HTTP 502")] });
+    await expect(awaitReview(deps, { once: true })).rejects.toThrow();
+    expect(deps.calls.sleeps).toHaveLength(0);
+  });
+
+  it("treats an unrecognised status as rate-limited when a rate-limit comment is at least as new", async () => {
+    // The rate-limited description is unobserved here; a different wording
+    // must still get the cooldown + re-request, not a silent 3h timeout.
+    const NEW_WORDING = { state: "success", description: "Paused", updated_at: "1970-01-01T00:00:00Z" };
+    const deps = fakeDeps({ statuses: [NEW_WORDING, COMPLETED], commentAt: "1970-01-01T00:00:05Z" });
+    expect(await awaitReview(deps, { pollMs: 1000 })).toBe(0);
+    expect(deps.calls.requests).toBe(1);
+    expect(deps.calls.sleeps[0]).toBe(parseCooldownMs(RL_COMMENT));
+  });
+
+  it("does not read an unrecognised status as rate-limited on the strength of an OLDER comment", async () => {
+    const NEW_WORDING = { state: "success", description: "Paused", updated_at: "1970-01-01T00:10:00Z" };
+    const deps = fakeDeps({ statuses: [NEW_WORDING, COMPLETED], commentAt: "1970-01-01T00:00:00Z" });
+    expect(await awaitReview(deps, { pollMs: 1000 })).toBe(0);
+    expect(deps.calls.requests).toBe(0);
+  });
+
+  it("re-requests when the head's OWN review has been in progress past the stale limit", async () => {
+    const STUCK = { ...IN_PROGRESS, updated_at: "1970-01-01T00:00:00Z" };
+    const deps = fakeDeps({ statuses: [STUCK, STUCK, STUCK, IN_PROGRESS, COMPLETED] });
+    expect(await awaitReview(deps, { pollMs: STALE_IN_PROGRESS_MS })).toBe(0);
+    expect(deps.calls.requests).toBe(1);
+  });
+
+  it("stops with 4, posting nothing, when the PR is merged mid-wait", async () => {
+    const deps = fakeDeps({ statuses: [RATE_LIMITED], prState: (i) => (i === 0 ? "OPEN" : "MERGED") });
+    expect(await awaitReview(deps, { pollMs: 1000 })).toBe(4);
+    expect(deps.calls.requests).toBe(0);
+  });
+
+  it("reports 4, not 1, when the PR closed during the post-request sleep and the budget is then spent", async () => {
+    // The sleep after posting a request is not followed by refreshPr(), so
+    // only the give-up path can notice the PR is gone.
+    let reads = 0;
+    const deps = fakeDeps({ statuses: [RATE_LIMITED], prState: () => (++reads > 2 ? "CLOSED" : "OPEN") });
+    expect(await awaitReview(deps, { pollMs: 1000, maxRequests: 1 })).toBe(4);
+    expect(deps.calls.requests).toBe(1);
+  });
+
+  it("follows a head that moved during the post-request sleep instead of failing on the budget", async () => {
+    // getPr: initial, before the request (old head), then at the budget exit
+    // the head has moved. The new head gets CodeRabbit's automatic review.
+    const deps = fakeDeps({
+      statuses: [RATE_LIMITED, RATE_LIMITED, COMPLETED],
+      heads: ["old00000", "old00000", "new00000"],
+    });
+    expect(await awaitReview(deps, { pollMs: 1000, maxRequests: 1 })).toBe(0);
+    expect(deps.calls.requests).toBe(1);
+    expect(deps.calls.statusShas.at(-1)).toBe("new00000");
+  });
+
+  it("gives up with a reason, not silently, when no status appears and the budget is spent", async () => {
+    const deps = fakeDeps({ statuses: [null] });
+    expect(await awaitReview(deps, { pollMs: 60_000, noStatusGraceMs: 90_000, maxRequests: 1 })).toBe(1);
+    expect(deps.calls.requests).toBe(1);
+    expect(deps.calls.logs.at(-1)).toMatch(/budget/);
   });
 
   it("requests a review when no CodeRabbit status appears within the grace period", async () => {

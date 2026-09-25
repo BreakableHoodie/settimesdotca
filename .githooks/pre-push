@@ -20,9 +20,21 @@
 #
 #     CODERABBIT_OVERAGE=1 git push
 #
-# Deliberately POSIX sh with no gh/jq/network: a hook that fails open when a
-# tool is missing is worse than no hook, and this must not add latency or a
-# failure mode to every push.
+# POSIX sh, and it makes exactly ONE optional network call: asking `gh`
+# whether each pushed branch's PR is a draft. CodeRabbit never reviews drafts
+# (`auto_review.drafts: false`), and CLAUDE.md says to iterate as a draft, so
+# counting draft pushes blocked the very workflow the budget rules recommend.
+#
+# That lookup can only ever REMOVE a push from the count on an explicit
+# "true". A missing `gh`, no network, no PR yet, an error, or a lookup slower
+# than DRAFT_LOOKUP_SECONDS all count the push exactly as before. That is what
+# keeps this from failing open: the earlier "no gh, no network" rule existed
+# because a tool that goes quiet when it is missing is worse than none, and a
+# lookup that fails TOWARD counting cannot go quiet. `make await-review` is
+# the merge gate now; this hook only paces pushes.
+#
+# Known gap, unchanged: `gh pr ready` starts a review without a push, so the
+# hook never sees it.
 
 set -eu
 
@@ -74,6 +86,36 @@ WINDOW_SECONDS=3600
 LIMIT=2
 WARN_AT=2
 DEFAULT_BRANCH=main
+# Overridable only so the tests can exercise a hung lookup in about a second.
+DRAFT_LOOKUP_SECONDS=${CODERABBIT_DRAFT_LOOKUP_SECONDS:-5}
+
+# Prints "true" only when gh answers, in time, that <branch>'s PR is a draft.
+# Anything else prints nothing, and the caller counts the push.
+pr_is_draft() {
+    command -v gh >/dev/null 2>&1 || return 0
+    # Explicit template: a bare `mktemp` ignores TMPDIR on macOS.
+    _out=$(mktemp "${TMPDIR:-/tmp}/coderabbit-draft.XXXXXX") || return 0
+    gh pr view "$1" --json isDraft -q .isDraft </dev/null >"$_out" 2>/dev/null &
+    _gh=$!
+    # Bound it without `timeout`, which macOS does not ship. The watchdog's
+    # own output is discarded so a lingering `sleep` cannot hold the hook's
+    # stderr open after git expects it closed.
+    # SIGKILL follows SIGTERM, because a process that ignores TERM would
+    # otherwise hang the push indefinitely -- the #882 `timeout` without `-k`.
+    ( sleep "$DRAFT_LOOKUP_SECONDS"; kill "$_gh" 2>/dev/null; sleep 1; kill -9 "$_gh" 2>/dev/null ) >/dev/null 2>&1 &
+    _dog=$!
+    # Capture gh's OWN status. `cmd || rc=$?` is the form that reads the
+    # command's status (see CLAUDE.md, #882); it also keeps set -e from ending
+    # this subshell before the cleanup below.
+    _rc=0
+    wait "$_gh" 2>/dev/null || _rc=$?
+    kill "$_dog" 2>/dev/null || :
+    # A draft only on success AND "true": output from a gh that then failed,
+    # or was killed by the watchdog, is not an answer.
+    [ "$_rc" -eq 0 ] && [ "$(cat "$_out")" = "true" ] && echo true
+    rm -f "$_out"
+    return 0
+}
 
 # pre-push receives one line per ref being updated on STDIN:
 #
@@ -106,8 +148,23 @@ while read -r _local_ref local_sha remote_ref _remote_sha; do
     eligible_refs="$eligible_refs${remote_ref#refs/heads/} "
 done
 
+# Drop branches whose PR is a draft: CodeRabbit will not review them.
+if [ "$eligible" -gt 0 ]; then
+    counted=""
+    eligible=0
+    for ref in $eligible_refs; do
+        if [ "$(pr_is_draft "$ref")" = "true" ]; then
+            printf '  CodeRabbit: %s is a draft PR -- not counted (drafts are not reviewed).\n' "$ref" >&2
+            continue
+        fi
+        counted="$counted$ref "
+        eligible=$((eligible + 1))
+    done
+    eligible_refs="$counted"
+fi
+
 # Nothing here triggers a review: a tag, a deletion, a push to the default
-# branch, or an invocation with no ref updates at all.
+# branch, a push to a draft PR, or an invocation with no ref updates at all.
 [ "$eligible" -eq 0 ] && exit 0
 
 # The log is deliberately NOT in $GIT_DIR. CodeRabbit's allowance is per

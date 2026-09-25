@@ -48,6 +48,9 @@ export const STALE_IN_PROGRESS_MS = 20 * 60_000;
 // progress 25 s later, then completed. Only a skip that persists this long is
 // taken as CodeRabbit's answer.
 export const SKIP_SETTLE_MS = 5 * 60_000;
+// `gh` failures in a row before giving up. A single blip (a 502, a secondary
+// rate limit) must not end a wait that may already be hours old.
+export const MAX_CONSECUTIVE_GH_FAILURES = 5;
 
 /**
  * Map the latest `CodeRabbit` commit status on a SHA to a state.
@@ -116,7 +119,8 @@ export function ghDeps(pr) {
       const hits = ghList(`repos/{owner}/{repo}/issues/${pr}/comments`).filter(
         (c) => c.user?.login === "coderabbitai[bot]" && /rate.?limit/i.test(c.body || ""),
       );
-      return hits.at(-1)?.body || null;
+      const last = hits.at(-1);
+      return last ? { body: last.body || "", at: last.updated_at } : null;
     },
     reviewInProgressElsewhere(head) {
       // A review still running on an EARLIER commit means the head's review is
@@ -154,15 +158,23 @@ export async function awaitReview(deps, opts = {}) {
     noStatusGraceMs = 30 * 60_000,
   } = opts;
   const start = deps.now();
-  let pr = deps.getPr();
-  if (pr.state !== "OPEN") {
-    deps.log(`PR is ${pr.state}; nothing to wait for.`);
-    return 4;
-  }
-  if (pr.isDraft) {
-    deps.log("PR is a draft (CodeRabbit skips drafts). Run `gh pr ready` first.");
-    return 4;
-  }
+  let pr;
+  // Every PR re-read goes through here, so a PR merged, closed or drafted
+  // mid-wait stops the monitor instead of it posting review requests on it.
+  const refreshPr = () => {
+    pr = deps.getPr();
+    if (pr.state !== "OPEN") {
+      deps.log(`PR is ${pr.state}; nothing to wait for.`);
+      return 4;
+    }
+    if (pr.isDraft) {
+      deps.log("PR is a draft (CodeRabbit skips drafts). Run `gh pr ready` first.");
+      return 4;
+    }
+    return null;
+  };
+  const initial = refreshPr();
+  if (initial !== null) return initial;
 
   let head = pr.head;
   let requests = 0;
@@ -178,10 +190,37 @@ export async function awaitReview(deps, opts = {}) {
     skippedSince = null;
   };
   let lastReported = "";
+  let ghFailures = 0;
 
   for (;;) {
+    try {
+      const code = await step();
+      // Reset only after a WHOLE pass succeeds: resetting on the status read
+      // alone let a call later in the pass fail forever without ever giving up.
+      ghFailures = 0;
+      if (code !== undefined) return code;
+    } catch (err) {
+      ghFailures += 1;
+      // --once is a quick read: retrying would turn it into a five-minute one.
+      if (once || ghFailures >= MAX_CONSECUTIVE_GH_FAILURES) throw err;
+      deps.log(`gh failed (${ghFailures}/${MAX_CONSECUTIVE_GH_FAILURES}): ${String(err.stderr || err.message).trim()}`);
+      await deps.sleep(pollMs);
+    }
+  }
+
+  /** One poll. Returns an exit code to stop, or undefined to poll again. */
+  async function step() {
     const status = deps.getStatus(head);
-    const state = classifyStatus(status);
+    let state = classifyStatus(status);
+    if (state === "in_progress" && deps.now() - Date.parse(status.updated_at) > STALE_IN_PROGRESS_MS) {
+      // The head's own review hung. Waiting on it only runs out the timeout.
+      state = "stalled";
+    } else if (state === "unknown") {
+      // The rate-limited description has never been observed here. If a
+      // rate-limit comment is at least as new as this status, trust it.
+      const c = deps.getLatestRateLimitComment();
+      if (c && Date.parse(c.at) >= Date.parse(status.updated_at)) state = "rate_limited";
+    }
     const short = head.slice(0, 8);
     // Report each state change once, so a long wait is visibly alive rather
     // than indistinguishable from a hang, without a line per poll.
@@ -194,11 +233,12 @@ export async function awaitReview(deps, opts = {}) {
     if (state === "reviewed") {
       // A push during the last sleep leaves `head` stale: this review is of a
       // commit that is no longer the PR's head, so it proves nothing.
-      pr = deps.getPr();
+      const gone = refreshPr();
+      if (gone !== null) return gone;
       if (pr.head !== head) {
         deps.log(`head moved ${short} -> ${pr.head.slice(0, 8)} before it could count; watching the new head.`);
         switchHead(pr.head);
-        continue;
+        return undefined;
       }
       deps.log(`head ${short} reviewed ("${status.description}").`);
       return 0;
@@ -216,35 +256,55 @@ export async function awaitReview(deps, opts = {}) {
       deps.log(`head ${short} is NOT reviewed: ${state}${status ? ` ("${status.description}")` : ""}.`);
       return 2;
     }
-    if (deps.now() - start > timeoutMs) {
-      deps.log(`timed out; head ${short} still ${state}.`);
+    // Re-check the PR at the moment of giving up: two sleeps (after a review
+    // request, and after a gh failure) are not followed by refreshPr(), so a
+    // PR closed during one must still report 4, not 1.
+    // A budget exit on a head that has since moved is not a failure: the new
+    // head gets CodeRabbit's automatic review, so watch it instead. The
+    // timeout exit does not do this -- it bounds the whole run, not one head.
+    const giveUp = (message, { watchMovedHead = false } = {}) => {
+      const gone = refreshPr();
+      if (gone !== null) return gone;
+      if (watchMovedHead && pr.head !== head) {
+        deps.log(`head moved ${short} -> ${pr.head.slice(0, 8)}; watching the new head.`);
+        switchHead(pr.head);
+        return undefined;
+      }
+      deps.log(message);
       return 1;
+    };
+    if (deps.now() - start > timeoutMs) {
+      return giveUp(`timed out; head ${short} still ${state}.`);
     }
 
-    if (state === "rate_limited" || state === "failed") {
+    if (state === "rate_limited" || state === "failed" || state === "stalled") {
       if (requests >= maxRequests) {
-        deps.log(`re-requested ${requests} times and head ${short} is still ${state}; giving up.`);
-        return 1;
+        return giveUp(`re-requested ${requests} times and head ${short} is still ${state}; giving up.`, {
+          watchMovedHead: true,
+        });
       }
       const wait =
-        (state === "rate_limited" && parseCooldownMs(deps.getLatestRateLimitComment())) || DEFAULT_COOLDOWN_MS;
+        (state === "rate_limited" && parseCooldownMs(deps.getLatestRateLimitComment()?.body)) || DEFAULT_COOLDOWN_MS;
       deps.log(`head ${short} ${state}; waiting ${Math.round(wait / 60_000)} min for the cooldown.`);
       await deps.sleep(wait);
       // The author may have pushed during the wait; a review request then
       // targets the new head, which CodeRabbit is already reviewing on its own.
-      pr = deps.getPr();
+      const gone = refreshPr();
+      if (gone !== null) return gone;
       if (pr.head !== head) {
         deps.log(`head moved ${short} -> ${pr.head.slice(0, 8)} during the wait; watching the new head.`);
         switchHead(pr.head);
-        continue;
+        return undefined;
       }
-      deps.requestReview();
+      // Counted BEFORE the call: a request that posts and then throws must
+      // still spend budget, or a flaky `gh` could exceed maxRequests.
       requests += 1;
+      deps.requestReview();
       deps.log(`posted @coderabbitai review (${requests}/${maxRequests}).`);
       // Give CodeRabbit time to replace the rate-limited status before re-reading
       // it; otherwise the old status triggers a second request at once.
       await deps.sleep(Math.max(pollMs, 2 * 60_000));
-      continue;
+      return undefined;
     }
 
     if (state === "none" && deps.reviewInProgressElsewhere(head)) {
@@ -252,23 +312,30 @@ export async function awaitReview(deps, opts = {}) {
       // nothing else is running, or a slow review costs a wasted request.
       headSeenAt = deps.now();
     } else if (state === "none" && deps.now() - headSeenAt > noStatusGraceMs) {
+      if (requests >= maxRequests) {
+        return giveUp(
+          `no CodeRabbit status on ${short} and the re-request budget (${maxRequests}) is spent; giving up.`,
+          { watchMovedHead: true },
+        );
+      }
       deps.log(
         `no CodeRabbit status on ${short} after ${Math.round(noStatusGraceMs / 60_000)} min; requesting a review.`,
       );
-      if (requests >= maxRequests) return 1;
-      deps.requestReview();
       requests += 1;
+      deps.requestReview();
       headSeenAt = deps.now();
     } else if (state === "unknown") {
       deps.log(`unrecognised CodeRabbit status "${status.description}" on ${short}; still waiting.`);
     }
 
     await deps.sleep(pollMs);
-    pr = deps.getPr();
+    const gone = refreshPr();
+    if (gone !== null) return gone;
     if (pr.head !== head) {
       deps.log(`head moved ${short} -> ${pr.head.slice(0, 8)}; watching the new head.`);
       switchHead(pr.head);
     }
+    return undefined;
   }
 }
 

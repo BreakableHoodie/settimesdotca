@@ -252,26 +252,21 @@ Canonical active roadmap: `docs/ROADMAP.md`. Use it for handoffs between Claude,
 - **Storage**: Cloudflare R2 (band photos)
 - **Email**: Postmark/Resend/MailChannels
 - **Tests**: Vitest (unit, frontend), Playwright (E2E + a11y + visual regression)
-- **CI/CD**: GitHub Actions (10 workflows), Dependabot, Snyk, GitGuardian, CodeRabbit
-  - **Runners are self-hosted** (2026-09-23): every job reads
-    `runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}`, and the repo variable
-    `RUNS_ON=self-hosted` routes it to ephemeral Ubuntu 24.04 containers on
-    Dre's homelab (host `lenny`; `pickles` CT 108 is a cold standby), one fresh
-    container per job.
-    **Kill switch:** `gh variable delete RUNS_ON` returns every job to
-    GitHub-hosted runners with no code change. **Two jobs stay hosted on
-    purpose:** `zap-baseline.yml` (needs Docker; job containers have no socket)
-    and `quality.yml`'s **Lighthouse CI** (its 0.90 floor was calibrated on
-    hosted hardware; on a shared self-hosted box it scored 0.80 against 0.93 for
-    identical code). Visual snapshots do run self-hosted, and the runner image
-    matches `ubuntu-latest` fonts, so compare them only against self-hosted runs.
-    Runner setup, hosts and the failback procedure live in the private
+- **CI/CD**: GitHub Actions (13 workflows), Dependabot, Snyk, GitGuardian, CodeRabbit
+  - **Runners are GitHub-hosted again** (2026-09-25, when the repo went public).
+    Every job still reads `runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}`,
+    and the repo variable `RUNS_ON` is **deleted**. From 2026-09-23 to
+    2026-09-25, while the repo was private, `RUNS_ON=self-hosted` routed jobs to
+    ephemeral containers on Dre's homelab; setup and failback live in the private
     `BreakableHoodie/gh-runner` repo.
+    **Never set `RUNS_ON` while this repo is public.** Anyone can open a fork PR
+    here, and a self-hosted runner would execute that code inside the homelab.
+    The runner sync also stops runners for public repos, so a stray `RUNS_ON`
+    would queue every job forever rather than run it.
   (`codeql.yml`, `secret-scan.yml` and `dependency-review.yml` were removed
-  2026-09-16; `semgrep.yml` was removed the same day and **rebuilt** in #1173 —
-  it still runs Semgrep SAST, but gates in the job itself instead of uploading
-  SARIF to GitHub code scanning. Name the **files**, not the tools: gitleaks still runs inside
-  CodeRabbit — see "The security tooling this repo actually has" under Security
+  2026-09-16 when the repo went private and **restored 2026-09-25** when it went
+  public again; `semgrep.yml` was **rebuilt** in #1173 and gates in the job
+  itself — see "The security tooling this repo actually has" under Security
   Notes)
 
 ---
@@ -1257,19 +1252,25 @@ gh pr create --label "bug,priority:p1"   # example
 
 ### The security tooling this repo actually has (2026-09-16)
 
-Four workflows were removed on 2026-09-16 — `codeql.yml`, `secret-scan.yml`
-(gitleaks), `semgrep.yml` and `dependency-review.yml`. **None of them could work
-any more, and every one had been failing on every PR.** This repository went
-private that day, and on the **Free** plan a private repo has no GitHub Advanced
-Security, which is what all four ultimately depended on: three wrote to code
-scanning, and `dependency-review` says so in its own error — *"Dependency review
-is not supported on this repository ... along with GitHub Advanced Security"*.
+**Restored 2026-09-25, when the repo went public again:** `codeql.yml`,
+`secret-scan.yml` (gitleaks) and `dependency-review.yml`, unchanged from their
+last working versions. `protect-main` requires the **"Detect Secrets
+(gitleaks)"** check, so that workflow must exist. When the rulesets came back
+into force with it missing, every PR to `main` waited on a check that could
+never run. **If the repo goes private again, remove that check from the ruleset
+in the same change that deletes the workflow.**
 
-**A permanently red check is worse than no check.** It is the mirror image of the
-green-means-did-not-look class catalogued elsewhere in this file: red that always
+The history below is kept because it happens again whenever the repo goes
+private. On the **Free** plan a private repo has no GitHub Advanced Security.
+The job logs recorded in #1174 show how each one failed. CodeQL's SARIF upload
+needs code scanning. gitleaks' scan completed (*"is an individual user. No
+license key is required"*), but the action's next API call returned `403`
+(job `104837284604`). dependency-review is refused outright (*"Dependency
+review is not supported on this repository ... along with GitHub Advanced
+Security"*). All three failed on every PR and were removed on 2026-09-16. **A permanently red check is worse than no check.** Red that always
 means nothing teaches you to stop reading red.
 
-**What still runs, each verified on a private Free-plan repo rather than assumed:**
+**What ran while the repo was private, each verified on a private Free-plan repo rather than assumed.** All of it still runs:
 
 | Concern | Covered by | How we know it works here |
 |---|---|---|

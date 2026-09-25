@@ -248,6 +248,15 @@ describe("awaitReview", () => {
     expect(deps.calls.requests).toBe(0);
   });
 
+  it("reports 4, not 1, when the PR closed during the post-request sleep and the budget is then spent", async () => {
+    // The sleep after posting a request is not followed by refreshPr(), so
+    // only the give-up path can notice the PR is gone.
+    let reads = 0;
+    const deps = fakeDeps({ statuses: [RATE_LIMITED], prState: () => (++reads > 2 ? "CLOSED" : "OPEN") });
+    expect(await awaitReview(deps, { pollMs: 1000, maxRequests: 1 })).toBe(4);
+    expect(deps.calls.requests).toBe(1);
+  });
+
   it("gives up with a reason, not silently, when no status appears and the budget is spent", async () => {
     const deps = fakeDeps({ statuses: [null] });
     expect(await awaitReview(deps, { pollMs: 60_000, noStatusGraceMs: 90_000, maxRequests: 1 })).toBe(1);

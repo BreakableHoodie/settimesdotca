@@ -256,15 +256,22 @@ export async function awaitReview(deps, opts = {}) {
       deps.log(`head ${short} is NOT reviewed: ${state}${status ? ` ("${status.description}")` : ""}.`);
       return 2;
     }
-    if (deps.now() - start > timeoutMs) {
-      deps.log(`timed out; head ${short} still ${state}.`);
+    // Re-check the PR at the moment of giving up: two sleeps (after a review
+    // request, and after a gh failure) are not followed by refreshPr(), so a
+    // PR closed during one must still report 4, not 1.
+    const giveUp = (message) => {
+      const gone = refreshPr();
+      if (gone !== null) return gone;
+      deps.log(message);
       return 1;
+    };
+    if (deps.now() - start > timeoutMs) {
+      return giveUp(`timed out; head ${short} still ${state}.`);
     }
 
     if (state === "rate_limited" || state === "failed" || state === "stalled") {
       if (requests >= maxRequests) {
-        deps.log(`re-requested ${requests} times and head ${short} is still ${state}; giving up.`);
-        return 1;
+        return giveUp(`re-requested ${requests} times and head ${short} is still ${state}; giving up.`);
       }
       const wait =
         (state === "rate_limited" && parseCooldownMs(deps.getLatestRateLimitComment()?.body)) || DEFAULT_COOLDOWN_MS;
@@ -296,8 +303,9 @@ export async function awaitReview(deps, opts = {}) {
       headSeenAt = deps.now();
     } else if (state === "none" && deps.now() - headSeenAt > noStatusGraceMs) {
       if (requests >= maxRequests) {
-        deps.log(`no CodeRabbit status on ${short} and the re-request budget (${maxRequests}) is spent; giving up.`);
-        return 1;
+        return giveUp(
+          `no CodeRabbit status on ${short} and the re-request budget (${maxRequests}) is spent; giving up.`,
+        );
       }
       deps.log(
         `no CodeRabbit status on ${short} after ${Math.round(noStatusGraceMs / 60_000)} min; requesting a review.`,

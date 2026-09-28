@@ -272,6 +272,15 @@ Canonical active roadmap: `docs/ROADMAP.md`. Use it for handoffs between Claude,
   public again; `semgrep.yml` was **rebuilt** in #1173 and gates in the job
   itself — see "The security tooling this repo actually has" under Security
   Notes)
+  - **Dependabot merges do not deploy on their own** (#1209). Auto-merge uses
+    `GITHUB_TOKEN`, and GitHub starts no push workflows for a push made with it.
+    `deploy-reconcile.yml` runs every 30 minutes and dispatches the production
+    deploy for any `main` HEAD without one (`workflow_dispatch` *is* allowed
+    from that token). It waits 10 minutes so it cannot race, and cancel, a
+    human merge's own deploy, and it **never re-dispatches after a real
+    failure**, so a broken deploy cannot loop. It also recovers a deploy killed
+    by `cancel-in-progress`. Push-only scans (Semgrep full-tree, CodeQL on push)
+    still do not run for bot merges; the PR runs covered the same content.
 
 ---
 

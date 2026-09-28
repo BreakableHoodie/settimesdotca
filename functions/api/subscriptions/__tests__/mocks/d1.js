@@ -275,13 +275,14 @@ export class MockD1Database {
       results = results.filter((e) => e.city?.toLowerCase() === city.toLowerCase());
     }
 
-    if (queryLower.includes("lower(bp.genre) = lower(?)") || queryLower.includes("lower(b.genre) = lower(?)")) {
+    // Mirrors `instr(LOWER(bp.genre), LOWER(?)) > 0` — a substring match (#1214).
+    if (queryLower.includes("instr(lower(bp.genre), lower(?)) > 0")) {
       const genre = params[paramIndex];
       results = results.filter((event) => {
         const performances = this.data.performances.filter((p) => p.event_id === event.id);
         return performances.some((perf) => {
           const band = this.data.band_profiles.find((bp) => bp.id === perf.band_profile_id);
-          return band?.genre?.toLowerCase() === genre.toLowerCase();
+          return (band?.genre?.toLowerCase() ?? "").includes(genre.toLowerCase());
         });
       });
     }
@@ -327,7 +328,7 @@ export class MockD1Database {
     // Simple param extraction - check query structure
     if (
       queryLower.includes("lower(e.city) = lower(?)") &&
-      (queryLower.includes("lower(b.genre) = lower(?)") || queryLower.includes("lower(bp.genre) = lower(?)"))
+      queryLower.includes("instr(lower(bp.genre), lower(?)) > 0")
     ) {
       // Both filters present
       cityFilter = params[0];
@@ -335,7 +336,7 @@ export class MockD1Database {
     } else if (queryLower.includes("lower(e.city) = lower(?)")) {
       // Only city filter
       cityFilter = params[0];
-    } else if (queryLower.includes("lower(b.genre) = lower(?)") || queryLower.includes("lower(bp.genre) = lower(?)")) {
+    } else if (queryLower.includes("instr(lower(bp.genre), lower(?)) > 0")) {
       // Only genre filter
       genreFilter = params[0];
     }
@@ -361,7 +362,7 @@ export class MockD1Database {
       }
 
       // Apply genre filter
-      if (genreFilter && band.genre?.toLowerCase() !== genreFilter.toLowerCase()) {
+      if (genreFilter && !(band.genre?.toLowerCase() ?? "").includes(genreFilter.toLowerCase())) {
         continue;
       }
 

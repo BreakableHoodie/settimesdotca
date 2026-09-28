@@ -82,8 +82,12 @@ export async function onRequestGet(context) {
       params.push(city);
     }
 
+    // Substring, not equality (#1214): artist genres are free text ("Punk Rock",
+    // "Folk Punk", "Post-Punk"), so `?genre=punk` by equality returned a quarter of
+    // the punk acts. instr() rather than LIKE: a `%` or `_` in the query string
+    // must not act as a wildcard.
     if (genre !== "all") {
-      query += ` AND LOWER(bp.genre) = LOWER(?)`;
+      query += ` AND instr(LOWER(bp.genre), LOWER(?)) > 0`;
       params.push(genre);
     }
 

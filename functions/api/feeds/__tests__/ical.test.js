@@ -806,3 +806,41 @@ describe("GET /api/feeds/ical — after-midnight sets land on the next calendar 
     expect(events.Closer.uid).toMatch(/-2099-07-04@settimes\.ca$/);
   });
 });
+
+// #1214: genres are free text, so `?genre=punk` must match "Folk Punk" and
+// "Post-Punk", not only a genre that is exactly "Punk". Real SQLite, not the
+// mock: the mock re-implements the filter in JS and cannot prove the SQL.
+describe("GET /api/feeds/ical — genre filter matches within free-text genres (#1214)", () => {
+  const seed = (rawDb) => {
+    const event = insertEvent(rawDb, { name: "Genre Fest", slug: "genre-fest", date: "2099-07-04" });
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
+    const venue = insertVenue(rawDb, { name: "Blue Room" });
+    const band = (name, genre, start_time) =>
+      insertBand(rawDb, { name, event_id: event.id, venue_id: venue.id, start_time, end_time: "23:00", genre });
+    band("Folky", "Folk Punk", "19:00");
+    band("Posty", "Post-Punk", "20:00");
+    band("Doomy", "Death Metal", "21:00");
+  };
+
+  const summaries = async (env, qs) => {
+    const res = await onRequestGet({ request: new Request(`https://example.test/api/feeds/ical${qs}`), env });
+    expect(res.status).toBe(200);
+    return [...(await res.text()).matchAll(/^SUMMARY:(.*)$/gm)].map((m) => m[1].trim());
+  };
+
+  test("?genre=punk includes every genre containing 'punk', and nothing else", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    seed(rawDb);
+
+    expect((await summaries(env, "?genre=punk")).sort()).toEqual(["Folky", "Posty"]);
+  });
+
+  test("a SQL wildcard in ?genre= is matched literally, not as 'everything'", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    seed(rawDb);
+
+    expect(await summaries(env, "?genre=%25")).toEqual([]);
+  });
+});

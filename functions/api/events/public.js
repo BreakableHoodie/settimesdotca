@@ -52,12 +52,16 @@ export async function onRequestGet(context) {
     }
 
     // Filter by genre (optimized to avoid N+1 queries)
+    // Substring, not equality (#1214): artist genres are free text ("Punk Rock",
+    // "Folk Punk", "Post-Punk"), so `?genre=punk` by equality returned a quarter of
+    // the punk acts. instr() rather than LIKE: a `%` or `_` in the query string
+    // must not act as a wildcard.
     if (genre !== "all") {
       query += ` AND EXISTS (
         SELECT 1 FROM performances p2
         JOIN band_profiles bp ON p2.band_profile_id = bp.id
         WHERE p2.event_id = e.id
-        AND LOWER(bp.genre) = LOWER(?)
+        AND instr(LOWER(bp.genre), LOWER(?)) > 0
       )`;
       params.push(genre);
     }

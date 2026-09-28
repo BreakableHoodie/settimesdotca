@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { onRequestGet } from "../public.js";
 import { MockD1Database } from "../../subscriptions/__tests__/mocks/d1.js";
 import { createMockEvent, createMockVenue, createMockBand, seedMockData } from "./helpers.js";
+import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../test-utils.js";
 
 // Generates `count` unique, published, upcoming events (distinct future dates)
 // so tests can distinguish "default limit applied" from "all rows returned".
@@ -451,5 +452,44 @@ describe("GET /api/events/public", () => {
       expect(response.status).toBe(200);
       expect(data.events[0].poster_url).toBeNull();
     });
+  });
+});
+
+// #1214: genres are free text, so `?genre=punk` must match an event whose act is
+// "Post-Punk", not only one whose act is exactly "Punk". Real SQLite, not the
+// mock: the mock re-implements the filter in JS and cannot prove the SQL.
+describe("GET /api/events/public — genre filter matches within free-text genres (#1214)", () => {
+  const seed = (rawDb) => {
+    const venue = insertVenue(rawDb, { name: "Blue Room" });
+    for (const [slug, genre, date] of [
+      ["post-punk-night", "Post-Punk", "2099-07-04"],
+      ["metal-night", "Death Metal", "2099-07-05"],
+    ]) {
+      const event = insertEvent(rawDb, { name: slug, slug, date });
+      rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
+      insertBand(rawDb, { name: `${slug} act`, event_id: event.id, venue_id: venue.id, genre });
+    }
+  };
+
+  const slugsFor = async (env, qs) => {
+    const res = await onRequestGet({ request: new Request(`https://example.test/api/events/public${qs}`), env });
+    expect(res.status).toBe(200);
+    return (await res.json()).events.map((e) => e.slug);
+  };
+
+  it("?genre=punk returns the event whose act is 'Post-Punk', and not the metal one", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    seed(rawDb);
+
+    expect(await slugsFor(env, "?genre=punk")).toEqual(["post-punk-night"]);
+  });
+
+  it("a SQL wildcard in ?genre= is matched literally, not as 'everything'", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    seed(rawDb);
+
+    expect(await slugsFor(env, "?genre=%25")).toEqual([]);
   });
 });

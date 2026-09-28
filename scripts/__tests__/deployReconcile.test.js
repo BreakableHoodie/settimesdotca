@@ -105,6 +105,20 @@ describe("main", () => {
     expect(calls).toContain("dispatch");
   });
 
+  it("does not dispatch when main moved between the decision and the dispatch", () => {
+    const calls = [];
+    const heads = [HEAD, "newer-sha"];
+    const code = main([], {
+      getHead: () => ({ sha: heads.shift(), updatedAt: OLD_COMMIT }),
+      getRuns: () => [],
+      dispatch: () => calls.push("dispatch"),
+      log: (message) => calls.push(message),
+    });
+    expect(code).toBe(0);
+    expect(calls).not.toContain("dispatch");
+    expect(calls.some((m) => m.startsWith("skip: main moved"))).toBe(true);
+  });
+
   it("--dry-run decides but never dispatches", () => {
     const calls = [];
     const code = main(["--dry-run"], {

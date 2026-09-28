@@ -97,6 +97,14 @@ export function main(argv, deps) {
     runtime.log(`${decision.action}: ${decision.reason}`);
 
     if (decision.action === "dispatch" && !dryRun) {
+      // `--ref main` deploys whatever main is NOW. If main moved since the
+      // decision, the new commit's own push deploy may be running, and a
+      // dispatch would cancel it (cancel-in-progress). Leave it to the next run.
+      const current = runtime.getHead().sha;
+      if (current !== head.sha) {
+        runtime.log(`skip: main moved ${head.sha.slice(0, 8)} -> ${current.slice(0, 8)} before dispatch`);
+        return 0;
+      }
       runtime.dispatch();
       runtime.log("dispatched cloudflare-pages.yml for main");
     }

@@ -173,7 +173,25 @@ export async function awaitReview(deps, opts = {}) {
     }
     return null;
   };
-  const initial = refreshPr();
+  let ghFailures = 0;
+  const handleGhFailure = async (err) => {
+    ghFailures += 1;
+    // --once is a quick read: retrying would turn it into a five-minute one.
+    if (once || ghFailures >= MAX_CONSECUTIVE_GH_FAILURES) throw err;
+    deps.log(`gh failed (${ghFailures}/${MAX_CONSECUTIVE_GH_FAILURES}): ${String(err.stderr || err.message).trim()}`);
+    await deps.sleep(pollMs);
+  };
+  let initial;
+  for (;;) {
+    try {
+      initial = refreshPr();
+      // A success ends the streak, so the poll loop starts with a full budget.
+      ghFailures = 0;
+      break;
+    } catch (err) {
+      await handleGhFailure(err);
+    }
+  }
   if (initial !== null) return initial;
 
   let head = pr.head;
@@ -183,14 +201,16 @@ export async function awaitReview(deps, opts = {}) {
   // Every piece of PER-HEAD state resets here and only here. The three
   // head-change paths each once reset it by hand, and one forgot the skip
   // timer (#1200 review), letting an old head's skip time shorten the new
-  // head's settle period. Add new per-head state to this function.
+  // head's settle period. The request budget is per-head too: carried over,
+  // a spent budget made the new head give up before one request (#1201
+  // review). Add new per-head state to this function.
   const switchHead = (newHead) => {
     head = newHead;
+    requests = 0;
     headSeenAt = deps.now();
     skippedSince = null;
   };
   let lastReported = "";
-  let ghFailures = 0;
 
   for (;;) {
     try {
@@ -200,11 +220,7 @@ export async function awaitReview(deps, opts = {}) {
       ghFailures = 0;
       if (code !== undefined) return code;
     } catch (err) {
-      ghFailures += 1;
-      // --once is a quick read: retrying would turn it into a five-minute one.
-      if (once || ghFailures >= MAX_CONSECUTIVE_GH_FAILURES) throw err;
-      deps.log(`gh failed (${ghFailures}/${MAX_CONSECUTIVE_GH_FAILURES}): ${String(err.stderr || err.message).trim()}`);
-      await deps.sleep(pollMs);
+      await handleGhFailure(err);
     }
   }
 
@@ -246,6 +262,13 @@ export async function awaitReview(deps, opts = {}) {
     if (state === "skipped") {
       skippedSince ??= deps.now();
       if (once || deps.now() - skippedSince >= SKIP_SETTLE_MS) {
+        const gone = refreshPr();
+        if (gone !== null) return gone;
+        if (pr.head !== head) {
+          deps.log(`head moved ${short} -> ${pr.head.slice(0, 8)}; watching the new head.`);
+          switchHead(pr.head);
+          return undefined;
+        }
         deps.log(`head ${short} was SKIPPED by CodeRabbit ("${status.description}"). No review will come.`);
         return 3;
       }

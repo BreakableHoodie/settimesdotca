@@ -4,6 +4,7 @@ import {
   DEFAULT_COOLDOWN_MS,
   MAX_CONSECUTIVE_GH_FAILURES,
   MAX_COOLDOWN_MS,
+  SKIP_SETTLE_MS,
   STALE_IN_PROGRESS_MS,
   awaitReview,
   classifyStatus,
@@ -196,6 +197,22 @@ describe("awaitReview", () => {
     expect(await awaitReview(deps, { pollMs: 1000 })).toBe(0);
   });
 
+  it("retries a transient gh failure during the initial PR read", async () => {
+    const deps = fakeDeps({ statuses: [COMPLETED] });
+    const getPr = deps.getPr;
+    let failed = false;
+    deps.getPr = () => {
+      if (!failed) {
+        failed = true;
+        throw new Error("HTTP 502");
+      }
+      return getPr();
+    };
+
+    expect(await awaitReview(deps, { pollMs: 1000 })).toBe(0);
+    expect(deps.calls.logs.filter((m) => m.includes("gh failed (1/")).length).toBe(1);
+  });
+
   it("gives up (throws, so main exits 4) after consecutive gh failures", async () => {
     const deps = fakeDeps({ statuses: [new Error("HTTP 502")] });
     await expect(awaitReview(deps, { pollMs: 1000 })).rejects.toThrow("HTTP 502");
@@ -267,6 +284,35 @@ describe("awaitReview", () => {
     expect(await awaitReview(deps, { pollMs: 1000, maxRequests: 1 })).toBe(0);
     expect(deps.calls.requests).toBe(1);
     expect(deps.calls.statusShas.at(-1)).toBe("new00000");
+  });
+
+  it("resets the request budget when a budget exit switches to a new head", async () => {
+    const deps = fakeDeps({
+      statuses: [RATE_LIMITED, RATE_LIMITED, RATE_LIMITED, COMPLETED],
+      heads: ["old00000", "old00000", "new00000", "new00000"],
+    });
+    expect(await awaitReview(deps, { pollMs: 1000, maxRequests: 1 })).toBe(0);
+    expect(deps.calls.requests).toBe(2);
+    expect(deps.calls.statusShas.at(-1)).toBe("new00000");
+  });
+
+  it("rechecks a settled skip before returning when the head moved", async () => {
+    const SKIPPED = { state: "success", description: "Review skipped" };
+    const deps = fakeDeps({
+      statuses: [SKIPPED, SKIPPED, COMPLETED],
+      heads: ["old00000", "old00000", "new00000"],
+    });
+    expect(await awaitReview(deps, { pollMs: SKIP_SETTLE_MS })).toBe(0);
+    expect(deps.calls.statusShas.at(-1)).toBe("new00000");
+  });
+
+  it("rechecks a settled skip before returning when the PR closed", async () => {
+    const SKIPPED = { state: "success", description: "Review skipped" };
+    const deps = fakeDeps({
+      statuses: [SKIPPED, SKIPPED],
+      prState: (i) => (i > 1 ? "CLOSED" : "OPEN"),
+    });
+    expect(await awaitReview(deps, { pollMs: SKIP_SETTLE_MS })).toBe(4);
   });
 
   it("gives up with a reason, not silently, when no status appears and the budget is spent", async () => {

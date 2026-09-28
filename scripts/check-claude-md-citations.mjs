@@ -30,10 +30,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
  * reader can check. Deleting an entry is how you re-open the question.
  */
 const KNOWN_ABSENT = new Map([
-  ["codeql.yml", "removed 2026-09-16; no GHAS on a private Free-plan repo"],
-  ["secret-scan.yml", "removed 2026-09-16; gitleaks now runs inside CodeRabbit"],
   ["semgrep.yml", "removed 2026-09-16; documented as leaving a false-green check (#1173)"],
-  ["dependency-review.yml", "removed 2026-09-16; unsupported without GHAS"],
   ["relay.mjs", "opencode-delegate is per-machine and gitignored; a fresh clone has none"],
   ["result.json", "runtime artifact a delegation writes; never committed"],
   ["DataGapFilter.jsx", "superseded by LinksColumnFilter.jsx; cited as history"],

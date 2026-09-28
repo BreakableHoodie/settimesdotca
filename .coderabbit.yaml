@@ -237,8 +237,8 @@ reviews:
       enabled: true
     # Default-on in the schema; pinned here because the repo relies on them.
     # shellcheck mirrors `make lint-sh` (.githooks/* and scripts/*.sh).
-    # zizmor is the only Actions-security analyser left since codeql.yml was
-    # removed (2026-09-16) — it complements the SHA-pinning rule above.
+    # zizmor is the only Actions-security analyser: codeql.yml scans
+    # JavaScript only. It complements the SHA-pinning rule above.
     shellcheck:
       enabled: true
     zizmor:

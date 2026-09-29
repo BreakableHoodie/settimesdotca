@@ -54,7 +54,8 @@ export const MAX_CONSECUTIVE_GH_FAILURES = 5;
 
 /**
  * Map the latest `CodeRabbit` commit status on a SHA to a state.
- * Descriptions seen on this repo: "Review in progress", "Review completed".
+ * Descriptions seen on this repo: "Review in progress", "Review completed",
+ * and "Review paused" (#1210).
  * "Review rate limited" is from CodeRabbit's docs, not yet observed here —
  * hence the loose /rate.?limit/ match rather than an exact string.
  */
@@ -62,6 +63,7 @@ export function classifyStatus(status) {
   if (!status) return "none";
   const d = String(status.description || "");
   if (/rate.?limit/i.test(d)) return "rate_limited";
+  if (/review paused/i.test(d)) return "paused";
   if (/review completed/i.test(d)) return "reviewed";
   if (/skip/i.test(d)) return "skipped";
   if (status.state === "error" || status.state === "failure") return "failed";
@@ -198,6 +200,7 @@ export async function awaitReview(deps, opts = {}) {
   let requests = 0;
   let headSeenAt = deps.now();
   let skippedSince = null;
+  let pausedRequestPosted = false;
   // Every piece of PER-HEAD state resets here and only here. The three
   // head-change paths each once reset it by hand, and one forgot the skip
   // timer (#1200 review), letting an old head's skip time shorten the new
@@ -209,6 +212,7 @@ export async function awaitReview(deps, opts = {}) {
     requests = 0;
     headSeenAt = deps.now();
     skippedSince = null;
+    pausedRequestPosted = false;
   };
   let lastReported = "";
 
@@ -298,6 +302,29 @@ export async function awaitReview(deps, opts = {}) {
     };
     if (deps.now() - start > timeoutMs) {
       return giveUp(`timed out; head ${short} still ${state}.`);
+    }
+
+    if (state === "paused" && !pausedRequestPosted) {
+      if (requests >= maxRequests) {
+        return giveUp(`re-requested ${requests} times and head ${short} is still paused; giving up.`, {
+          watchMovedHead: true,
+        });
+      }
+      // A paused review is not rate-limited, so request immediately. Re-check
+      // first: a push while paused must not request the old head (#1210).
+      const gone = refreshPr();
+      if (gone !== null) return gone;
+      if (pr.head !== head) {
+        deps.log(`head moved ${short} -> ${pr.head.slice(0, 8)}; watching the new head.`);
+        switchHead(pr.head);
+        return undefined;
+      }
+      // Counted BEFORE the call, like the rate-limit path: a thrown request
+      // still consumed budget, and this head must not be retried endlessly.
+      requests += 1;
+      pausedRequestPosted = true;
+      deps.requestReview();
+      deps.log(`posted @coderabbitai review (${requests}/${maxRequests}).`);
     }
 
     if (state === "rate_limited" || state === "failed" || state === "stalled") {

@@ -12,6 +12,7 @@ import {
 } from "../coderabbit-await-review.mjs";
 
 const RATE_LIMITED = { state: "success", description: "Review rate limited" };
+const PAUSED = { state: "success", description: "Review paused" };
 const COMPLETED = { state: "success", description: "Review completed" };
 const IN_PROGRESS = { state: "pending", description: "Review in progress" };
 const RL_COMMENT = "Rate limit exceeded. Please wait **21 minutes and 50 seconds** before requesting another review.";
@@ -65,6 +66,10 @@ describe("classifyStatus: a passing check is not a review", () => {
     expect(classifyStatus(RATE_LIMITED)).toBe("rate_limited");
   });
 
+  it("reads CodeRabbit's PASSING paused status as paused, never reviewed", () => {
+    expect(classifyStatus(PAUSED)).toBe("paused");
+  });
+
   it("reads 'Review completed' as reviewed", () => {
     expect(classifyStatus(COMPLETED)).toBe("reviewed");
   });
@@ -97,6 +102,34 @@ describe("parseCooldownMs", () => {
 });
 
 describe("awaitReview", () => {
+  it("requests a paused head once, then succeeds on the completed review", async () => {
+    const deps = fakeDeps({ statuses: [PAUSED, COMPLETED] });
+    expect(await awaitReview(deps, { pollMs: 1000 })).toBe(0);
+    expect(deps.calls.requests).toBe(1);
+  });
+
+  it("does not re-request a head that stays paused across polls", async () => {
+    const deps = fakeDeps({ statuses: [PAUSED, PAUSED, PAUSED] });
+    expect(await awaitReview(deps, { pollMs: 1000, timeoutMs: 4000 })).toBe(1);
+    expect(deps.calls.requests).toBe(1);
+  });
+
+  it("--once reports a paused head as NOT reviewed and never posts a request", async () => {
+    const deps = fakeDeps({ statuses: [PAUSED] });
+    expect(await awaitReview(deps, { once: true })).toBe(2);
+    expect(deps.calls.requests).toBe(0);
+  });
+
+  it("gives a moved paused head its own single request", async () => {
+    const deps = fakeDeps({
+      statuses: [PAUSED, PAUSED, COMPLETED],
+      heads: ["old00000", "old00000", "new00000", "new00000", "new00000"],
+    });
+    expect(await awaitReview(deps, { pollMs: 1000 })).toBe(0);
+    expect(deps.calls.requests).toBe(2);
+    expect(deps.calls.statusShas).toEqual(["old00000", "new00000", "new00000"]);
+  });
+
   it("waits out a rate limit, re-requests exactly once, then succeeds on the completed review", async () => {
     const deps = fakeDeps({ statuses: [RATE_LIMITED, IN_PROGRESS, COMPLETED] });
     const code = await awaitReview(deps, { pollMs: 1000 });

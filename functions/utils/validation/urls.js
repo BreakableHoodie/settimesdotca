@@ -247,15 +247,19 @@ const BAND_LINK_FIELD_CONFIG = {
     domain: "youtube.com",
     allowedHosts: ["youtube.com", "youtu.be"],
   },
+  // Narrower than the parent domain on purpose: apple.com and spotify.com
+  // also host the App Store, support and community sites, and a link to any
+  // of those would render with the music icon (CodeRabbit on #1220). Every
+  // stored link in production is on these hosts.
   spotify: {
     maxLength: FIELD_LIMITS.bandUrl.max,
     label: "Spotify URL",
-    allowedHosts: ["spotify.com"],
+    allowedHosts: ["open.spotify.com"],
   },
   apple_music: {
     maxLength: FIELD_LIMITS.bandUrl.max,
     label: "Apple Music URL",
-    allowedHosts: ["apple.com"],
+    allowedHosts: ["music.apple.com", "itunes.apple.com"],
   },
   linktree: {
     maxLength: FIELD_LIMITS.bandUrl.max,

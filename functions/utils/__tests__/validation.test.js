@@ -666,8 +666,8 @@ describe("normalizeLinkField platform hosts (#1213)", () => {
     ["bandcamp", "https://instagram.com/foo", "Bandcamp URL", "bandcamp.com"],
     ["facebook", "https://foo.bandcamp.com/", "Facebook URL", "facebook.com"],
     ["youtube", "https://foo.bandcamp.com/", "YouTube URL", "youtube.com"],
-    ["spotify", "https://foo.bandcamp.com/", "Spotify URL", "spotify.com"],
-    ["apple_music", "https://foo.bandcamp.com/", "Apple Music URL", "apple.com"],
+    ["spotify", "https://foo.bandcamp.com/", "Spotify URL", "open.spotify.com"],
+    ["apple_music", "https://foo.bandcamp.com/", "Apple Music URL", "music.apple.com"],
     ["linktree", "https://foo.bandcamp.com/", "Linktree URL", "linktr.ee"],
   ])("rejects a cross-platform URL in the %s field", (field, value, label, domain) => {
     expect(() => bandSanitizer(field, value)).toThrow(`${label} must link to ${domain}`);
@@ -689,11 +689,19 @@ describe("normalizeLinkField platform hosts (#1213)", () => {
     ["facebook", "https://instagram.com.evil.com/x"],
     ["youtube", "https://notfacebook.com/x"],
   ])("rejects bait host %s", (field, value) => {
-    expect(() => bandSanitizer(field, value)).toThrow();
+    expect(() => bandSanitizer(field, value)).toThrow(/must link to/);
   });
 
   it.each([
-    ["apple_music", "bandcamp.com/foo", "Apple Music URL must link to apple.com"],
+    ["apple_music", "https://apps.apple.com/ca/app/x/id1", "Apple Music URL must link to music.apple.com"],
+    ["apple_music", "https://support.apple.com/en-ca/x", "Apple Music URL must link to music.apple.com"],
+    ["spotify", "https://support.spotify.com/x", "Spotify URL must link to open.spotify.com"],
+  ])("rejects a non-music subdomain of the platform in %s: %s", (field, value, message) => {
+    expect(() => bandSanitizer(field, value)).toThrow(message);
+  });
+
+  it.each([
+    ["apple_music", "bandcamp.com/foo", "Apple Music URL must link to music.apple.com"],
     ["x", "instagram.com/foo", "X / Twitter must link to x.com"],
   ])("rejects scheme-less cross-platform URL in %s", (field, value, message) => {
     const sanitizer = field === "x" ? eventSanitizer : bandSanitizer;

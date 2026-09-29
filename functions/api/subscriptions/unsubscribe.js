@@ -85,7 +85,7 @@ export async function onRequestGet(context) {
         <body>
           <div class="container">
             <h1>✓ Unsubscribed</h1>
-            <p>You've been removed from ${escapeHtml(subscription.city)} ${escapeHtml(subscription.genre)} show notifications.</p>
+            <p>You've been unsubscribed from SetTimes show announcements.</p>
             <p>You can resubscribe anytime at <a href="${escapeHtml(env.PUBLIC_URL)}/subscribe" style="color: #f97316;">${escapeHtml(env.PUBLIC_URL)}/subscribe</a></p>
           </div>
         </body>

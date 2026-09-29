@@ -113,8 +113,8 @@ describe("GET /api/subscriptions/unsubscribe", () => {
 
     const html = await response.text();
     expect(html).toContain("Unsubscribed");
-    expect(html).toContain("portland");
-    expect(html).toContain("punk");
+    expect(html).toContain("unsubscribed from SetTimes show announcements");
+    expect(html).not.toContain("all all");
     expect(html).toContain("example.com/subscribe");
   });
 });

@@ -5,7 +5,6 @@ import { generateToken } from "../../utils/tokens.js";
 import { sendEmail, isEmailConfigured } from "../../utils/email.js";
 import { isValidEmail } from "../../utils/validation.js";
 import { verifyTurnstile } from "../../utils/turnstile.js";
-import { escapeHtml } from "../../utils/html.js";
 import { getPublicBaseUrl } from "../../utils/publicUrl.js";
 import { parseJsonObjectBody } from "../../utils/request.js";
 
@@ -40,21 +39,15 @@ export async function onRequestPost(context) {
       });
     }
     const email = typeof body.email === "string" ? body.email.trim() : "";
-    const city = typeof body.city === "string" ? body.city.trim() : "";
-    const genre = typeof body.genre === "string" ? body.genre.trim() : "";
-    const frequency = typeof body.frequency === "string" ? body.frequency.trim().toLowerCase() : "";
+    const city = typeof body.city === "string" && body.city.trim() ? body.city.trim() : "all";
+    const genre = typeof body.genre === "string" && body.genre.trim() ? body.genre.trim() : "all";
+    const frequency =
+      typeof body.frequency === "string" && body.frequency.trim() ? body.frequency.trim().toLowerCase() : "weekly";
     const turnstileToken = body.turnstileToken;
 
     // Validation
     if (!email || email.length > MAX_EMAIL_LENGTH || !isValidEmail(email)) {
       return new Response(JSON.stringify({ error: "Invalid email address" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    if (!city || !genre || !frequency) {
-      return new Response(JSON.stringify({ error: "Missing required fields" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
       });
@@ -109,7 +102,7 @@ export async function onRequestPost(context) {
         );
       } else {
         // Re-send verification email
-        const emailResult = await sendVerificationEmail(env, email, city, genre, existing[0].verification_token);
+        const emailResult = await sendVerificationEmail(env, email, existing[0].verification_token);
 
         if (!emailResult.delivered && emailResult.reason === "not_configured") {
           return subscriptionResponse(
@@ -155,7 +148,7 @@ export async function onRequestPost(context) {
     }
 
     // Send verification email
-    const emailResult = await sendVerificationEmail(env, email, city, genre, verificationToken);
+    const emailResult = await sendVerificationEmail(env, email, verificationToken);
 
     if (!emailResult.delivered && emailResult.reason === "not_configured") {
       return subscriptionResponse(
@@ -186,20 +179,17 @@ export async function onRequestPost(context) {
   }
 }
 
-async function sendVerificationEmail(env, email, city, genre, token) {
+async function sendVerificationEmail(env, email, token) {
   const baseUrl = getPublicBaseUrl(env);
   // Must target the handler, functions/api/subscriptions/verify.js: a path
   // nothing serves 404s every confirmation. emailLinkTargets.test.js checks
   // that every emailed link resolves.
   const verifyUrl = `${baseUrl}/api/subscriptions/verify?token=${encodeURIComponent(token)}`;
   const subject = "Confirm your SetTimes subscription";
-  const safeCity = escapeHtml(city);
-  const safeGenre = escapeHtml(genre);
-  const text = `Please confirm your subscription.\n\nVerify: ${verifyUrl}\n\nCity: ${city}\nGenre: ${genre}`;
+  const text = `Please confirm your subscription to SetTimes show announcements.\n\nVerify: ${verifyUrl}`;
   const html = `
-    <p>Please confirm your subscription.</p>
+    <p>Please confirm your subscription to SetTimes show announcements.</p>
     <p><a href="${verifyUrl}">Verify your email</a></p>
-    <p>City: ${safeCity}<br/>Genre: ${safeGenre}</p>
   `.trim();
 
   if (isEmailConfigured(env)) {

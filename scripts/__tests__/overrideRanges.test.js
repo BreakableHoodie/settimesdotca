@@ -70,6 +70,7 @@ function scanLockfile(lock, lockfile) {
   for (const [dependentPath, dependent] of Object.entries(packages)) {
     for (const [kind, dependencies] of Object.entries({
       dependencies: dependent?.dependencies,
+      optionalDependencies: dependent?.optionalDependencies,
       peerDependencies: dependent?.peerDependencies,
     })) {
       for (const [dependencyName, declaredRange] of Object.entries(dependencies ?? {})) {
@@ -80,10 +81,17 @@ function scanLockfile(lock, lockfile) {
         if (!resolved || typeof resolved.entry.version !== "string") continue;
         examinedEdges += 1;
 
-        if (dependencyName === "eslint" && ESLINT_10_PEER_ALLOWLIST.has(posix.basename(dependentPath))) {
+        // Only the documented case: a PEER edge from one of these plugins, with
+        // eslint 10 installed. eslint 11, or a non-peer edge, is scanned as usual.
+        if (
+          kind === "peerDependencies" &&
+          dependencyName === "eslint" &&
+          ESLINT_10_PEER_ALLOWLIST.has(posix.basename(dependentPath)) &&
+          semver.major(resolved.entry.version) === 10
+        ) {
           continue;
         }
-        if (!semver.satisfies(resolved.entry.version, declaredRange, { includePrerelease: true })) {
+        if (!semver.satisfies(resolved.entry.version, declaredRange)) {
           violations.push({
             lockfile,
             dependent: dependentPath || ".",
@@ -127,6 +135,38 @@ describe("dependency overrides stay within dependent ranges", () => {
     const live = new Set(violations().map(conflictKey));
     const stale = Object.keys(KNOWN_OVERRIDE_CONFLICTS).filter((key) => !live.has(key));
     expect(stale, `No longer out of range; delete from KNOWN_OVERRIDE_CONFLICTS:\n  ${stale.join("\n  ")}`).toEqual([]);
+  });
+
+  // One case per review finding on #1222, each built so the real lockfiles
+  // (which contain none of these shapes today) cannot hide a regression.
+  const scanOne = (packages) => scanLockfile({ packages }, "synthetic/package-lock.json").violations;
+
+  it("scans optionalDependencies, not only dependencies and peers", () => {
+    expect(
+      scanOne({
+        "node_modules/parent": { version: "1.0.0", optionalDependencies: { child: "^2.0.0" } },
+        "node_modules/child": { version: "1.0.0" },
+      }),
+    ).toEqual([expect.objectContaining({ dependency: "child", declaredRange: "^2.0.0" })]);
+  });
+
+  it("does not let a prerelease satisfy a range that did not opt into one", () => {
+    expect(
+      scanOne({
+        "node_modules/parent": { version: "1.0.0", dependencies: { child: "^1.0.0" } },
+        "node_modules/child": { version: "1.1.0-beta.1" },
+      }),
+    ).toEqual([expect.objectContaining({ dependency: "child", resolvedVersion: "1.1.0-beta.1" })]);
+  });
+
+  it("exempts only the eslint-10 PEER edge of the named plugins", () => {
+    const plugin = (kind, eslint) => ({
+      "node_modules/eslint-plugin-react": { version: "7.0.0", [kind]: { eslint: "^8 || ^9" } },
+      "node_modules/eslint": { version: eslint },
+    });
+    expect(scanOne(plugin("peerDependencies", "10.11.0"))).toEqual([]);
+    expect(scanOne(plugin("peerDependencies", "11.0.0"))).toHaveLength(1);
+    expect(scanOne(plugin("dependencies", "10.11.0"))).toHaveLength(1);
   });
 
   it("examines both lockfiles and rejects a synthetic mismatch", () => {

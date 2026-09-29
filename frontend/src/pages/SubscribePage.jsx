@@ -31,6 +31,16 @@ export default function SubscribePage() {
     document.title = PAGE_TITLE
   }, [])
 
+  // The confirmation link (GET /api/subscriptions/verify) redirects here with
+  // ?verified=true. Without this the visitor landed on a blank form with no
+  // sign that confirming had worked.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('verified') === 'true') {
+      setStatus('success')
+      setMessage("You're subscribed. Your email address is confirmed.")
+    }
+  }, [])
+
   const handleSubmit = async e => {
     e.preventDefault()
     setStatus('submitting')
@@ -185,6 +195,7 @@ export default function SubscribePage() {
             {/* Status message */}
             {message && (
               <div
+                role="status"
                 className={`p-4 rounded-lg ${
                   status === 'success' ? 'bg-success-500/20 text-text-primary' : 'bg-error-500/20 text-text-primary'
                 }`}

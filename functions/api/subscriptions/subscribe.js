@@ -188,7 +188,12 @@ export async function onRequestPost(context) {
 
 async function sendVerificationEmail(env, email, city, genre, token) {
   const baseUrl = getPublicBaseUrl(env);
-  const verifyUrl = `${baseUrl}/verify?token=${token}`;
+  // The handler is functions/api/subscriptions/verify.js. From #21 until
+  // 2026-09-29 this link pointed at a bare "/verify" path that nothing serves,
+  // so every confirmation 404'd and no subscriber could ever verify. Its tests
+  // called the handler directly and never followed the emailed link;
+  // functions/__tests__/emailLinkTargets.test.js now checks every emailed link.
+  const verifyUrl = `${baseUrl}/api/subscriptions/verify?token=${encodeURIComponent(token)}`;
   const subject = "Confirm your SetTimes subscription";
   const safeCity = escapeHtml(city);
   const safeGenre = escapeHtml(genre);

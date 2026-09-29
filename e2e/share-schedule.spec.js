@@ -78,6 +78,15 @@ test("a shared schedule link shows and imports exactly the selected stops", asyn
   const sharedContext = await browser.newContext();
   const sharedPage = await sharedContext.newPage();
   try {
+    // Give the second device a route of its own first. With an empty route,
+    // Replace and Merge end in the same state, so only a pre-existing stop can
+    // prove Replace actually replaces (CodeRabbit on #1218).
+    await sharedPage.clock.setFixedTime(new Date(`${localToday()}T18:00:00`));
+    await sharedPage.goto(`/event/${slug}`);
+    const deviceMain = sharedPage.getByRole("main");
+    await deviceMain.getByRole("button", { name: `Add ${names[2]} to my route` }).click();
+    await expect(deviceMain.getByRole("button", { name: `Remove ${names[2]} from my route` })).toBeVisible();
+
     await sharedPage.goto(shareUrl);
     const routeList = sharedPage.getByRole("list", { name: "Bands in this route" });
     const routeItems = routeList.getByRole("listitem");

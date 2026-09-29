@@ -8,10 +8,10 @@ import { escapeHtml } from "../../../utils/html.js";
 
 const htmlPage = (heading, body) =>
   new Response(
-    `<html><body style="font-family:sans-serif;padding:2rem"><h2>${heading}</h2><p>${body}</p></body></html>`,
+    `<html><head><meta charset="utf-8"></head><body style="font-family:sans-serif;padding:2rem"><h2>${heading}</h2><p>${body}</p></body></html>`,
     {
       status: 200,
-      headers: { "Content-Type": "text/html", "Cache-Control": "no-store" },
+      headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
     },
   );
 

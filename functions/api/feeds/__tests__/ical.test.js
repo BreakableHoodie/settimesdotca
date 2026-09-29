@@ -378,7 +378,7 @@ describe("GET /api/feeds/ical — day-aware performance_date (real-DB)", () => {
     expect(icalData).not.toContain(`DTSTART:${day1Compact}T140000`);
   });
 
-  test("after-midnight set (01:00) keeps day-1's calendar date in DTSTART — no +1-day sort offset applied", async () => {
+  test("after-midnight set (01:00) stored on day 1 is stamped with day 2's calendar date", async () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
 
@@ -409,11 +409,15 @@ describe("GET /api/feeds/ical — day-aware performance_date (real-DB)", () => {
     expect(response.status).toBe(200);
     const icalData = await response.text();
 
-    // Wall-clock date+time pair: day-1's calendar date with the 01:00 clock
-    // time. iCal must NOT apply prepareBands' frontend-only +1-day sort
-    // offset (that offset is for display ordering only, not wall-clock time).
-    expect(icalData).toContain(`DTSTART:${day1.replace(/-/g, "")}T010000`);
-    expect(icalData).not.toContain(`DTSTART:${day2.replace(/-/g, "")}T010000`);
+    // The stored date is the FESTIVAL day (migration 0051); a 01:00 start on
+    // the night of day 1 happens at 01:00 on day 2 by the wall clock. This test
+    // previously asserted day 1, which put every after-midnight set in
+    // subscribers' calendars the night BEFORE it happened. The UID keeps the
+    // festival date so existing calendar entries move rather than duplicate.
+    expect(icalData).toContain(`DTSTART:${day2.replace(/-/g, "")}T010000`);
+    expect(icalData).toContain(`DTEND:${day2.replace(/-/g, "")}T020000`);
+    expect(icalData).not.toContain(`DTSTART:${day1.replace(/-/g, "")}T010000`);
+    expect(icalData).toContain(`UID:performance-${lateNightPerf.id}-${day1}@settimes.ca`);
   });
 
   test("VEVENTs are ordered by festival day then by time-of-day, not interleaved by raw clock time", async () => {
@@ -732,5 +736,73 @@ describe("GET /api/feeds/ical — the calendar names itself (#1096)", () => {
 
     expect(text).toContain("X-WR-CALNAME:Kitchener Punk Shows");
     expect(disposition).toContain('filename="kitchener-punk.ics"');
+  });
+});
+
+// A set starting before AFTER_MIDNIGHT_THRESHOLD_HOUR belongs to the PREVIOUS
+// evening's festival day (CLAUDE.md "After-midnight band sorting"). The stored
+// date is the festival day, so the calendar date of a 00:25 start is the NEXT
+// day. The feed stamped it with the festival date instead, putting Vol 18's
+// closing act in subscribers' calendars the morning BEFORE the show.
+describe("GET /api/feeds/ical — after-midnight sets land on the next calendar day", () => {
+  const seed = (rawDb) => {
+    const event = insertEvent(rawDb, { name: "Late Fest", slug: "late-fest", date: "2099-07-04" });
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
+    const venue = insertVenue(rawDb, { name: "Blue Room" });
+    const set = (name, start_time, end_time) =>
+      insertBand(rawDb, { name, event_id: event.id, venue_id: venue.id, start_time, end_time });
+    set("Evening Act", "21:00", "21:45");
+    set("Straddler", "23:50", "00:20");
+    const closer = set("Closer", "00:25", "01:00");
+    rawDb.prepare("UPDATE performances SET end_time = NULL WHERE id = ?").run(closer.id);
+  };
+
+  const eventsByName = async (env) => {
+    const res = await onRequestGet({ request: new Request("https://example.test/api/feeds/ical"), env });
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    return Object.fromEntries(
+      text
+        .split("BEGIN:VEVENT")
+        .slice(1)
+        .map((block) => [
+          block.match(/^SUMMARY:(.*)$/m)[1].trim(),
+          {
+            start: block.match(/^DTSTART:(.*)$/m)[1].trim(),
+            end: block.match(/^DTEND:(.*)$/m)[1].trim(),
+            uid: block.match(/^UID:(.*)$/m)[1].trim(),
+          },
+        ]),
+    );
+  };
+
+  test("a set starting at 00:25 is dated the day AFTER the festival day", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    seed(rawDb);
+
+    const events = await eventsByName(env);
+    expect(events.Closer.start).toBe("20990705T002500");
+    // No end time: derived as start + 1h, on the same (next) calendar day.
+    expect(events.Closer.end).toBe("20990705T012500");
+  });
+
+  test("evening sets and a midnight straddle keep their existing dates", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    seed(rawDb);
+
+    const events = await eventsByName(env);
+    expect(events["Evening Act"]).toMatchObject({ start: "20990704T210000", end: "20990704T214500" });
+    expect(events.Straddler).toMatchObject({ start: "20990704T235000", end: "20990705T002000" });
+  });
+
+  test("the UID keeps the festival date, so subscribed calendars update the entry in place", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    seed(rawDb);
+
+    const events = await eventsByName(env);
+    expect(events.Closer.uid).toMatch(/-2099-07-04@settimes\.ca$/);
   });
 });

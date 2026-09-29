@@ -20,6 +20,7 @@ describe("POST /api/subscriptions/subscribe", () => {
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 
@@ -72,15 +73,75 @@ describe("POST /api/subscriptions/subscribe", () => {
     expect(data.error).toBe("Invalid email address");
   });
 
-  it("should reject request with missing city", async () => {
-    const request = createMockRequest("POST", "/api/subscriptions/subscribe", INVALID_PAYLOADS.missingCity);
+  it("should default omitted preferences for an email-only request", async () => {
+    const request = createMockRequest("POST", "/api/subscriptions/subscribe", { email: "email-only@example.com" });
+    mockContext.request = request;
+
+    const response = await onRequestPost(mockContext);
+
+    expect(response.status).toBe(201);
+    expect(mockDB.data.email_subscriptions[0]).toMatchObject({
+      email: "email-only@example.com",
+      city: "all",
+      genre: "all",
+      frequency: "weekly",
+    });
+  });
+
+  it("should default empty preferences for an email-only request", async () => {
+    const request = createMockRequest("POST", "/api/subscriptions/subscribe", {
+      email: "empty-preferences@example.com",
+      city: " ",
+      genre: "",
+      frequency: "",
+    });
+    mockContext.request = request;
+
+    const response = await onRequestPost(mockContext);
+
+    expect(response.status).toBe(201);
+    expect(mockDB.data.email_subscriptions[0]).toMatchObject({ city: "all", genre: "all", frequency: "weekly" });
+  });
+
+  it("should reject an invalid frequency when one is provided", async () => {
+    const request = createMockRequest("POST", "/api/subscriptions/subscribe", {
+      email: "invalid-frequency@example.com",
+      frequency: "yearly",
+    });
     mockContext.request = request;
 
     const response = await onRequestPost(mockContext);
 
     expect(response.status).toBe(400);
     const data = await response.json();
-    expect(data.error).toBe("Missing required fields");
+    expect(data.error).toBe("Invalid frequency value");
+    expect(mockDB.data.email_subscriptions).toHaveLength(0);
+  });
+
+  it("should send verification email copy without preference fields", async () => {
+    mockContext.env.EMAIL_PROVIDER = "mailchannels";
+    mockContext.env.EMAIL_FROM = "no-reply@example.com";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 202 })));
+    mockContext.request = createMockRequest("POST", "/api/subscriptions/subscribe", {
+      email: "copy@example.com",
+      city: "portland",
+      genre: "punk",
+      frequency: "weekly",
+    });
+
+    const response = await onRequestPost(mockContext);
+
+    expect(response.status).toBe(201);
+    const [, options] = fetch.mock.calls[0];
+    const payload = JSON.parse(options.body);
+    const text = payload.content.find(({ type }) => type === "text/plain").value;
+    const html = payload.content.find(({ type }) => type === "text/html").value;
+    expect(text).toContain("Please confirm your subscription to SetTimes show announcements.");
+    expect(html).toContain("Please confirm your subscription to SetTimes show announcements.");
+    expect(text).not.toContain("City:");
+    expect(text).not.toContain("Genre:");
+    expect(html).not.toContain("City:");
+    expect(html).not.toContain("Genre:");
   });
 
   it("should reject duplicate verified subscription", async () => {

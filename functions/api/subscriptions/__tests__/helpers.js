@@ -37,7 +37,4 @@ export const VALID_SUBSCRIPTION = {
 export const INVALID_PAYLOADS = {
   missingEmail: { city: "portland", genre: "punk", frequency: "weekly" },
   invalidEmail: { email: "not-an-email", city: "portland", genre: "punk", frequency: "weekly" },
-  missingCity: { email: "test@example.com", genre: "punk", frequency: "weekly" },
-  missingGenre: { email: "test@example.com", city: "portland", frequency: "weekly" },
-  missingFrequency: { email: "test@example.com", city: "portland", genre: "punk" },
 };

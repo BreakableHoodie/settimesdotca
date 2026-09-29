@@ -18,9 +18,6 @@ export default function SubscribePage() {
 
   const [formData, setFormData] = useState({
     email: '',
-    city: 'kitchener',
-    genre: 'all',
-    frequency: 'weekly',
   })
   const [status, setStatus] = useState('idle') // idle, submitting, success, error
   const [message, setMessage] = useState('')
@@ -60,7 +57,7 @@ export default function SubscribePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...formData,
+          email: formData.email,
           turnstileToken,
         }),
       })
@@ -70,7 +67,7 @@ export default function SubscribePage() {
       if (response.ok) {
         setStatus('success')
         setMessage('Check your email to confirm your subscription!')
-        setFormData({ email: '', city: 'kitchener', genre: 'all', frequency: 'weekly' })
+        setFormData({ email: '' })
         resetTurnstile()
       } else {
         setStatus('error')
@@ -103,7 +100,7 @@ export default function SubscribePage() {
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-text-primary mb-4">Never Miss a Show</h1>
           <p className="text-xl text-text-secondary">
-            Get weekly emails about concerts in your city. No algorithm, no ads, just shows.
+            Get an email when a lineup or set times are announced. No algorithm, no ads, just shows.
           </p>
         </div>
 
@@ -128,61 +125,6 @@ export default function SubscribePage() {
                 className="w-full px-4 py-3 rounded-lg bg-surface text-text-primary border border-border focus:border-accent-500 focus:outline-hidden placeholder-text-tertiary"
                 placeholder="you@example.com"
               />
-            </div>
-
-            {/* City */}
-            <div>
-              <label htmlFor="city" className="block text-text-primary font-medium mb-2">
-                City
-              </label>
-              <select
-                id="city"
-                value={formData.city}
-                onChange={e => setFormData({ ...formData, city: e.target.value })}
-                className="w-full px-4 py-3 rounded-lg bg-surface text-text-primary border border-border focus:border-accent-500 focus:outline-hidden"
-              >
-                <option value="kitchener">Kitchener</option>
-                <option value="waterloo">Waterloo</option>
-                <option value="cambridge">Cambridge</option>
-                <option value="guelph">Guelph</option>
-                <option value="all">All Cities</option>
-              </select>
-            </div>
-
-            {/* Genre */}
-            <div>
-              <label htmlFor="genre" className="block text-text-primary font-medium mb-2">
-                Genre Preference
-              </label>
-              <select
-                id="genre"
-                value={formData.genre}
-                onChange={e => setFormData({ ...formData, genre: e.target.value })}
-                className="w-full px-4 py-3 rounded-lg bg-surface text-text-primary border border-border focus:border-accent-500 focus:outline-hidden"
-              >
-                <option value="all">All Genres</option>
-                <option value="punk">Punk</option>
-                <option value="indie">Indie</option>
-                <option value="rock">Rock</option>
-                <option value="metal">Metal</option>
-                <option value="electronic">Electronic</option>
-              </select>
-            </div>
-
-            {/* Frequency */}
-            <div>
-              <label htmlFor="frequency" className="block text-text-primary font-medium mb-2">
-                Email Frequency
-              </label>
-              <select
-                id="frequency"
-                value={formData.frequency}
-                onChange={e => setFormData({ ...formData, frequency: e.target.value })}
-                className="w-full px-4 py-3 rounded-lg bg-surface text-text-primary border border-border focus:border-accent-500 focus:outline-hidden"
-              >
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-              </select>
             </div>
 
             {/* Submit */}

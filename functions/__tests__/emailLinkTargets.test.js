@@ -5,13 +5,10 @@ import { fileURLToPath } from "node:url";
 
 // Every link a SetTimes email carries must lead somewhere that serves it.
 //
-// From #21 until 2026-09-29 the subscription confirmation email linked to
-// `/verify`, a path with no Pages Function and no frontend route, so every
-// confirmation 404'd and not one subscriber could ever verify. The handler and
-// the link were each tested, separately; nothing checked that one pointed at
-// the other. This scans every file that sends mail, extracts each site path it
-// builds, and requires that path to resolve to a Pages Function file or a
-// frontend <Route>.
+// A link and its handler can each be tested and still not point at one another.
+// This scans every file that sends mail, extracts each site path it builds,
+// and requires that path to resolve to a Pages Function file or a frontend
+// <Route>.
 
 const REPO = fileURLToPath(new URL("../..", import.meta.url));
 const FUNCTIONS = join(REPO, "functions");

@@ -4,12 +4,10 @@ import { onRequestGet as verify } from "../verify.js";
 import { MockD1Database } from "./mocks/d1.js";
 import { createMockContext, createMockRequest, VALID_SUBSCRIPTION } from "./helpers.js";
 
-// From #21 until 2026-09-29 the confirmation email linked to `/verify`, a path
-// nothing serves, so every link 404'd and no subscriber could ever verify.
-// Both halves were tested -- but separately: subscribe.test asserted the (wrong)
-// URL shape and verify.test called /api/subscriptions/verify directly. Nothing
-// ever FOLLOWED the emailed link. This does: the URL subscribe produces is the
-// one fed to the verify handler, so a link and a handler that drift apart fail.
+// Testing the link's shape and the handler separately lets the two drift apart
+// unnoticed. This feeds the URL subscribe produces into the verify handler.
+// The handler reads only the query string, so the pathname assertion is what
+// catches a link aimed at the wrong route.
 describe("the emailed verification link reaches the verify handler", () => {
   let mockDB;
   let context;

@@ -32,12 +32,15 @@ export default function SubscribePage() {
   }, [])
 
   // The confirmation link (GET /api/subscriptions/verify) redirects here with
-  // ?verified=true. Without this the visitor landed on a blank form with no
-  // sign that confirming had worked.
+  // ?verified=true. Show that it worked, then drop the parameter so a reload
+  // after submitting a DIFFERENT address cannot claim that one is confirmed.
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('verified') === 'true') {
+    const url = new URL(window.location.href)
+    if (url.searchParams.get('verified') === 'true') {
       setStatus('success')
       setMessage("You're subscribed. Your email address is confirmed.")
+      url.searchParams.delete('verified')
+      window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
     }
   }, [])
 

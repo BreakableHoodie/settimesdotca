@@ -209,9 +209,9 @@ export function sanitizeOptionalHttpUrl(value, maxLength = FIELD_LIMITS.url.max,
 
 /**
  * Per-platform configuration for `normalizeLinkField`. Each entry
- * defines the field limit, error label, and — where the platform has a
- * canonical handle form — a function that builds the profile URL from a
- * bare handle.
+ * defines the field limit, error label, allowed hosts, and — where the
+ * platform has a canonical handle form — a function that builds the profile
+ * URL from a bare handle.
  *
  * Platforms without `handleToUrl` (website, spotify, apple_music) accept
  * URL input only (scheme optional); a bare non-domain string is rejected.
@@ -223,32 +223,46 @@ const BAND_LINK_FIELD_CONFIG = {
     label: "Instagram",
     handleToUrl: (h) => `https://instagram.com/${h}`,
     domain: "instagram.com",
+    allowedHosts: ["instagram.com", "instagr.am"],
   },
   bandcamp: {
     maxLength: FIELD_LIMITS.bandUrl.max,
     label: "Bandcamp URL",
     handleToUrl: (h) => `https://${h}.bandcamp.com`,
     domain: "bandcamp.com",
+    // Custom Bandcamp domains belong in website; none are supported here.
+    allowedHosts: ["bandcamp.com"],
   },
   facebook: {
     maxLength: FIELD_LIMITS.bandUrl.max,
     label: "Facebook URL",
     handleToUrl: (h) => `https://facebook.com/${h}`,
     domain: "facebook.com",
+    allowedHosts: ["facebook.com", "fb.com"],
   },
   youtube: {
     maxLength: FIELD_LIMITS.bandUrl.max,
     label: "YouTube URL",
     handleToUrl: (h) => `https://youtube.com/@${h}`,
     domain: "youtube.com",
+    allowedHosts: ["youtube.com", "youtu.be"],
   },
-  spotify: { maxLength: FIELD_LIMITS.bandUrl.max, label: "Spotify URL" },
-  apple_music: { maxLength: FIELD_LIMITS.bandUrl.max, label: "Apple Music URL" },
+  spotify: {
+    maxLength: FIELD_LIMITS.bandUrl.max,
+    label: "Spotify URL",
+    allowedHosts: ["spotify.com"],
+  },
+  apple_music: {
+    maxLength: FIELD_LIMITS.bandUrl.max,
+    label: "Apple Music URL",
+    allowedHosts: ["apple.com"],
+  },
   linktree: {
     maxLength: FIELD_LIMITS.bandUrl.max,
     label: "Linktree URL",
     handleToUrl: (h) => `https://linktr.ee/${h}`,
     domain: "linktr.ee",
+    allowedHosts: ["linktr.ee"],
   },
 };
 
@@ -283,36 +297,43 @@ const EVENT_LINK_FIELD_CONFIG = {
     label: "Instagram",
     handleToUrl: (h) => `https://instagram.com/${h}`,
     domain: "instagram.com",
+    allowedHosts: ["instagram.com", "instagr.am"],
   },
   facebook: {
     maxLength: FIELD_LIMITS.ticketLink.max,
     label: "Facebook",
     handleToUrl: (h) => `https://facebook.com/${h}`,
     domain: "facebook.com",
+    allowedHosts: ["facebook.com", "fb.com"],
   },
   x: {
     maxLength: FIELD_LIMITS.ticketLink.max,
     label: "X / Twitter",
     handleToUrl: (h) => `https://x.com/${h}`,
     domain: "x.com",
+    allowedHosts: ["x.com", "twitter.com"],
   },
   tiktok: {
     maxLength: FIELD_LIMITS.ticketLink.max,
     label: "TikTok",
     handleToUrl: (h) => `https://tiktok.com/@${h}`,
     domain: "tiktok.com",
+    allowedHosts: ["tiktok.com"],
   },
   youtube: {
     maxLength: FIELD_LIMITS.ticketLink.max,
     label: "YouTube",
     handleToUrl: (h) => `https://youtube.com/@${h}`,
     domain: "youtube.com",
+    allowedHosts: ["youtube.com", "youtu.be"],
   },
   bandcamp: {
     maxLength: FIELD_LIMITS.ticketLink.max,
     label: "Bandcamp",
     handleToUrl: (h) => `https://${h}.bandcamp.com`,
     domain: "bandcamp.com",
+    // Custom Bandcamp domains belong in website; none are supported here.
+    allowedHosts: ["bandcamp.com"],
   },
 };
 
@@ -335,7 +356,7 @@ const EVENT_LINK_FIELD_CONFIG = {
  * @returns {string|null} Canonical URL or null
  */
 function normalizeLinkField(value, config) {
-  const { maxLength, label, handleToUrl, domain } = config;
+  const { maxLength, label, handleToUrl, domain, allowedHosts } = config;
 
   const text = sanitizeOptionalText(value, maxLength, label);
   if (!text) {
@@ -347,6 +368,7 @@ function normalizeLinkField(value, config) {
     if (!normalized) {
       throw new Error(`${label} must be a valid URL`);
     }
+    validateLinkHost(normalized, label, allowedHosts);
     return normalized;
   }
 
@@ -401,6 +423,7 @@ function normalizeLinkField(value, config) {
     if (!normalized) {
       throw new Error(`${label} must be a valid URL`);
     }
+    validateLinkHost(normalized, label, allowedHosts);
     return normalized;
   }
 
@@ -422,6 +445,24 @@ function normalizeLinkField(value, config) {
     throw new Error(`${label} must be a valid handle or URL`);
   }
   return built;
+}
+
+// A full URL used to be stored under whatever field it was typed into, so a
+// Bandcamp link saved as Apple Music rendered as an Apple Music icon on the
+// artist page, with no error anywhere (#1213: 3 such rows in production).
+// Matched on the PARSED hostname, exactly or as a subdomain, never on the URL
+// string: `https://evil.com/?x=instagram.com` and `instagram.com.evil.com`
+// must both fail. A config with no `allowedHosts` (website) is unrestricted,
+// because an artist's own site can live anywhere.
+function validateLinkHost(url, label, allowedHosts) {
+  if (!allowedHosts) {
+    return;
+  }
+
+  const host = new URL(url).hostname.toLowerCase();
+  if (!allowedHosts.some((allowedHost) => host === allowedHost || host.endsWith(`.${allowedHost}`))) {
+    throw new Error(`${label} must link to ${allowedHosts[0]}`);
+  }
 }
 
 export function sanitizeBandSocialLinks(value) {

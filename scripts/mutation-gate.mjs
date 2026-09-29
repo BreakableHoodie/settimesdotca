@@ -396,6 +396,15 @@ export const MUTATIONS = [
     replace: "url: safePresentedByUrl,",
     tests: ["functions/event/__tests__/slug.presenter-age.test.js"],
   },
+  {
+    id: "ical-after-midnight-calendar-date",
+    invariant:
+      "CLAUDE.md 'After-midnight band sorting' — the iCal feed stamps a set starting before the threshold with the NEXT calendar day, since the stored date is the festival day",
+    file: "functions/api/feeds/ical.js",
+    find: "startTime < AFTER_MIDNIGHT_THRESHOLD_TIME ? nextCalendarDay(eventDate) : eventDate",
+    replace: "eventDate",
+    tests: ["functions/api/feeds/__tests__/ical.test.js"],
+  },
 ];
 
 // ============================================================================

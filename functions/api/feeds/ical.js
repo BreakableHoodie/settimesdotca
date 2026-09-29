@@ -4,7 +4,7 @@
 
 import { getPublicDataGateResponse } from "../../utils/publicGate.js";
 import { publicEventStatusSql } from "../../utils/eventVisibility.js";
-import { nextCalendarDay } from "../../utils/eventDay.js";
+import { AFTER_MIDNIGHT_THRESHOLD_TIME, nextCalendarDay } from "../../utils/eventDay.js";
 
 /**
  * A set's default duration when no end time was recorded: one hour after the
@@ -159,20 +159,27 @@ function generateICal(bands, calendarName) {
     // No such row exists in production today; nothing stops one being written.
     const endTime = band.end_time || addOneHour(startTime);
 
-    // A set that straddles midnight (e.g. 23:30–00:30) ENDS on the next
-    // calendar day — stamping both ends with the same date would put DTEND
-    // before DTSTART, an invalid VEVENT some clients reject (#601). Zero-padded
-    // HH:MM compares lexicographically; this mirrors prepareBands()'s
-    // `endMs < startMs` +1-day roll in frontend/src/utils/bandUtils.js. Pure
-    // after-midnight sets (start 00:00–05:59) are unaffected: both stamps
-    // correctly share the stored date.
-    const endDate = endTime < startTime ? nextCalendarDay(eventDate) : eventDate;
+    // `eventDate` is the FESTIVAL day. A set starting before the after-midnight
+    // threshold belongs to that evening but happens on the NEXT calendar day
+    // (CLAUDE.md "After-midnight band sorting"; mirrors prepareBands()'s +1 day
+    // in frontend/src/utils/bandUtils.js). Stamping it with the festival date
+    // put Vol 18's 00:25 closer in calendars the morning BEFORE the show.
+    const startDate = startTime < AFTER_MIDNIGHT_THRESHOLD_TIME ? nextCalendarDay(eventDate) : eventDate;
+
+    // A set that straddles midnight (e.g. 23:30–00:30) ENDS on the day after it
+    // starts — stamping both ends with the same date would put DTEND before
+    // DTSTART, an invalid VEVENT some clients reject (#601). Zero-padded HH:MM
+    // compares lexicographically, mirroring prepareBands()'s `endMs < startMs`
+    // +1-day roll.
+    const endDate = endTime < startTime ? nextCalendarDay(startDate) : startDate;
 
     // Convert to iCal format (YYYYMMDDTHHMMSS)
-    const dtstart = `${eventDate.replace(/-/g, "")}T${startTime.replace(/:/g, "")}00`;
+    const dtstart = `${startDate.replace(/-/g, "")}T${startTime.replace(/:/g, "")}00`;
     const dtend = `${endDate.replace(/-/g, "")}T${endTime.replace(/:/g, "")}00`;
 
-    // Generate unique ID using performance ID to ensure uniqueness per band
+    // Generate unique ID using performance ID to ensure uniqueness per band.
+    // Keyed on the festival date, not startDate: a subscribed calendar matches
+    // entries by UID, so changing it would duplicate the set instead of moving it.
     const uid = `performance-${band.performance_id}-${eventDate}@settimes.ca`;
 
     // Location

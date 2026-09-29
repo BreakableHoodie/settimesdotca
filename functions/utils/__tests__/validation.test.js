@@ -22,6 +22,7 @@ import {
   validateId,
   normalizeOptionalVenueId,
 } from "../validation.js";
+import { sanitizeEventSocialLinks } from "../validation/urls.js";
 
 describe("validateId", () => {
   it.each([1, 42, Number.MAX_SAFE_INTEGER, "1", "42", "0003", String(Number.MAX_SAFE_INTEGER)])(
@@ -574,8 +575,11 @@ describe("normalizeArtistLinkField — sanitise-or-reject on every band link fie
     expect(() => sanitizeBandSocialLinks({ instagram: "javascript:alert(1)" })).toThrow();
   });
 
-  it("rejects handle with colon (http scheme injection)", () => {
-    expect(() => sanitizeBandSocialLinks({ facebook: "http://evil.com" })).not.toThrow();
+  // A colon in an http(s) value is a URL scheme, not a handle containing a
+  // colon: it must take the URL path, not the handle rejection. (Cross-host
+  // URLs are rejected separately, in the #1213 block below.)
+  it("treats an http:// value as a URL, not a handle with a colon", () => {
+    expect(sanitizeBandSocialLinks({ facebook: "http://facebook.com/somepage" })).toContain("facebook.com/somepage");
   });
 
   it("rejects handle with whitespace", () => {
@@ -650,6 +654,82 @@ describe("normalizeArtistLinkField — sanitise-or-reject on every band link fie
   it("normalises youtube @handle by stripping and re-adding exactly one @", () => {
     const result = JSON.parse(sanitizeBandSocialLinks({ youtube: "@myband" }));
     expect(result.youtube).toBe("https://youtube.com/@myband");
+  });
+});
+
+describe("normalizeLinkField platform hosts (#1213)", () => {
+  const bandSanitizer = (field, value) => sanitizeBandSocialLinks({ [field]: value });
+  const eventSanitizer = (field, value) => sanitizeEventSocialLinks({ [field]: value });
+
+  it.each([
+    ["instagram", "https://foo.bandcamp.com/", "Instagram", "instagram.com"],
+    ["bandcamp", "https://instagram.com/foo", "Bandcamp URL", "bandcamp.com"],
+    ["facebook", "https://foo.bandcamp.com/", "Facebook URL", "facebook.com"],
+    ["youtube", "https://foo.bandcamp.com/", "YouTube URL", "youtube.com"],
+    ["spotify", "https://foo.bandcamp.com/", "Spotify URL", "open.spotify.com"],
+    ["apple_music", "https://foo.bandcamp.com/", "Apple Music URL", "music.apple.com"],
+    ["linktree", "https://foo.bandcamp.com/", "Linktree URL", "linktr.ee"],
+  ])("rejects a cross-platform URL in the %s field", (field, value, label, domain) => {
+    expect(() => bandSanitizer(field, value)).toThrow(`${label} must link to ${domain}`);
+  });
+
+  it.each([
+    ["instagram", "https://foo.bandcamp.com/", "Instagram", "instagram.com"],
+    ["facebook", "https://foo.bandcamp.com/", "Facebook", "facebook.com"],
+    ["x", "https://foo.bandcamp.com/", "X / Twitter", "x.com"],
+    ["tiktok", "https://foo.bandcamp.com/", "TikTok", "tiktok.com"],
+    ["youtube", "https://foo.bandcamp.com/", "YouTube", "youtube.com"],
+    ["bandcamp", "https://instagram.com/foo", "Bandcamp", "bandcamp.com"],
+  ])("rejects a cross-platform URL in the event %s field", (field, value, label, domain) => {
+    expect(() => eventSanitizer(field, value)).toThrow(`${label} must link to ${domain}`);
+  });
+
+  it.each([
+    ["instagram", "https://evil.com/?x=instagram.com"],
+    ["facebook", "https://instagram.com.evil.com/x"],
+    ["youtube", "https://notfacebook.com/x"],
+  ])("rejects bait host %s", (field, value) => {
+    expect(() => bandSanitizer(field, value)).toThrow(/must link to/);
+  });
+
+  it.each([
+    ["apple_music", "https://apps.apple.com/ca/app/x/id1", "Apple Music URL must link to music.apple.com"],
+    ["apple_music", "https://support.apple.com/en-ca/x", "Apple Music URL must link to music.apple.com"],
+    ["spotify", "https://support.spotify.com/x", "Spotify URL must link to open.spotify.com"],
+  ])("rejects a non-music subdomain of the platform in %s: %s", (field, value, message) => {
+    expect(() => bandSanitizer(field, value)).toThrow(message);
+  });
+
+  it.each([
+    ["apple_music", "bandcamp.com/foo", "Apple Music URL must link to music.apple.com"],
+    ["x", "instagram.com/foo", "X / Twitter must link to x.com"],
+  ])("rejects scheme-less cross-platform URL in %s", (field, value, message) => {
+    const sanitizer = field === "x" ? eventSanitizer : bandSanitizer;
+    expect(() => sanitizer(field, value)).toThrow(message);
+  });
+
+  it.each([
+    ["facebook", "https://www.facebook.com/share/1AF7hMe7ho/"],
+    ["youtube", "https://youtu.be/abc"],
+    ["apple_music", "https://music.apple.com/ca/artist/x/1"],
+    ["spotify", "https://open.spotify.com/artist/2rRz"],
+    ["bandcamp", "https://foo.bandcamp.com/"],
+    ["linktree", "https://linktr.ee/foo"],
+    ["instagram", "https://instagram.com/foo"],
+  ])("accepts valid artist platform host %s", (field, value) => {
+    expect(() => bandSanitizer(field, value)).not.toThrow();
+  });
+
+  it.each([
+    ["x", "https://x.com/foo"],
+    ["x", "https://twitter.com/foo"],
+    ["tiktok", "https://www.tiktok.com/@foo"],
+  ])("accepts valid event platform host %s", (field, value) => {
+    expect(() => eventSanitizer(field, value)).not.toThrow();
+  });
+
+  it("accepts any website host", () => {
+    expect(() => bandSanitizer("website", "https://notfacebook.com/x")).not.toThrow();
   });
 });
 

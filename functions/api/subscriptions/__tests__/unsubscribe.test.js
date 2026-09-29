@@ -109,7 +109,7 @@ describe("GET /api/subscriptions/unsubscribe", () => {
     const response = await onRequestGet(mockContext);
 
     expect(response.status).toBe(200);
-    expect(response.headers.get("Content-Type")).toBe("text/html");
+    expect(response.headers.get("Content-Type")).toBe("text/html; charset=utf-8");
 
     const html = await response.text();
     expect(html).toContain("Unsubscribed");

@@ -60,6 +60,7 @@ export async function onRequestGet(context) {
       <!DOCTYPE html>
       <html>
         <head>
+          <meta charset="utf-8">
           <title>Unsubscribed</title>
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
@@ -92,7 +93,7 @@ export async function onRequestGet(context) {
       </html>
     `,
       {
-        headers: { "Content-Type": "text/html" },
+        headers: { "Content-Type": "text/html; charset=utf-8" },
       },
     );
   } catch (error) {

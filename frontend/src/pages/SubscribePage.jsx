@@ -31,6 +31,19 @@ export default function SubscribePage() {
     document.title = PAGE_TITLE
   }, [])
 
+  // The confirmation link (GET /api/subscriptions/verify) redirects here with
+  // ?verified=true. Show that it worked, then drop the parameter so a reload
+  // after submitting a DIFFERENT address cannot claim that one is confirmed.
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    if (url.searchParams.get('verified') === 'true') {
+      setStatus('success')
+      setMessage("You're subscribed. Your email address is confirmed.")
+      url.searchParams.delete('verified')
+      window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
+    }
+  }, [])
+
   const handleSubmit = async e => {
     e.preventDefault()
     setStatus('submitting')
@@ -185,6 +198,7 @@ export default function SubscribePage() {
             {/* Status message */}
             {message && (
               <div
+                role="status"
                 className={`p-4 rounded-lg ${
                   status === 'success' ? 'bg-success-500/20 text-text-primary' : 'bg-error-500/20 text-text-primary'
                 }`}

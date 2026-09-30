@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, it, expect } from 'vitest'
-import { prepareBands } from '../bandUtils'
+import { DEFAULT_SET_DURATION_MS, prepareBands } from '../bandUtils'
+import { computeNextMove } from '../nextMove'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -64,10 +65,12 @@ describe('prepareBands', () => {
     expect(band.endMs).toBe(0)
   })
 
-  it('handles missing endTime (startMs computed, endMs 0)', () => {
+  // This asserted endMs 0 until the Vol 18 readiness pass: an open-ended set
+  // ("12:25 - END") was then "upcoming" forever and dropped from My Route.
+  it('handles missing endTime (startMs computed, end derived as start + 1h)', () => {
     const [band] = prepareBands([makeBand('20:00', undefined)])
     expect(band.startMs).toBe(Date.parse('2024-06-01T20:00:00'))
-    expect(band.endMs).toBe(0)
+    expect(band.endMs).toBe(Date.parse('2024-06-01T21:00:00'))
   })
 
   it('returns empty array for empty input', () => {
@@ -258,5 +261,38 @@ describe('prepareBands — DST-safe after-midnight offset (#768)', () => {
 
     const brokenEndMs = Date.parse('2027-03-14T00:20:00') + DAY_MS
     expect(band.endMs).not.toBe(brokenEndMs)
+  })
+})
+
+// Vol 18's closing act is billed "12:25 - END": a start time and no end time.
+// Leaving endMs at 0 made every consumer treat it as untimed. The end is now
+// derived as start + 1 hour, the same rule as the iCal feed (#1079).
+describe('prepareBands — a set with a start but no end time', () => {
+  it('derives the end as start + one hour', () => {
+    const [band] = prepareBands([makeBand('21:00', null, '2026-10-11')])
+    expect(band.endMs - band.startMs).toBe(DEFAULT_SET_DURATION_MS)
+  })
+
+  it('keeps an after-midnight start on the next calendar day, ending an hour later', () => {
+    const [band] = prepareBands([makeBand('00:25', null, '2026-10-11')])
+    expect(new Date(band.startMs).getDate()).toBe(12)
+    expect(new Date(band.startMs).getHours()).toBe(0)
+    expect(band.endMs - band.startMs).toBe(DEFAULT_SET_DURATION_MS)
+  })
+
+  it('leaves a set with no start time untimed (endMs stays 0)', () => {
+    const [band] = prepareBands([makeBand(null, null, '2026-10-11')])
+    expect(band.startMs).toBe(0)
+    expect(band.endMs).toBe(0)
+  })
+
+  it('makes the open-ended closer "playing now" at 00:30, not skipped', () => {
+    const bands = prepareBands([
+      { ...makeBand('23:50', '00:20', '2026-10-11'), id: 'dux', name: 'Frank Dux' },
+      { ...makeBand('00:25', null, '2026-10-11'), id: 'frogs', name: 'The Friendly Frogs Freak Show' },
+    ])
+    const move = computeNextMove(bands, new Date('2026-10-12T00:30:00'))
+    expect(move.kind).toBe('watching')
+    expect(move.nowBand.id).toBe('frogs')
   })
 })

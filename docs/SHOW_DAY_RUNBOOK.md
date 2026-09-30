@@ -2,7 +2,7 @@
 
 What to do when something changes during an event, and which actions silently do nothing.
 
-Written 2026-08-05, before Buddies Fest 2 (event 36, Aug 7–9). Everything here was verified against the code and production data at that date — if a procedure stops matching the code, fix this file in the same change.
+Written 2026-08-05, before Buddies Fest 2 (event 36, Aug 7–9). Re-verified 2026-09-30 for **Vol. 18 (event 37, `lwbc18`, single day, Oct 11)**. If a procedure stops matching the code, fix this file in the same change.
 
 ---
 
@@ -42,6 +42,10 @@ Getting it wrong sorts the set to the top of the wrong day instead of the end of
 
 The cutover is 6 AM: anything starting before 06:00 belongs to the previous evening.
 
+**Moving several sets at once** (e.g. swapping two acts): use the event's **Schedule** grid, which saves every changed row together and checks the *final* arrangement for clashes. Saving the rows one at a time would refuse a swap, because each half clashes with the other's old time.
+
+**A set with no end time** (a closing act billed "12:25 – END"): leave the end blank. The site treats it as one hour long for "playing now", "up next" and the calendar feed, so it shows as live once it starts. Enter a real end time only if the organizers give one.
+
 ## A band is added last minute
 
 Admin → Lineup tab → add the artist, venue, and set time. If the artist has no profile yet, one is created.
@@ -56,7 +60,7 @@ This drives the "Live Tonight" / "Happening Now" edge on an event's **first day 
 
 ## Silent no-ops — things that look like they worked
 
-**Un-announcing a set on a published lineup.** All 8 public read paths guard with `AND (e.reveal_mode = 0 OR p.is_announced = 1)`. When `reveal_mode = 0` — the normal state for a published event, and BF2's state — that condition is already true, so `is_announced` is never consulted **for visibility**. The set stays fully visible. Nothing errors.
+**Un-announcing a set on a published lineup.** Every public read path that returns per-performance rows guards with `AND (e.reveal_mode = 0 OR p.is_announced = 1)`. When `reveal_mode = 0` — the normal state for a published event, and BF2's state — that condition is already true, so `is_announced` is never consulted **for visibility**. The set stays fully visible. Nothing errors.
 
 Two things follow, and they are easy to conflate:
 
@@ -69,10 +73,20 @@ Two things follow, and they are easy to conflate:
 
 ## If something looks wrong on the live site
 
-1. **Check the API before the page.** `https://settimes.ca/api/events/{id}/details` and `https://settimes.ca/api/venues/{id}` show exactly what the frontend receives (Buddies Fest 2 is event `36`). Most "the page is wrong" reports are the payload being wrong.
+1. **Check the API before the page.** `https://settimes.ca/api/events/{id}/details` and `https://settimes.ca/api/venues/{id}` show exactly what the frontend receives (Vol. 18 is event `37`). Most "the page is wrong" reports are the payload being wrong.
 2. **Deploys are automatic on merge to `main`**, including database migrations. There is no manual apply step. A change that is merged but not visible is usually a deploy still running — check Actions.
-3. **The API caches for 5 minutes** (`Cache-Control: public, max-age=300` on the public read endpoints). A correct-looking database and a stale page is usually this; wait it out rather than re-editing.
+3. **Set times, cancellations and venues cache for about a minute** (`Cache-Control: public, max-age=60` on show-critical endpoints; browse-only pages cache 5 minutes). A correct-looking database and a stale page is usually this: wait a minute rather than re-editing.
 4. **Times are Toronto-local everywhere.** If something classifies as the wrong day, suspect the after-midnight rule (above) before suspecting a timezone bug.
+
+## Telling fans about a change
+
+Nothing emails anyone automatically when a set moves or is cancelled.
+
+- **Calendar subscribers** see changes late: the feed is cached for **up to an hour** (`max-age=3600`), and each calendar app then refreshes on its own schedule (often every few hours). Times move and a cancelled set shows as cancelled, but not quickly.
+- **Band followers** are emailed when a set is first *announced*. There is no email for a later change. The Lineup tab's **Resend announcement** only reaches followers the *original* announcement missed (a partial send); it never re-mails anyone and never describes a change.
+- **Subscribers** get the admin **Notify** broadcast, and each kind of notice ("lineup is live", "set times are up") goes to a subscriber **at most once**. Pressing it again after a change sends nothing to people who already had it.
+
+So for a change on the day, **post it on Instagram** (@settimes.ca, and ask the organizers to share). The site itself shows the change within about a minute; calendars and email will not keep up.
 
 ## What to avoid mid-event
 

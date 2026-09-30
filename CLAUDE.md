@@ -792,6 +792,12 @@ is likewise derived (`start + 1h`), never a constant -- a literal `"21:00"` agai
 23:00 start is *before* it, which the midnight-straddle roll then reads as spanning
 into the next day, turning an absent end time into a 22-hour event.
 
+**The frontend derives it the same way** (`DEFAULT_SET_DURATION_MS` in
+`frontend/src/utils/bandUtils.js`, applied in `prepareBands`). Until the Vol. 18
+readiness pass it left `endMs = 0`, so an open-ended closer ("12:25 – END") was
+"upcoming" forever, never "playing now", and dropped from My Route as finished.
+Keep the two surfaces in step: one hour, derived from the start.
+
 Both are in the mutation gate. A fallback is invisible to every happy-path test by
 construction, which is how the constant survived in a file that already had four
 describe blocks.

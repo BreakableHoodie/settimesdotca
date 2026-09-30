@@ -18,6 +18,10 @@ import { AFTER_MIDNIGHT_THRESHOLD_HOUR, addLocalDays } from './festivalDays'
  * every band shares one `date` (today's single-day events, and the NULL
  * `performance_date` degenerate case), this is byte-identical to before.
  */
+// Used when a set has a start time but no end time. Matches the iCal feed's
+// derived end (functions/api/feeds/ical.js, #1079) so the two surfaces agree.
+export const DEFAULT_SET_DURATION_MS = 60 * 60 * 1000
+
 export function prepareBands(list) {
   return list.map(band => {
     let startMs = Date.parse(`${band.date}T${band.startTime}:00`)
@@ -37,6 +41,16 @@ export function prepareBands(list) {
 
     if (!Number.isNaN(startMs) && !Number.isNaN(endMs) && endMs < startMs) {
       endMs = addLocalDays(endMs, 1)
+    }
+
+    // A set with a start but no end (a closing act billed "12:25 - END") is a
+    // real, timed set. Leaving endMs at 0 made every consumer treat it as
+    // untimed: "upcoming" forever on the schedule, never "playing now" or
+    // "up next", dropped from My Route as already finished, and ignored when
+    // deciding the night was over. Derive the end as the calendar feed does
+    // (#1079): start + 1 hour, never a constant clock time.
+    if (!Number.isNaN(startMs) && Number.isNaN(endMs)) {
+      endMs = startMs + DEFAULT_SET_DURATION_MS
     }
 
     return {

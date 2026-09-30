@@ -1,6 +1,8 @@
 import { CalendarDays, Rss } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
+import { Link } from 'react-router-dom'
+import { trackPageView } from '../utils/metrics'
 import { TURNSTILE_ERROR_MESSAGE, TURNSTILE_VERIFYING_MESSAGE, useTurnstile } from '../hooks/useTurnstile'
 
 const PAGE_TITLE = 'Subscribe — Never Miss a Show | SetTimes'
@@ -41,6 +43,7 @@ export default function SubscribePage() {
   // directly to match the <Helmet> title below. See BandProfilePage.jsx.
   useEffect(() => {
     document.title = PAGE_TITLE
+    trackPageView('/subscribe')
   }, [])
 
   // The confirmation link (GET /api/subscriptions/verify) redirects here with
@@ -178,7 +181,12 @@ export default function SubscribePage() {
           {/* Privacy note */}
           <div className="mt-8 pt-6 border-t border-border">
             <p className="text-sm text-text-tertiary text-center">
-              We respect your privacy. No tracking, no ads, no selling your data.
+              We respect your privacy: no ads, no third-party trackers, and we never sell your data. We only count
+              anonymous, aggregate page visits (see our{' '}
+              <Link to="/privacy" className="underline hover:text-accent-400 transition-colors">
+                Privacy Policy
+              </Link>
+              ).
               <br />
               Unsubscribe anytime with one click.
             </p>

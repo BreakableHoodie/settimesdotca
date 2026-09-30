@@ -74,6 +74,22 @@ describe('useTurnstile', () => {
     expect(screen.getByTestId('error-code').textContent).toBe('script_load_failed')
   })
 
+  it('counts a reused in-flight script as the first attempt', () => {
+    delete window.turnstile
+    // beforeEach left one un-loaded script in the page: the in-flight download.
+    const scripts = () => document.querySelectorAll('script[data-turnstile-script="true"]')
+    expect(scripts()).toHaveLength(1)
+    render(<Harness active />)
+
+    act(() => scripts()[0].dispatchEvent(new Event('error')))
+    expect(scripts()).toHaveLength(1)
+    expect(screen.getByTestId('status').textContent).toBe('pending')
+
+    act(() => scripts()[0].dispatchEvent(new Event('error')))
+    expect(scripts()).toHaveLength(0)
+    expect(screen.getByTestId('status').textContent).toBe('error')
+  })
+
   it("configures retry: 'never' so the hook's one retry is the whole budget", () => {
     render(<Harness active />)
     expect(renderMock.mock.calls[0][1].retry).toBe('never')

@@ -162,6 +162,10 @@ export function useTurnstile(active) {
     if (window.turnstile) {
       renderTurnstile()
     } else if (scriptElement) {
+      // Reusing a script another activation is still loading: that download is
+      // this activation's first attempt, so one failure plus one retry still
+      // ends in the error message rather than a third download.
+      scriptAttempts = 1
       scriptElement.addEventListener('load', renderTurnstile)
       scriptElement.addEventListener('error', onScriptError)
     } else {

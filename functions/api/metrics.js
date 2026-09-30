@@ -16,9 +16,22 @@ const ALLOWED_EVENTS = new Set([
   "ticket_click",
   "share_event",
   "filter_use",
+  "turnstile_error",
 ]);
 
-const SAFE_KEYS = new Set(["band_profile_id", "event_id", "link_type", "page"]);
+const SAFE_KEYS = new Set(["band_profile_id", "event_id", "link_type", "page", "error_code"]);
+
+// Props come from the browser and flow into Analytics Engine blobs, which cap
+// a datapoint at 16 KB. Every real value is a short path, link type, id or
+// Turnstile code, so a string is truncated here and anything that is not a
+// finite number or a string is dropped.
+const MAX_PROP_LENGTH = 200;
+
+function sanitizePropValue(value) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  if (typeof value === "string") return value.slice(0, MAX_PROP_LENGTH);
+  return undefined;
+}
 
 function sanitizeEvent(raw) {
   if (!raw || typeof raw !== "object") return null;
@@ -28,8 +41,9 @@ function sanitizeEvent(raw) {
   const safeProps = {};
   if (raw.props && typeof raw.props === "object") {
     for (const key of SAFE_KEYS) {
-      if (raw.props[key] !== undefined && raw.props[key] !== null) {
-        safeProps[key] = raw.props[key];
+      const value = sanitizePropValue(raw.props[key]);
+      if (value !== undefined) {
+        safeProps[key] = value;
       }
     }
   }
@@ -80,6 +94,7 @@ export async function onRequestPost(context) {
             String(event.props?.event_id ?? ""),
             String(event.props?.link_type ?? ""),
             String(event.props?.page ?? ""),
+            String(event.props?.error_code ?? ""),
           ],
           doubles: [Date.now()],
           indexes: [event.event],

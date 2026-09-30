@@ -7,14 +7,19 @@ import { useTurnstile } from '../useTurnstile'
 vi.stubEnv('VITE_TURNSTILE_SITE_KEY', 'test-placeholder-site-key')
 
 function Harness({ active }) {
-  const { enabled, token, containerRef, reset } = useTurnstile(active)
+  const { enabled, token, status, errorCode, containerRef, reset, submitWhenReady } = useTurnstile(active)
   return (
     <div>
       <div data-testid="container" ref={containerRef} />
       <span data-testid="token">{token}</span>
+      <span data-testid="status">{status}</span>
+      <span data-testid="error-code">{errorCode || ''}</span>
       <span data-testid="enabled">{String(enabled)}</span>
       <button type="button" onClick={reset}>
         reset
+      </button>
+      <button type="button" onClick={() => submitWhenReady(vi.fn())}>
+        queue
       </button>
     </div>
   )
@@ -46,6 +51,56 @@ describe('useTurnstile', () => {
     cleanup()
     delete window.turnstile
     document.querySelectorAll('script[data-turnstile-script="true"]').forEach(s => s.remove())
+  })
+
+  // A content blocker usually blocks the script itself: no widget, so no
+  // error-callback. The hook must notice the script's own `error` event.
+  it('retries a failed script load once, then reports script_load_failed', () => {
+    delete window.turnstile
+    document.querySelectorAll('script[data-turnstile-script="true"]').forEach(s => s.remove())
+    render(<Harness active />)
+    const scripts = () => document.querySelectorAll('script[data-turnstile-script="true"]')
+    expect(scripts()).toHaveLength(1)
+    const first = scripts()[0]
+
+    act(() => first.dispatchEvent(new Event('error')))
+    expect(scripts()).toHaveLength(1)
+    expect(scripts()[0]).not.toBe(first)
+    expect(screen.getByTestId('status').textContent).toBe('pending')
+
+    act(() => scripts()[0].dispatchEvent(new Event('error')))
+    expect(scripts()).toHaveLength(0)
+    expect(screen.getByTestId('status').textContent).toBe('error')
+    expect(screen.getByTestId('error-code').textContent).toBe('script_load_failed')
+  })
+
+  it('counts a reused in-flight script as the first attempt', () => {
+    delete window.turnstile
+    // beforeEach left one un-loaded script in the page: the in-flight download.
+    const scripts = () => document.querySelectorAll('script[data-turnstile-script="true"]')
+    expect(scripts()).toHaveLength(1)
+    render(<Harness active />)
+
+    act(() => scripts()[0].dispatchEvent(new Event('error')))
+    expect(scripts()).toHaveLength(1)
+    expect(screen.getByTestId('status').textContent).toBe('pending')
+
+    act(() => scripts()[0].dispatchEvent(new Event('error')))
+    expect(scripts()).toHaveLength(0)
+    expect(screen.getByTestId('status').textContent).toBe('error')
+  })
+
+  it("configures retry: 'never' so the hook's one retry is the whole budget", () => {
+    render(<Harness active />)
+    expect(renderMock.mock.calls[0][1].retry).toBe('never')
+  })
+
+  it('returns to idle when deactivated before the widget ever renders', () => {
+    delete window.turnstile
+    const { rerender } = render(<Harness active />)
+    expect(screen.getByTestId('status').textContent).toBe('pending')
+    rerender(<Harness active={false} />)
+    expect(screen.getByTestId('status').textContent).toBe('idle')
   })
 
   it('stays fully dormant while active is false', () => {
@@ -88,9 +143,91 @@ describe('useTurnstile', () => {
     fireEvent.click(screen.getByRole('button', { name: 'reset' })) // no-op before token, must not throw
     act(() => config.callback('tok-123'))
     expect(screen.getByTestId('token').textContent).toBe('tok-123')
+    expect(screen.getByTestId('status').textContent).toBe('ready')
 
     act(() => config['expired-callback']())
     expect(screen.getByTestId('token').textContent).toBe('')
+    expect(screen.getByTestId('status').textContent).toBe('pending')
+  })
+
+  it('retries the first error and exposes the second error', () => {
+    render(<Harness active={true} />)
+    const [, config] = renderMock.mock.calls[0]
+
+    act(() => config['error-callback']('network-error'))
+    expect(window.turnstile.reset).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('status').textContent).toBe('pending')
+
+    act(() => config['error-callback']('blocked'))
+    expect(window.turnstile.reset).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('status').textContent).toBe('error')
+    expect(screen.getByTestId('error-code').textContent).toBe('blocked')
+  })
+
+  it('clears an error when a token arrives', () => {
+    render(<Harness active={true} />)
+    const [, config] = renderMock.mock.calls[0]
+
+    act(() => config['error-callback']('blocked'))
+    act(() => config.callback('tok-recovered'))
+
+    expect(screen.getByTestId('status').textContent).toBe('ready')
+    expect(screen.getByTestId('error-code').textContent).toBe('')
+  })
+
+  it('submits a queued callback exactly once when a token arrives', () => {
+    const submit = vi.fn()
+    function SubmitHarness() {
+      const { containerRef, submitWhenReady } = useTurnstile(true)
+      return (
+        <>
+          <div ref={containerRef} />
+          <button type="button" onClick={() => submitWhenReady(submit)}>
+            queue submit
+          </button>
+        </>
+      )
+    }
+
+    render(<SubmitHarness />)
+    const [, config] = renderMock.mock.calls[0]
+    fireEvent.click(screen.getByRole('button', { name: 'queue submit' }))
+    expect(submit).not.toHaveBeenCalled()
+
+    act(() => config.callback('tok-queued'))
+    expect(submit).toHaveBeenCalledOnce()
+    expect(submit).toHaveBeenCalledWith('tok-queued')
+  })
+
+  it('drops a queued submit when the widget errors or deactivates', () => {
+    const submit = vi.fn()
+    function SubmitHarness({ active }) {
+      const { containerRef, submitWhenReady } = useTurnstile(active)
+      return (
+        <>
+          <div ref={containerRef} />
+          <button type="button" onClick={() => submitWhenReady(submit)}>
+            queue submit
+          </button>
+        </>
+      )
+    }
+
+    const { rerender } = render(<SubmitHarness active={true} />)
+    const [, config] = renderMock.mock.calls[0]
+    fireEvent.click(screen.getByRole('button', { name: 'queue submit' }))
+    act(() => config['error-callback']('first'))
+    act(() => config['error-callback']('second'))
+    act(() => config.callback('tok-after-error'))
+    expect(submit).not.toHaveBeenCalled()
+
+    rerender(<SubmitHarness active={false} />)
+    rerender(<SubmitHarness active={true} />)
+    const [, nextConfig] = renderMock.mock.calls[1]
+    fireEvent.click(screen.getByRole('button', { name: 'queue submit' }))
+    rerender(<SubmitHarness active={false} />)
+    act(() => nextConfig.callback('tok-after-deactivate'))
+    expect(submit).not.toHaveBeenCalled()
   })
 
   it('reset() clears the token and resets the widget', () => {

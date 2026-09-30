@@ -344,3 +344,27 @@ describe("POST /api/metrics — date key is Toronto-local, not UTC (#668)", () =
     expect(kept.event_views).toBe(1);
   });
 });
+
+// Props flow into Analytics Engine blobs (16 KB per datapoint). The sanitizer
+// bounds every prop, not only the error_code #1230 added.
+describe("POST /api/metrics — prop values are bounded before Analytics Engine", () => {
+  test("truncates a long string prop and drops a non-string, non-number one", async () => {
+    const { env } = createTestEnv();
+    const writeDataPoint = vi.fn();
+    env.ANALYTICS = { writeDataPoint };
+
+    const res = await onRequestPost({
+      request: makeRequest([
+        { event: "turnstile_error", props: { error_code: "x".repeat(20000) } },
+        { event: "page_view", props: { page: { nested: "object" } } },
+      ]),
+      env,
+    });
+    expect(res.status).toBe(200);
+
+    const blobs = writeDataPoint.mock.calls.map(([point]) => point.blobs);
+    expect(blobs[0]).toContain("x".repeat(200));
+    expect(blobs[0].every((b) => b.length <= 200)).toBe(true);
+    expect(blobs[1]).not.toContain("[object Object]");
+  });
+});

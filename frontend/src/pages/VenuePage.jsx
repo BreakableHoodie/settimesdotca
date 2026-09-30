@@ -141,6 +141,55 @@ export default function VenuePage() {
     }
   }, [id])
 
+  // Keep the sets live while the page is open, as App.jsx does for the event
+  // schedule (#1081): a cancellation or time change otherwise never reached a
+  // fan who left this page open outside the venue. Visibility-gated so a phone
+  // in a pocket does not burn data; refetches at once on return to the tab.
+  // Silent: no loading state, and the page view is not counted again.
+  useEffect(() => {
+    let active = true
+    let pollInterval = null
+    const refresh = () => {
+      fetchPublicJson(`/api/venues/${id}`, {}, 'Failed to load venue')
+        .then(data => {
+          if (!active) return
+          setVenue(data.venue)
+          setUpcoming(data.upcoming || [])
+          setPast(data.past || [])
+        })
+        .catch(() => {
+          // Keep showing the last good data; the next poll tries again.
+        })
+    }
+    const startPolling = () => {
+      if (pollInterval) return
+      pollInterval = setInterval(() => {
+        if (document.visibilityState === 'visible') refresh()
+      }, 60000)
+    }
+    const stopPolling = () => {
+      if (pollInterval) {
+        clearInterval(pollInterval)
+        pollInterval = null
+      }
+    }
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        refresh()
+        startPolling()
+      } else {
+        stopPolling()
+      }
+    }
+    startPolling()
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      active = false
+      stopPolling()
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [id])
+
   const website = venue ? safeExternalHref(venue.website) : '#'
   const directionsHref = venue ? buildDirectionsHref(venue.name, venue.address) : null
   // Same trim rule as the helper: a whitespace-only address is truthy and would

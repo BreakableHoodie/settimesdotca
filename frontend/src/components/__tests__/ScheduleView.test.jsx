@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import '@testing-library/jest-dom'
 import { copyToClipboard } from '../../utils/clipboard'
 import ScheduleView from '../ScheduleView'
+import { prepareBands } from '../../utils/bandUtils'
 
 vi.mock('../../utils/clipboard', () => ({
   copyToClipboard: vi.fn().mockResolvedValue(true),
@@ -91,6 +92,22 @@ describe('ScheduleView — Bug 4: finished sets hidden count', () => {
   it('does not count TBD bands as finished', () => {
     const bands = [makeBand({ id: '1', endTime: 'TBD', endMs: 0 })]
     renderView({ bands })
+    expect(screen.queryByText(/finished set/i)).not.toBeInTheDocument()
+  })
+
+  // An open-ended set ("12:25 - END") has no endTime string; prepareBands
+  // derives its end. Testing the string made the list hide it as past without
+  // counting it: Vol 18's closer vanished and the counter said 14 of 15.
+  it('counts an open-ended set whose derived end has passed as finished', () => {
+    const [closer] = prepareBands([makeBand({ id: 'closer', name: 'Closer', startTime: '17:00', endTime: null })])
+    renderView({ bands: [closer], showPast: false })
+    expect(screen.getByText(/1 finished set hidden/i)).toBeInTheDocument()
+  })
+
+  it('keeps an open-ended set that is still playing on the schedule', () => {
+    const [closer] = prepareBands([makeBand({ id: 'closer', name: 'Closer', startTime: '19:30', endTime: null })])
+    renderView({ bands: [closer], showPast: false })
+    expect(screen.getByText('Closer')).toBeInTheDocument()
     expect(screen.queryByText(/finished set/i)).not.toBeInTheDocument()
   })
 

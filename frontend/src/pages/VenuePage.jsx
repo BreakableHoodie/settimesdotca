@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { ArrowLeft, Globe, MapPin, Navigation } from 'lucide-react'
@@ -100,6 +100,10 @@ export default function VenuePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [currentTime, setCurrentTime] = useState(() => new Date())
+  // Shared by the first load and every refresh: only the newest request's
+  // response is applied, so a slow older response cannot overwrite newer data
+  // (e.g. put a cancelled set back on screen).
+  const requestSeqRef = useRef(0)
 
   // BandCard derives "Starts in Nm" / "Live Now" from this prop, so a frozen
   // value strands a fan on a stale countdown -- and this is the page someone
@@ -118,9 +122,10 @@ export default function VenuePage() {
     setLoading(true)
     setError(null)
     trackPageView(`/venue/${id}`)
+    const seq = ++requestSeqRef.current
     fetchPublicJson(`/api/venues/${id}`, {}, 'Failed to load venue')
       .then(data => {
-        if (!active) return
+        if (!active || seq !== requestSeqRef.current) return
         setVenue(data.venue)
         setUpcoming(data.upcoming || [])
         setPast(data.past || [])
@@ -131,13 +136,66 @@ export default function VenuePage() {
         } | SetTimes`
       })
       .catch(err => {
-        if (active) setError(err)
+        if (active && seq === requestSeqRef.current) setError(err)
       })
       .finally(() => {
-        if (active) setLoading(false)
+        if (active && seq === requestSeqRef.current) setLoading(false)
       })
     return () => {
       active = false
+    }
+  }, [id])
+
+  // Keep the sets live while the page is open, as App.jsx does for the event
+  // schedule (#1081): a cancellation or time change otherwise never reached a
+  // fan who left this page open outside the venue. Visibility-gated so a phone
+  // in a pocket does not burn data; refetches at once on return to the tab.
+  // Silent: no loading state, and the page view is not counted again.
+  useEffect(() => {
+    let active = true
+    let pollInterval = null
+    const refresh = () => {
+      const seq = ++requestSeqRef.current
+      fetchPublicJson(`/api/venues/${id}`, {}, 'Failed to load venue')
+        .then(data => {
+          if (!active || seq !== requestSeqRef.current) return
+          setVenue(data.venue)
+          setUpcoming(data.upcoming || [])
+          setPast(data.past || [])
+          // A refresh that succeeds after a failed first load recovers the page.
+          setError(null)
+          setLoading(false)
+        })
+        .catch(() => {
+          // Keep showing the last good data; the next poll tries again.
+        })
+    }
+    const startPolling = () => {
+      if (pollInterval) return
+      pollInterval = setInterval(() => {
+        if (document.visibilityState === 'visible') refresh()
+      }, 60000)
+    }
+    const stopPolling = () => {
+      if (pollInterval) {
+        clearInterval(pollInterval)
+        pollInterval = null
+      }
+    }
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        refresh()
+        startPolling()
+      } else {
+        stopPolling()
+      }
+    }
+    startPolling()
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      active = false
+      stopPolling()
+      document.removeEventListener('visibilitychange', handleVisibility)
     }
   }, [id])
 

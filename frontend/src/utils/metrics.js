@@ -14,9 +14,10 @@ const ALLOWED_EVENTS = new Set([
   'ticket_click',
   'share_event',
   'filter_use',
+  'turnstile_error',
 ])
 
-const SAFE_KEYS = new Set(['band_profile_id', 'event_id', 'link_type', 'page'])
+const SAFE_KEYS = new Set(['band_profile_id', 'event_id', 'link_type', 'page', 'error_code'])
 
 let eventQueue = []
 let flushTimeout = null

@@ -1,7 +1,7 @@
 import { CalendarDays, Rss } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
-import { useTurnstile } from '../hooks/useTurnstile'
+import { TURNSTILE_ERROR_MESSAGE, TURNSTILE_VERIFYING_MESSAGE, useTurnstile } from '../hooks/useTurnstile'
 
 const PAGE_TITLE = 'Subscribe — Never Miss a Show | SetTimes'
 
@@ -12,15 +12,26 @@ export default function SubscribePage() {
   const {
     enabled: turnstileEnabled,
     token: turnstileToken,
+    status: turnstileStatus,
     containerRef: turnstileContainerRef,
     reset: resetTurnstile,
+    submitWhenReady,
   } = useTurnstile(formEngaged)
 
   const [formData, setFormData] = useState({
     email: '',
   })
-  const [status, setStatus] = useState('idle') // idle, submitting, success, error
+  const [status, setStatus] = useState('idle') // idle, verifying, submitting, success, error
   const [message, setMessage] = useState('')
+
+  // A submit queued while Turnstile was still checking is dropped if the check
+  // then fails; without this the form would say "Checking…" forever (#1224).
+  useEffect(() => {
+    if (status === 'verifying' && turnstileStatus === 'error') {
+      setStatus('error')
+      setMessage(TURNSTILE_ERROR_MESSAGE)
+    }
+  }, [status, turnstileStatus])
 
   // react-helmet-async does not reliably set document.title in React 19 — set it
   // directly to match the <Helmet> title below. See BandProfilePage.jsx.
@@ -41,24 +52,16 @@ export default function SubscribePage() {
     }
   }, [])
 
-  const handleSubmit = async e => {
-    e.preventDefault()
+  const submitSubscription = async token => {
     setStatus('submitting')
     setMessage('')
-
-    if (turnstileEnabled && !turnstileToken) {
-      setStatus('error')
-      setMessage('Please complete the bot verification challenge.')
-      return
-    }
-
     try {
       const response = await fetch('/api/subscriptions/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: formData.email,
-          turnstileToken,
+          turnstileToken: token,
         }),
       })
 
@@ -81,6 +84,20 @@ export default function SubscribePage() {
       setMessage('Network error. Please try again.')
       resetTurnstile()
     }
+  }
+
+  const handleSubmit = e => {
+    e.preventDefault()
+    if (turnstileEnabled && !turnstileToken) {
+      const queued = submitWhenReady(submitSubscription)
+      if (!queued) {
+        const failed = turnstileStatus === 'error'
+        setStatus(failed ? 'error' : 'verifying')
+        setMessage(failed ? TURNSTILE_ERROR_MESSAGE : TURNSTILE_VERIFYING_MESSAGE)
+      }
+      return
+    }
+    submitWhenReady(submitSubscription)
   }
 
   return (
@@ -142,7 +159,11 @@ export default function SubscribePage() {
               <div
                 role="status"
                 className={`p-4 rounded-lg ${
-                  status === 'success' ? 'bg-success-500/20 text-text-primary' : 'bg-error-500/20 text-text-primary'
+                  status === 'success'
+                    ? 'bg-success-500/20 text-text-primary'
+                    : status === 'verifying'
+                      ? 'bg-surface text-text-secondary'
+                      : 'bg-error-500/20 text-text-primary'
                 }`}
               >
                 {message}

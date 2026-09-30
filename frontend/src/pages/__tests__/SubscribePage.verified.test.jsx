@@ -5,8 +5,20 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import SubscribePage from '../SubscribePage.jsx'
 
-vi.mock('../../hooks/useTurnstile', () => ({
-  useTurnstile: () => ({ enabled: false, token: '', containerRef: { current: null }, reset: () => {} }),
+const turnstileMock = vi.hoisted(() => ({
+  enabled: false,
+  token: '',
+  status: 'idle',
+  containerRef: { current: null },
+  reset: vi.fn(),
+  submitWhenReady: submit => submit(''),
+  queuedSubmit: null,
+}))
+
+// Keep the module's real exports (the shared message copy) and fake only the hook.
+vi.mock('../../hooks/useTurnstile', async importOriginal => ({
+  ...(await importOriginal()),
+  useTurnstile: () => turnstileMock,
 }))
 
 const renderAt = path => {
@@ -23,6 +35,14 @@ const renderAt = path => {
 describe('SubscribePage after the confirmation link', () => {
   afterEach(() => {
     window.history.replaceState(null, '', '/')
+    Object.assign(turnstileMock, {
+      enabled: false,
+      token: '',
+      status: 'idle',
+      reset: vi.fn(),
+      submitWhenReady: submit => submit(''),
+      queuedSubmit: null,
+    })
     vi.restoreAllMocks()
   })
 
@@ -62,5 +82,79 @@ describe('SubscribePage after the confirmation link', () => {
     const request = fetchSpy.mock.calls[0][1]
     expect(JSON.parse(request.body)).toEqual({ email: 'fan@example.com', turnstileToken: '' })
     fetchSpy.mockRestore()
+  })
+
+  it('queues a submit while Turnstile is pending and sends once a token arrives', async () => {
+    let queuedSubmit
+    Object.assign(turnstileMock, {
+      enabled: true,
+      status: 'pending',
+      submitWhenReady: submit => {
+        queuedSubmit = submit
+        return false
+      },
+    })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ message: 'Subscription created' }),
+    })
+    renderAt('/subscribe')
+    fireEvent.change(screen.getByRole('textbox', { name: 'Email Address' }), {
+      target: { value: 'fan@example.com' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }))
+
+    expect(screen.getByRole('status')).toHaveTextContent("Checking you're human…")
+    expect(fetchSpy).not.toHaveBeenCalled()
+    await queuedSubmit('token-123')
+
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledOnce())
+    expect(JSON.parse(fetchSpy.mock.calls[0][1].body).turnstileToken).toBe('token-123')
+  })
+
+  // The dead end #1224 exists to remove: the visitor submits while the check
+  // is still running, the check then fails, and the queued submit is dropped.
+  // The form must say so instead of "Checking…" forever.
+  it('switches from "Checking…" to the content-blocker message if Turnstile fails after a queued submit', () => {
+    Object.assign(turnstileMock, { enabled: true, status: 'pending', submitWhenReady: () => false })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    const view = renderAt('/subscribe')
+    fireEvent.change(screen.getByRole('textbox', { name: 'Email Address' }), {
+      target: { value: 'fan@example.com' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }))
+    expect(screen.getByRole('status')).toHaveTextContent("Checking you're human…")
+
+    turnstileMock.status = 'error'
+    view.rerender(
+      <HelmetProvider>
+        <MemoryRouter initialEntries={['/subscribe']}>
+          <SubscribePage />
+        </MemoryRouter>
+      </HelmetProvider>
+    )
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      "Verification couldn't load. Turn off content blockers for this page, or try another browser."
+    )
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('shows the content-blocker message after Turnstile errors', () => {
+    Object.assign(turnstileMock, {
+      enabled: true,
+      status: 'error',
+      submitWhenReady: () => false,
+    })
+    renderAt('/subscribe')
+    fireEvent.change(screen.getByRole('textbox', { name: 'Email Address' }), {
+      target: { value: 'fan@example.com' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }))
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      "Verification couldn't load. Turn off content blockers for this page, or try another browser."
+    )
+    expect(screen.getByRole('status')).not.toHaveTextContent('Please complete the bot verification challenge.')
   })
 })

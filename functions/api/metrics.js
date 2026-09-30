@@ -16,9 +16,10 @@ const ALLOWED_EVENTS = new Set([
   "ticket_click",
   "share_event",
   "filter_use",
+  "turnstile_error",
 ]);
 
-const SAFE_KEYS = new Set(["band_profile_id", "event_id", "link_type", "page"]);
+const SAFE_KEYS = new Set(["band_profile_id", "event_id", "link_type", "page", "error_code"]);
 
 function sanitizeEvent(raw) {
   if (!raw || typeof raw !== "object") return null;
@@ -80,6 +81,7 @@ export async function onRequestPost(context) {
             String(event.props?.event_id ?? ""),
             String(event.props?.link_type ?? ""),
             String(event.props?.page ?? ""),
+            String(event.props?.error_code ?? ""),
           ],
           doubles: [Date.now()],
           indexes: [event.event],

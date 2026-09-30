@@ -1,6 +1,6 @@
 import { Bell, Check } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useTurnstile } from '../hooks/useTurnstile'
+import { TURNSTILE_ERROR_MESSAGE, TURNSTILE_VERIFYING_MESSAGE, useTurnstile } from '../hooks/useTurnstile'
 
 /**
  * LockInLineupPanel — Batch follow CTA for "My Route" and shared-route import.
@@ -17,7 +17,7 @@ import { useTurnstile } from '../hooks/useTurnstile'
  */
 export default function LockInLineupPanel({ performanceIds, bandCount }) {
   const [followEmail, setFollowEmail] = useState('')
-  const [followStatus, setFollowStatus] = useState('idle') // 'idle' | 'loading' | 'success' | 'error'
+  const [followStatus, setFollowStatus] = useState('idle') // 'idle' | 'verifying' | 'loading' | 'success' | 'error'
   const [followError, setFollowError] = useState('')
   // Turnstile stays dormant until the visitor engages with the email field.
   // Engagement is only possible when the form is mounted, which also covers
@@ -27,9 +27,20 @@ export default function LockInLineupPanel({ performanceIds, bandCount }) {
   const {
     enabled: turnstileEnabled,
     token: turnstileToken,
+    status: turnstileStatus,
     containerRef: turnstileContainerRef,
     reset: resetTurnstile,
+    submitWhenReady,
   } = useTurnstile(followEngaged)
+
+  // A follow queued while Turnstile was still checking is dropped if the check
+  // then fails; without this the form would say "Checking…" forever (#1224).
+  useEffect(() => {
+    if (followStatus === 'verifying' && turnstileStatus === 'error') {
+      setFollowStatus('error')
+      setFollowError(TURNSTILE_ERROR_MESSAGE)
+    }
+  }, [followStatus, turnstileStatus])
   const hasPerformances = Array.isArray(performanceIds) && performanceIds.length > 0
 
   // If the route empties (fan removes every band), the form — and the Turnstile
@@ -46,14 +57,7 @@ export default function LockInLineupPanel({ performanceIds, bandCount }) {
 
   const n = bandCount ?? performanceIds.length
 
-  const handleSubmit = async e => {
-    e.preventDefault()
-    if (!followEmail.trim()) return
-    if (turnstileEnabled && !turnstileToken) {
-      setFollowStatus('error')
-      setFollowError('Please complete the bot verification challenge.')
-      return
-    }
+  const submitFollowRequest = async token => {
     setFollowStatus('loading')
     setFollowError('')
     try {
@@ -63,7 +67,7 @@ export default function LockInLineupPanel({ performanceIds, bandCount }) {
         body: JSON.stringify({
           email: followEmail.trim(),
           performance_ids: performanceIds,
-          turnstileToken,
+          turnstileToken: token,
         }),
       })
       if (!res.ok) {
@@ -77,6 +81,21 @@ export default function LockInLineupPanel({ performanceIds, bandCount }) {
       setFollowError(err.message)
       resetTurnstile()
     }
+  }
+
+  const handleSubmit = e => {
+    e.preventDefault()
+    if (!followEmail.trim()) return
+    if (turnstileEnabled && !turnstileToken) {
+      const queued = submitWhenReady(submitFollowRequest)
+      if (!queued) {
+        const failed = turnstileStatus === 'error'
+        setFollowStatus(failed ? 'error' : 'verifying')
+        setFollowError(failed ? TURNSTILE_ERROR_MESSAGE : TURNSTILE_VERIFYING_MESSAGE)
+      }
+      return
+    }
+    submitWhenReady(submitFollowRequest)
   }
 
   return (
@@ -121,7 +140,7 @@ export default function LockInLineupPanel({ performanceIds, bandCount }) {
               />
               <button
                 type="submit"
-                disabled={followStatus === 'loading' || (turnstileEnabled && !turnstileToken)}
+                disabled={followStatus === 'loading'}
                 className="shrink-0 min-h-[44px] rounded-lg bg-accent-500 px-4 py-2 text-sm font-semibold text-bg-navy transition-all hover:bg-accent-400 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500"
               >
                 {followStatus === 'loading' ? 'Saving…' : 'Notify me'}
@@ -132,6 +151,11 @@ export default function LockInLineupPanel({ performanceIds, bandCount }) {
         )}
       </div>
 
+      {followStatus === 'verifying' && (
+        <p className="mt-2 text-xs text-text-tertiary" role="status">
+          {followError}
+        </p>
+      )}
       {followStatus === 'error' && (
         <p className="mt-2 text-xs text-error-400" role="alert">
           {followError}

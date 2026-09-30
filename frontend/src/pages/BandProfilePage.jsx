@@ -36,7 +36,7 @@ import { fetchPublicJson } from '../utils/publicApi'
 import { getSelectedBands, saveSelectedBands, hasAnySchedule, getScheduleEventSlug } from '../utils/scheduleStorage'
 import { formatPerformanceDayLabel, formatTimeRange } from '../utils/timeFormat'
 import { safeExternalHref, safeInstagramHref } from '../utils/urlSafety'
-import { useTurnstile } from '../hooks/useTurnstile'
+import { TURNSTILE_ERROR_MESSAGE, TURNSTILE_VERIFYING_MESSAGE, useTurnstile } from '../hooks/useTurnstile'
 
 const ZERO_WIDTH_ENTITY_REGEX = /&shy;|&#173;|&#xad;|&ZeroWidthSpace;|&#8203;|&#x200B;/gi
 
@@ -109,7 +109,7 @@ export default function BandProfilePage() {
   const [scheduleSelections, setScheduleSelections] = useState({}) // { eventSlug: Set of bandIds }
   const [stageMates, setStageMates] = useState([])
   const [followEmail, setFollowEmail] = useState('')
-  const [followStatus, setFollowStatus] = useState('idle') // 'idle' | 'loading' | 'success' | 'error'
+  const [followStatus, setFollowStatus] = useState('idle') // 'idle' | 'verifying' | 'loading' | 'success' | 'error'
   const [followError, setFollowError] = useState('')
   // Turnstile stays dormant until the visitor engages with the follow email
   // field. Engagement requires the form to be mounted, so this also replaces
@@ -119,9 +119,20 @@ export default function BandProfilePage() {
   const {
     enabled: turnstileEnabled,
     token: turnstileToken,
+    status: turnstileStatus,
     containerRef: turnstileContainerRef,
     reset: resetTurnstile,
+    submitWhenReady,
   } = useTurnstile(followEngaged)
+
+  // A follow queued while Turnstile was still checking is dropped if the check
+  // then fails; without this the form would say "Checking…" forever (#1224).
+  useEffect(() => {
+    if (followStatus === 'verifying' && turnstileStatus === 'error') {
+      setFollowStatus('error')
+      setFollowError(TURNSTILE_ERROR_MESSAGE)
+    }
+  }, [followStatus, turnstileStatus])
   const [userHasSchedule] = useState(() => hasAnySchedule())
   const scheduleEventSlug = useMemo(() => getScheduleEventSlug(), [])
   const sourceEventSlug = searchParams.get('fromEvent') || location.state?.fromEventSlug || null
@@ -325,21 +336,14 @@ export default function BandProfilePage() {
     setFollowEngaged(false)
   }, [profile?.id])
 
-  const submitFollow = async e => {
-    e.preventDefault()
-    if (!followEmail.trim()) return
-    if (turnstileEnabled && !turnstileToken) {
-      setFollowStatus('error')
-      setFollowError('Please complete the bot verification challenge.')
-      return
-    }
+  const submitFollowRequest = async token => {
     setFollowStatus('loading')
     setFollowError('')
     try {
       const res = await fetch(`/api/bands/${profile.id}/follow`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: followEmail.trim(), turnstileToken }),
+        body: JSON.stringify({ email: followEmail.trim(), turnstileToken: token }),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
@@ -352,6 +356,21 @@ export default function BandProfilePage() {
       setFollowError(err.message)
       resetTurnstile()
     }
+  }
+
+  const submitFollow = e => {
+    e.preventDefault()
+    if (!followEmail.trim()) return
+    if (turnstileEnabled && !turnstileToken) {
+      const queued = submitWhenReady(submitFollowRequest)
+      if (!queued) {
+        const failed = turnstileStatus === 'error'
+        setFollowStatus(failed ? 'error' : 'verifying')
+        setFollowError(failed ? TURNSTILE_ERROR_MESSAGE : TURNSTILE_VERIFYING_MESSAGE)
+      }
+      return
+    }
+    submitWhenReady(submitFollowRequest)
   }
 
   if (loading) {
@@ -696,11 +715,7 @@ export default function BandProfilePage() {
                     required
                     className="flex-1 min-w-0 px-3 py-2 rounded bg-bg-navy text-text-primary border border-text-primary/20 focus:border-accent-500 focus:outline-none text-sm"
                   />
-                  <Button
-                    type="submit"
-                    disabled={followStatus === 'loading' || (turnstileEnabled && !turnstileToken)}
-                    size="sm"
-                  >
+                  <Button type="submit" disabled={followStatus === 'loading'} size="sm">
                     {followStatus === 'loading' ? 'Saving…' : 'Follow'}
                   </Button>
                 </div>
@@ -708,6 +723,11 @@ export default function BandProfilePage() {
               </form>
             )}
           </div>
+          {followStatus === 'verifying' && (
+            <p className="mt-2 text-xs text-text-tertiary" role="status">
+              {followError}
+            </p>
+          )}
           {followStatus === 'error' && <p className="mt-2 text-xs text-error-400">{followError}</p>}
         </div>
 

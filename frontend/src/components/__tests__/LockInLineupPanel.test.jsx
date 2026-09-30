@@ -3,6 +3,21 @@ import '@testing-library/jest-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import LockInLineupPanel from '../LockInLineupPanel'
 
+const turnstileMock = vi.hoisted(() => ({
+  enabled: false,
+  token: '',
+  status: 'idle',
+  containerRef: { current: null },
+  reset: vi.fn(),
+  submitWhenReady: submit => submit(''),
+}))
+
+// Keep the module's real exports (the shared message copy) and fake only the hook.
+vi.mock('../../hooks/useTurnstile', async importOriginal => ({
+  ...(await importOriginal()),
+  useTurnstile: () => turnstileMock,
+}))
+
 // Turnstile is not available in jsdom — ensure the env var is empty so the
 // component treats Turnstile as disabled (no site key = bot protection off).
 // This lets us exercise the full submit path without mocking the Turnstile API.
@@ -24,6 +39,13 @@ describe('LockInLineupPanel', () => {
   })
 
   afterEach(() => {
+    Object.assign(turnstileMock, {
+      enabled: false,
+      token: '',
+      status: 'idle',
+      reset: vi.fn(),
+      submitWhenReady: submit => submit(''),
+    })
     vi.unstubAllEnvs()
     vi.unstubAllGlobals()
     vi.clearAllMocks()
@@ -74,6 +96,78 @@ describe('LockInLineupPanel', () => {
   it('button is enabled when Turnstile is disabled (no site key)', () => {
     renderPanel()
     expect(screen.getByRole('button', { name: /notify me/i })).not.toBeDisabled()
+  })
+
+  it('button is enabled before a Turnstile token exists', () => {
+    Object.assign(turnstileMock, {
+      enabled: true,
+      status: 'pending',
+    })
+    renderPanel()
+    expect(screen.getByRole('button', { name: /notify me/i })).not.toBeDisabled()
+  })
+
+  it('switches from "Checking…" to the content-blocker message if Turnstile fails after a queued submit', () => {
+    Object.assign(turnstileMock, { enabled: true, status: 'pending', submitWhenReady: () => false })
+    const view = renderPanel()
+    fireEvent.change(screen.getByLabelText(/your email address/i), {
+      target: { value: 'fan@example.com' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /notify me/i }))
+    expect(screen.getByText("Checking you're human…")).toBeInTheDocument()
+
+    turnstileMock.status = 'error'
+    view.rerender(<LockInLineupPanel performanceIds={PERFORMANCE_IDS} bandCount={BAND_COUNT} />)
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      "Verification couldn't load. Turn off content blockers for this page, or try another browser."
+    )
+    expect(screen.queryByText("Checking you're human…")).not.toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('queues a pending submit and posts once Turnstile provides a token', async () => {
+    let queuedSubmit
+    Object.assign(turnstileMock, {
+      enabled: true,
+      status: 'pending',
+      submitWhenReady: submit => {
+        queuedSubmit = submit
+        return false
+      },
+    })
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) })
+    renderPanel()
+    fireEvent.change(screen.getByLabelText(/your email address/i), {
+      target: { value: 'fan@example.com' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /notify me/i }))
+
+    // Pending is neutral (role="status"), not an error alert.
+    expect(screen.getByText("Checking you're human…")).toHaveAttribute('role', 'status')
+    expect(fetchMock).not.toHaveBeenCalled()
+    await queuedSubmit('token-123')
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce())
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).turnstileToken).toBe('token-123')
+  })
+
+  it('shows the content-blocker message after Turnstile errors without posting', () => {
+    Object.assign(turnstileMock, {
+      enabled: true,
+      status: 'error',
+      submitWhenReady: () => false,
+    })
+    renderPanel()
+    fireEvent.change(screen.getByLabelText(/your email address/i), {
+      target: { value: 'fan@example.com' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /notify me/i }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      "Verification couldn't load. Turn off content blockers for this page, or try another browser."
+    )
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   // ── Submit ─────────────────────────────────────────────────────────────────

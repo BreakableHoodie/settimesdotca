@@ -208,6 +208,7 @@ export async function awaitReview(deps, opts = {}) {
   let headSeenAt = deps.now();
   let skippedSince = null;
   let unknownSince = null;
+  let unknownDescription = null;
   let pausedRequestPosted = false;
   // Every piece of PER-HEAD state resets here and only here. The three
   // head-change paths each once reset it by hand, and one forgot the skip
@@ -221,6 +222,7 @@ export async function awaitReview(deps, opts = {}) {
     headSeenAt = deps.now();
     skippedSince = null;
     unknownSince = null;
+    unknownDescription = null;
     pausedRequestPosted = false;
   };
   let lastReported = "";
@@ -251,15 +253,23 @@ export async function awaitReview(deps, opts = {}) {
       if (c && Date.parse(c.at) >= Date.parse(status.updated_at)) state = "rate_limited";
     }
     if (state === "unknown") {
-      unknownSince ??= deps.now();
+      // "Unchanged", not merely "unknown": a new wording restarts the clock, so
+      // it is never converted on an earlier wording's deadline.
+      const description = String(status?.description ?? "");
+      if (unknownSince === null || description !== unknownDescription) {
+        unknownSince = deps.now();
+        unknownDescription = description;
+      }
       if (deps.now() - unknownSince >= UNKNOWN_SETTLE_MS) {
         state = "failed";
         // Restart the clock, so a status that stays unknown after the request
         // waits another full settle period instead of re-requesting every poll.
         unknownSince = null;
+        unknownDescription = null;
       }
     } else {
       unknownSince = null;
+      unknownDescription = null;
     }
     const short = head.slice(0, 8);
     // Report each state change once, so a long wait is visibly alive rather

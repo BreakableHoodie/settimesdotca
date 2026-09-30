@@ -122,6 +122,18 @@ describe("awaitReview", () => {
     expect(deps.calls.requests).toBe(0);
   });
 
+  it("restarts the unknown clock when the wording changes, so it is not converted on the old deadline", async () => {
+    const minutes = Math.ceil(UNKNOWN_SETTLE_MS / 60_000);
+    const OTHER_WORDING = { state: "success", description: "Another future CodeRabbit wording" };
+    // The first wording runs to just short of the deadline, then a new one
+    // appears and the review completes well within ITS settle period.
+    const deps = fakeDeps({
+      statuses: [...Array(minutes - 1).fill(NEW_WORDING), ...Array(3).fill(OTHER_WORDING), COMPLETED],
+    });
+    expect(await awaitReview(deps, { pollMs: 60_000 })).toBe(0);
+    expect(deps.calls.requests).toBe(0);
+  });
+
   it("treats an unrecognised status unchanged past UNKNOWN_SETTLE_MS as failed and requests once", async () => {
     const polls = Math.ceil(UNKNOWN_SETTLE_MS / 60_000) + 2;
     const deps = fakeDeps({ statuses: [...Array(polls).fill(NEW_WORDING), COMPLETED] });

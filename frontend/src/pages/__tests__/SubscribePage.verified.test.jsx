@@ -15,6 +15,14 @@ const turnstileMock = vi.hoisted(() => ({
   queuedSubmit: null,
 }))
 
+// trackPageView is faked so no metrics request is queued behind the tests'
+// fetch assertions; the rest of the module (trackEvent) stays real.
+const trackPageViewMock = vi.hoisted(() => vi.fn())
+vi.mock('../../utils/metrics', async importOriginal => ({
+  ...(await importOriginal()),
+  trackPageView: trackPageViewMock,
+}))
+
 // Keep the module's real exports (the shared message copy) and fake only the hook.
 vi.mock('../../hooks/useTurnstile', async importOriginal => ({
   ...(await importOriginal()),
@@ -54,6 +62,12 @@ describe('SubscribePage after the confirmation link', () => {
   it('drops ?verified from the URL so a later reload cannot claim a new address is confirmed', () => {
     renderAt('/subscribe?verified=true&utm_source=email')
     expect(window.location.search).toBe('?utm_source=email')
+  })
+
+  it('records its own page view, so /subscribe visits can be counted', () => {
+    trackPageViewMock.mockClear()
+    renderAt('/subscribe')
+    expect(trackPageViewMock).toHaveBeenCalledWith('/subscribe')
   })
 
   it('shows no confirmation on a plain visit', () => {

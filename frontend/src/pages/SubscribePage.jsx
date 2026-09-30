@@ -1,6 +1,7 @@
 import { CalendarDays, Rss } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
+import { trackPageView } from '../utils/metrics'
 import { TURNSTILE_ERROR_MESSAGE, TURNSTILE_VERIFYING_MESSAGE, useTurnstile } from '../hooks/useTurnstile'
 
 const PAGE_TITLE = 'Subscribe — Never Miss a Show | SetTimes'
@@ -41,6 +42,7 @@ export default function SubscribePage() {
   // directly to match the <Helmet> title below. See BandProfilePage.jsx.
   useEffect(() => {
     document.title = PAGE_TITLE
+    trackPageView('/subscribe')
   }, [])
 
   // The confirmation link (GET /api/subscriptions/verify) redirects here with

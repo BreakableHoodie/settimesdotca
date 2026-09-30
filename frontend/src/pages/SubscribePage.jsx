@@ -30,6 +30,10 @@ export default function SubscribePage() {
     if (status === 'verifying' && turnstileStatus === 'error') {
       setStatus('error')
       setMessage(TURNSTILE_ERROR_MESSAGE)
+    } else if (status === 'verifying' && turnstileStatus === 'idle') {
+      // Deactivated mid-check: the queued submit is gone, so stop saying "Checking…".
+      setStatus('idle')
+      setMessage('')
     }
   }, [status, turnstileStatus])
 

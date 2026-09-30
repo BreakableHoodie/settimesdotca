@@ -39,6 +39,11 @@ export default function LockInLineupPanel({ performanceIds, bandCount }) {
     if (followStatus === 'verifying' && turnstileStatus === 'error') {
       setFollowStatus('error')
       setFollowError(TURNSTILE_ERROR_MESSAGE)
+    } else if (followStatus === 'verifying' && turnstileStatus === 'idle') {
+      // Deactivated mid-check (the lineup emptied, or the band changed): the
+      // queued follow is gone, so stop saying "Checking…".
+      setFollowStatus('idle')
+      setFollowError('')
     }
   }, [followStatus, turnstileStatus])
   const hasPerformances = Array.isArray(performanceIds) && performanceIds.length > 0

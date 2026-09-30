@@ -126,6 +126,22 @@ describe('LockInLineupPanel', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('stops saying "Checking…" if verification deactivates mid-check', () => {
+    Object.assign(turnstileMock, { enabled: true, status: 'pending', submitWhenReady: () => false })
+    const view = renderPanel()
+    fireEvent.change(screen.getByLabelText(/your email address/i), {
+      target: { value: 'fan@example.com' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /notify me/i }))
+    expect(screen.getByText("Checking you're human…")).toBeInTheDocument()
+
+    turnstileMock.status = 'idle'
+    view.rerender(<LockInLineupPanel performanceIds={PERFORMANCE_IDS} bandCount={BAND_COUNT} />)
+
+    expect(screen.queryByText("Checking you're human…")).not.toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('queues a pending submit and posts once Turnstile provides a token', async () => {
     let queuedSubmit
     Object.assign(turnstileMock, {

@@ -53,6 +53,40 @@ describe('useTurnstile', () => {
     document.querySelectorAll('script[data-turnstile-script="true"]').forEach(s => s.remove())
   })
 
+  // A content blocker usually blocks the script itself: no widget, so no
+  // error-callback. The hook must notice the script's own `error` event.
+  it('retries a failed script load once, then reports script_load_failed', () => {
+    delete window.turnstile
+    document.querySelectorAll('script[data-turnstile-script="true"]').forEach(s => s.remove())
+    render(<Harness active />)
+    const scripts = () => document.querySelectorAll('script[data-turnstile-script="true"]')
+    expect(scripts()).toHaveLength(1)
+    const first = scripts()[0]
+
+    act(() => first.dispatchEvent(new Event('error')))
+    expect(scripts()).toHaveLength(1)
+    expect(scripts()[0]).not.toBe(first)
+    expect(screen.getByTestId('status').textContent).toBe('pending')
+
+    act(() => scripts()[0].dispatchEvent(new Event('error')))
+    expect(scripts()).toHaveLength(0)
+    expect(screen.getByTestId('status').textContent).toBe('error')
+    expect(screen.getByTestId('error-code').textContent).toBe('script_load_failed')
+  })
+
+  it("configures retry: 'never' so the hook's one retry is the whole budget", () => {
+    render(<Harness active />)
+    expect(renderMock.mock.calls[0][1].retry).toBe('never')
+  })
+
+  it('returns to idle when deactivated before the widget ever renders', () => {
+    delete window.turnstile
+    const { rerender } = render(<Harness active />)
+    expect(screen.getByTestId('status').textContent).toBe('pending')
+    rerender(<Harness active={false} />)
+    expect(screen.getByTestId('status').textContent).toBe('idle')
+  })
+
   it('stays fully dormant while active is false', () => {
     render(<Harness active={false} />)
     expect(renderMock).not.toHaveBeenCalled()

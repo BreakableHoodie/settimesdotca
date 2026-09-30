@@ -131,6 +131,11 @@ export default function BandProfilePage() {
     if (followStatus === 'verifying' && turnstileStatus === 'error') {
       setFollowStatus('error')
       setFollowError(TURNSTILE_ERROR_MESSAGE)
+    } else if (followStatus === 'verifying' && turnstileStatus === 'idle') {
+      // Deactivated mid-check (the lineup emptied, or the band changed): the
+      // queued follow is gone, so stop saying "Checking…".
+      setFollowStatus('idle')
+      setFollowError('')
     }
   }, [followStatus, turnstileStatus])
   const [userHasSchedule] = useState(() => hasAnySchedule())
@@ -728,7 +733,11 @@ export default function BandProfilePage() {
               {followError}
             </p>
           )}
-          {followStatus === 'error' && <p className="mt-2 text-xs text-error-400">{followError}</p>}
+          {followStatus === 'error' && (
+            <p className="mt-2 text-xs text-error-400" role="alert">
+              {followError}
+            </p>
+          )}
         </div>
 
         {/* Stage-mates — who this artist has shared a bill with, most-shared first.

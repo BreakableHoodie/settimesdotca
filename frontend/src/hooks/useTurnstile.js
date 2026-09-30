@@ -75,6 +75,13 @@ export function useTurnstile(active) {
 
     let cancelled = false
     let scriptElement = document.querySelector('script[data-turnstile-script="true"]')
+    let scriptAttempts = 0
+
+    const failVerification = code => {
+      updateState('', 'error', code)
+      queuedSubmitRef.current = null
+      trackEvent('turnstile_error', { error_code: code })
+    }
 
     const renderTurnstile = () => {
       if (cancelled || !window.turnstile || !containerRef.current) {
@@ -90,6 +97,9 @@ export function useTurnstile(active) {
         // the form uncluttered for legit visitors while preserving bot
         // protection.
         appearance: 'interaction-only',
+        // Our error-callback owns the retry budget (one reset). Turnstile's
+        // default 'auto' would keep retrying, and reporting, on its own.
+        retry: 'never',
         callback: newToken => {
           consecutiveErrorsRef.current = 0
           updateState(newToken, 'ready')
@@ -109,34 +119,60 @@ export function useTurnstile(active) {
             return
           }
 
-          updateState('', 'error', code)
-          queuedSubmitRef.current = null
-          trackEvent('turnstile_error', { error_code: code })
+          failVerification(code)
         },
       })
     }
 
-    if (scriptElement) {
-      if (window.turnstile) {
-        renderTurnstile()
-      } else {
-        scriptElement.addEventListener('load', renderTurnstile)
-      }
-    } else {
+    // A content blocker usually blocks this script outright. Then no widget
+    // renders and error-callback never fires, so without handling the script's
+    // own `error` event the form would wait on "Checking…" forever (#1224).
+    // A failed <script> never fires again, so it is removed: a later activation
+    // re-injects instead of waiting on a dead element.
+    const injectScript = () => {
+      scriptAttempts += 1
       const script = document.createElement('script')
       script.src = TURNSTILE_SCRIPT_SRC
       script.async = true
       script.defer = true
       script.setAttribute('data-turnstile-script', 'true')
       script.addEventListener('load', renderTurnstile)
+      script.addEventListener('error', onScriptError)
       document.head.appendChild(script)
       scriptElement = script
+    }
+
+    function onScriptError() {
+      if (scriptElement) {
+        scriptElement.removeEventListener('load', renderTurnstile)
+        scriptElement.removeEventListener('error', onScriptError)
+        scriptElement.remove()
+        scriptElement = null
+      }
+      if (cancelled) {
+        return
+      }
+      if (scriptAttempts < 2) {
+        injectScript()
+        return
+      }
+      failVerification('script_load_failed')
+    }
+
+    if (window.turnstile) {
+      renderTurnstile()
+    } else if (scriptElement) {
+      scriptElement.addEventListener('load', renderTurnstile)
+      scriptElement.addEventListener('error', onScriptError)
+    } else {
+      injectScript()
     }
 
     return () => {
       cancelled = true
       if (scriptElement) {
         scriptElement.removeEventListener('load', renderTurnstile)
+        scriptElement.removeEventListener('error', onScriptError)
       }
       if (window.turnstile && widgetIdRef.current !== null) {
         // try/catch: the widget's DOM may already be gone (container unmounted
@@ -149,8 +185,10 @@ export function useTurnstile(active) {
           // Widget already torn down with its container — nothing to release.
         }
         widgetIdRef.current = null
-        updateState('', 'idle')
       }
+      // Always, not only when a widget existed: deactivating while the script is
+      // still loading must not leave status 'pending' for a form to wait on.
+      updateState('', 'idle')
       queuedSubmitRef.current = null
     }
   }, [enabled, active, siteKey, updateState])

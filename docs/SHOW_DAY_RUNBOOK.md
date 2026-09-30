@@ -82,11 +82,11 @@ Two things follow, and they are easy to conflate:
 
 Nothing emails anyone automatically when a set moves or is cancelled.
 
-- **Calendar subscribers** get changes on their calendar app's next refresh (times move; a cancelled set shows as cancelled).
-- **Band followers** are emailed only when a set is first *announced*, never for a later change.
+- **Calendar subscribers** see changes late: the feed is cached for **up to an hour** (`max-age=3600`), and each calendar app then refreshes on its own schedule (often every few hours). Times move and a cancelled set shows as cancelled, but not quickly.
+- **Band followers** are emailed when a set is first *announced*. There is no email for a later change. The Lineup tab's **Resend announcement** only reaches followers the *original* announcement missed (a partial send); it never re-mails anyone and never describes a change.
 - **Subscribers** get the admin **Notify** broadcast, and each kind of notice ("lineup is live", "set times are up") goes to a subscriber **at most once**. Pressing it again after a change sends nothing to people who already had it.
 
-So for a change on the day, **post it on Instagram** (@settimes.ca, and ask the organizers to share). The site shows the change within about a minute.
+So for a change on the day, **post it on Instagram** (@settimes.ca, and ask the organizers to share). The site itself shows the change within about a minute; calendars and email will not keep up.
 
 ## What to avoid mid-event
 

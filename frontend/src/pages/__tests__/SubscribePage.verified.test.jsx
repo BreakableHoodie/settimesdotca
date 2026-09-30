@@ -70,6 +70,15 @@ describe('SubscribePage after the confirmation link', () => {
     expect(trackPageViewMock).toHaveBeenCalledWith('/subscribe')
   })
 
+  // The page records a visit, so it must not claim "no tracking"; it states
+  // what it counts and points at the policy that says so (#1233 review).
+  it('describes its anonymous visit counting honestly and links the Privacy Policy', () => {
+    renderAt('/subscribe')
+    expect(screen.queryByText(/no tracking/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/anonymous, aggregate page visits/i)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute('href', '/privacy')
+  })
+
   it('shows no confirmation on a plain visit', () => {
     renderAt('/subscribe')
     expect(screen.queryByRole('status')).not.toBeInTheDocument()

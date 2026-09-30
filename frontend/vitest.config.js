@@ -38,10 +38,10 @@ export default defineConfig({
       // v5 (v4 72.39/67.36/73.87/73.13 -> v5 72.71/67.57/74.08/73.47 for
       // statements/branches/functions/lines), so these stay as they were.
       thresholds: {
-        statements: 70,
-        branches: 65,
-        functions: 72,
-        lines: 71,
+        statements: 72,
+        branches: 66,
+        functions: 73,
+        lines: 73,
       },
     },
   },

@@ -124,11 +124,10 @@ function ScheduleView({
   // Count finished sets within the active venue/genre filter (not affected by showPast toggle)
   const finishedCount = useMemo(
     () =>
-      venueGenreFilteredBands.reduce((count, band) => {
-        if (!band.endTime || band.endTime === 'TBD') return count
-        const bandEndMs = band.endMs > 0 ? band.endMs : Date.parse(`${band.date}T${band.endTime}:00`)
-        return Number.isFinite(bandEndMs) && bandEndMs <= nowMs ? count + 1 : count
-      }, 0),
+      // endMs, not the raw endTime string: prepareBands derives an end for an
+      // open-ended set ("12:25 - END"), and the grouping below already uses
+      // endMs. Testing the string hid that set as past without counting it.
+      venueGenreFilteredBands.reduce((count, band) => (band.endMs > 0 && band.endMs <= nowMs ? count + 1 : count), 0),
     [venueGenreFilteredBands, nowMs]
   )
 
@@ -136,12 +135,8 @@ function ScheduleView({
     () =>
       showPast
         ? venueGenreFilteredBands
-        : venueGenreFilteredBands.filter(band => {
-            if (!band.endTime || band.endTime === 'TBD') return true
-            const bandEndMs =
-              typeof band.endMs === 'number' ? band.endMs : Date.parse(`${band.date}T${band.endTime}:00`)
-            return bandEndMs > nowMs
-          }),
+        : // Untimed sets (endMs 0) always show; timed ones hide once over.
+          venueGenreFilteredBands.filter(band => !(band.endMs > 0) || band.endMs > nowMs),
     [venueGenreFilteredBands, showPast, nowMs]
   )
 

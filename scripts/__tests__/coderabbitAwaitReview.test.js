@@ -6,6 +6,7 @@ import {
   MAX_COOLDOWN_MS,
   SKIP_SETTLE_MS,
   STALE_IN_PROGRESS_MS,
+  UNKNOWN_SETTLE_MS,
   awaitReview,
   classifyStatus,
   parseCooldownMs,
@@ -15,6 +16,9 @@ const RATE_LIMITED = { state: "success", description: "Review rate limited" };
 const PAUSED = { state: "success", description: "Review paused" };
 const COMPLETED = { state: "success", description: "Review completed" };
 const IN_PROGRESS = { state: "pending", description: "Review in progress" };
+// Seen on #1225 (2026-09-29): a PASSING status on a commit no one reviewed.
+const INTERNAL_ERROR = { state: "success", description: "Internal error occurred during review" };
+const NEW_WORDING = { state: "success", description: "Some future CodeRabbit wording" };
 const RL_COMMENT = "Rate limit exceeded. Please wait **21 minutes and 50 seconds** before requesting another review.";
 
 /**
@@ -70,6 +74,10 @@ describe("classifyStatus: a passing check is not a review", () => {
     expect(classifyStatus(PAUSED)).toBe("paused");
   });
 
+  it("reads CodeRabbit's PASSING internal-error status as failed, never reviewed (#1226)", () => {
+    expect(classifyStatus(INTERNAL_ERROR)).toBe("failed");
+  });
+
   it("reads 'Review completed' as reviewed", () => {
     expect(classifyStatus(COMPLETED)).toBe("reviewed");
   });
@@ -102,6 +110,25 @@ describe("parseCooldownMs", () => {
 });
 
 describe("awaitReview", () => {
+  it("re-requests after CodeRabbit's internal error, then succeeds on the completed review (#1226)", async () => {
+    const deps = fakeDeps({ statuses: [INTERNAL_ERROR, COMPLETED] });
+    expect(await awaitReview(deps, { pollMs: 1000 })).toBe(0);
+    expect(deps.calls.requests).toBe(1);
+  });
+
+  it("waits out an unrecognised status briefly without requesting", async () => {
+    const deps = fakeDeps({ statuses: [NEW_WORDING, NEW_WORDING, COMPLETED] });
+    expect(await awaitReview(deps, { pollMs: 60_000 })).toBe(0);
+    expect(deps.calls.requests).toBe(0);
+  });
+
+  it("treats an unrecognised status unchanged past UNKNOWN_SETTLE_MS as failed and requests once", async () => {
+    const polls = Math.ceil(UNKNOWN_SETTLE_MS / 60_000) + 2;
+    const deps = fakeDeps({ statuses: [...Array(polls).fill(NEW_WORDING), COMPLETED] });
+    expect(await awaitReview(deps, { pollMs: 60_000 })).toBe(0);
+    expect(deps.calls.requests).toBe(1);
+  });
+
   it("requests a paused head once, then succeeds on the completed review", async () => {
     const deps = fakeDeps({ statuses: [PAUSED, COMPLETED] });
     expect(await awaitReview(deps, { pollMs: 1000 })).toBe(0);

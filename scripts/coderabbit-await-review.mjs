@@ -51,11 +51,17 @@ export const SKIP_SETTLE_MS = 5 * 60_000;
 // `gh` failures in a row before giving up. A single blip (a 502, a secondary
 // rate limit) must not end a wait that may already be hours old.
 export const MAX_CONSECUTIVE_GH_FAILURES = 5;
+// An unrecognised status that has not changed for this long is treated as a
+// failed review and re-requested, instead of being waited out to the timeout.
+// CodeRabbit keeps adding wordings (#1210 "Review paused", #1226 "Internal
+// error occurred during review"); this bounds the next one.
+export const UNKNOWN_SETTLE_MS = 15 * 60_000;
 
 /**
  * Map the latest `CodeRabbit` commit status on a SHA to a state.
  * Descriptions seen on this repo: "Review in progress", "Review completed",
- * and "Review paused" (#1210).
+ * "Review paused" (#1210), and "Internal error occurred during review" (#1226),
+ * which CodeRabbit posts as a PASSING status on a commit nobody reviewed.
  * "Review rate limited" is from CodeRabbit's docs, not yet observed here —
  * hence the loose /rate.?limit/ match rather than an exact string.
  */
@@ -64,6 +70,7 @@ export function classifyStatus(status) {
   const d = String(status.description || "");
   if (/rate.?limit/i.test(d)) return "rate_limited";
   if (/review paused/i.test(d)) return "paused";
+  if (/internal error|error occurred/i.test(d)) return "failed";
   if (/review completed/i.test(d)) return "reviewed";
   if (/skip/i.test(d)) return "skipped";
   if (status.state === "error" || status.state === "failure") return "failed";
@@ -200,6 +207,7 @@ export async function awaitReview(deps, opts = {}) {
   let requests = 0;
   let headSeenAt = deps.now();
   let skippedSince = null;
+  let unknownSince = null;
   let pausedRequestPosted = false;
   // Every piece of PER-HEAD state resets here and only here. The three
   // head-change paths each once reset it by hand, and one forgot the skip
@@ -212,6 +220,7 @@ export async function awaitReview(deps, opts = {}) {
     requests = 0;
     headSeenAt = deps.now();
     skippedSince = null;
+    unknownSince = null;
     pausedRequestPosted = false;
   };
   let lastReported = "";
@@ -240,6 +249,17 @@ export async function awaitReview(deps, opts = {}) {
       // rate-limit comment is at least as new as this status, trust it.
       const c = deps.getLatestRateLimitComment();
       if (c && Date.parse(c.at) >= Date.parse(status.updated_at)) state = "rate_limited";
+    }
+    if (state === "unknown") {
+      unknownSince ??= deps.now();
+      if (deps.now() - unknownSince >= UNKNOWN_SETTLE_MS) {
+        state = "failed";
+        // Restart the clock, so a status that stays unknown after the request
+        // waits another full settle period instead of re-requesting every poll.
+        unknownSince = null;
+      }
+    } else {
+      unknownSince = null;
     }
     const short = head.slice(0, 8);
     // Report each state change once, so a long wait is visibly alive rather

@@ -94,6 +94,16 @@ export async function verifyPassword(password, storedHash) {
       if (!iterations || !saltBase64 || !hashBase64) {
         return false;
       }
+      // Refuse before deriving: the edge would throw on an over-cap count, and
+      // the catch below would report it as a wrong password while the account
+      // collects failed-login rows toward its lockout. This is a data problem,
+      // not a bad password, so say so at error level.
+      if (iterations > WORKERS_PBKDF2_MAX_ITERATIONS) {
+        console.error(
+          `Password verification refused: stored hash uses ${iterations} PBKDF2 iterations, above the Workers cap of ${WORKERS_PBKDF2_MAX_ITERATIONS}`,
+        );
+        return false;
+      }
     } else {
       // Legacy format: salt:hash
       const legacyParts = storedHash.split(":");

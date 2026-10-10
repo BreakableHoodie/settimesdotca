@@ -15,6 +15,19 @@ const WORKERS_CAP_ERROR = (n) =>
     name: "NotSupportedError",
   });
 
+// ONE stub, used by every test below, so the self-check proves the very
+// emulation the guard tests rely on (two copies could drift apart and let a
+// guard pass vacuously). Returns the spy.
+function emulateWorkersCap() {
+  const realDeriveBits = crypto.subtle.deriveBits.bind(crypto.subtle);
+  return vi.spyOn(crypto.subtle, "deriveBits").mockImplementation(async (params, key, length) => {
+    if (params?.name === "PBKDF2" && params.iterations > WORKERS_CAP) {
+      throw WORKERS_CAP_ERROR(params.iterations);
+    }
+    return realDeriveBits(params, key, length);
+  });
+}
+
 describe("crypto.js — the production Workers PBKDF2 cap", () => {
   afterEach(() => vi.restoreAllMocks());
 
@@ -26,13 +39,7 @@ describe("crypto.js — the production Workers PBKDF2 cap", () => {
   // The guard that would have caught #426. Raising DEFAULT_ITERATIONS above
   // the cap makes hashPassword throw here exactly as it threw in production.
   it("hashPassword succeeds under a runtime that refuses > 100,000 iterations", async () => {
-    const realDeriveBits = crypto.subtle.deriveBits.bind(crypto.subtle);
-    vi.spyOn(crypto.subtle, "deriveBits").mockImplementation(async (params, key, length) => {
-      if (params?.name === "PBKDF2" && params.iterations > WORKERS_CAP) {
-        throw WORKERS_CAP_ERROR(params.iterations);
-      }
-      return realDeriveBits(params, key, length);
-    });
+    emulateWorkersCap();
 
     const password = "CorrectHorseBatteryStaple1!";
     const hash = await hashPassword(password);
@@ -43,13 +50,7 @@ describe("crypto.js — the production Workers PBKDF2 cap", () => {
   // The emulation above is only worth trusting if it really refuses: prove
   // the stub throws for an over-cap request rather than silently passing.
   it("the emulated runtime really refuses an over-cap request", async () => {
-    const realDeriveBits = crypto.subtle.deriveBits.bind(crypto.subtle);
-    vi.spyOn(crypto.subtle, "deriveBits").mockImplementation(async (params, key, length) => {
-      if (params?.name === "PBKDF2" && params.iterations > WORKERS_CAP) {
-        throw WORKERS_CAP_ERROR(params.iterations);
-      }
-      return realDeriveBits(params, key, length);
-    });
+    emulateWorkersCap();
     const km = await crypto.subtle.importKey("raw", new TextEncoder().encode("x"), "PBKDF2", false, ["deriveBits"]);
     await expect(
       crypto.subtle.deriveBits(
@@ -58,6 +59,19 @@ describe("crypto.js — the production Workers PBKDF2 cap", () => {
         256,
       ),
     ).rejects.toThrow(/iteration counts above 100000 are not supported/);
+  });
+
+  // A stored over-cap hash must be refused BEFORE deriving. The assertion that
+  // earns this test is that deriveBits is never called: returning false alone
+  // also happens when the edge throws and the catch swallows it, which is the
+  // misleading "wrong password" path this guard replaces.
+  it("verifyPassword refuses a stored over-cap hash without deriving", async () => {
+    const spy = emulateWorkersCap();
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(await verifyPassword("anything", "pbkdf2$600000$c2FsdA==$aGFzaA==")).toBe(false);
+    expect(spy).not.toHaveBeenCalled();
+    expect(errSpy).toHaveBeenCalledWith(expect.stringMatching(/above the Workers cap/));
   });
 
   // A literal iteration count elsewhere is how login.js kept asking for

@@ -1,11 +1,98 @@
 // Direct tests for the PBKDF2 password hashing utility: pins the on-disk
 // hash format (pbkdf2$iterations$salt$hash), the roundtrip, salt uniqueness,
 // and the iteration count.
-import { describe, expect, it } from "vitest";
-import { hashPassword, verifyPassword } from "../crypto.js";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_ITERATIONS, WORKERS_PBKDF2_MAX_ITERATIONS, hashPassword, verifyPassword } from "../crypto.js";
 
-// Mirrors crypto.js's DEFAULT_ITERATIONS (not exported).
-const EXPECTED_ITERATIONS = 600000;
+// The production Workers runtime's exact refusal, measured on the live edge
+// 2026-10-10. Node and local workerd do NOT enforce it, which is the whole
+// reason this file has to emulate it.
+const WORKERS_CAP = 100000;
+const WORKERS_CAP_ERROR = (n) =>
+  Object.assign(new Error(`Pbkdf2 failed: iteration counts above 100000 are not supported (requested ${n}).`), {
+    name: "NotSupportedError",
+  });
+
+describe("crypto.js — the production Workers PBKDF2 cap", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("pins the cap to the value production enforces", () => {
+    expect(WORKERS_PBKDF2_MAX_ITERATIONS).toBe(WORKERS_CAP);
+    expect(DEFAULT_ITERATIONS).toBeLessThanOrEqual(WORKERS_CAP);
+  });
+
+  // The guard that would have caught #426. Raising DEFAULT_ITERATIONS above
+  // the cap makes hashPassword throw here exactly as it threw in production.
+  it("hashPassword succeeds under a runtime that refuses > 100,000 iterations", async () => {
+    const realDeriveBits = crypto.subtle.deriveBits.bind(crypto.subtle);
+    vi.spyOn(crypto.subtle, "deriveBits").mockImplementation(async (params, key, length) => {
+      if (params?.name === "PBKDF2" && params.iterations > WORKERS_CAP) {
+        throw WORKERS_CAP_ERROR(params.iterations);
+      }
+      return realDeriveBits(params, key, length);
+    });
+
+    const password = "CorrectHorseBatteryStaple1!";
+    const hash = await hashPassword(password);
+    expect(Number(hash.split("$")[1])).toBe(DEFAULT_ITERATIONS);
+    expect(await verifyPassword(password, hash)).toBe(true);
+  });
+
+  // The emulation above is only worth trusting if it really refuses: prove
+  // the stub throws for an over-cap request rather than silently passing.
+  it("the emulated runtime really refuses an over-cap request", async () => {
+    const realDeriveBits = crypto.subtle.deriveBits.bind(crypto.subtle);
+    vi.spyOn(crypto.subtle, "deriveBits").mockImplementation(async (params, key, length) => {
+      if (params?.name === "PBKDF2" && params.iterations > WORKERS_CAP) {
+        throw WORKERS_CAP_ERROR(params.iterations);
+      }
+      return realDeriveBits(params, key, length);
+    });
+    const km = await crypto.subtle.importKey("raw", new TextEncoder().encode("x"), "PBKDF2", false, ["deriveBits"]);
+    await expect(
+      crypto.subtle.deriveBits(
+        { name: "PBKDF2", salt: new Uint8Array(16), iterations: 600000, hash: "SHA-256" },
+        km,
+        256,
+      ),
+    ).rejects.toThrow(/iteration counts above 100000 are not supported/);
+  });
+
+  // A literal iteration count elsewhere is how login.js kept asking for
+  // 600,000 after crypto.js was the only place meant to decide. Scan for any
+  // over-cap literal in functions/ outside tests.
+  it("no non-test file under functions/ hard-codes an over-cap iteration count", () => {
+    const root = join(__dirname, "..", "..");
+    const ITER_CONTEXT = /iteration/i;
+    const overCap = (line) =>
+      (line.match(/\b\d[\d_]{5,}\b/g) || []).some((n) => Number(n.replace(/_/g, "")) > WORKERS_CAP);
+    const OVER_CAP = { test: overCap };
+    const offenders = [];
+    const walk = (dir) => {
+      for (const name of readdirSync(dir)) {
+        const p = join(dir, name);
+        if (statSync(p).isDirectory()) {
+          if (name !== "__tests__" && name !== "node_modules") walk(p);
+        } else if (p.endsWith(".js")) {
+          readFileSync(p, "utf8")
+            .split("\n")
+            .forEach((line, i) => {
+              if (ITER_CONTEXT.test(line) && OVER_CAP.test(line) && !line.trim().startsWith("//")) {
+                offenders.push(`${relative(root, p)}:${i + 1}: ${line.trim()}`);
+              }
+            });
+        }
+      }
+    };
+    walk(root);
+    expect(offenders).toEqual([]);
+    // Self-check: the scan's patterns still recognise the shape that shipped.
+    expect(ITER_CONTEXT.test("storedIterations < 600000") && OVER_CAP.test("storedIterations < 600000")).toBe(true);
+    expect(OVER_CAP.test("iterations = 100000")).toBe(false);
+  });
+});
 
 describe("crypto.js — PBKDF2 password hashing", () => {
   it("produces the pbkdf2$iterations$salt$hash format", async () => {
@@ -20,10 +107,10 @@ describe("crypto.js — PBKDF2 password hashing", () => {
     expect(digest.length).toBeGreaterThan(0);
   });
 
-  it("uses the documented iteration count", async () => {
+  it("uses the documented iteration count (the Workers cap, 100,000)", async () => {
     const hash = await hashPassword("CorrectHorseBatteryStaple1!");
     const [, iterations] = hash.split("$");
-    expect(Number(iterations)).toBe(EXPECTED_ITERATIONS);
+    expect(Number(iterations)).toBe(100000);
   });
 
   it("round-trips: a hash verifies against the password that produced it", async () => {

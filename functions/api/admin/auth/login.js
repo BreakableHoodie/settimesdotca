@@ -3,7 +3,7 @@
 // Body: { email: string, password: string }
 // Returns: { success: true, user: object } or error
 
-import { verifyPassword, hashPassword } from "../../../utils/crypto.js";
+import { verifyPassword, hashPassword, DEFAULT_ITERATIONS } from "../../../utils/crypto.js";
 import { generateCSRFToken, setCSRFCookie } from "../../../utils/csrf.js";
 import { getClientIP, parseJsonObjectBody } from "../../../utils/request.js";
 import { initializeLucia } from "../../../utils/auth.js";
@@ -156,15 +156,18 @@ export async function onRequestPost(context) {
     }
 
     // Password is valid — opportunistically upgrade the hash if it was created with
-    // fewer than 600 000 iterations. Best-effort: a write failure must not block login.
+    // fewer than DEFAULT_ITERATIONS. Best-effort: a write failure must not block login.
+    // The threshold is the shared constant, never a literal: a literal 600000 here
+    // made EVERY login attempt a rehash that the Workers runtime refused, and this
+    // catch hid it for months. Logged at error level so a failure here is visible.
     try {
       const storedIterations = Number(user.password_hash.split("$")[1]);
-      if (storedIterations && storedIterations < 600000) {
+      if (storedIterations && storedIterations < DEFAULT_ITERATIONS) {
         const newHash = await hashPassword(password);
         await DB.prepare("UPDATE users SET password_hash = ? WHERE id = ?").bind(newHash, user.id).run();
       }
     } catch (rehashError) {
-      logger.warn("opportunistic password rehash failed (login not affected)", {
+      logger.error("opportunistic password rehash failed (login not affected)", {
         userId: user.id,
         error: rehashError?.message,
       });

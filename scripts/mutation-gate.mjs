@@ -405,6 +405,15 @@ export const MUTATIONS = [
     replace: "eventDate",
     tests: ["functions/api/feeds/__tests__/ical.test.js"],
   },
+  {
+    id: "pbkdf2-workers-iteration-cap",
+    invariant:
+      "CLAUDE.md 'PBKDF2, not bcrypt' — production Workers refuse PBKDF2 above 100,000 iterations, so hashPassword must stay at or under the cap (600,000 broke signup and password reset from #426 until 2026-10-10)",
+    file: "functions/utils/crypto.js",
+    find: "export const DEFAULT_ITERATIONS = WORKERS_PBKDF2_MAX_ITERATIONS;",
+    replace: "export const DEFAULT_ITERATIONS = 600000;",
+    tests: ["functions/utils/__tests__/crypto.test.js"],
+  },
 ];
 
 // ============================================================================

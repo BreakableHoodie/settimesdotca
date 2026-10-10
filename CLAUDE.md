@@ -396,7 +396,11 @@ Every other `expires_at` column in the schema is `TEXT` (ISO-8601 / space-separa
 
 ### PBKDF2, not bcrypt
 
-Password hashing uses PBKDF2-SHA256 via the Web Crypto API (`functions/utils/crypto.js`). Current format is `pbkdf2$iterations$salt$hash` and is self-describing — `verifyPassword` reads the iteration count from the string itself, so hashes created before the default was bumped from 100,000 to 600,000 (`DEFAULT_ITERATIONS`) still verify unchanged. A second, older `salt:hash` format (no `pbkdf2$` prefix, predating the versioned format entirely) carries no iteration count at all; it's verified against the hardcoded `LEGACY_ITERATIONS` (100,000) fallback instead.
+Password hashing uses PBKDF2-SHA256 via the Web Crypto API (`functions/utils/crypto.js`). Current format is `pbkdf2$iterations$salt$hash` and is self-describing — `verifyPassword` reads the iteration count from the string itself. A second, older `salt:hash` format (no `pbkdf2$` prefix, predating the versioned format entirely) carries no iteration count at all; it's verified against the hardcoded `LEGACY_ITERATIONS` (100,000) fallback instead.
+
+**`DEFAULT_ITERATIONS` is capped at 100,000, because production refuses more.** The live Workers runtime throws `NotSupportedError: Pbkdf2 failed: iteration counts above 100000 are not supported` (measured on the edge 2026-10-10). **Node and local `wrangler dev` do not enforce it**, so no local run can catch a higher value. #426 raised the default to 600,000 anyway, and from 2026-06-28 to 2026-10-10 every `hashPassword` call in production threw: **signup and password reset were broken**, and login's "best-effort" rehash failed on every login inside a `catch` that only logged a warning, which is why nobody noticed. ADR 0005 and `scripts/reset-admin-password.js` already recorded the cap; this file claimed 600,000 as fact. OWASP's 600k is not reachable on this platform.
+
+The cap is `WORKERS_PBKDF2_MAX_ITERATIONS`, and callers import `DEFAULT_ITERATIONS`; never re-type a count (login's literal `600000` was half the bug). `functions/utils/__tests__/crypto.test.js` emulates the production refusal and scans `functions/` for any over-cap iteration literal; both are in the mutation gate.
 
 bcrypt requires a native binary (`better-sqlite3` style) that cannot run on Cloudflare Workers. Do not introduce bcrypt anywhere in `functions/`.
 

@@ -63,21 +63,56 @@ describe("admin signup", () => {
     expect(payload.requiresActivation).toBe(true);
     expect(payload.user).toBeUndefined();
 
-    // Verify the invite code was marked as used
-    const usedInvite = rawDb.prepare("SELECT * FROM invite_codes WHERE code = ?").get(inviteCode);
-    expect(usedInvite.used_by_user_id).toBeDefined();
-    expect(usedInvite.used_at).toBeDefined();
-
     const createdUser = rawDb
       .prepare(
-        "SELECT email, is_active, activation_token, activation_token_expires_at, activated_at FROM users WHERE email = ?",
+        "SELECT id, email, is_active, activation_token, activation_token_expires_at, activated_at FROM users WHERE email = ?",
       )
       .get("new.user@example.com");
     expect(createdUser).toBeDefined();
+
+    // The invite is claimed BY THIS USER. (toBeDefined() was vacuous here:
+    // null is defined, so an unclaimed invite passed.)
+    const usedInvite = rawDb.prepare("SELECT * FROM invite_codes WHERE code = ?").get(inviteCode);
+    expect(usedInvite.used_by_user_id).toBe(createdUser.id);
+    expect(usedInvite.used_at).toBeTruthy();
     expect(createdUser.is_active).toBe(0);
     expect(createdUser.activation_token).toBeTruthy();
     expect(createdUser.activation_token_expires_at).toBeTruthy();
     expect(createdUser.activated_at).toBeNull();
+  });
+
+  // #1255: two signups racing ONE open (not email-restricted) invite. The
+  // handler awaits a password hash between validating the invite and writing
+  // the user, so both requests pass validation before either writes. Exactly
+  // one may create an account; the other must be refused, with no second user
+  // and the invite claimed by the winner.
+  it("lets exactly one of two concurrent signups redeem a single invite (#1255)", async () => {
+    const { env, rawDb } = createTestEnv({ role: "editor" });
+    env.ALLOW_ADMIN_SIGNUP = "true";
+    const inviteCode = "RACE-INVITE-CODE-1255";
+    rawDb
+      .prepare("INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES (?, ?, ?, ?)")
+      .run(inviteCode, "admin", daysFromNow(7), 1);
+
+    const signup = (email) =>
+      signupHandler.onRequestPost({
+        request: new Request("https://example.test/api/admin/auth/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password: "StrongPass1!", name: "Race Runner", inviteCode }),
+        }),
+        env,
+      });
+
+    const [a, b] = await Promise.all([signup("racer.a@example.com"), signup("racer.b@example.com")]);
+    expect([a.status, b.status].sort()).toEqual([201, 403]);
+
+    const racers = rawDb
+      .prepare("SELECT id, email FROM users WHERE email IN ('racer.a@example.com', 'racer.b@example.com')")
+      .all();
+    expect(racers).toHaveLength(1);
+    const invite = rawDb.prepare("SELECT used_by_user_id FROM invite_codes WHERE code = ?").get(inviteCode);
+    expect(invite.used_by_user_id).toBe(racers[0].id);
   });
 
   it("rejects an expired invite code (T4)", async () => {

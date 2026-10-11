@@ -414,6 +414,17 @@ export const MUTATIONS = [
     replace: "export const DEFAULT_ITERATIONS = 600000;",
     tests: ["functions/utils/__tests__/crypto.test.js"],
   },
+  {
+    id: "signup-invite-single-redeem",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — an invite code creates at most one account: the user INSERT fires only while the invite is still unclaimed, in the same batch as the claim (#1255)",
+    file: "functions/api/admin/auth/signup.js",
+    // Keeps ONE bind parameter so the mutant fails on the race, not on a
+    // bind-count error (CLAUDE.md "Hand-rolled mutation runs").
+    find: "WHERE ${INVITE_STILL_OPEN}`,",
+    replace: "WHERE ? IS NOT NULL`,",
+    tests: ["functions/api/admin/auth/__tests__/signup.test.js"],
+  },
 ];
 
 // ============================================================================

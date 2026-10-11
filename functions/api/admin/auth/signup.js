@@ -235,11 +235,28 @@ export async function onRequestPost(context) {
     // against D1's datetime('now') in activate.js's SQL expiry guard.
     const activationExpires = toSqliteDateTime(new Date(Date.now() + 24 * 60 * 60 * 1000));
 
-    // Create user (inactive until activation)
-    const user = await DB.prepare(
-      "INSERT INTO users (email, password_hash, name, first_name, last_name, role, is_active, activation_token, activation_token_expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id, email, name, first_name, last_name, role",
-    )
-      .bind(
+    // Create the user AND claim the invite as ONE atomic step (#1255).
+    //
+    // The SELECT above validated the invite, but between it and here sits an
+    // awaited hash, so two signups racing one code could both pass it. The old
+    // claim (`UPDATE ... WHERE code = ?`, result unchecked) then let both create
+    // an account at the invite's role, which can be admin.
+    //
+    // Now the INSERT only fires while the invite is STILL unclaimed (the same
+    // predicate as the validation SELECT), and the claim UPDATE only matches
+    // an unclaimed row. D1 runs a batch as one transaction and serialises
+    // writers, so of two racing batches only the first inserts anyone; the
+    // second inserts nothing and reports changes === 0.
+    const INVITE_STILL_OPEN = `EXISTS (
+      SELECT 1 FROM invite_codes
+      WHERE code = ? AND is_active = 1 AND expires_at > datetime('now') AND used_by_user_id IS NULL
+    )`;
+    const [created] = await DB.batch([
+      DB.prepare(
+        `INSERT INTO users (email, password_hash, name, first_name, last_name, role, is_active, activation_token, activation_token_expires_at)
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+         WHERE ${INVITE_STILL_OPEN}`,
+      ).bind(
         email,
         passwordHash,
         resolvedName || null,
@@ -249,13 +266,41 @@ export async function onRequestPost(context) {
         0,
         activationToken,
         activationExpires,
-      )
-      .first();
+        inviteCode,
+      ),
+      DB.prepare(
+        `UPDATE invite_codes
+         SET used_by_user_id = (SELECT id FROM users WHERE email = ?), used_at = datetime('now')
+         WHERE code = ? AND used_by_user_id IS NULL`,
+      ).bind(email, inviteCode),
+    ]);
 
-    // Mark invite code as used
-    await DB.prepare("UPDATE invite_codes SET used_by_user_id = ?, used_at = datetime('now') WHERE code = ?")
-      .bind(user.id, inviteCode)
-      .run();
+    // Only an EXPLICIT changes === 0 means "lost the race" (CLAUDE.md: an
+    // absent meta must not turn a committed write into a false failure).
+    if (created?.meta?.changes === 0) {
+      await writeAuthAttempt(DB, {
+        attemptType: AUTH_ATTEMPT_TYPES.signup,
+        email,
+        failureReason: "invite_already_used",
+        ipAddress,
+        success: false,
+        userAgent: request.headers.get("User-Agent") || "unknown",
+      });
+      return new Response(
+        JSON.stringify({
+          error: "Invalid invite code",
+          message: "The invite code is invalid, expired, or has already been used",
+        }),
+        { status: 403, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    const user = await DB.prepare("SELECT id, email, name, first_name, last_name, role FROM users WHERE email = ?")
+      .bind(email)
+      .first();
+    if (!user) {
+      throw new Error("signup: user row missing after a committed create");
+    }
 
     // Also an audit row, not just an auth attempt (#1143). An admin creating a
     // user via users.js writes `user.created`; a self-signup through an invite

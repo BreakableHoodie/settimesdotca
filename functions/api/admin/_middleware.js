@@ -57,22 +57,36 @@ const KEY_FORBIDDEN_PREFIXES = [
   "/api/admin/users",
   "/api/admin/invite-codes",
   "/api/admin/api-keys",
+  // Security review 2026-10-11: maintenance reaches lucia_sessions, trusted_devices
+  // and password_reset_tokens through runRetentionCleanup, and the audit log exposes
+  // every user's IP and shows who is investigating. Both are human tasks.
+  "/api/admin/maintenance/",
+  "/api/admin/audit-log",
 ];
 
-// The denylist is matched against the raw path AND a canonical form, so a spelling
-// the router may still dispatch (%75sers, //users, USERS, bands%2f..%2fusers) cannot
-// step around it: decode, collapse slashes, resolve dot segments, lowercase.
-// Over-matching is the safe direction here: it can only refuse a key, never admit
-// one. A path that does not decode is refused outright.
+// The denylist is matched against THREE forms of the path, and refuses if any one
+// matches, so a spelling the router may still dispatch cannot step around it:
+//   - the raw path, lowercased: catches mixed case (the router may match
+//     case-insensitively) even when an encoded tail follows;
+//   - the decoded path, slashes collapsed, lowercased: catches %75sers and //users;
+//   - that path with dot segments resolved: catches bands%2f..%2fusers.
+// No single form is enough. Resolving dot segments SHRINKS the path, so
+// /API/ADMIN/USERS/1%2F..%2F..%2F.. resolves to /api/ and was admitted when the
+// resolved form stood in for the others (security review, 2026-10-11).
+// Over-matching is the safe direction: it can only refuse a key, never admit one.
+// A path that does not decode is refused outright.
 function isKeyForbiddenPath(pathname) {
-  let canonical;
+  let forms;
   try {
-    const decoded = decodeURIComponent(pathname).replace(/\/{2,}/g, "/");
-    canonical = new URL(decoded, "https://canonical.invalid").pathname.toLowerCase();
+    const decoded = decodeURIComponent(pathname)
+      .replace(/\/{2,}/g, "/")
+      .toLowerCase();
+    const resolved = new URL(decoded, "https://canonical.invalid").pathname.toLowerCase();
+    forms = [pathname, pathname.toLowerCase(), decoded, resolved];
   } catch {
     return true;
   }
-  return KEY_FORBIDDEN_PREFIXES.some((prefix) => pathname.startsWith(prefix) || canonical.startsWith(prefix));
+  return KEY_FORBIDDEN_PREFIXES.some((prefix) => forms.some((form) => form.startsWith(prefix)));
 }
 
 function normalizeUser(user) {

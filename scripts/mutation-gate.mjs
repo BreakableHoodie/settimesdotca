@@ -420,11 +420,20 @@ export const MUTATIONS = [
   {
     id: "api-key-denylist-canonical-path",
     invariant:
-      "CLAUDE.md 'API keys (#744)', request path — the key denylist also matches the decoded, slash-collapsed, dot-resolved, lowercased path",
+      "CLAUDE.md 'API keys (#744)', request path — the key denylist matches the lowercased raw path too, not only the dot-resolved one, which SHRINKS a path with an encoded ../ tail",
     file: "functions/api/admin/_middleware.js",
-    find: "pathname.startsWith(prefix) || canonical.startsWith(prefix)",
-    replace: "pathname.startsWith(prefix)",
+    find: "forms = [pathname, pathname.toLowerCase(), decoded, resolved];",
+    replace: "forms = [pathname, resolved];",
     tests: ["functions/api/admin/__tests__/api-key-auth.test.js"],
+  },
+  {
+    id: "api-key-me-hides-creator",
+    invariant:
+      "CLAUDE.md 'API keys (#744)', request path — /api/admin/me tells a key its own prefix and role, never its creator's email or name",
+    file: "functions/api/admin/me.js",
+    find: "if (data?.apiKey) {",
+    replace: "if (false) {",
+    tests: ["functions/api/admin/__tests__/me.test.js"],
   },
 ];
 

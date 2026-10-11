@@ -328,6 +328,9 @@ describe("API key authentication path (#744 part 3)", () => {
       ["/api/admin/api-keys", "GET"],
       ["/api/admin/api-keys", "POST"],
       ["/api/admin/api-keys/1", "DELETE"],
+      ["/api/admin/maintenance/cleanup-sessions", "POST"],
+      ["/api/admin/maintenance/retention", "POST"],
+      ["/api/admin/audit-log", "GET"],
     ];
 
     it.each(SELF_SERVICE)("%s (%s) returns 403 KEY_NOT_PERMITTED", async (path, method) => {
@@ -357,6 +360,10 @@ describe("API key authentication path (#744 part 3)", () => {
       "/api/admin/Invite-Codes",
       "/api/admin/bands%2f..%2fusers",
       "/api/admin/%E0%A4%A",
+      // Mixed case plus an encoded dot-segment tail: resolving dots shrinks these to
+      // /api/ and the denied prefix vanishes, so the resolved form alone admitted them.
+      "/API/ADMIN/USERS/1%2F..%2F..%2F..",
+      "/Api/admin/invite-codes/ABC%2F..%2F..",
     ])("refuses the non-canonical spelling %s", async (path) => {
       const { env, rawDb } = createTestEnv({ role: "admin" });
       const key = await seedKey(rawDb, { role: "admin" });

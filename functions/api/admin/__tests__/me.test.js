@@ -28,4 +28,19 @@ describe("GET /api/admin/me", () => {
     expect(payload.session).not.toHaveProperty("session_token");
     expect(payload.session).not.toHaveProperty("user_id");
   });
+
+  test("an API key learns its own role and nothing about its creator", async () => {
+    const response = await onRequestGet({
+      request: new Request("https://example.test/api/admin/me"),
+      data: {
+        user: { userId: 1, email: "creator-admin@test", name: "Creator Admin", role: "viewer" },
+        apiKey: { id: 7, keyPrefix: "st_abcd1234", role: "viewer" },
+      },
+    });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload).toEqual({ apiKey: { keyPrefix: "st_abcd1234", role: "viewer" }, authenticated: true });
+    expect(JSON.stringify(payload)).not.toContain("creator-admin@test");
+  });
 });

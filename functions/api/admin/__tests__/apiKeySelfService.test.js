@@ -72,13 +72,28 @@ function forbiddenPrefixes() {
 // A write to any table that defines who can sign in, at what role, or with what
 // credential. Case-insensitive because SQL is.
 const PRINCIPAL_WRITE =
-  /\b(?:INSERT\s+(?:OR\s+\w+\s+)?INTO|UPDATE|DELETE\s+FROM|REPLACE\s+INTO)\s+(?:users|invite_codes|api_keys|lucia_sessions|trusted_devices|mfa_challenges|password_reset_tokens|email_otp_codes)\b/i;
+  /\b(?:INSERT\s+(?:OR\s+\w+\s+)?INTO|UPDATE|DELETE\s+FROM|REPLACE\s+INTO)\s+(?:users|invite_codes|api_keys|lucia_sessions|sessions|trusted_devices|mfa_challenges|password_reset_tokens|email_otp_codes|webauthn_credentials)\b/i;
+
+// The route's own source AND every relative module it imports, one hop. A write
+// made inside an imported helper is the same write: cleanup-sessions reaches
+// lucia_sessions only through runRetentionCleanup in retention.js, and a
+// file-only scan never saw it (security review, 2026-10-11). utils/ is skipped:
+// it is shared by every route, and following it would flag the whole tree.
+function writesPrincipalTable(file) {
+  const source = readFileSync(file, "utf8");
+  if (PRINCIPAL_WRITE.test(source)) return true;
+  return [...source.matchAll(/from\s+["'](\.{1,2}\/[^"']+)["']/g)]
+    .map((m) => join(dirname(file), m[1]))
+    .filter((dep) => !dep.includes(join("functions", "utils")) && !dep.endsWith("_middleware.js"))
+    .some((dep) => PRINCIPAL_WRITE.test(readFileSync(dep, "utf8")));
+}
 
 // Reachable by a key and acting only on data it was given explicitly (params, body),
 // never on the caller's own account. Each entry is a decision that must be argued, not
 // a way to silence the test -- adding one without a reason is the failure mode here.
 const REVIEWED_UNGATED_ROUTES = {
-  "/api/admin/me": "read-only; returns the identity the key holder already has from the admin who minted the key",
+  "/api/admin/me":
+    "read-only; on the key path returns only the key's own prefix and role, never its creator's identity",
 };
 
 describe("API keys cannot reach account self-service endpoints", () => {
@@ -129,10 +144,16 @@ describe("API keys cannot reach account self-service endpoints", () => {
   // credential table can create, promote, or keep alive a principal, so a key must
   // never reach it. A new route of that shape fails here until it is denylisted.
   it("every route that writes an account or credential table is denied to API keys", () => {
-    const writers = routes.filter((file) => PRINCIPAL_WRITE.test(readFileSync(file, "utf8"))).map(routePathFor);
+    const writers = routes.filter((file) => writesPrincipalTable(file)).map(routePathFor);
     // The scan must still find what it hunts, or it reports all-clear forever.
     expect(writers).toEqual(
-      expect.arrayContaining(["/api/admin/users", "/api/admin/invite-codes", "/api/admin/api-keys"]),
+      expect.arrayContaining([
+        "/api/admin/users",
+        "/api/admin/invite-codes",
+        "/api/admin/api-keys",
+        // Reachable only through the import hop: proves the hop still works.
+        "/api/admin/maintenance/cleanup-sessions",
+      ]),
     );
 
     const reachable = writers.filter((route) => !prefixes.some((prefix) => route.startsWith(prefix)));

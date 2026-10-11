@@ -3181,6 +3181,13 @@ components:
         limits, and a revoked or expired key stops working on the very next request
         with no cache window.
 
+
+        Account and credential routes are session-only at every key role, including
+        `admin`: `/api/admin/auth/*`, `/mfa/*`, `/sessions*`, `/trusted-devices`,
+        `/users*`, `/invite-codes*` and `/api-keys*` answer 403 `KEY_NOT_PERMITTED`
+        before the key is verified. A key cannot create, promote, deactivate or list
+        accounts, mint invites, or mint another key.
+
   parameters:
     NumericId:
       name: id

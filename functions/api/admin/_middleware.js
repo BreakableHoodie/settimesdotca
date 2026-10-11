@@ -41,12 +41,39 @@ const LAST_USED_THROTTLE_MS = 5 * 60 * 1000;
 // /api/admin/me is deliberately NOT listed: it is a read that returns the identity
 // the key holder already obtained from the admin who minted the key, and a machine
 // client discovering its own role is a legitimate use. A decision, not an omission.
+//
+// ACCOUNT MANAGEMENT is denied for the same reason at a larger blast radius (owner
+// decision, 2026-10-11): /users (list, create, role, deactivate, reset password),
+// /invite-codes (mint accounts at any role) and /api-keys (a key minting a key
+// survives the revocation of the one that was leaked). A credential that can create
+// or promote principals is a persistence mechanism, so these are session-only at
+// every key role. apiKeySelfService.test.js fails if any route that writes an
+// account or credential table is missing from this list.
 const KEY_FORBIDDEN_PREFIXES = [
   "/api/admin/auth/",
   "/api/admin/mfa/",
   "/api/admin/sessions",
   "/api/admin/trusted-devices",
+  "/api/admin/users",
+  "/api/admin/invite-codes",
+  "/api/admin/api-keys",
 ];
+
+// The denylist is matched against the raw path AND a canonical form, so a spelling
+// the router may still dispatch (%75sers, //users, USERS, bands%2f..%2fusers) cannot
+// step around it: decode, collapse slashes, resolve dot segments, lowercase.
+// Over-matching is the safe direction here: it can only refuse a key, never admit
+// one. A path that does not decode is refused outright.
+function isKeyForbiddenPath(pathname) {
+  let canonical;
+  try {
+    const decoded = decodeURIComponent(pathname).replace(/\/{2,}/g, "/");
+    canonical = new URL(decoded, "https://canonical.invalid").pathname.toLowerCase();
+  } catch {
+    return true;
+  }
+  return KEY_FORBIDDEN_PREFIXES.some((prefix) => pathname.startsWith(prefix) || canonical.startsWith(prefix));
+}
 
 function normalizeUser(user) {
   if (!user) return null;
@@ -318,8 +345,8 @@ export async function onRequest(context) {
     // the path, not of any particular key, so a valid key and a forged one are refused
     // identically. It also costs zero D1 round-trips, which is the right posture for a
     // path an attacker can hammer for free.
-    if (KEY_FORBIDDEN_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
-      log.warn("API key blocked from account self-service route", {
+    if (isKeyForbiddenPath(pathname)) {
+      log.warn("API key blocked from an account route", {
         keyPrefix: bearerValue.slice(0, DISPLAY_PREFIX_LENGTH),
         path: pathname,
         ipAddress,
@@ -328,7 +355,8 @@ export async function onRequest(context) {
         JSON.stringify({
           error: "Not available to API keys",
           code: "KEY_NOT_PERMITTED",
-          message: "This endpoint acts on the account behind the key and is reachable only with a session.",
+          message:
+            "Account and credential endpoints are reachable only with a signed-in session, never with an API key.",
         }),
         { status: 403, headers: { "Content-Type": "application/json" } },
       );

@@ -6,7 +6,10 @@ import { generateApiKey, verifyApiKey } from "../../../utils/apiKeys.js";
 import { toSqliteDateTime } from "../../../utils/authAttempts.js";
 
 const BASE_URL = "https://example.test/api/admin/me";
-const API_KEYS_URL = "https://example.test/api/admin/api-keys";
+// A content route a key may legitimately reach. Not /api-keys: since 2026-10-11
+// account and credential routes are refused to keys before verification, so a
+// test aimed there would assert the denylist instead of what it names.
+const CONTENT_URL = "https://example.test/api/admin/venues";
 
 async function seedKey(
   rawDb,
@@ -74,7 +77,7 @@ describe("API key authentication path (#744 part 3)", () => {
 
     const { response } = await runMiddleware(
       env,
-      keyRequest(key.plaintext, { method: "POST", url: API_KEYS_URL }),
+      keyRequest(key.plaintext, { method: "POST", url: CONTENT_URL }),
       adminGuardNext,
     );
 
@@ -87,7 +90,7 @@ describe("API key authentication path (#744 part 3)", () => {
 
     const { response } = await runMiddleware(
       env,
-      keyRequest(key.plaintext, { method: "POST", url: API_KEYS_URL }),
+      keyRequest(key.plaintext, { method: "POST", url: CONTENT_URL }),
       adminGuardNext,
     );
 
@@ -180,7 +183,7 @@ describe("API key authentication path (#744 part 3)", () => {
       env,
       keyRequest(key.plaintext, {
         method: "POST",
-        url: API_KEYS_URL,
+        url: CONTENT_URL,
         body: JSON.stringify({ name: "x" }),
       }),
       okNext,
@@ -194,7 +197,7 @@ describe("API key authentication path (#744 part 3)", () => {
     const sessionId = headers.Authorization.replace("Bearer ", "");
 
     const response = await onRequest({
-      request: new Request(API_KEYS_URL, {
+      request: new Request(CONTENT_URL, {
         method: "POST",
         headers: { Cookie: `session_token=${sessionId}`, "Content-Type": "application/json" },
         body: JSON.stringify({ name: "x" }),
@@ -265,7 +268,7 @@ describe("API key authentication path (#744 part 3)", () => {
       env,
       keyRequest(key.plaintext, {
         method: "POST",
-        url: API_KEYS_URL,
+        url: CONTENT_URL,
         body: JSON.stringify({}),
       }),
       okNext,
@@ -279,7 +282,7 @@ describe("API key authentication path (#744 part 3)", () => {
     expect(audit.api_key_id).toBe(key.id);
     const details = JSON.parse(audit.details);
     expect(details.method).toBe("POST");
-    expect(details.path).toBe("/api/admin/api-keys");
+    expect(details.path).toBe("/api/admin/venues");
   });
 
   it("a failed authentication logs the key prefix and never the full key", async () => {
@@ -311,6 +314,20 @@ describe("API key authentication path (#744 part 3)", () => {
       ["/api/admin/sessions/revoke-all", "POST"],
       ["/api/admin/trusted-devices", "GET"],
       ["/api/admin/auth/login", "POST"],
+      // Account management (owner decision 2026-10-11): a key must never create,
+      // promote, deactivate or list principals, or mint another key.
+      ["/api/admin/users", "GET"],
+      ["/api/admin/users", "POST"],
+      ["/api/admin/users/2", "PATCH"],
+      ["/api/admin/users/2", "DELETE"],
+      ["/api/admin/users/2/reset-password", "POST"],
+      ["/api/admin/users/2/toggle-status", "POST"],
+      ["/api/admin/invite-codes", "GET"],
+      ["/api/admin/invite-codes", "POST"],
+      ["/api/admin/invite-codes/abc", "DELETE"],
+      ["/api/admin/api-keys", "GET"],
+      ["/api/admin/api-keys", "POST"],
+      ["/api/admin/api-keys/1", "DELETE"],
     ];
 
     it.each(SELF_SERVICE)("%s (%s) returns 403 KEY_NOT_PERMITTED", async (path, method) => {
@@ -329,6 +346,44 @@ describe("API key authentication path (#744 part 3)", () => {
       expect(response.status).toBe(403);
       expect((await response.json()).code).toBe("KEY_NOT_PERMITTED");
       expect(reached).not.toHaveBeenCalled();
+    });
+
+    // The router may dispatch spellings a plain startsWith never sees. Each of these
+    // must be refused exactly like the canonical path.
+    it.each([
+      "/api/admin/%75sers",
+      "/api/admin//users",
+      "/api/admin/USERS",
+      "/api/admin/Invite-Codes",
+      "/api/admin/bands%2f..%2fusers",
+      "/api/admin/%E0%A4%A",
+    ])("refuses the non-canonical spelling %s", async (path) => {
+      const { env, rawDb } = createTestEnv({ role: "admin" });
+      const key = await seedKey(rawDb, { role: "admin" });
+      const reached = vi.fn(async () => new Response("ok", { status: 200 }));
+
+      const { response } = await runMiddleware(
+        env,
+        keyRequest(key.plaintext, { method: "POST", url: `https://example.test${path}` }),
+        reached,
+      );
+
+      expect(response.status).toBe(403);
+      expect((await response.json()).code).toBe("KEY_NOT_PERMITTED");
+      expect(reached).not.toHaveBeenCalled();
+    });
+
+    it("does not over-refuse a content route whose parameter merely contains a denied word", async () => {
+      const { env, rawDb } = createTestEnv({ role: "admin" });
+      const key = await seedKey(rawDb, { role: "admin" });
+
+      const { response } = await runMiddleware(
+        env,
+        keyRequest(key.plaintext, { url: "https://example.test/api/admin/bands/stats/The%20Users" }),
+        okNext,
+      );
+
+      expect(response.status).toBe(200);
     });
 
     it("refuses before verifying the key, so an invalid key gets the same answer", async () => {
@@ -351,7 +406,7 @@ describe("API key authentication path (#744 part 3)", () => {
       const { env, rawDb } = createTestEnv({ role: "admin" });
       const key = await seedKey(rawDb, { role: "admin" });
 
-      const { response } = await runMiddleware(env, keyRequest(key.plaintext, { url: API_KEYS_URL }), okNext);
+      const { response } = await runMiddleware(env, keyRequest(key.plaintext, { url: CONTENT_URL }), okNext);
 
       expect(response.status).toBe(200);
     });

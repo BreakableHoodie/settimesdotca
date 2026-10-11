@@ -69,6 +69,11 @@ function forbiddenPrefixes() {
   return [...block[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
 }
 
+// A write to any table that defines who can sign in, at what role, or with what
+// credential. Case-insensitive because SQL is.
+const PRINCIPAL_WRITE =
+  /\b(?:INSERT\s+(?:OR\s+\w+\s+)?INTO|UPDATE|DELETE\s+FROM|REPLACE\s+INTO)\s+(?:users|invite_codes|api_keys|lucia_sessions|trusted_devices|mfa_challenges|password_reset_tokens|email_otp_codes)\b/i;
+
 // Reachable by a key and acting only on data it was given explicitly (params, body),
 // never on the caller's own account. Each entry is a decision that must be argued, not
 // a way to silence the test -- adding one without a reason is the failure mode here.
@@ -111,6 +116,43 @@ describe("API keys cannot reach account self-service endpoints", () => {
       "/api/admin/sessions/revoke-all",
       "/api/admin/trusted-devices",
       "/api/admin/auth/login",
+    ]) {
+      expect(
+        prefixes.some((prefix) => route.startsWith(prefix)),
+        `${route} must be denied to API keys`,
+      ).toBe(true);
+    }
+  });
+
+  // The account-management class (owner decision 2026-10-11), by what a route DOES
+  // rather than what it is called: any dispatchable route that writes an account or
+  // credential table can create, promote, or keep alive a principal, so a key must
+  // never reach it. A new route of that shape fails here until it is denylisted.
+  it("every route that writes an account or credential table is denied to API keys", () => {
+    const writers = routes.filter((file) => PRINCIPAL_WRITE.test(readFileSync(file, "utf8"))).map(routePathFor);
+    // The scan must still find what it hunts, or it reports all-clear forever.
+    expect(writers).toEqual(
+      expect.arrayContaining(["/api/admin/users", "/api/admin/invite-codes", "/api/admin/api-keys"]),
+    );
+
+    const reachable = writers.filter((route) => !prefixes.some((prefix) => route.startsWith(prefix)));
+    expect(
+      reachable,
+      "These admin routes write an account or credential table and are reachable by an API key. " +
+        "Add them to KEY_FORBIDDEN_PREFIXES in _middleware.js.",
+    ).toEqual([]);
+  });
+
+  it("the account-management families are all covered", () => {
+    for (const route of [
+      "/api/admin/users",
+      "/api/admin/users/[id]",
+      "/api/admin/users/[id]/reset-password",
+      "/api/admin/users/[id]/toggle-status",
+      "/api/admin/invite-codes",
+      "/api/admin/invite-codes/[code]",
+      "/api/admin/api-keys",
+      "/api/admin/api-keys/[id]",
     ]) {
       expect(
         prefixes.some((prefix) => route.startsWith(prefix)),

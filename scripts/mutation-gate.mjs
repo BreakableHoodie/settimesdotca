@@ -405,6 +405,27 @@ export const MUTATIONS = [
     replace: "eventDate",
     tests: ["functions/api/feeds/__tests__/ical.test.js"],
   },
+  {
+    id: "api-key-account-management-denied",
+    invariant:
+      "CLAUDE.md 'API keys (#744)', request path — account management (/users, /invite-codes, /api-keys) is session-only at every key role",
+    file: "functions/api/admin/_middleware.js",
+    find: '  "/api/admin/users",',
+    replace: "",
+    tests: [
+      "functions/api/admin/__tests__/api-key-auth.test.js",
+      "functions/api/admin/__tests__/apiKeySelfService.test.js",
+    ],
+  },
+  {
+    id: "api-key-denylist-canonical-path",
+    invariant:
+      "CLAUDE.md 'API keys (#744)', request path — the key denylist also matches the decoded, slash-collapsed, dot-resolved, lowercased path",
+    file: "functions/api/admin/_middleware.js",
+    find: "pathname.startsWith(prefix) || canonical.startsWith(prefix)",
+    replace: "pathname.startsWith(prefix)",
+    tests: ["functions/api/admin/__tests__/api-key-auth.test.js"],
+  },
 ];
 
 // ============================================================================

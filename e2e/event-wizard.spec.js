@@ -3,11 +3,13 @@ import { loginAsAdmin } from "./utils/session";
 
 const uniqueSuffix = () => `${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-// Always 90 days from today — keeps tests valid as time passes
+// Always 90 days from today — keeps tests valid as time passes. Local date,
+// never toISOString() (that is UTC, the #1256 bug class); playwright.config.js
+// pins the runner's local zone to America/Toronto.
 const futureDate = () => {
   const d = new Date();
   d.setDate(d.getDate() + 90);
-  return d.toISOString().slice(0, 10);
+  return d.toLocaleDateString("en-CA");
 };
 
 const getCsrfToken = async (page) => {

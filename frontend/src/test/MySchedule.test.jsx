@@ -1,5 +1,5 @@
 import { afterEach, describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import '@testing-library/jest-dom'
 import MySchedule from '../components/MySchedule'
@@ -363,5 +363,33 @@ describe('MySchedule — cancelled set gap suggestions', () => {
     expect(onToggleBand).toHaveBeenCalledTimes(1)
     expect(selectedBands).toEqual(bands)
     expect(selectedBands).not.toContain(candidateBand)
+  })
+
+  it('downloads the picked route as a calendar without fetching', async () => {
+    const createObjectURL = vi.fn(() => 'blob:route')
+    const revokeObjectURL = vi.fn()
+    vi.stubGlobal('URL', { ...URL, createObjectURL, revokeObjectURL })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    const blobSpy = vi.spyOn(globalThis, 'Blob')
+    const clickSpy = vi.spyOn(globalThis.HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const bands = [makeBand(1, 'Picked Act', 'Room 47', '20:00', '21:00')]
+
+    renderSchedule({ bands, eventSlug: 'lwbc18', eventStartDate: '2026-05-17' })
+    fireEvent.click(screen.getByRole('button', { name: 'Add my route to calendar' }))
+
+    expect(blobSpy).toHaveBeenCalledWith(expect.any(Array), { type: 'text/calendar;charset=utf-8' })
+    const [blobParts] = blobSpy.mock.calls[0]
+    expect(blobParts[0]).toContain('Picked Act')
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(createObjectURL).toHaveBeenCalled()
+    expect(clickSpy).toHaveBeenCalled()
+    // Revoked on the NEXT tick (Safari aborts a download revoked in the same
+    // tick), but it must still be revoked, or every click leaks a blob.
+    expect(revokeObjectURL).not.toHaveBeenCalled()
+    await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith('blob:route'))
+    // The temporary link is removed again.
+    expect(document.querySelector('a[download$="-my-route.ics"]')).toBeNull()
+
+    vi.restoreAllMocks()
   })
 })

@@ -26,6 +26,7 @@ import { dayNumberMapFromDays, formatFestivalDate, orderedFestivalDays } from '.
 import { prepareBands } from '../utils/bandUtils'
 import { suggestGapFillers } from '../utils/gapSuggestions'
 import { formatTime, formatTimeRange } from '../utils/timeFormat'
+import { buildRouteIcs } from '../utils/routeIcs'
 import { useFestivalDayFilter } from '../hooks/useFestivalDayFilter'
 import BandCard from './BandCard'
 import LockInLineupPanel from './LockInLineupPanel'
@@ -135,6 +136,7 @@ function MySchedule({
   nowOverride,
   onBrowseAll,
   eventSlug,
+  eventName = null,
   eventId,
   doorsJson = null,
   festivalDays: festivalDaysProp = null,
@@ -312,6 +314,45 @@ function MySchedule({
     }, [])
   }, [bands])
 
+  const timedBands = bands.filter(band => band.startTime)
+  const canAddRouteToCalendar = timedBands.length > 0
+
+  const downloadRouteCalendar = () => {
+    if (!canAddRouteToCalendar) return
+
+    const ical = buildRouteIcs({
+      event: { name: eventName, slug: eventSlug, date: eventStartDate },
+      sets: bands,
+    })
+    const blob = new window.Blob([ical], { type: 'text/calendar;charset=utf-8' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${eventSlug || 'settimes'}-my-route.ics`
+    // Attached for the click and revoked on the NEXT tick: some browsers
+    // (Safari, older Firefox) abort a download whose URL is revoked in the
+    // same tick, or whose link is not in the document.
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.setTimeout(() => window.URL.revokeObjectURL(url), 0)
+  }
+
+  const routeCalendarControl = (
+    <div className="flex flex-col items-center gap-1">
+      <button
+        type="button"
+        onClick={downloadRouteCalendar}
+        disabled={!canAddRouteToCalendar}
+        className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded border border-accent-500/50 bg-accent-500/20 px-3 py-1.5 text-xs font-semibold text-accent-400 transition-colors hover:bg-accent-500/30 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-500 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <CalendarPlus size={14} aria-hidden="true" />
+        Add my route to calendar
+      </button>
+      {!canAddRouteToCalendar && <span className="text-xs text-text-tertiary">Your route has no timed sets yet.</span>}
+    </div>
+  )
+
   // Detect overlaps and conflicts
   const { conflicts, overlaps, overlapCount } = useMemo(() => {
     const conflicts = []
@@ -362,6 +403,7 @@ function MySchedule({
         </div>
         <p className="text-text-primary text-xl font-semibold">No bands selected yet</p>
         <p className="text-accent-400 text-sm">Tap a band to start building your schedule</p>
+        {routeCalendarControl}
         {onBrowseAll && (
           <button
             onClick={onBrowseAll}
@@ -388,6 +430,7 @@ function MySchedule({
         </div>
         <p className="text-text-primary text-xl font-semibold">No bands in your route for {activeDayLabel}</p>
         <p className="text-accent-400 text-sm">Switch days above, or browse the lineup to add more.</p>
+        {routeCalendarControl}
         {onBrowseAll && (
           <button
             onClick={onBrowseAll}
@@ -406,6 +449,7 @@ function MySchedule({
         {dayTabsControl}
         <p className="text-text-primary text-xl mb-2">All your selected bands have wrapped up</p>
         <p className="text-accent-400">Tap &ldquo;Show finished sets&rdquo; to revisit what you already caught.</p>
+        {routeCalendarControl}
         <div className="mt-4">
           <button
             onClick={onToggleShowPast}
@@ -472,7 +516,6 @@ function MySchedule({
 
   const reminder = getScheduleReminder()
   const hasFinishedBands = hiddenFinishedCount > 0
-
   const copyBands = async bandsToCopy => {
     if (bandsToCopy.length === 0) {
       return false
@@ -794,6 +837,8 @@ function MySchedule({
       <div className="max-w-5xl mx-auto">
         <LockInLineupPanel performanceIds={performanceIds} bandCount={performanceIds.length} />
       </div>
+
+      {routeCalendarControl}
 
       <div className="max-w-5xl mx-auto mt-8 text-center text-xs text-text-tertiary">
         <Car size={14} aria-hidden="true" className="mr-2 inline" />

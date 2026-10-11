@@ -1008,6 +1008,7 @@ function App() {
               nowOverride={debugTime}
               onBrowseAll={() => setView('all')}
               eventSlug={slug || eventData?.slug}
+              eventName={eventData?.name}
               eventId={eventData?.id}
               doorsJson={eventData?.doors_json}
               festivalDays={eventFestivalDays}

@@ -197,12 +197,26 @@ async function enforceSession(request, env) {
 // Role hierarchy: admin (3) > editor (2) > viewer (1)
 export async function checkPermission(context, requiredRole) {
   const { request, env, data } = context;
+  const roleHierarchy = { admin: 3, editor: 2, viewer: 1 };
+
+  if (!Object.hasOwn(roleHierarchy, requiredRole)) {
+    logger.error("Unknown required role", { requiredRole });
+    return {
+      error: true,
+      response: new Response(
+        JSON.stringify({
+          error: "Forbidden",
+          message: "Insufficient permissions",
+        }),
+        { status: 403, headers: { "Content-Type": "application/json" } },
+      ),
+    };
+  }
 
   if (data && data.user) {
     const user = data.user;
-    const roleHierarchy = { admin: 3, editor: 2, viewer: 1 };
     const userLevel = roleHierarchy[user.role] || 0;
-    const requiredLevel = roleHierarchy[requiredRole] || 0;
+    const requiredLevel = roleHierarchy[requiredRole];
 
     if (userLevel < requiredLevel) {
       return {
@@ -226,9 +240,8 @@ export async function checkPermission(context, requiredRole) {
   }
 
   const normalizedUser = normalizeUser(auth.result.user);
-  const roleHierarchy = { admin: 3, editor: 2, viewer: 1 };
   const userLevel = roleHierarchy[normalizedUser.role] || 0;
-  const requiredLevel = roleHierarchy[requiredRole] || 0;
+  const requiredLevel = roleHierarchy[requiredRole];
 
   if (userLevel < requiredLevel) {
     return {

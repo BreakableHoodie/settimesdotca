@@ -19,13 +19,16 @@ vi.mock("../../_middleware.js", () => ({
     const userId = role === "admin" ? 1 : role === "editor" ? 2 : 3;
 
     // Enforce minimal RBAC semantics for tests
-    if (level === "admin" && role !== "admin") {
+    if ((level === "admin" && role !== "admin") || (level === "editor" && role === "viewer")) {
       return {
         error: true,
-        response: new Response(JSON.stringify({ error: "Forbidden", message: "Admin required" }), {
-          status: 403,
-          headers: { "Content-Type": "application/json" },
-        }),
+        response: new Response(
+          JSON.stringify({ error: "Forbidden", message: level === "admin" ? "Admin required" : "Editor required" }),
+          {
+            status: 403,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
       };
     }
 
@@ -966,7 +969,7 @@ describe("Event API - handler integration", () => {
     expect(data.error).toBe("Validation error");
   });
 
-  it("archive requires admin role", async () => {
+  it("archive requires editor role", async () => {
     const rawDb = createTestDB();
     const env = { DB: createDBEnv(rawDb) };
     const ev = insertEvent(rawDb, { name: "Protected", slug: "protected" });
@@ -975,7 +978,7 @@ describe("Event API - handler integration", () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-test-role": "editor",
+        "x-test-role": "viewer",
       },
     });
 
@@ -1003,7 +1006,7 @@ describe("Event API - handler integration", () => {
     expect(res.status).toBe(403);
   });
 
-  it("archive endpoint requires admin and archives the event", async () => {
+  it("archive endpoint allows an editor and archives the event", async () => {
     const rawDb = createTestDB();
     const env = { DB: createDBEnv(rawDb) };
 
@@ -1012,7 +1015,7 @@ describe("Event API - handler integration", () => {
 
     const request = new Request(`https://example.test/api/admin/events/${ev.id}/archive`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-test-role": "admin" },
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
     });
 
     const res = await archiveHandler.onRequestPost({ request, env });

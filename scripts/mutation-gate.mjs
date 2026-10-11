@@ -543,6 +543,14 @@ export const MUTATIONS = [
     replace: "const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD",
     tests: ["functions/utils/__tests__/utcCalendarDayGuard.test.js"],
   },
+  {
+    id: "rbac-publish-requires-editor",
+    invariant: "CLAUDE.md 'RBAC Roles' — publishing an event requires editor permission or higher",
+    file: "functions/api/admin/events/[id]/publish.js",
+    find: 'checkPermission(context, "editor")',
+    replace: 'checkPermission(context, "viewer")',
+    tests: ["functions/api/admin/__tests__/rbacBoundaries.test.js"],
+  },
 ];
 
 // ============================================================================

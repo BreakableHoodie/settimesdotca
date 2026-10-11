@@ -667,10 +667,12 @@ The privacy policy's 30 days covers the live table. D1 Time Travel can hold earl
 Three roles in ascending order: `viewer` → `editor` → `admin`.
 
 - `viewer`: read-only access to all admin data
-- `editor`: can create/edit bands, events, lineup, and **create** venues (owner decision 2026-10-10: the person who builds editions is an editor); cannot edit or delete an existing venue (a rename or delete rewrites every past edition held there), archive an event, use the event wizard, or manage users. `VenuesTab` hides Edit/Delete from non-admins through `canManage`, so the screen never offers a button the server will refuse
-- `admin`: full access including user management and platform settings
+- `editor`: can create/edit bands, events, lineup, **archive** events, use the event wizard, and **create** venues (owner decision 2026-10-10: the person who builds editions is an editor); cannot edit or delete an existing venue (a rename or delete rewrites every past edition held there), delete events, or manage users. `VenuesTab` hides Edit/Delete from non-admins through `canManage`, so the screen never offers a button the server will refuse
+- `admin`: full access including editing or deleting venues, deleting events, user management, API keys, invite codes, audit log, maintenance, and platform settings
 
 Enforced via `checkPermission(context, "viewer"|"editor"|"admin")` in `functions/api/admin/_middleware.js`. Every mutating endpoint must call this before touching the database.
+
+**The route policy is one explicit table:** `POLICY` in `functions/api/admin/__tests__/rbacBoundaries.test.js`. Every admin handler must appear in it (a new route fails the build until someone declares who may call it), the role in the code must equal the table, and every role below each entry is called and must get 403 with no row written. The table is the source of truth on purpose: a guard that read the expected role FROM the code could never catch the code being weakened (the first draft did exactly that and survived the mutation). Changing who may call a route means changing the code AND this table in the same PR. `checkPermissionLiterals.test.js` and `checkPermission`'s fail-closed branch keep a misspelled role literal from silently granting access to everyone.
 
 ---
 

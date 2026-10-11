@@ -454,7 +454,8 @@ export default function AdminPanel({ currentUser, onLogout }) {
                 selectedEvent={selectedEvent}
                 onEventFilterChange={setSelectedEventId}
                 readOnly={!canEdit}
-                canArchiveEvents={isAdmin}
+                canArchiveEvents={canEdit}
+                canDeleteEvents={isAdmin}
               />
             )}
 

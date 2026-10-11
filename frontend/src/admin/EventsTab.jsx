@@ -209,6 +209,8 @@ const areEventPropsEqual = (prevProps, nextProps) => {
     // This comparator whitelists fields, so a new one that drives UI must be
     // listed here -- it is not enough to add it to the API projection.
     prevEvent.scheduled_count === nextEvent.scheduled_count &&
+    prevProps.canArchiveEvents === nextProps.canArchiveEvents &&
+    prevProps.canDeleteEvents === nextProps.canDeleteEvents &&
     (prevEvent.ticket_url || prevEvent.ticket_link) === (nextEvent.ticket_url || nextEvent.ticket_link)
   )
 }
@@ -225,6 +227,7 @@ const EventRow = memo(function EventRow({
   showToast,
   readOnly,
   canArchiveEvents,
+  canDeleteEvents,
 }) {
   const ticketLink = event.ticket_url || event.ticket_link
 
@@ -307,7 +310,7 @@ const EventRow = memo(function EventRow({
               <button
                 onClick={() => onArchive(event)}
                 className={`px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-sm font-medium transition-colors ${buttonFocusClass}`}
-                title="Archive event (admin only)"
+                title="Archive event (editor and above)"
               >
                 Archive
               </button>
@@ -321,12 +324,14 @@ const EventRow = memo(function EventRow({
                 Notify
               </button>
             )}
-            <button
-              onClick={() => onDelete(event)}
-              className={`px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors ${buttonFocusClass}`}
-            >
-              Delete
-            </button>
+            {canDeleteEvents && (
+              <button
+                onClick={() => onDelete(event)}
+                className={`px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors ${buttonFocusClass}`}
+              >
+                Delete
+              </button>
+            )}
           </div>
         </td>
       )}
@@ -344,6 +349,7 @@ const EventCard = memo(function EventCard({
   onNotifySubscribers,
   readOnly,
   canArchiveEvents,
+  canDeleteEvents,
 }) {
   return (
     <div className="p-4 space-y-3">
@@ -406,12 +412,14 @@ const EventCard = memo(function EventCard({
                 Notify
               </button>
             )}
-            <button
-              onClick={() => onDelete(event)}
-              className={`px-4 py-2 min-h-[44px] bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors ${buttonFocusClass}`}
-            >
-              Delete
-            </button>
+            {canDeleteEvents && (
+              <button
+                onClick={() => onDelete(event)}
+                className={`px-4 py-2 min-h-[44px] bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors ${buttonFocusClass}`}
+              >
+                Delete
+              </button>
+            )}
           </>
         )}
       </div>
@@ -438,6 +446,7 @@ export default function EventsTab({
   onEventFilterChange,
   readOnly = false,
   canArchiveEvents = false,
+  canDeleteEvents = false,
 }) {
   const { refreshEvents } = useEventContext()
   const [showModal, setShowModal] = useState(false)
@@ -1302,6 +1311,7 @@ export default function EventsTab({
                       showToast={showToast}
                       readOnly={readOnly}
                       canArchiveEvents={canArchiveEvents}
+                      canDeleteEvents={canDeleteEvents}
                     />
                   ))}
                 </tbody>
@@ -1322,6 +1332,7 @@ export default function EventsTab({
                   onDelete={handleDelete}
                   readOnly={readOnly}
                   canArchiveEvents={canArchiveEvents}
+                  canDeleteEvents={canDeleteEvents}
                 />
               ))}
             </div>

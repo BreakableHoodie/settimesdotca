@@ -6,16 +6,16 @@ vi.mock("../../_middleware.js", () => ({
   checkPermission: async (context) => {
     const { request } = context;
     const role = request.headers.get("x-test-role") || "editor";
-    if (role !== "admin") {
+    if (role === "viewer") {
       return {
         error: true,
-        response: new Response(JSON.stringify({ error: "Forbidden", message: "Admin required" }), {
+        response: new Response(JSON.stringify({ error: "Forbidden", message: "Editor required" }), {
           status: 403,
           headers: { "Content-Type": "application/json" },
         }),
       };
     }
-    return { error: false, user: { userId: 1, role: "admin" } };
+    return { error: false, user: { userId: role === "admin" ? 1 : 2, role } };
   },
   auditLog: async () => {},
 }));
@@ -52,9 +52,17 @@ beforeEach(() => {
 });
 
 describe("POST /api/admin/events/wizard - RBAC", () => {
-  it("returns 403 for non-admin users", async () => {
+  it("returns 201 for editor users", async () => {
     const res = await wizardHandler.onRequestPost({
       request: makeRequest(basePayload(), "editor"),
+      env,
+    });
+    expect(res.status).toBe(201);
+  });
+
+  it("returns 403 for viewer users", async () => {
+    const res = await wizardHandler.onRequestPost({
+      request: makeRequest(basePayload(), "viewer"),
       env,
     });
     expect(res.status).toBe(403);

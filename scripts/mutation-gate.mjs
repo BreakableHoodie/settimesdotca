@@ -516,6 +516,15 @@ export const MUTATIONS = [
     replace: "<loc>https://settimes.ca/events/${event.slug}/recap</loc>",
     tests: ["functions/__tests__/sitemap.test.js"],
   },
+  {
+    id: "ical-description-single-escape",
+    invariant:
+      "CLAUDE.md 'Pulling a band from a live lineup' — the iCal feed encodes a DESCRIPTION line break once; joining with a literal backslash-n before escaping makes calendars show the text \\n",
+    file: "functions/api/feeds/ical.js",
+    find: '.join("\\n");',
+    replace: '.join("\\\\n");',
+    tests: ["functions/api/feeds/__tests__/ical.test.js"],
+  },
 ];
 
 // ============================================================================

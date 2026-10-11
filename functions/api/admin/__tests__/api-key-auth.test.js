@@ -131,6 +131,18 @@ describe("API key authentication path (#744 part 3)", () => {
     expect(viewerContext.data.apiKey.role).toBe("viewer");
   });
 
+  // users.role has no CHECK constraint, and a bare object lookup treats
+  // inherited names as known: roleRank["constructor"] is truthy. A creator role
+  // like that must still fail closed (no key), never fall back to the key's role.
+  it("fails closed when the creator's role is an inherited object property name", async () => {
+    const { env, rawDb } = createTestEnv({ role: "admin" });
+    const key = await seedKey(rawDb, { role: "admin", created_by: 1 });
+    rawDb.prepare("UPDATE users SET role = 'constructor' WHERE id = ?").run(1);
+
+    const { response } = await runMiddleware(env, keyRequest(key.plaintext), okNext);
+    expect(response.status).toBe(401);
+  });
+
   it("a revoked key is rejected on the very next request — no TTL", async () => {
     const { env, rawDb } = createTestEnv({ role: "admin" });
     const key = await seedKey(rawDb, { role: "viewer" });

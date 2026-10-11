@@ -50,6 +50,34 @@ describe("Admin user item API", () => {
     expect(stillAdmin.role).toBe("admin");
   });
 
+  // The demotion pre-check used to count EVERY active admin (target included)
+  // with `<= 1`, so demoting an INACTIVE admin while one other admin was active
+  // was wrongly refused. It now counts the OTHER active admins, as the
+  // deactivation check does.
+  test("can demote an inactive admin while another active admin remains", async () => {
+    const { env, rawDb } = createTestEnv({ role: "admin" });
+    rawDb
+      .prepare(
+        "INSERT INTO users (email, role, name, password_hash, is_active) VALUES (?, 'admin', ?, 'placeholder', 0)",
+      )
+      .run("dormant-admin@test.com", "Dormant Admin");
+    const dormant = rawDb.prepare("SELECT id FROM users WHERE email = ?").get("dormant-admin@test.com");
+
+    const response = await userItemHandler.onRequestPatch({
+      request: new Request(`https://example.test/api/admin/users/${dormant.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: "editor" }),
+      }),
+      env,
+      params: { id: String(dormant.id) },
+      data: { user: { userId: 1, role: "admin" } },
+    });
+
+    expect(response.status).toBe(200);
+    expect(rawDb.prepare("SELECT role FROM users WHERE id = ?").get(dormant.id).role).toBe("editor");
+  });
+
   test("concurrent cross-demotions leave one active admin", async () => {
     const { env, rawDb } = createTestEnv({ role: "admin" });
     rawDb

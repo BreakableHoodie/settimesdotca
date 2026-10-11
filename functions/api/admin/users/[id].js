@@ -100,11 +100,16 @@ export async function onRequestPatch(context) {
       if (user.role === "admin" && role !== "admin") {
         const { results: adminUsers } = await DB.prepare(
           `
-          SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND is_active = 1
+          SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND is_active = 1 AND id != ?
         `,
-        ).all();
+        )
+          .bind(userId)
+          .all();
 
-        if (adminUsers[0].count <= 1) {
+        // Count the OTHER active admins, as the deactivation check below does.
+        // Counting every active admin including the target with `<= 1` wrongly
+        // refused demoting an INACTIVE admin while one other admin was active.
+        if (adminUsers[0].count < 1) {
           return new Response(
             JSON.stringify({
               error: "Cannot modify last admin",
@@ -321,6 +326,13 @@ export async function onRequestPatch(context) {
     const [userUpdate] = await DB.batch(mutationStatements);
     // Only an EXPLICIT changes === 0 means the guard refused (CLAUDE.md: an
     // absent meta must not turn a committed write into a false failure).
+    if (userUpdate?.meta?.changes === 0 && !protectsLastAdmin) {
+      // The unguarded UPDATE matched nothing: the user was deleted mid-request.
+      return new Response(JSON.stringify({ error: "Not found", message: "User not found" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     if (userUpdate?.meta?.changes === 0) {
       return new Response(
         JSON.stringify(

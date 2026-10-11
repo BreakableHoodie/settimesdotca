@@ -132,8 +132,11 @@ export async function verifyApiKey(DB, presentedKey) {
   }
 
   const roleRank = { viewer: 1, editor: 2, admin: 3 };
-  const keyRoleRank = roleRank[row.role];
-  const creatorRoleRank = roleRank[row.creator_role];
+  // Object.hasOwn, not a bare lookup: users.role has no CHECK constraint, and
+  // roleRank["constructor"] is truthy, so a stray value would otherwise pass
+  // the "unknown role fails closed" check below.
+  const keyRoleRank = Object.hasOwn(roleRank, row.role) ? roleRank[row.role] : 0;
+  const creatorRoleRank = Object.hasOwn(roleRank, row.creator_role) ? roleRank[row.creator_role] : 0;
   if (!keyRoleRank || !creatorRoleRank) {
     return undefined;
   }

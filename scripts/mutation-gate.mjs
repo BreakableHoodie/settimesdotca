@@ -425,6 +425,16 @@ export const MUTATIONS = [
     replace: "WHERE ? IS NOT NULL`,",
     tests: ["functions/api/admin/auth/__tests__/signup.test.js"],
   },
+  {
+    id: "signup-invite-claim-same-predicate",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — the invite claim UPDATE carries the user INSERT's predicate, so an invite that closes mid-request is never stamped used with no user behind it (#1252 review)",
+    file: "functions/api/admin/auth/signup.js",
+    // Keeps the bind count so the mutant fails on the assertion, not a bind error.
+    find: "WHERE code = ? AND ${INVITE_STILL_OPEN}`,",
+    replace: "WHERE code = ? AND ? IS NOT NULL`,",
+    tests: ["functions/api/admin/auth/__tests__/signup.test.js"],
+  },
 ];
 
 // ============================================================================

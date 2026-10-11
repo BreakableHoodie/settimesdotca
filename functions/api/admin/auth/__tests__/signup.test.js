@@ -115,6 +115,37 @@ describe("admin signup", () => {
     expect(invite.used_by_user_id).toBe(racers[0].id);
   });
 
+  // The claim UPDATE must carry the INSERT's predicate. An invite deactivated
+  // after validation but before the batch skips the INSERT; a claim keyed only
+  // on "unclaimed" would still stamp used_at with no user behind it.
+  it("leaves an invite untouched when it closes between validation and the write", async () => {
+    const { env, rawDb } = createTestEnv({ role: "editor" });
+    env.ALLOW_ADMIN_SIGNUP = "true";
+    const inviteCode = "CLOSES-MID-REQUEST-1252";
+    rawDb
+      .prepare("INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES (?, ?, ?, ?)")
+      .run(inviteCode, "editor", daysFromNow(7), 1);
+    const batch = env.DB.batch.bind(env.DB);
+    env.DB.batch = (statements) => {
+      rawDb.prepare("UPDATE invite_codes SET is_active = 0 WHERE code = ?").run(inviteCode);
+      return batch(statements);
+    };
+
+    const response = await signupHandler.onRequestPost({
+      request: new Request("https://example.test/api/admin/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "late@example.com", password: "StrongPass1!", name: "Late Comer", inviteCode }),
+      }),
+      env,
+    });
+
+    expect(response.status).toBe(403);
+    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM users WHERE email = 'late@example.com'").get().n).toBe(0);
+    const invite = rawDb.prepare("SELECT used_at, used_by_user_id FROM invite_codes WHERE code = ?").get(inviteCode);
+    expect(invite).toEqual({ used_at: null, used_by_user_id: null });
+  });
+
   it("rejects an expired invite code (T4)", async () => {
     const { env, rawDb } = createTestEnv({ role: "editor" });
     env.ALLOW_ADMIN_SIGNUP = "true";

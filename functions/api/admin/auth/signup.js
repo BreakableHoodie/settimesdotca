@@ -243,8 +243,10 @@ export async function onRequestPost(context) {
     // an account at the invite's role, which can be admin.
     //
     // Now the INSERT only fires while the invite is STILL unclaimed (the same
-    // predicate as the validation SELECT), and the claim UPDATE only matches
-    // an unclaimed row. D1 runs a batch as one transaction and serialises
+    // predicate as the validation SELECT), and the claim UPDATE carries that
+    // SAME predicate, so it fires exactly when the INSERT did. A narrower one
+    // (`used_by_user_id IS NULL` alone) stamped used_at on an invite that
+    // expired or was deactivated mid-request, with no user behind it. D1 runs a batch as one transaction and serialises
     // writers, so of two racing batches only the first inserts anyone; the
     // second inserts nothing and reports changes === 0.
     const INVITE_STILL_OPEN = `EXISTS (
@@ -271,8 +273,8 @@ export async function onRequestPost(context) {
       DB.prepare(
         `UPDATE invite_codes
          SET used_by_user_id = (SELECT id FROM users WHERE email = ?), used_at = datetime('now')
-         WHERE code = ? AND used_by_user_id IS NULL`,
-      ).bind(email, inviteCode),
+         WHERE code = ? AND ${INVITE_STILL_OPEN}`,
+      ).bind(email, inviteCode, inviteCode),
     ]);
 
     // Only an EXPLICIT changes === 0 means "lost the race" (CLAUDE.md: an

@@ -646,6 +646,10 @@ Two traps around this:
 
 `view_count_legacy` preserves each link's pre-#705 count. Nothing reads it. It keeps the cutover reversible and the old figure queryable.
 
+### Schedule builds are per-event pseudonyms, anonymised 30 days after the event (#1245)
+
+`schedule_builds.visitor_hash` stores a SHA-256 code of `scheduleSessionId|event_id`, never the raw schedule session id. The event component is deliberate: the same browser produces different values for different events and cannot be linked across them. For events concluded more than 30 days ago, the scheduled anonymiser replaces each remaining per-event value with an `anon:<rank>` label, preserving exact pick and distinct-builder counts while carrying no client-derived value. Existing `anon:` labels are retained and new labels start after the event's current maximum numeric label. **Never store the raw `scheduleSessionId`.**
+
 ---
 
 ## RBAC Roles

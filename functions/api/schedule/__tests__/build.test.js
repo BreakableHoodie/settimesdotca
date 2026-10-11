@@ -44,8 +44,58 @@ describe("POST /api/schedule/build", () => {
     expect(row).toMatchObject({
       event_id: event.id,
       performance_id: performance.id,
-      user_session: "session-123",
     });
+    expect(Object.values(row)).not.toContain("session-123");
+    expect(row.visitor_hash).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  test("hashes the same session differently for different events", async () => {
+    const { env, rawDb } = createTestEnv();
+    const firstEvent = insertEvent(rawDb, { name: "First", slug: "first", status: "published" });
+    const secondEvent = insertEvent(rawDb, { name: "Second", slug: "second", status: "published" });
+    const firstPerformance = insertBand(rawDb, { name: "First Band", event_id: firstEvent.id });
+    const secondPerformance = insertBand(rawDb, { name: "Second Band", event_id: secondEvent.id });
+    const post = (eventId, performanceId) =>
+      onRequestPost({
+        request: new Request("https://example.test/api/schedule/build", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ event_id: eventId, performance_ids: [performanceId], user_session: "same-session" }),
+        }),
+        env,
+      });
+
+    await post(firstEvent.id, firstPerformance.id);
+    await post(secondEvent.id, secondPerformance.id);
+
+    const hashes = rawDb.prepare("SELECT visitor_hash FROM schedule_builds ORDER BY event_id").all();
+    expect(hashes).toHaveLength(2);
+    expect(hashes[0].visitor_hash).not.toBe(hashes[1].visitor_hash);
+  });
+
+  test("deduplicates repeated builds for the same event and session", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { name: "Dedupe", slug: "dedupe", status: "published" });
+    const performance = insertBand(rawDb, { name: "Dedupe Band", event_id: event.id });
+    const request = () =>
+      onRequestPost({
+        request: new Request("https://example.test/api/schedule/build", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            event_id: event.id,
+            performance_ids: [performance.id],
+            user_session: "repeat-session",
+          }),
+        }),
+        env,
+      });
+
+    await request();
+    await request();
+    expect(rawDb.prepare("SELECT COUNT(*) AS count FROM schedule_builds WHERE event_id = ?").get(event.id).count).toBe(
+      1,
+    );
   });
 
   test("validates event_id", async () => {

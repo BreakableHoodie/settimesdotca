@@ -87,6 +87,24 @@ export const REPO_ROOT = path.join(__dirname, "..");
 /** @type {Mutation[]} */
 export const MUTATIONS = [
   {
+    id: "schedule-builds-hash-session",
+    invariant:
+      "CLAUDE.md 'Schedule builds are per-event pseudonyms, anonymised 30 days after the event (#1245)' — schedule builds never persist the raw schedule session id",
+    file: "functions/api/schedule/build.js",
+    find: ").bind(eventId, performanceId, visitorHash),",
+    replace: ").bind(eventId, performanceId, userSession),",
+    tests: ["functions/api/schedule/__tests__/build.test.js"],
+  },
+  {
+    id: "schedule-builds-retention-window",
+    invariant:
+      "CLAUDE.md 'Schedule builds are per-event pseudonyms, anonymised 30 days after the event (#1245)' — recent events remain pseudonymous until 30 days after conclusion",
+    file: "functions/scheduled/anonymize-schedule-builds.js",
+    find: "export const SCHEDULE_BUILD_ANONYMIZATION_DAYS = 30;",
+    replace: "export const SCHEDULE_BUILD_ANONYMIZATION_DAYS = 0;",
+    tests: ["functions/scheduled/__tests__/anonymize-schedule-builds.test.js"],
+  },
+  {
     id: "sitemap-upcoming-event-priority",
     invariant:
       "CLAUDE.md 'The sitemap is the event-discovery signal — spend it (#1158)' — an upcoming event outranks a concluded one",

@@ -281,18 +281,18 @@ describe("GET /api/admin/events/[id]/metrics", () => {
 
     // Alpha Band: 3 schedule builds across 3 sessions
     rawDb
-      .prepare("INSERT INTO schedule_builds (event_id, performance_id, user_session) VALUES (?, ?, ?)")
+      .prepare("INSERT INTO schedule_builds (event_id, performance_id, visitor_hash) VALUES (?, ?, ?)")
       .run(event.id, perfA.id, "session-1");
     rawDb
-      .prepare("INSERT INTO schedule_builds (event_id, performance_id, user_session) VALUES (?, ?, ?)")
+      .prepare("INSERT INTO schedule_builds (event_id, performance_id, visitor_hash) VALUES (?, ?, ?)")
       .run(event.id, perfA.id, "session-2");
     rawDb
-      .prepare("INSERT INTO schedule_builds (event_id, performance_id, user_session) VALUES (?, ?, ?)")
+      .prepare("INSERT INTO schedule_builds (event_id, performance_id, visitor_hash) VALUES (?, ?, ?)")
       .run(event.id, perfA.id, "session-3");
     // Beta Band: 1 schedule build, sharing session-3 with Alpha so the event
     // still has exactly 3 distinct visitor sessions overall
     rawDb
-      .prepare("INSERT INTO schedule_builds (event_id, performance_id, user_session) VALUES (?, ?, ?)")
+      .prepare("INSERT INTO schedule_builds (event_id, performance_id, visitor_hash) VALUES (?, ?, ?)")
       .run(event.id, perfB.id, "session-3");
 
     const res = await call(env, event.id);
@@ -329,7 +329,7 @@ describe("GET /api/admin/events/[id]/metrics", () => {
     );
 
     const insertBuild = rawDb.prepare(
-      "INSERT INTO schedule_builds (event_id, performance_id, user_session) VALUES (?, ?, ?)",
+      "INSERT INTO schedule_builds (event_id, performance_id, visitor_hash) VALUES (?, ?, ?)",
     );
     performances.forEach((performance) => insertBuild.run(event.id, performance.id, "large-route"));
     insertBuild.run(event.id, performances[0].id, "small-route");
@@ -354,7 +354,7 @@ describe("GET /api/admin/events/[id]/metrics", () => {
     const event = insertEvent(rawDb, { name: "No Views Fest", slug: "no-views-fest" });
     const performance = insertBand(rawDb, { name: "Solo Band", event_id: event.id });
     rawDb
-      .prepare("INSERT INTO schedule_builds (event_id, performance_id, user_session) VALUES (?, ?, ?)")
+      .prepare("INSERT INTO schedule_builds (event_id, performance_id, visitor_hash) VALUES (?, ?, ?)")
       .run(event.id, performance.id, "builder");
     rawDb
       .prepare("INSERT INTO event_daily_stats (event_id, date, event_views) VALUES (?, ?, ?)")

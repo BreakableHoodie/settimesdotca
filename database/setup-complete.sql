@@ -239,7 +239,7 @@ CREATE TABLE IF NOT EXISTS schedule_builds (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   event_id INTEGER NOT NULL,
   performance_id INTEGER NOT NULL,
-  user_session TEXT NOT NULL,              -- Session identifier (no PII)
+  visitor_hash TEXT NOT NULL,              -- Session identifier (no PII)
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
 
   FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
@@ -247,8 +247,6 @@ CREATE TABLE IF NOT EXISTS schedule_builds (
 );
 
 CREATE INDEX IF NOT EXISTS idx_schedule_builds_event ON schedule_builds(event_id);
-
-CREATE INDEX IF NOT EXISTS idx_schedule_builds_session ON schedule_builds(user_session);
 
 CREATE INDEX IF NOT EXISTS idx_schedule_builds_created ON schedule_builds(created_at);
 
@@ -273,9 +271,6 @@ CREATE INDEX IF NOT EXISTS idx_invite_codes_code ON invite_codes(code);
 CREATE INDEX IF NOT EXISTS idx_invite_codes_active ON invite_codes(is_active, expires_at);
 
 CREATE INDEX IF NOT EXISTS idx_invite_codes_email ON invite_codes(email);
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_schedule_builds_unique
-  ON schedule_builds(event_id, performance_id, user_session);
 
 CREATE TABLE IF NOT EXISTS mfa_challenges (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -562,6 +557,9 @@ CREATE TABLE IF NOT EXISTS "band_follow_notifications" (
 
 CREATE INDEX IF NOT EXISTS idx_band_follow_notifications_lookup
   ON band_follow_notifications(performance_id, band_follow_id, delivered_at, claimed_at);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_schedule_builds_unique
+  ON schedule_builds(event_id, performance_id, visitor_hash);
 
 -- ============================================
 -- TEST ACCOUNTS (passwords set by scripts/setup-local-db.sh)

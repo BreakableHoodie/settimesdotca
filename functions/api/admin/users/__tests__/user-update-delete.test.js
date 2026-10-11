@@ -50,6 +50,86 @@ describe("Admin user item API", () => {
     expect(stillAdmin.role).toBe("admin");
   });
 
+  test("concurrent cross-demotions leave one active admin", async () => {
+    const { env, rawDb } = createTestEnv({ role: "admin" });
+    rawDb
+      .prepare("INSERT INTO users (email, role, name, password_hash) VALUES (?, 'admin', ?, 'placeholder')")
+      .run("second-admin@test.com", "Second Admin");
+    const secondAdmin = rawDb.prepare("SELECT id FROM users WHERE email = ?").get("second-admin@test.com");
+
+    const makeContext = (actorId, targetId) => ({
+      request: new Request(`https://example.test/api/admin/users/${targetId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: "editor" }),
+      }),
+      env,
+      params: { id: String(targetId) },
+      data: { user: { userId: actorId, role: "admin" } },
+    });
+
+    const [first, second] = await Promise.all([
+      userItemHandler.onRequestPatch(makeContext(1, secondAdmin.id)),
+      userItemHandler.onRequestPatch(makeContext(secondAdmin.id, 1)),
+    ]);
+
+    const adminCount = rawDb
+      .prepare("SELECT COUNT(*) AS count FROM users WHERE role = 'admin' AND is_active = 1")
+      .get();
+    expect(adminCount.count).toBeGreaterThanOrEqual(1);
+    expect([first.status, second.status].filter((status) => status === 200)).toHaveLength(1);
+  });
+
+  // The guarded UPDATE and everything that depends on it (key revocation,
+  // session deletion, the audit row) commit in ONE batch, and every follow-up is
+  // conditioned on the change having applied. So the WINNING demotion revokes
+  // its target's keys and writes one audit row, and the LOSING request writes
+  // nothing: no revocation of a still-admin's keys, no audit row claiming a
+  // change that did not happen. A two-batch version could leave a demoted user
+  // with live keys if the second batch failed.
+  test("a lost last-admin race writes nothing; the winner revokes its target's keys in the same batch", async () => {
+    const { env, rawDb } = createTestEnv({ role: "admin" });
+    rawDb
+      .prepare("INSERT INTO users (email, role, name, password_hash) VALUES (?, 'admin', ?, 'placeholder')")
+      .run("second-admin@test.com", "Second Admin");
+    const secondAdmin = rawDb.prepare("SELECT id FROM users WHERE email = ?").get("second-admin@test.com");
+    const seedKey = (ownerId, hash) =>
+      rawDb
+        .prepare(
+          "INSERT INTO api_keys (name, key_prefix, key_hash, role, created_by, expires_at) VALUES (?, ?, ?, 'admin', ?, datetime('now', '+30 days'))",
+        )
+        .run(`key-${ownerId}`, "st_test", hash, ownerId);
+    seedKey(1, "test-hash-placeholder-a");
+    seedKey(secondAdmin.id, "test-hash-placeholder-b");
+
+    const patch = (actorId, targetId) =>
+      userItemHandler.onRequestPatch({
+        request: new Request(`https://example.test/api/admin/users/${targetId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ role: "editor" }),
+        }),
+        env,
+        params: { id: String(targetId) },
+        data: { user: { userId: actorId, role: "admin" } },
+      });
+    await Promise.all([patch(1, secondAdmin.id), patch(secondAdmin.id, 1)]);
+
+    const demoted = rawDb.prepare("SELECT id FROM users WHERE role = 'editor' AND id IN (1, ?)").all(secondAdmin.id);
+    const stillAdmin = rawDb.prepare("SELECT id FROM users WHERE role = 'admin' AND id IN (1, ?)").all(secondAdmin.id);
+    expect(demoted).toHaveLength(1);
+    expect(stillAdmin).toHaveLength(1);
+
+    const revoked = (ownerId) =>
+      rawDb.prepare("SELECT revoked_at FROM api_keys WHERE created_by = ?").get(ownerId).revoked_at;
+    expect(revoked(demoted[0].id)).toBeTruthy();
+    expect(revoked(stillAdmin[0].id)).toBeNull();
+
+    const audits = rawDb.prepare("SELECT resource_id FROM audit_log WHERE action = 'user.updated'").all();
+    expect(audits).toHaveLength(1);
+    expect(String(audits[0].resource_id)).toBe(String(demoted[0].id));
+  });
+
   test("admin deactivates user and sets deactivation metadata", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "admin" });
     rawDb

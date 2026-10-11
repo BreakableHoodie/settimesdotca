@@ -61,6 +61,35 @@ const isIdentifier = (value) => typeof value === "string" && IDENTIFIER.test(val
  * that silence is the point in the conditional case and a hazard in the creation
  * case, where you must pass a value the preceding INSERT just wrote.
  */
+/**
+ * An audit row that is written ONLY when `predicateSql` holds at execution
+ * time, for a batch whose main write is itself conditional (it may match
+ * nothing). Pass the same condition that proves the change applied, so a
+ * no-op write leaves no audit row claiming it happened. `predicateSql` is
+ * caller-written SQL with `?` placeholders; `predicateBinds` fills them.
+ */
+export function auditLogStatementWhere(
+  env,
+  predicateSql,
+  predicateBinds,
+  userId,
+  action,
+  resourceType,
+  resourceId,
+  details,
+  ipAddress,
+  apiKeyId,
+) {
+  const [type, id, detailsJson, ip, keyId] = normalize(resourceType, resourceId, details, ipAddress, apiKeyId);
+  return env.DB.prepare(
+    `
+    INSERT INTO audit_log (${AUDIT_LOG_COLUMNS})
+    SELECT ?, ?, ?, ?, ?, ?, ?
+    WHERE ${predicateSql}
+  `,
+  ).bind(userId, action, type, id, detailsJson, ip, keyId, ...predicateBinds);
+}
+
 export function auditLogStatementForInsertedRow(
   env,
   userId,

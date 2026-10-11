@@ -114,6 +114,7 @@ export async function verifyApiKey(DB, presentedKey) {
     `SELECT k.id, k.name, k.key_prefix, k.role, k.created_by, k.created_at,
             k.expires_at, k.last_used_at, k.revoked_at,
             u.email AS creator_email, u.name AS creator_name,
+            u.role AS creator_role,
             u.first_name AS creator_first_name, u.last_name AS creator_last_name
      FROM api_keys k
      JOIN users u ON u.id = k.created_by
@@ -129,6 +130,15 @@ export async function verifyApiKey(DB, presentedKey) {
   if (row.revoked_at !== null || !expiresAt || expiresAt.getTime() <= Date.now()) {
     return undefined;
   }
+
+  const roleRank = { viewer: 1, editor: 2, admin: 3 };
+  const keyRoleRank = roleRank[row.role];
+  const creatorRoleRank = roleRank[row.creator_role];
+  if (!keyRoleRank || !creatorRoleRank) {
+    return undefined;
+  }
+
+  row.role = keyRoleRank <= creatorRoleRank ? row.role : row.creator_role;
 
   return row;
 }

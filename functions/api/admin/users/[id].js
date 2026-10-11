@@ -3,7 +3,7 @@
 // DELETE /api/admin/users/:id - Delete user (soft delete)
 
 import { checkPermission } from "../_middleware.js";
-import { auditLogStatement } from "../../../utils/auditLogStatement.js";
+import { auditLogStatement, auditLogStatementWhere } from "../../../utils/auditLogStatement.js";
 import { getClientIP, parseJsonObjectBody } from "../../../utils/request.js";
 import { validateId } from "../../../utils/validation.js";
 
@@ -227,15 +227,50 @@ export async function onRequestPatch(context) {
       );
     }
 
-    // Add user ID to values
+    const demotingAdmin = user.role === "admin" && role !== undefined && role !== "admin";
+    const deactivatingAdmin = user.role === "admin" && isActive !== undefined && !isActive;
+    const protectsLastAdmin = demotingAdmin || deactivatingAdmin;
+    const deactivating = isActive !== undefined && !isActive;
+    const roleChanged = role !== undefined && role !== user.role;
+
+    // The pre-checks above provide the fast error. This predicate makes the
+    // UPDATE itself win the race when two admins change each other at once.
     values.push(userId);
+    if (protectsLastAdmin) {
+      values.push(userId);
+    }
+
+    const lastAdminCondition = protectsLastAdmin
+      ? " AND (SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_active = 1 AND id != ?) >= 1"
+      : "";
+
+    // ONE atomic batch. When the guarded UPDATE can no-op (it lost the
+    // last-admin race), every statement after it is conditioned on the change
+    // having APPLIED: the user row now carries the new role and/or is
+    // inactive. A lost race therefore writes nothing at all. Splitting this
+    // into two batches would let a failure between them leave a demoted or
+    // deactivated user with live API keys and sessions and no audit row,
+    // which is the exact hole the revocation below exists to close.
+    const appliedConditions = [];
+    const appliedBinds = [userId];
+    if (demotingAdmin) {
+      appliedConditions.push("role = ?");
+      appliedBinds.push(role);
+    }
+    if (deactivatingAdmin) appliedConditions.push("is_active = 0");
+    const applied = protectsLastAdmin
+      ? {
+          sql: `EXISTS (SELECT 1 FROM users WHERE id = ? AND ${appliedConditions.join(" AND ")})`,
+          binds: appliedBinds,
+        }
+      : { sql: "1", binds: [] };
 
     const mutationStatements = [
       DB.prepare(
         `
         UPDATE users
         SET ${updates.join(", ")}
-        WHERE id = ?
+        WHERE id = ?${lastAdminCondition}
       `,
       ).bind(...values),
     ];
@@ -244,19 +279,17 @@ export async function onRequestPatch(context) {
     // guard, the is_active write, and the deactivated_at stamp). A body of
     // `{"isActive": 0}` deactivates the user at every one of them, so it must
     // revoke their keys here too or the departed account keeps a live credential.
-    const deactivating = isActive !== undefined && !isActive;
     // api_keys.role is frozen at creation and never reconciled against its creator's
     // current role, so a demotion would otherwise leave a bearer credential still
     // carrying the role the user just lost -- letting them re-promote themselves with
     // it once the Bearer path exists. Any role change revokes, not just a demotion:
     // deciding which direction is "safe" needs the rank hierarchy, and over-revoking
     // is the fail-safe error. Reissuing a key is cheap; an un-demotable admin is not.
-    const roleChanged = role !== undefined && role !== user.role;
     if (deactivating || roleChanged) {
       mutationStatements.push(
-        DB.prepare("UPDATE api_keys SET revoked_at = datetime('now') WHERE created_by = ? AND revoked_at IS NULL").bind(
-          userId,
-        ),
+        DB.prepare(
+          `UPDATE api_keys SET revoked_at = datetime('now') WHERE created_by = ? AND revoked_at IS NULL AND ${applied.sql}`,
+        ).bind(userId, ...applied.binds),
       );
     }
     if (deactivating) {
@@ -264,12 +297,16 @@ export async function onRequestPatch(context) {
       // enforceSession already rejects an inactive user, so this is tidiness rather
       // than a live hole -- but two deactivation paths doing different amounts of
       // work is precisely the shape of the bug this change exists to fix.
-      mutationStatements.push(DB.prepare("DELETE FROM lucia_sessions WHERE user_id = ?").bind(userId));
+      mutationStatements.push(
+        DB.prepare(`DELETE FROM lucia_sessions WHERE user_id = ? AND ${applied.sql}`).bind(userId, ...applied.binds),
+      );
     }
 
     mutationStatements.push(
-      auditLogStatement(
+      auditLogStatementWhere(
         env,
+        applied.sql,
+        applied.binds,
         currentUser.userId,
         "user.updated",
         "user",
@@ -281,7 +318,25 @@ export async function onRequestPatch(context) {
       ),
     );
 
-    await DB.batch(mutationStatements);
+    const [userUpdate] = await DB.batch(mutationStatements);
+    // Only an EXPLICIT changes === 0 means the guard refused (CLAUDE.md: an
+    // absent meta must not turn a committed write into a false failure).
+    if (userUpdate?.meta?.changes === 0) {
+      return new Response(
+        JSON.stringify(
+          deactivatingAdmin
+            ? {
+                error: "Cannot deactivate last admin",
+                message: "Cannot deactivate the last active admin user",
+              }
+            : {
+                error: "Cannot modify last admin",
+                message: "Cannot remove admin role from the last active admin user",
+              },
+        ),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
 
     // Fetch updated user
     const updatedUser = await DB.prepare(

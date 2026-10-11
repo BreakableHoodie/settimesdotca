@@ -54,6 +54,10 @@ const adminGuardNext = async (ctx) => {
   const perm = await checkPermission(ctx, "admin");
   return perm.error ? perm.response : new Response("ok", { status: 200 });
 };
+const editorGuardNext = async (ctx) => {
+  const perm = await checkPermission(ctx, "editor");
+  return perm.error ? perm.response : new Response("ok", { status: 200 });
+};
 
 describe("API key authentication path (#744 part 3)", () => {
   it("authenticates a valid key and reaches the endpoint", async () => {
@@ -92,6 +96,39 @@ describe("API key authentication path (#744 part 3)", () => {
     );
 
     expect(response.status).toBe(403);
+  });
+
+  it("caps a key at its creator's current role, while preserving lower key roles", async () => {
+    const { env, rawDb } = createTestEnv({ role: "admin" });
+    const adminKey = await seedKey(rawDb, { role: "admin", created_by: 1 });
+    const viewerKey = await seedKey(rawDb, { role: "viewer", created_by: 1 });
+
+    rawDb.prepare("UPDATE users SET role = 'editor' WHERE id = ?").run(1);
+
+    const { response: adminResponse, context: adminContext } = await runMiddleware(
+      env,
+      keyRequest(adminKey.plaintext, { method: "POST", url: API_KEYS_URL }),
+      adminGuardNext,
+    );
+    expect(adminResponse.status).toBe(403);
+    expect(adminContext.data.user.role).toBe("editor");
+    expect(adminContext.data.apiKey.role).toBe("editor");
+
+    const { response: editorResponse } = await runMiddleware(
+      env,
+      keyRequest(adminKey.plaintext, { method: "POST", url: API_KEYS_URL }),
+      editorGuardNext,
+    );
+    expect(editorResponse.status).toBe(200);
+
+    const { response: viewerResponse, context: viewerContext } = await runMiddleware(
+      env,
+      keyRequest(viewerKey.plaintext),
+      editorGuardNext,
+    );
+    expect(viewerResponse.status).toBe(403);
+    expect(viewerContext.data.user.role).toBe("viewer");
+    expect(viewerContext.data.apiKey.role).toBe("viewer");
   });
 
   it("a revoked key is rejected on the very next request — no TTL", async () => {

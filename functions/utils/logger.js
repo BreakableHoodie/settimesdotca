@@ -156,21 +156,25 @@ function serializeMetadata(meta) {
  * Format log entry as structured JSON
  */
 function formatLogEntry(level, message, meta = {}) {
-  const entry = {
-    timestamp: new Date().toISOString(),
-    level,
-    message,
-  };
-
-  // Add metadata if present
+  let metadata = {};
   if (meta && typeof meta === "object" && Object.keys(meta).length > 0) {
     const serialized = serializeMetadata(meta);
     if (serialized && typeof serialized === "object") {
-      Object.assign(entry, serialized);
+      metadata = serialized;
     }
   }
 
-  return JSON.stringify(entry);
+  // The entry's own fields go LAST, so metadata can add context but never
+  // overwrite timestamp, level or message (#1247, code scanning #37). With
+  // Object.assign(entry, meta) a meta key named `level` or `message` rewrote
+  // the line: an error could be logged as "debug", or say something else.
+  // Spread defines own properties, so a `__proto__` key stays plain data.
+  return JSON.stringify({
+    ...metadata,
+    timestamp: new Date().toISOString(),
+    level,
+    message,
+  });
 }
 
 /**

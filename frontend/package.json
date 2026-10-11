@@ -76,7 +76,7 @@
     "vite": "^8.3.1",
     "vite-bundle-visualizer": "^1.0.0",
     "vitest": "^5.0.2",
-    "wrangler": "^4.142.0"
+    "wrangler": "^4.147.0"
   },
   "overrides": {
     "@lhci/cli": {
@@ -93,19 +93,16 @@
     "lighthouse": {
       "ws": "7.5.11"
     },
-    "node-gyp": {
-      "undici": "6.28.0"
-    },
     "@babel/core": "7.29.6",
     "@puppeteer/browsers": "3.2.0",
     "basic-ftp": "5.3.1",
     "esbuild": "0.28.1",
-    "sharp": "0.35.4",
     "js-yaml": "^4.3.2",
     "ajv": "^6.14.0",
     "body-parser": {
       "qs": "6.16.0"
-    }
+    },
+    "sharp": "0.35.5"
   },
   "engines": {
     "node": "^22.12.0 || ^24.0.0 || >=26.0.0"

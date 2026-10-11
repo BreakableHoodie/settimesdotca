@@ -80,8 +80,11 @@ export async function onRequestPost(context) {
   const { request, env } = context;
   const { DB } = env;
 
-  // RBAC: Require admin role (venues are structural)
-  const permCheck = await checkPermission(context, "admin");
+  // RBAC: editor. Creating a venue is part of building an edition, and the
+  // person who builds editions is an editor (owner decision 2026-10-10).
+  // Editing and deleting an existing venue stay admin-only in venues/[id].js:
+  // a rename or delete rewrites every past edition held there.
+  const permCheck = await checkPermission(context, "editor");
   if (permCheck.error) {
     return permCheck.response;
   }

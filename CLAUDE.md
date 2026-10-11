@@ -653,7 +653,7 @@ Two traps around this:
 Three roles in ascending order: `viewer` → `editor` → `admin`.
 
 - `viewer`: read-only access to all admin data
-- `editor`: can create/edit bands, events, lineup; cannot manage users
+- `editor`: can create/edit bands, events, lineup, and **create** venues (owner decision 2026-10-10: the person who builds editions is an editor); cannot edit or delete an existing venue (a rename or delete rewrites every past edition held there), archive an event, use the event wizard, or manage users. `VenuesTab` hides Edit/Delete from non-admins through `canManage`, so the screen never offers a button the server will refuse
 - `admin`: full access including user management and platform settings
 
 Enforced via `checkPermission(context, "viewer"|"editor"|"admin")` in `functions/api/admin/_middleware.js`. Every mutating endpoint must call this before touching the database.

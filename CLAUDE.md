@@ -1378,6 +1378,14 @@ Do not "fix" the App's check by moving the Rule Board to "Comment": that is a
 dashboard setting, not in git, not reviewable in a PR, and silently reversible
 by anyone with account access. The gate lives in the workflow on purpose.
 
+**The weekly security digest** (`.github/workflows/security-digest.yml`, `scripts/security-digest.mjs`, #1247) opens, updates or closes ONE issue labelled `security-digest`. It exists because 23 code-scanning and 8 Dependabot alerts sat unnoticed for weeks in October 2026. It opens when any Dependabot or code-scanning alert is older than 7 days, when a required scanner (`REQUIRED_SCANNERS`: CodeQL, Semgrep) has NO analysis or none newer than 14 days, or when `npm audit` (both lockfiles) reports an advisory not in `ACCEPTED_NPM_AUDIT`. Three properties are load-bearing:
+
+- **A failed read fails the job; it never reports zero.** A digest that says "0" because it could not look is exactly the silent failure it replaces. The only tolerated failure is the API's `404 "no analysis found"` for one tool name, which means "none", and the required-scanner rule then flags it.
+- **Analyses are fetched per tool by name**, never as "the newest N". A dead scanner falls off a shared page behind a live one's frequent runs and looks absent instead of stale.
+- **`ACCEPTED_NPM_AUDIT` holds recorded decisions only** (today: the Lighthouse CI chain, #1208). Without it the issue stays open permanently, and an alarm that is always on gets ignored. The digest lists accepted entries that are no longer flagged, so the list shrinks.
+
+Semgrep SARIF is uploaded again (category `semgrep`) on push and schedule runs. Before that, the Security tab's Semgrep alerts were frozen at 2026-09-14 and never closed.
+
 **Snyk Code (Snyk's SAST) is deliberately not enabled** (decided 2026-09-22).
 The Snyk PR check covers dependency manifests only. Semgrep was chosen because
 its gate is in git and its Pro ruleset is measured on this repo; Snyk Code would

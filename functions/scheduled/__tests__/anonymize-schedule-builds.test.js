@@ -78,6 +78,68 @@ describe("anonymizeScheduleBuilds", () => {
     expect(firstRun).toEqual([{ visitor_hash: "anon:1" }, { visitor_hash: "anon:3" }, { visitor_hash: "anon:4" }]);
     expect(secondRun).toEqual(firstRun);
   });
+
+  test("anonymises an event moved back to draft after it ran", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { slug: "unpublished-later", date: shiftDate(-31), status: "draft" });
+    seedBuilds(rawDb, event, ["raw-draft"]);
+
+    await anonymizeScheduleBuilds({}, env, {});
+
+    expect(rawDb.prepare("SELECT visitor_hash FROM schedule_builds WHERE event_id = ?").get(event.id)).toEqual({
+      visitor_hash: "anon:1",
+    });
+  });
+
+  test("one event failing does not stop the events after it", async () => {
+    const { env, rawDb } = createTestEnv();
+    const failing = insertEvent(rawDb, { slug: "failing", date: shiftDate(-40), status: "archived" });
+    const healthy = insertEvent(rawDb, { slug: "healthy", date: shiftDate(-35), status: "archived" });
+    seedBuilds(rawDb, failing, ["raw-fail"]);
+    seedBuilds(rawDb, healthy, ["raw-ok"]);
+    const realBatch = env.DB.batch.bind(env.DB);
+    env.DB.batch = async (statements) => {
+      const hitsFailing = rawDb
+        .prepare("SELECT 1 FROM schedule_builds WHERE event_id = ? AND visitor_hash = 'raw-fail'")
+        .get(failing.id);
+      if (hitsFailing && !env.__failedOnce) {
+        env.__failedOnce = true;
+        throw new Error("simulated D1 failure");
+      }
+      return realBatch(statements);
+    };
+
+    await anonymizeScheduleBuilds({}, env, {});
+
+    expect(rawDb.prepare("SELECT visitor_hash FROM schedule_builds WHERE event_id = ?").get(failing.id)).toEqual({
+      visitor_hash: "raw-fail",
+    });
+    expect(rawDb.prepare("SELECT visitor_hash FROM schedule_builds WHERE event_id = ?").get(healthy.id)).toEqual({
+      visitor_hash: "anon:1",
+    });
+  });
+
+  test("a label taken by a concurrent run is never reused for a different builder", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { slug: "race", date: shiftDate(-31), status: "archived" });
+    seedBuilds(rawDb, event, ["anon:1", "raw-late"]);
+    const extra = insertBand(rawDb, { name: "race-extra", event_id: event.id });
+    const realBatch = env.DB.batch.bind(env.DB);
+    env.DB.batch = async (statements) => {
+      // Another run claims anon:2 for a different builder between our read and our write.
+      rawDb
+        .prepare("INSERT INTO schedule_builds (event_id, performance_id, visitor_hash) VALUES (?, ?, 'anon:2')")
+        .run(event.id, extra.id);
+      return realBatch(statements);
+    };
+
+    await anonymizeScheduleBuilds({}, env, {});
+
+    const builders = rawDb
+      .prepare("SELECT COUNT(DISTINCT visitor_hash) AS n FROM schedule_builds WHERE event_id = ?")
+      .get(event.id);
+    expect(builders.n).toBe(3);
+  });
 });
 
 test("migration anonymises legacy rows while preserving distinct values", () => {

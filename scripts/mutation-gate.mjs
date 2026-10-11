@@ -105,6 +105,24 @@ export const MUTATIONS = [
     tests: ["functions/scheduled/__tests__/anonymize-schedule-builds.test.js"],
   },
   {
+    id: "schedule-builds-anonymiser-per-event-isolation",
+    invariant:
+      "CLAUDE.md 'Schedule builds are per-event pseudonyms, anonymised 30 days after the event (#1245)' — one failing event must not stop anonymisation of the rest",
+    file: "functions/scheduled/anonymize-schedule-builds.js",
+    find: "console.error(`[scheduled] Failed to anonymise schedule builds for event ${event.id}`, error);",
+    replace: "throw error;",
+    tests: ["functions/scheduled/__tests__/anonymize-schedule-builds.test.js"],
+  },
+  {
+    id: "schedule-builds-anonymiser-label-collision-guard",
+    invariant:
+      "CLAUDE.md 'Schedule builds are per-event pseudonyms, anonymised 30 days after the event (#1245)' — a label already in use is never reused for a different builder",
+    file: "functions/scheduled/anonymize-schedule-builds.js",
+    find: "AND NOT EXISTS (SELECT 1 FROM schedule_builds WHERE event_id = ? AND visitor_hash = ?)`,",
+    replace: "AND NOT EXISTS (SELECT 1 WHERE 0 AND ? IS ?)`,",
+    tests: ["functions/scheduled/__tests__/anonymize-schedule-builds.test.js"],
+  },
+  {
     id: "sitemap-upcoming-event-priority",
     invariant:
       "CLAUDE.md 'The sitemap is the event-discovery signal — spend it (#1158)' — an upcoming event outranks a concluded one",

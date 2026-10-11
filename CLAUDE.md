@@ -650,6 +650,14 @@ Two traps around this:
 
 `schedule_builds.visitor_hash` stores a SHA-256 code of `scheduleSessionId|event_id`, never the raw schedule session id. The event component is deliberate: the same browser produces different values for different events and cannot be linked across them. For events concluded more than 30 days ago, the scheduled anonymiser replaces each remaining per-event value with an `anon:<rank>` label, preserving exact pick and distinct-builder counts while carrying no client-derived value. Existing `anon:` labels are retained and new labels start after the event's current maximum numeric label. **Never store the raw `scheduleSessionId`.**
 
+Three things in `functions/scheduled/anonymize-schedule-builds.js` are load-bearing, each found in security review:
+
+- **Each event has its own try/catch.** With one try around the loop, a single failing event skipped every later event, every day, while the policy kept promising anonymisation.
+- **Each rewrite carries `NOT EXISTS` for its label.** Labels are computed from a read. A concurrent run could otherwise give the same `anon:N` to two builders and merge them, with no error unless they shared a set.
+- **Eligibility is keyed on the event's last date, not its status.** An event moved back to draft after it ran must still be anonymised.
+
+The privacy policy's 30 days covers the live table. D1 Time Travel can hold earlier values for its own window, and the policy says so.
+
 ---
 
 ## RBAC Roles

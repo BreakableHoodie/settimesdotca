@@ -47,11 +47,12 @@ export default function PrivacyPage() {
             <h3 className="text-text-secondary font-medium mb-2 mt-4">If you just browse</h3>
             <p>
               We count anonymous page views and artist profile visits (including social link clicks, ticket link clicks,
-              event views, and schedule builds) to understand which features are useful. When you add a set, the site
-              sends which sets you picked plus a random browser id. The server stores only a one-way per-event code,
-              which cannot be linked across events. Thirty days after the event, that code is replaced by an anonymous
-              sequence number. The counts show how many people plan schedules and which sets are popular. These metrics
-              are aggregated and do not identify individual visitors. We use Cloudflare Analytics Engine — a
+              event views, and schedule builds) to understand which features are useful. When you add sets to your
+              schedule, including by importing a shared one, the site sends which sets you picked plus a random browser
+              id. The server stores your picks under a one-way code that is different for each event, so they cannot be
+              linked across events. Thirty days after the event, that code is replaced by an anonymous sequence number.
+              Database backups may hold the earlier code for up to 30 days more. The counts show how many people plan
+              schedules and which sets are popular. None of this identifies you. We use Cloudflare Analytics Engine — a
               privacy-safe, aggregate, first-party metrics sink on our infrastructure provider (Cloudflare) — rather
               than third-party tracking scripts or tracking pixels. Limited request metadata may be processed briefly by
               Cloudflare for security and abuse prevention, but public browsing is not tied to a persistent account or

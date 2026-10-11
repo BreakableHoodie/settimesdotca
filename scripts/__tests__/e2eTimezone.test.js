@@ -47,13 +47,17 @@ describe("E2E clock matches the app clock (#1256)", () => {
         if (statSync(p).isDirectory()) {
           if (name !== "node_modules" && !name.endsWith("-snapshots")) walk(p);
         } else if (/\.(m?js|ts)$/.test(name)) {
-          readFileSync(p, "utf8")
-            .split("\n")
-            .forEach((line, i) => {
-              if (UTC_DATE_IDIOM.test(line) && !line.trim().startsWith("//")) {
-                offenders.push(`${relative(repo, p)}:${i + 1}: ${line.trim()}`);
-              }
-            });
+          // The WHOLE file, not line by line: a chain split across lines
+          // (`.toISOString()` then `.slice(0, 10)` on the next) evaded a
+          // per-line scan. \s in the pattern already spans newlines.
+          const source = readFileSync(p, "utf8");
+          for (const match of source.matchAll(new RegExp(UTC_DATE_IDIOM, "g"))) {
+            const lineStart = source.lastIndexOf("\n", match.index) + 1;
+            const line = source.slice(lineStart).split("\n")[0];
+            if (line.trim().startsWith("//")) continue;
+            const lineNo = source.slice(0, match.index).split("\n").length;
+            offenders.push(`${relative(repo, p)}:${lineNo}: ${match[0].replace(/\s+/g, " ")}`);
+          }
         }
       }
     };
@@ -67,6 +71,7 @@ describe("E2E clock matches the app clock (#1256)", () => {
     expect(UTC_DATE_IDIOM.test("return d.toISOString().slice(0, 10);")).toBe(true);
     expect(UTC_DATE_IDIOM.test("new Date().toISOString().split('T')[0]")).toBe(true);
     expect(UTC_DATE_IDIOM.test("x.toISOString().substring(0,10)")).toBe(true);
+    expect(UTC_DATE_IDIOM.test("d\n  .toISOString()\n  .slice(0, 10)")).toBe(true);
     expect(UTC_DATE_IDIOM.test('d.toLocaleDateString("en-CA")')).toBe(false);
   });
 });

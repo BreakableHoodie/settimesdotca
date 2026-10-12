@@ -213,7 +213,7 @@ function App() {
         // are never retried, which matters here because this effect aborts on
         // unmount and on every slug change.
         const data = await fetchPublicJson(
-          `/api/schedule?event=${eventParam}`,
+          `/api/schedule?event=${encodeURIComponent(eventParam)}`,
           { signal: controller.signal },
           'Failed to load schedule'
         )

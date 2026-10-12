@@ -123,7 +123,7 @@ export default function VenuePage() {
     setError(null)
     trackPageView(`/venue/${id}`)
     const seq = ++requestSeqRef.current
-    fetchPublicJson(`/api/venues/${id}`, {}, 'Failed to load venue')
+    fetchPublicJson(`/api/venues/${encodeURIComponent(id)}`, {}, 'Failed to load venue')
       .then(data => {
         if (!active || seq !== requestSeqRef.current) return
         setVenue(data.venue)
@@ -156,7 +156,7 @@ export default function VenuePage() {
     let pollInterval = null
     const refresh = () => {
       const seq = ++requestSeqRef.current
-      fetchPublicJson(`/api/venues/${id}`, {}, 'Failed to load venue')
+      fetchPublicJson(`/api/venues/${encodeURIComponent(id)}`, {}, 'Failed to load venue')
         .then(data => {
           if (!active || seq !== requestSeqRef.current) return
           setVenue(data.venue)

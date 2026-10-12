@@ -246,3 +246,19 @@ describe("GET /sitemap.xml — event crawl priority (#1158)", () => {
     expect(recap).toBeGreaterThan(eventPage);
   });
 });
+
+describe("GET /sitemap.xml — XML escaping (#1276)", () => {
+  test("a legacy slug with XML metacharacters is escaped, never emitted raw", async () => {
+    const { env, rawDb } = createTestEnv();
+    // Seeded straight into D1: the write paths now refuse this slug, but rows
+    // that predate that validation can still hold one.
+    const ev = insertEvent(rawDb, { name: "Odd Fest", slug: "a&b<c>\"'", date: "2020-01-01" });
+    publish(rawDb, ev.id);
+
+    const xml = await fetchSitemap(env);
+    expect(xml).toContain("<loc>https://settimes.ca/event/a&amp;b&lt;c&gt;&quot;&#39;</loc>");
+    expect(xml).toContain("<loc>https://settimes.ca/events/a&amp;b&lt;c&gt;&quot;&#39;/recap</loc>");
+    expect(xml).not.toContain("<c>");
+    expect(xml).not.toContain("a&b");
+  });
+});

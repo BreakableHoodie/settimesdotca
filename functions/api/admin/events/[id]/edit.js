@@ -5,7 +5,21 @@
 
 import { checkPermission, auditLog } from "../../_middleware.js";
 import { getClientIP, parseJsonObjectBody } from "../../../../utils/request.js";
-import { safeReflectSocialLinksString, validateId } from "../../../../utils/validation.js";
+import {
+  safeReflectSocialLinksString,
+  validateEntity,
+  validateId,
+  validationErrorResponse,
+  VALIDATION_SCHEMAS,
+} from "../../../../utils/validation.js";
+
+// Same field rules as event creation (events.js), reused rather than retyped so
+// an edit cannot accept a slug that create would reject (#1276). A slug lands
+// unescaped in the sitemap <loc> and in email hrefs, so format is a security
+// control here, not cosmetics. Renaming is still allowed -- only the shape is
+// enforced.
+const { name: nameRules, slug: slugRules, date: dateRules } = VALIDATION_SCHEMAS.event;
+const IDENTITY_SCHEMA = { name: nameRules, slug: slugRules, date: dateRules };
 
 export async function onRequestPut(context) {
   const { request, env, params } = context;
@@ -35,7 +49,8 @@ export async function onRequestPut(context) {
         },
       );
     }
-    const { name, date, slug, ticket_url } = body;
+    const { ticket_url } = body;
+    let { name, date, slug } = body;
 
     // Validation
     if (!name || !date || !slug) {
@@ -50,6 +65,14 @@ export async function onRequestPut(context) {
         },
       );
     }
+
+    // Format/length rules for name, date and slug (#1276). Use the sanitized
+    // values for the write: they are what the rules were actually applied to.
+    const identity = validateEntity({ name, date, slug }, IDENTITY_SCHEMA);
+    if (!identity.valid) {
+      return validationErrorResponse(Object.values(identity.errors)[0], { fields: identity.errors });
+    }
+    ({ name, date, slug } = identity.sanitized);
 
     // Validate ticket_url URL if provided
     if (ticket_url && !ticket_url.match(/^https?:\/\//)) {

@@ -172,8 +172,8 @@ export async function notifySubscribers(env, DB, { eventId, kind, eventName, eve
       text: `${lead}\n\n${eventName}: ${eventUrl}\n\nUnsubscribe: ${unsubUrl}`,
       html:
         `<p>${escapeHtml(lead)}</p>` +
-        `<p><a href="${eventUrl}">${escapeHtml(eventName)}</a></p>` +
-        `<p><a href="${unsubUrl}">Unsubscribe</a></p>`,
+        `<p><a href="${escapeHtml(eventUrl)}">${escapeHtml(eventName)}</a></p>` +
+        `<p><a href="${escapeHtml(unsubUrl)}">Unsubscribe</a></p>`,
     });
 
     if (result?.delivered !== true) {

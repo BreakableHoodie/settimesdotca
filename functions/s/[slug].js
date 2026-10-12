@@ -152,7 +152,7 @@ export async function onRequest(context) {
     `<meta name="twitter:description" content="${escapeAttr(ogDescription)}" />`,
   ].join("\n    ");
 
-  const injected = html.replace("</head>", `    ${metaTags}\n  </head>`);
+  const injected = html.replace("</head>", () => `    ${metaTags}\n  </head>`);
 
   // Preserve the shell's policy headers (CSP, etc.) but NOT its ETag and other
   // representation headers -- the body is rewritten (headersForRewrittenShell).

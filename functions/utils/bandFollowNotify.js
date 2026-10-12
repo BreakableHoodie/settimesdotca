@@ -76,7 +76,7 @@ export async function notifyBandFollowers(env, DB, { performanceId, bandProfileI
         subject: `${bandName} just joined the lineup for ${eventName}!`,
         idempotencyKey: `band-follow:${performanceId}:${follower.id}`,
         text: `${bandName} is now on the lineup for ${eventName}.\n\nUnfollow: ${unsubUrl}`,
-        html: `<p><strong>${escapeHtml(bandName)}</strong> is now on the lineup for <strong>${escapeHtml(eventName)}</strong>.</p><p><a href="${unsubUrl}">Unfollow this band</a></p>`,
+        html: `<p><strong>${escapeHtml(bandName)}</strong> is now on the lineup for <strong>${escapeHtml(eventName)}</strong>.</p><p><a href="${escapeHtml(unsubUrl)}">Unfollow this band</a></p>`,
       });
 
       const delivered = result?.delivered === true;

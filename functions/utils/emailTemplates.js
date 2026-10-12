@@ -1,3 +1,5 @@
+import { escapeHtml } from "./html.js";
+
 const BRAND = {
   name: "SetTimes",
   accent: "#f97316",
@@ -7,6 +9,9 @@ const BRAND = {
   muted: "#9ca3af",
 };
 
+// `intro` is plain text (callers reuse it verbatim in the text part, and it can
+// carry a recipient name), so it is escaped here. `bodyHtml` and `footerNote`
+// are the only intentional-HTML slots.
 function renderEmail({ title, preheader, intro, ctaLabel, ctaUrl, bodyHtml, footerNote }) {
   const preheaderText = preheader ? String(preheader) : "";
   const safeTitle = String(title);
@@ -42,18 +47,18 @@ function renderEmail({ title, preheader, intro, ctaLabel, ctaUrl, bodyHtml, foot
                     <h1 style="margin:0 0 12px; font-size:22px; font-weight:700; color:${BRAND.text};">
                       ${safeTitle}
                     </h1>
-                    ${intro ? `<p style="margin:0 0 16px; font-size:15px; color:${BRAND.muted};">${intro}</p>` : ""}
+                    ${intro ? `<p style="margin:0 0 16px; font-size:15px; color:${BRAND.muted};">${escapeHtml(intro)}</p>` : ""}
                     ${
                       ctaLabel && ctaUrl
                         ? `
                       <div style="margin:24px 0;">
-                        <a href="${ctaUrl}" style="display:inline-block; background:${BRAND.accent}; color:${BRAND.background}; text-decoration:none; font-weight:700; padding:12px 20px; border-radius:10px;">
+                        <a href="${escapeHtml(ctaUrl)}" style="display:inline-block; background:${BRAND.accent}; color:${BRAND.background}; text-decoration:none; font-weight:700; padding:12px 20px; border-radius:10px;">
                           ${ctaLabel}
                         </a>
                       </div>
                       <div style="font-size:12px; color:${BRAND.muted}; word-break:break-all;">
                         Or copy this link:<br />
-                        <a href="${ctaUrl}" style="color:${BRAND.accent}; text-decoration:none;">${ctaUrl}</a>
+                        <a href="${escapeHtml(ctaUrl)}" style="color:${BRAND.accent}; text-decoration:none;">${escapeHtml(ctaUrl)}</a>
                       </div>
                     `
                         : ""

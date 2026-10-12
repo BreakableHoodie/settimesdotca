@@ -127,3 +127,35 @@ describe("GET /s/[slug] — the OG card resolves only publicly-visible sets", ()
     expect(html).not.toContain("Their Act");
   });
 });
+
+describe("GET /s/[slug] — $-sequences in event data are literal (#1276)", () => {
+  it("an event name containing $& does not splice </head> into the card", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.ASSETS = {
+      fetch: async () =>
+        new Response("<html><head><title>SetTimes</title></head><body></body></html>", {
+          headers: { "Content-Type": "text/html" },
+        }),
+    };
+    const ev = insertEvent(rawDb, { name: "Fest $& End", slug: "dollar", status: "published" });
+    const band = insertBand(rawDb, { name: "Some Act", event_id: ev.id });
+    insertShareLink(rawDb, {
+      slug: "ogdollar1",
+      event_id: ev.id,
+      event_slug: "dollar",
+      performance_ids: [band.id],
+      band_names: ["Some Act"],
+    });
+
+    const html = await (
+      await onRequest({
+        params: { slug: "ogdollar1" },
+        env,
+        request: new Request("https://settimes.ca/s/ogdollar1"),
+      })
+    ).text();
+
+    expect(html).toContain("Fest $&amp; End");
+    expect(html.match(/<\/head>/g)).toHaveLength(1);
+  });
+});

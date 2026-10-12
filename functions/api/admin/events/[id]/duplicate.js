@@ -10,7 +10,18 @@
 
 import { checkPermission, auditLog } from "../../_middleware.js";
 import { getClientIP, parseJsonObjectBody } from "../../../../utils/request.js";
-import { normalizeHttpUrl, safeReflectSocialLinksString, validateId } from "../../../../utils/validation.js";
+import {
+  normalizeHttpUrl,
+  safeReflectSocialLinksString,
+  validateEntity,
+  validateId,
+  VALIDATION_SCHEMAS,
+} from "../../../../utils/validation.js";
+
+// Same field rules as event creation (events.js), reused rather than retyped so
+// a duplicate cannot mint a slug that create would reject (#1276).
+const { name: nameRules, slug: slugRules, date: dateRules } = VALIDATION_SCHEMAS.event;
+const IDENTITY_SCHEMA = { name: nameRules, slug: slugRules, date: dateRules };
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -44,7 +55,7 @@ export async function onRequestPost(context) {
         headers: { "Content-Type": "application/json" },
       });
     }
-    const { name, date, slug } = body;
+    let { name, date, slug } = body;
 
     if (!name || !date || !slug) {
       return json(
@@ -55,6 +66,15 @@ export async function onRequestPost(context) {
         400,
       );
     }
+
+    const identity = validateEntity({ name, date, slug }, IDENTITY_SCHEMA);
+    if (!identity.valid) {
+      return json(
+        { error: "Validation error", message: Object.values(identity.errors)[0], fields: identity.errors },
+        400,
+      );
+    }
+    ({ name, date, slug } = identity.sanitized);
 
     // Source event to copy from.
     const originalEvent = await DB.prepare("SELECT * FROM events WHERE id = ?").bind(eventId).first();

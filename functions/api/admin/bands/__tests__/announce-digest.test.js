@@ -766,3 +766,30 @@ describe("flushAnnounceDigest", () => {
     expect(errorSpy).toHaveBeenCalled();
   });
 });
+
+describe("flushAnnounceDigest href escaping (#1276)", () => {
+  it("a legacy event slug containing a quote cannot break out of the href attribute", async () => {
+    vi.clearAllMocks();
+    const { env, rawDb } = createTestEnv();
+    const slug = 'x" onmouseover="alert(1)';
+    const ev = insertEvent(rawDb, { name: "Fest", slug });
+    const venue = insertVenue(rawDb, { name: "Hall" });
+    const perf = insertBand(rawDb, { name: "The Band", event_id: ev.id, venue_id: venue.id });
+    const followId = rawDb
+      .prepare("INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)")
+      .run("fan@example.com", perf.band_profile_id, "tok-unsub").lastInsertRowid;
+    rawDb
+      .prepare(
+        `INSERT INTO band_announce_queue
+       (band_follow_id, performance_id, event_id, band_name, event_name, event_slug, band_profile_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(followId, perf.id, ev.id, "The Band", "Fest", slug, perf.band_profile_id);
+
+    await flushAnnounceDigest(env, env.DB);
+
+    const { html } = sendEmail.mock.calls[0][1];
+    expect(html).toContain("/event/x&quot; onmouseover=&quot;alert(1)");
+    expect(html).not.toContain('onmouseover="alert(1)');
+  });
+});

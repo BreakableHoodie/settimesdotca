@@ -166,7 +166,7 @@ export async function onRequestPost(context) {
           html: [
             "<p>Someone (hopefully you) asked to follow this lineup on SetTimes:</p>",
             `<ul>${bandListHtml}</ul>`,
-            `<p><a href="${confirmUrl}">Confirm your lineup</a> to get an email the moment set times drop.</p>`,
+            `<p><a href="${escapeHtml(confirmUrl)}">Confirm your lineup</a> to get an email the moment set times drop.</p>`,
             "<p>If this wasn't you, just ignore this email — you won't be subscribed.</p>",
           ].join(""),
         })

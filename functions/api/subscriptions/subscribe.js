@@ -5,6 +5,7 @@ import { generateToken } from "../../utils/tokens.js";
 import { sendEmail, isEmailConfigured } from "../../utils/email.js";
 import { isValidEmail } from "../../utils/validation.js";
 import { verifyTurnstile } from "../../utils/turnstile.js";
+import { escapeHtml } from "../../utils/html.js";
 import { getPublicBaseUrl } from "../../utils/publicUrl.js";
 import { parseJsonObjectBody } from "../../utils/request.js";
 
@@ -189,7 +190,7 @@ async function sendVerificationEmail(env, email, token) {
   const text = `Please confirm your subscription to SetTimes show announcements.\n\nVerify: ${verifyUrl}`;
   const html = `
     <p>Please confirm your subscription to SetTimes show announcements.</p>
-    <p><a href="${verifyUrl}">Verify your email</a></p>
+    <p><a href="${escapeHtml(verifyUrl)}">Verify your email</a></p>
   `.trim();
 
   if (isEmailConfigured(env)) {

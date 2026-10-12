@@ -4,7 +4,7 @@
 
 import { getPublicDataGateResponse } from "../../utils/publicGate.js";
 import { publicEventStatusSql } from "../../utils/eventVisibility.js";
-import { AFTER_MIDNIGHT_THRESHOLD_TIME, nextCalendarDay } from "../../utils/eventDay.js";
+import { AFTER_MIDNIGHT_THRESHOLD_TIME, eventLocalFestivalToday, nextCalendarDay } from "../../utils/eventDay.js";
 
 /**
  * A set's default duration when no end time was recorded: one hour after the
@@ -72,10 +72,15 @@ export async function onRequestGet(context) {
       LEFT JOIN band_profiles bp ON p.band_profile_id = bp.id
       LEFT JOIN venues v ON v.id = p.venue_id
       WHERE ${publicEventStatusSql("e")}
-      AND COALESCE(e.end_date, e.date) >= date('now')
+      AND COALESCE(e.end_date, e.date) >= ?
     `;
 
-    const params = [];
+    // The Toronto FESTIVAL day, never SQLite's date('now'), which is UTC. That
+    // rolled over at 8 PM Eastern on Vol 18's show night and emptied the feed
+    // for every subscriber while the remaining sets, after-midnight closer
+    // included, were still to play. eventLocalFestivalToday() keeps the event
+    // current until 06:00 local the morning after its last day.
+    const params = [eventLocalFestivalToday()];
 
     if (city !== "all") {
       query += ` AND LOWER(e.city) = LOWER(?)`;

@@ -865,3 +865,49 @@ describe("GET /api/feeds/ical — genre filter matches within free-text genres (
     expect(await summaries(env, "?genre=%25")).toEqual([]);
   });
 });
+
+// Vol 18 show night: the feed filtered on SQLite's date('now'), which is UTC,
+// so at 8 PM Eastern on the event's own day every set vanished from it. The
+// cutoff is the Toronto FESTIVAL day: the event stays until 06:00 local the
+// morning after its last day.
+describe("GET /api/feeds/ical — an event stays in the feed through its own festival day", () => {
+  const seed = (rawDb) => {
+    const event = insertEvent(rawDb, { name: "Show Night", slug: "show-night", date: "2026-10-11" });
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
+    const venue = insertVenue(rawDb, { name: "Blue Room" });
+    insertBand(rawDb, {
+      name: "Headliner",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "23:00",
+      end_time: "23:45",
+    });
+  };
+
+  const veventCountAt = async (iso) => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(iso));
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    seed(rawDb);
+    const res = await onRequestGet({ request: new Request("https://example.test/api/feeds/ical"), env });
+    expect(res.status).toBe(200);
+    return (await res.text()).split("BEGIN:VEVENT").length - 1;
+  };
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test("8:12 PM Eastern on show night (UTC already the next day) still lists the sets", async () => {
+    expect(await veventCountAt("2026-10-12T00:12:00Z")).toBe(1);
+  });
+
+  test("5:59 AM Eastern the morning after is still the festival day", async () => {
+    expect(await veventCountAt("2026-10-12T09:59:00Z")).toBe(1);
+  });
+
+  test("06:00 Eastern the morning after, the event leaves the feed", async () => {
+    expect(await veventCountAt("2026-10-12T10:00:00Z")).toBe(0);
+  });
+});

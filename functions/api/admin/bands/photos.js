@@ -6,7 +6,7 @@
  * Supports image validation, optimization, and secure file storage.
  */
 
-import { checkPermission, auditLog } from "../_middleware.js";
+import { checkPermission } from "../_middleware.js";
 import { auditLogStatementForInsertedRow } from "../../../utils/auditLogStatement.js";
 import { getClientIP } from "../../../utils/request.js";
 import { detectImageMimeType, MAX_FILE_SIZE, ALLOWED_IMAGE_TYPES } from "../../../utils/imageUpload.js";
@@ -188,65 +188,6 @@ export async function onRequestPost(context) {
     return new Response(
       JSON.stringify({
         error: "Photo upload failed",
-      }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      },
-    );
-  }
-}
-
-/**
- * DELETE /api/admin/bands/photos/:filename
- * Delete a photo from R2 bucket
- */
-export async function onRequestDelete(context) {
-  const { request, env } = context;
-
-  try {
-    const permCheck = await checkPermission(context, "editor");
-    if (permCheck.error) {
-      return permCheck.response;
-    }
-    const { user } = permCheck;
-
-    // Extract filename from URL path
-    const url = new URL(request.url);
-    const pathParts = url.pathname.split("/");
-    const encodedSegment = pathParts[pathParts.length - 1];
-    if (!encodedSegment || encodedSegment === "photos") {
-      return new Response(JSON.stringify({ error: "Filename required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    const objectKey = decodeURIComponent(encodedSegment);
-    if (!objectKey.startsWith("band-photos/")) {
-      return new Response(JSON.stringify({ error: "Invalid key" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    // Delete from R2 bucket
-    await env.BAND_PHOTOS.delete(objectKey);
-
-    // Destroying a photo is a change, and unlike the upload path there is no
-    // band_profile row to point at -- this route takes an object key, not a
-    // profile id. Logged against the key so the deletion is still attributable.
-    await auditLog(env, user.userId, "band.photo_deleted", "band_photo", null, { objectKey }, getClientIP(request));
-
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    console.error("Photo deletion error:", error);
-    return new Response(
-      JSON.stringify({
-        error: "Photo deletion failed",
       }),
       {
         status: 500,

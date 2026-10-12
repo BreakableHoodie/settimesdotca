@@ -1,5 +1,5 @@
 // Tests for functions/api/admin/bands/photos.js — POST /api/admin/bands/photos
-// (multipart photo intake) and DELETE /api/admin/bands/photos/:key.
+// (multipart photo intake).
 //
 // Mirrors functions/api/admin/events/__tests__/posters.test.js: same
 // magic-byte MIME validation (functions/utils/imageUpload.js), same R2
@@ -11,7 +11,7 @@
 // rather than a Blob `type:` option.
 
 import { describe, expect, test, vi } from "vitest";
-import { onRequestPost, onRequestDelete } from "../photos.js";
+import { onRequestPost } from "../photos.js";
 import { createTestDB, createDBEnv, insertEvent, insertVenue, insertBand } from "../../../test-utils.js";
 
 function jpegBytes() {
@@ -59,12 +59,6 @@ function postRequest(formData) {
   return new Request("https://example.test/api/admin/bands/photos", {
     method: "POST",
     body: formData,
-  });
-}
-
-function deleteRequest(encodedKey) {
-  return new Request(`https://example.test/api/admin/bands/photos/${encodedKey}`, {
-    method: "DELETE",
   });
 }
 
@@ -374,66 +368,5 @@ describe("POST /api/admin/bands/photos", () => {
 
     expect(res.status).toBe(200);
     expect(put).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe("DELETE /api/admin/bands/photos/:key", () => {
-  test("viewer role is forbidden (403)", async () => {
-    const { env, del } = buildEnv();
-
-    const res = await onRequestDelete({
-      request: deleteRequest(encodeURIComponent("band-photos/123-x.jpg")),
-      env,
-      data: { user: authedUser("viewer", 3) },
-    });
-
-    expect(res.status).toBe(403);
-    expect(del).not.toHaveBeenCalled();
-  });
-
-  test("a request with no filename segment returns 400", async () => {
-    const { env, del } = buildEnv();
-
-    const res = await onRequestDelete({
-      request: new Request("https://example.test/api/admin/bands/photos/", { method: "DELETE" }),
-      env,
-      data: { user: authedUser("editor", 2) },
-    });
-
-    expect(res.status).toBe(400);
-    const data = await res.json();
-    expect(data.error).toBe("Filename required");
-    expect(del).not.toHaveBeenCalled();
-  });
-
-  test("a key outside the band-photos/ prefix is rejected with 400", async () => {
-    const { env, del } = buildEnv();
-
-    const res = await onRequestDelete({
-      request: deleteRequest(encodeURIComponent("event-posters/123-x.jpg")),
-      env,
-      data: { user: authedUser("editor", 2) },
-    });
-
-    expect(res.status).toBe(400);
-    const data = await res.json();
-    expect(data.error).toBe("Invalid key");
-    expect(del).not.toHaveBeenCalled();
-  });
-
-  test("a valid band-photos/ key is deleted from R2 and returns success", async () => {
-    const { env, del } = buildEnv();
-    const key = "band-photos/1730000000000-band.jpg";
-
-    const res = await onRequestDelete({
-      request: deleteRequest(encodeURIComponent(key)),
-      env,
-      data: { user: authedUser("editor", 2) },
-    });
-
-    expect(res.status).toBe(200);
-    const data = await res.json();
-    expect(data.success).toBe(true);
-    expect(del).toHaveBeenCalledExactlyOnceWith(key);
   });
 });

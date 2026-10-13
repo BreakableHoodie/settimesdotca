@@ -27,11 +27,11 @@ const ADMIN_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
  * it green, because the rename still contains the substring. So would a mention
  * in a comment, or the unrelated `auditLogStatement` helper.
  *
- * `auditLogStatement` and `auditLogStatementForInsertedRow` DO count — they are
- * how a handler batches the audit row with its write, which is the better
- * pattern, not a lesser one.
+ * `auditLogStatement`, `auditLogStatementForInsertedRow` and
+ * `auditLogStatementWhere` DO count — they are how a handler batches the audit
+ * row with its write, which is the better pattern, not a lesser one.
  */
-const AUDIT_CALL = /\bauditLog(?:Statement(?:ForInsertedRow)?)?\s*\(/;
+const AUDIT_CALL = /\bauditLog(?:Statement(?:ForInsertedRow|Where)?)?\s*\(/;
 
 // Comments and string literals removed before the scan, so neither prose about
 // auditing nor a string containing `auditLog(` can stand in for doing it --
@@ -179,6 +179,7 @@ describe("admin audit coverage", () => {
     expect(AUDIT_CALL.test("await auditLog(env, id);")).toBe(true);
     expect(AUDIT_CALL.test("statements.push(auditLogStatement(env, id));")).toBe(true);
     expect(AUDIT_CALL.test("auditLogStatementForInsertedRow(env, id)")).toBe(true);
+    expect(AUDIT_CALL.test("statements.push(auditLogStatementWhere(env, sql, binds, id));")).toBe(true);
     expect(AUDIT_CALL.test("auditLogX(env, id)")).toBe(false);
     expect(AUDIT_CALL.test("// we should auditLog this later")).toBe(false);
     expect(stripNonCode("// auditLog(x)\ncode();")).not.toMatch(AUDIT_CALL);

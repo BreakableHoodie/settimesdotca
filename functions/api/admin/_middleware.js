@@ -436,6 +436,7 @@ export async function onRequest(context) {
     const normalizedUser = normalizeUser(user);
 
     const sessionData = {
+      id: sessionId,
       user_id: normalizedUser.userId,
       expires_at: session.expiresAt?.toISOString?.() || null,
       created_at: sessionMeta?.created_at || null,

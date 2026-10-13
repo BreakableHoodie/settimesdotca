@@ -49,25 +49,32 @@ function walk(dir) {
 const currentFile = fileURLToPath(import.meta.url);
 const functionsRoot = path.join(path.dirname(currentFile), "../../");
 
-// Files allowed to contain a flagged pattern, each with the reason. An entry
-// must keep matching: a fixed file left here would silently exempt the next
-// regression in it, so a stale entry fails the build (see the last test).
+// Files allowed to contain a flagged pattern, each with the reason and the
+// EXACT occurrences approved (duplicates included). An entry exempts those
+// occurrences, not the file: a new match in an allowlisted file fails like
+// anywhere else. An entry must also keep matching: a fixed file left here
+// would silently exempt the next regression in it (see the last test).
+const SLICE = "toISOString().slice(0, 10)";
+const SIX_HOURS = "date('now', '-6 hours')";
 const ALLOWED = {
   // Calendar arithmetic on dates BUILT in UTC from a Y-M-D (nextCalendarDay /
   // previousCalendarDay). The UTC day is the intended answer there, by
   // construction; this file is also the home of the Toronto-local helpers.
-  "utils/eventDay.js": "UTC-constructed calendar arithmetic, not a 'today'",
+  "utils/eventDay.js": { reason: "UTC-constructed calendar arithmetic, not a 'today'", hits: [SLICE, SLICE] },
   // Round-trips a noon-UTC probe to reject impossible dates (Feb 30). Never
   // asks what day it is.
-  "event/[slug].js": "noon-UTC validity probe, not a 'today'",
+  "event/[slug].js": { reason: "noon-UTC validity probe, not a 'today'", hits: [SLICE] },
   // Admin-only past-date check made deliberately LENIENT: "yesterday in UTC"
   // admits today in every timezone. It can refuse nothing a Toronto admin
   // should be allowed and hides nothing from fans.
-  "api/admin/events/wizard.js": "deliberately lenient admin cutoff",
+  "api/admin/events/wizard.js": { reason: "deliberately lenient admin cutoff", hits: [SLICE] },
   // Known live instances, tracked. Remove each entry in the PR that fixes it.
-  "api/feeds/ical.js": "#1269 — bare date('now') emptied the feed at 8 PM",
-  "api/schedule.js": "#1270 — date('now', '-6 hours') flips at 2 AM EDT",
-  "api/events/public.js": "#1270 — date('now', '-6 hours') flips at 2 AM EDT",
+  "api/feeds/ical.js": { reason: "#1269 — bare date('now') emptied the feed at 8 PM", hits: ["date('now')"] },
+  "api/schedule.js": { reason: "#1270 — date('now', '-6 hours') flips at 2 AM EDT", hits: [SIX_HOURS] },
+  "api/events/public.js": {
+    reason: "#1270 — date('now', '-6 hours') flips at 2 AM EDT",
+    hits: [SIX_HOURS, SIX_HOURS],
+  },
 };
 
 // Comment lines are dropped before scanning: several files explain this very
@@ -84,19 +91,24 @@ function stripComments(source) {
 
 const SQL_DATE_NOW_RE = /\bdate\(\s*(['"])now\1((?:\s*,\s*(['"])[^'"]*\3)*)\s*\)/gi;
 const ROLLING_WINDOW_MODIFIER_RE = /^[+-]?\d+\s+(?:days?|months?|years?)$/i;
+// `date('now', '+0 days')` is a no-op: still today's UTC date, not a window.
+const ZERO_OFFSET_MODIFIER_RE = /^[+-]?0+\s+(?:days?|months?|years?)$/i;
 const ISO_DATE_SLICE_RE =
-  /toISOString\(\)\s*\.\s*(?:slice\(\s*0\s*,\s*10\s*\)|substring\(\s*0\s*,\s*10\s*\)|split\(\s*(['"])T\1\s*\)\s*\[\s*0\s*\])/;
+  /toISOString\(\)\s*\.\s*(?:slice\(\s*0\s*,\s*10\s*\)|substring\(\s*0\s*,\s*10\s*\)|split\(\s*(['"])T\1\s*\)\s*\[\s*0\s*\])/g;
 
 function findUtcCalendarDays(source) {
   const code = stripComments(source);
   const hits = [];
   for (const match of code.matchAll(SQL_DATE_NOW_RE)) {
     const modifiers = [...match[2].matchAll(/(['"])([^'"]*)\1/g)].map((m) => m[2].trim());
-    const isRollingWindow = modifiers.length > 0 && modifiers.every((m) => ROLLING_WINDOW_MODIFIER_RE.test(m));
+    const isRollingWindow =
+      modifiers.length > 0 &&
+      modifiers.every((m) => ROLLING_WINDOW_MODIFIER_RE.test(m)) &&
+      modifiers.some((m) => !ZERO_OFFSET_MODIFIER_RE.test(m));
     if (!isRollingWindow) hits.push(match[0]);
   }
-  const slice = code.match(ISO_DATE_SLICE_RE);
-  if (slice) hits.push(slice[0]);
+  // Every occurrence, not the first: the allowlist approves exact counts.
+  for (const match of code.matchAll(ISO_DATE_SLICE_RE)) hits.push(match[0]);
   return hits;
 }
 
@@ -120,6 +132,8 @@ describe("no UTC calendar day in functions/ (Toronto-local, never UTC-sliced)", 
       'WHERE d >= date("now")',
       "WHERE d >= date('now', '-6 hours')",
       "WHERE d >= date( 'now' , '-1 day', '+4 hours')",
+      "WHERE d = date('now', '+0 days')",
+      "WHERE d = date('now', '-00 months')",
       "const today = new Date().toISOString().slice(0, 10);",
       "const today = new Date().toISOString().split('T')[0];",
       "const today = d.toISOString().substring(0, 10);",
@@ -147,10 +161,14 @@ describe("no UTC calendar day in functions/ (Toronto-local, never UTC-sliced)", 
     }
   });
 
-  it("has no UTC calendar day outside the allowlist", () => {
+  it("has no UTC calendar day outside the approved occurrences", () => {
+    const sorted = (list) => [...list].sort();
     const offenders = [...scan()]
-      .filter(([file]) => !(file in ALLOWED))
-      .map(([file, hits]) => `${file}: ${hits.join(" | ")}`);
+      .filter(([file, hits]) => JSON.stringify(sorted(hits)) !== JSON.stringify(sorted(ALLOWED[file]?.hits ?? [])))
+      .map(
+        ([file, hits]) =>
+          `${file}: found ${hits.join(" | ")}; approved ${(ALLOWED[file]?.hits ?? []).join(" | ") || "none"}`,
+      );
     expect(
       offenders,
       "A UTC calendar day rolls to tomorrow at 8 PM Eastern. Bind eventLocalFestivalToday() or eventLocalToday() " +
@@ -161,6 +179,8 @@ describe("no UTC calendar day in functions/ (Toronto-local, never UTC-sliced)", 
   it("every allowlist entry still matches, so a fixed file cannot stay exempt", () => {
     const results = scan();
     const stale = Object.keys(ALLOWED).filter((file) => !results.has(file));
+    // An approved occurrence that disappeared while another remains is caught
+    // by the exact-match test above, so this only needs whole-file staleness.
     expect(stale, "These files no longer contain a UTC calendar day. Remove them from ALLOWED.").toEqual([]);
   });
 });

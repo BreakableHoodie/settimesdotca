@@ -109,7 +109,7 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'Schedule builds are per-event pseudonyms, anonymised 30 days after the event (#1245)' — one failing event must not stop anonymisation of the rest",
     file: "functions/scheduled/anonymize-schedule-builds.js",
-    find: "console.error(`[scheduled] Failed to anonymise schedule builds for event ${event.id}`, error);",
+    find: 'console.error("[scheduled] Failed to anonymise schedule builds for event", event.id, error);',
     replace: "throw error;",
     tests: ["functions/scheduled/__tests__/anonymize-schedule-builds.test.js"],
   },

@@ -72,7 +72,7 @@ export async function anonymizeScheduleBuilds(_event, env, _ctx) {
     try {
       await anonymizeEvent(DB, event.id);
     } catch (error) {
-      console.error(`[scheduled] Failed to anonymise schedule builds for event ${event.id}`, error);
+      console.error("[scheduled] Failed to anonymise schedule builds for event", event.id, error);
     }
   }
 }

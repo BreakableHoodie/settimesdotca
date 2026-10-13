@@ -523,6 +523,7 @@ export const MUTATIONS = [
     file: "functions/api/feeds/ical.js",
     find: '.join("\\n");',
     replace: '.join("\\\\n");',
+    tests: ["functions/api/feeds/__tests__/ical.test.js"],
   },
   {
     id: "ical-feed-cutoff-is-toronto-festival-day",

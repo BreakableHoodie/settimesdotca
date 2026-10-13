@@ -1382,7 +1382,7 @@ by anyone with account access. The gate lives in the workflow on purpose.
 
 - **A failed read fails the job; it never reports zero.** A digest that says "0" because it could not look is exactly the silent failure it replaces. The only tolerated failure is the API's `404 "no analysis found"` for one tool name, which means "none", and the required-scanner rule then flags it.
 - **Analyses are fetched per tool by name**, never as "the newest N". A dead scanner falls off a shared page behind a live one's frequent runs and looks absent instead of stale.
-- **`ACCEPTED_NPM_AUDIT` holds recorded decisions only** (today: the Lighthouse CI chain, #1208). Without it the issue stays open permanently, and an alarm that is always on gets ignored. The digest lists accepted entries that are no longer flagged, so the list shrinks.
+- **`ACCEPTED_NPM_AUDIT` holds recorded decisions only, keyed `lockfile|package|advisory`** (today: one entry, #1267). Never key by package alone: one package can carry several advisories, so a package-level entry silently accepts the next one published. The September Lighthouse CI decision (#1208) was package-level and would have hidden two October advisories. Without the list the issue stays open permanently, and an alarm that is always on gets ignored. The digest lists accepted entries that are no longer flagged, so the list shrinks.
 
 Semgrep SARIF is uploaded again (category `semgrep`) on push and schedule runs. Before that, the Security tab's Semgrep alerts were frozen at 2026-09-14 and never closed.
 

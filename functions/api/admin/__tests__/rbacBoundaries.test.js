@@ -27,7 +27,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
-import { createTestEnv } from "../../test-utils.js";
+import { createTestEnv, insertBand, insertEvent, insertVenue } from "../../test-utils.js";
 
 const POLICY = {
   "GET /api/admin/analytics/subscriptions": "admin",
@@ -139,17 +139,34 @@ function discoverHandlers() {
   });
 }
 
-function tableCounts(rawDb) {
+// Every row of every table, not just counts: a handler that UPDATES an
+// existing row before refusing changes no count, and only the contents show it.
+// Table names come from sqlite_master, never from input.
+function tableSnapshot(rawDb) {
   const tables = rawDb
     .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
     .all();
   return Object.fromEntries(
-    tables.map(({ name }) => [
-      name,
-      rawDb.prepare(`SELECT COUNT(*) AS count FROM "${name.replaceAll('"', '""')}"`).get().count,
-    ]),
+    tables.map(({ name }) => [name, rawDb.prepare(`SELECT * FROM "${name.replaceAll('"', '""')}" ORDER BY 1`).all()]),
   );
 }
+
+// Real rows for the fixed `id: "1"` params to resolve to, so a handler that
+// wrote before its permission check would have something to change. The body
+// carries the fields admin writes most often for the same reason.
+function seedTargets(rawDb) {
+  const venue = insertVenue(rawDb, { name: "Boundary Venue" });
+  const event = insertEvent(rawDb, { name: "Boundary Event", slug: "boundary-event", status: "published" });
+  insertBand(rawDb, { name: "Boundary Band", event_id: event.id, venue_id: venue.id });
+}
+const WRITE_BODY = {
+  name: "changed",
+  status: "archived",
+  role: "admin",
+  isActive: false,
+  is_cancelled: true,
+  date: "2030-01-01",
+};
 
 const HANDLERS = discoverHandlers();
 const BY_KEY = Object.fromEntries(HANDLERS.map((h) => [h.key, h]));
@@ -197,13 +214,14 @@ describe("admin RBAC boundaries: a lower role is refused and nothing is written"
     it(`${testCase.method} ${testCase.path} refuses ${testCase.role}`, async () => {
       const module = await import(pathToFileURL(testCase.filePath).href);
       const { env, rawDb, headers } = createTestEnv({ role: testCase.role });
+      seedTargets(rawDb);
       const requestInit = { method: testCase.method, headers };
       // The platform rejects a body on GET/HEAD.
       if (testCase.method !== "GET" && testCase.method !== "HEAD") {
-        requestInit.body = JSON.stringify({});
+        requestInit.body = JSON.stringify(WRITE_BODY);
         requestInit.headers = { ...headers, "Content-Type": "application/json" };
       }
-      const before = tableCounts(rawDb);
+      const before = tableSnapshot(rawDb);
       const response = await module[testCase.handlerName]({
         request: new Request(`https://example.test${testCase.path}`, requestInit),
         env,
@@ -211,7 +229,7 @@ describe("admin RBAC boundaries: a lower role is refused and nothing is written"
       });
 
       expect(response.status).toBe(403);
-      expect(tableCounts(rawDb)).toEqual(before);
+      expect(tableSnapshot(rawDb)).toEqual(before);
     });
   }
 });

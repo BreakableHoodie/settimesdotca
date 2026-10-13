@@ -1,30 +1,60 @@
 import { AFTER_MIDNIGHT_THRESHOLD_HOUR } from './festivalDays'
 import { DEFAULT_SET_DURATION_MS } from './bandUtils'
 
+// Wall-clock arithmetic in UTC, which has no DST. The device's own zone must
+// never apply: a London phone adding an hour across ITS spring-forward would
+// shift a Toronto set's end time.
 function dateFromParts(date) {
   const [year, month, day] = date.split('-').map(Number)
-  return new Date(year, month - 1, day)
+  return new Date(Date.UTC(year, month - 1, day))
 }
 
 function formatDate(date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`
 }
 
 function nextCalendarDay(date) {
   const next = dateFromParts(date)
-  next.setDate(next.getDate() + 1)
+  next.setUTCDate(next.getUTCDate() + 1)
   return formatDate(next)
 }
 
 function addMinutes(date, time, minutes) {
   const [hour, minute] = time.split(':').map(Number)
   const result = dateFromParts(date)
-  result.setHours(hour, minute + minutes, 0, 0)
+  result.setUTCHours(hour, minute + minutes, 0, 0)
   return {
     date: formatDate(result),
-    time: `${String(result.getHours()).padStart(2, '0')}:${String(result.getMinutes()).padStart(2, '0')}`,
+    time: `${String(result.getUTCHours()).padStart(2, '0')}:${String(result.getUTCMinutes()).padStart(2, '0')}`,
   }
 }
+
+// Set times are Toronto wall-clock times. Without a TZID, RFC 5545 reads
+// DTSTART as FLOATING, so a traveller's calendar shows a 20:00 set at 20:00
+// wherever they are. X-WR-TIMEZONE is a non-standard hint and does not fix
+// that. The rules are Canada's since 2007. The server feed
+// (functions/api/feeds/ical.js) carries the same block; Pages Functions cannot
+// import from frontend/, so keep the two in step.
+const TORONTO_TZID = 'America/Toronto'
+const TORONTO_VTIMEZONE = [
+  'BEGIN:VTIMEZONE',
+  `TZID:${TORONTO_TZID}`,
+  'BEGIN:DAYLIGHT',
+  'TZOFFSETFROM:-0500',
+  'TZOFFSETTO:-0400',
+  'TZNAME:EDT',
+  'DTSTART:19700308T020000',
+  'RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU',
+  'END:DAYLIGHT',
+  'BEGIN:STANDARD',
+  'TZOFFSETFROM:-0400',
+  'TZOFFSETTO:-0500',
+  'TZNAME:EST',
+  'DTSTART:19701101T020000',
+  'RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU',
+  'END:STANDARD',
+  'END:VTIMEZONE',
+]
 
 function escapeIcal(text) {
   if (!text) return ''
@@ -52,12 +82,15 @@ export function buildRouteIcs({ event, sets }) {
     'X-WR-TIMEZONE:America/Toronto',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
+    ...TORONTO_VTIMEZONE,
   ]
 
   for (const set of sets ?? []) {
-    if (!set.startTime || !eventDate) continue
-
+    // A set needs a date from itself OR the event; the schedule response can
+    // arrive without an event record, and every set still carries its own.
     const festivalDate = set.performance_date || set.date || eventDate
+    if (!set.startTime || !festivalDate) continue
+
     const startDate = calendarDateForSet(set, eventDate)
     const hasEnd = Boolean(set.endTime)
     const derivedEnd = hasEnd ? null : addMinutes(startDate, set.startTime, DEFAULT_SET_DURATION_MS / 60000)
@@ -77,8 +110,8 @@ export function buildRouteIcs({ event, sets }) {
       'BEGIN:VEVENT',
       `UID:performance-${performanceId}-${festivalDate}@settimes.ca`,
       `DTSTAMP:${now}`,
-      `DTSTART:${startDate.replace(/-/g, '')}T${set.startTime.replace(/:/g, '')}00`,
-      `DTEND:${endDate.replace(/-/g, '')}T${endTime.replace(/:/g, '')}00`,
+      `DTSTART;TZID=${TORONTO_TZID}:${startDate.replace(/-/g, '')}T${set.startTime.replace(/:/g, '')}00`,
+      `DTEND;TZID=${TORONTO_TZID}:${endDate.replace(/-/g, '')}T${endTime.replace(/:/g, '')}00`,
       `SUMMARY:${escapeIcal(name)}`,
       `LOCATION:${escapeIcal(venue)}`,
       `DESCRIPTION:${escapeIcal(description)}`,

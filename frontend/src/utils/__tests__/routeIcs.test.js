@@ -25,10 +25,43 @@ describe('buildRouteIcs', () => {
       ],
     })
 
-    expect(ical).toContain('DTSTART:20261011T230000')
-    expect(ical).toContain('DTSTART:20261012T002500')
-    expect(ical).toContain('DTSTART:20261011T233000')
-    expect(ical).toContain('DTEND:20261012T003000')
+    expect(ical).toContain('DTSTART;TZID=America/Toronto:20261011T230000')
+    expect(ical).toContain('DTSTART;TZID=America/Toronto:20261012T002500')
+    expect(ical).toContain('DTSTART;TZID=America/Toronto:20261011T233000')
+    expect(ical).toContain('DTEND;TZID=America/Toronto:20261012T003000')
+  })
+
+  it('binds every time to Toronto with a VTIMEZONE, never floating', () => {
+    const ical = buildRouteIcs({ event, sets: [set()] })
+
+    expect(ical).toContain('BEGIN:VTIMEZONE\r\nTZID:America/Toronto')
+    expect(ical).toContain('DTSTART;TZID=America/Toronto:20261011T200000')
+    expect(ical).toContain('DTEND;TZID=America/Toronto:20261011T210000')
+    const events = ical.split('BEGIN:VEVENT').slice(1).join('')
+    expect(events).not.toMatch(/^DT(START|END):/m)
+  })
+
+  it('keeps dated sets when the event record is absent', () => {
+    const ical = buildRouteIcs({ event: undefined, sets: [set({ date: '2026-10-11' })] })
+
+    expect(ical).toContain('DTSTART;TZID=America/Toronto:20261011T200000')
+  })
+
+  // 01:30 on 2026-03-29 does not exist in London (UK springs forward that
+  // night) but does in Toronto. Deriving the end in the device zone moved it.
+  it('derives an end time without applying the device time zone', () => {
+    const previous = process.env.TZ
+    process.env.TZ = 'Europe/London'
+    try {
+      const ical = buildRouteIcs({
+        event: { ...event, date: '2026-03-28' },
+        sets: [set({ date: '2026-03-28', startTime: '00:30', endTime: null })],
+      })
+      expect(ical).toContain('DTEND;TZID=America/Toronto:20260329T013000')
+    } finally {
+      if (previous === undefined) delete process.env.TZ
+      else process.env.TZ = previous
+    }
   })
 
   it('omits sets without a start time', () => {
@@ -41,8 +74,8 @@ describe('buildRouteIcs', () => {
   it('derives a missing end time as exactly one hour after the start', () => {
     const ical = buildRouteIcs({ event, sets: [set({ startTime: '23:30', endTime: null })] })
 
-    expect(ical).toContain('DTSTART:20261011T233000')
-    expect(ical).toContain('DTEND:20261012T003000')
+    expect(ical).toContain('DTSTART;TZID=America/Toronto:20261011T233000')
+    expect(ical).toContain('DTEND;TZID=America/Toronto:20261012T003000')
   })
 
   it('marks cancelled and confirmed sets with their matching status', () => {
@@ -61,7 +94,7 @@ describe('buildRouteIcs', () => {
       sets: [set({ performance_date: '2026-10-12', date: event.date, startTime: '19:00' })],
     })
 
-    expect(ical).toContain('DTSTART:20261012T190000')
+    expect(ical).toContain('DTSTART;TZID=America/Toronto:20261012T190000')
     expect(ical).toContain('UID:performance-42-2026-10-12@settimes.ca')
   })
 
@@ -98,7 +131,7 @@ describe('buildRouteIcs', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
     const ical = buildRouteIcs({ event, sets: [set()] })
-    expect(ical).toContain('DTSTART:20261011T200000')
+    expect(ical).toContain('DTSTART;TZID=America/Toronto:20261011T200000')
     vi.useRealTimers()
   })
 })

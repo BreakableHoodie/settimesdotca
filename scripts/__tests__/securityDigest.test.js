@@ -204,6 +204,14 @@ describe("security digest", () => {
     expect(digest.body).toContain("…and 550 more");
   });
 
+  it("lists overdue alerts within the cap even when newer alerts outnumber it", () => {
+    const fresh = Array.from({ length: 60 }, (_, i) => ({ ...dependabotAlert("2026-10-09T00:00:00Z"), number: i + 1 }));
+    const overdue = { ...dependabotAlert("2026-09-01T00:00:00Z"), number: 999 };
+    const digest = buildDigest({ now: NOW, analyses: HEALTHY_SCANNERS, dependabot: [...fresh, overdue] });
+    expect(digest.shouldOpen).toBe(true);
+    expect(digest.body).toContain("dependabot/999)");
+  });
+
   // import.meta.url is percent-encoded; comparing it with a raw path never
   // matched a checkout containing a space, and the job exited 0 doing nothing.
   it("runs main() when invoked from a path containing a space", () => {

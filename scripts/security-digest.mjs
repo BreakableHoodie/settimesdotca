@@ -137,7 +137,11 @@ export function buildDigest({ now, dependabot = [], codeScanning = [], analyses 
     }
   }
 
-  const oldAlertExists = alerts.some((alert) => ageInDays(alert.createdAt, currentTime) > ALERT_AGE_DAYS);
+  const isOverdue = (alert) => ageInDays(alert.createdAt, currentTime) > ALERT_AGE_DAYS;
+  const oldAlertExists = alerts.some(isOverdue);
+  // Overdue alerts first, so the cap can never hide the alerts that opened the
+  // issue; each group keeps its newest-first order.
+  const listedAlerts = [...alerts.filter(isOverdue), ...alerts.filter((alert) => !isOverdue(alert))];
   const auditLines = npmAudit.map(
     ({ lockfile, critical = 0, high = 0, moderate = 0, low = 0 }) =>
       `- \`${lockfile}\`: critical ${critical}, high ${high}, moderate ${moderate}, low ${low}`,
@@ -163,13 +167,13 @@ export function buildDigest({ now, dependabot = [], codeScanning = [], analyses 
     "### Open alerts",
     "",
     alerts.length > 0
-      ? alerts
+      ? listedAlerts
           .slice(0, MAX_LISTED_ALERTS)
           .map((alert) => formatAlert(alert, currentTime))
           .concat(
             alerts.length > MAX_LISTED_ALERTS
               ? [
-                  `- …and ${alerts.length - MAX_LISTED_ALERTS} more, newest first above; see https://github.com/${REPOSITORY}/security`,
+                  `- …and ${alerts.length - MAX_LISTED_ALERTS} more (overdue first, then newest); see https://github.com/${REPOSITORY}/security`,
                 ]
               : [],
           )

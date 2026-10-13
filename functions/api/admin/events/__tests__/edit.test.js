@@ -243,13 +243,17 @@ describe("PUT /api/admin/events/:id/edit — slug format (#1276)", () => {
     const { env, rawDb } = createTestEnv({ role: "editor" });
     const event = insertEvent(rawDb, { name: "Clean Event", slug: "clean-slug", date: "2026-10-01" });
 
+    // The <script> slug is the attack payload this test proves is REJECTED; it
+    // is never rendered. The rule cannot tell a fixture from output.
     const res = await onRequestPut({
+      // nosemgrep: unknown-value-with-script-tag
       request: putRequest(event.id, {
         name: "Clean Event",
         date: "2026-10-01",
         slug: "x</loc><script>alert(1)</script>",
       }),
       env,
+      // nosemgrep: unknown-value-with-script-tag
       params: { id: String(event.id) },
       data: { user: authedUser("editor", 2) },
     });

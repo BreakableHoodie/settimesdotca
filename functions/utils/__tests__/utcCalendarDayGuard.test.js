@@ -69,7 +69,6 @@ const ALLOWED = {
   // should be allowed and hides nothing from fans.
   "api/admin/events/wizard.js": { reason: "deliberately lenient admin cutoff", hits: [SLICE] },
   // Known live instances, tracked. Remove each entry in the PR that fixes it.
-  "api/feeds/ical.js": { reason: "#1269 — bare date('now') emptied the feed at 8 PM", hits: ["date('now')"] },
   "api/schedule.js": { reason: "#1270 — date('now', '-6 hours') flips at 2 AM EDT", hits: [SIX_HOURS] },
   "api/events/public.js": {
     reason: "#1270 — date('now', '-6 hours') flips at 2 AM EDT",

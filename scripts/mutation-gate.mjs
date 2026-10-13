@@ -525,6 +525,15 @@ export const MUTATIONS = [
     replace: '.join("\\\\n");',
     tests: ["functions/api/feeds/__tests__/ical.test.js"],
   },
+  {
+    id: "ical-feed-cutoff-is-toronto-festival-day",
+    invariant:
+      "CLAUDE.md 'Server-side' (today/now is Toronto-local) — the iCal feed keeps an event until 06:00 Toronto after its last day; a UTC cutoff emptied it at 8 PM on Vol 18's show night",
+    file: "functions/api/feeds/ical.js",
+    find: "const params = [eventLocalFestivalToday()];",
+    replace: "const params = [new Date().toISOString().slice(0, 10)];",
+    tests: ["functions/api/feeds/__tests__/ical.test.js"],
+  },
 ];
 
 // ============================================================================

@@ -818,6 +818,13 @@ Both are in the mutation gate. A fallback is invisible to every happy-path test 
 construction, which is how the constant survived in a file that already had four
 describe blocks.
 
+**Every calendar time is bound to Toronto (`DTSTART;TZID=America/Toronto` plus a
+`VTIMEZONE`), never floating.** A DTSTART without a TZID floats under RFC 5545,
+so a subscriber travelling west saw each set at the right hour in the WRONG zone;
+`X-WR-TIMEZONE` is a non-standard hint that does not prevent it. Two homes again,
+for the build-boundary reason: `functions/api/feeds/ical.js` and the on-device
+"add my route to calendar" export (#1261). Keep the blocks identical.
+
 The human-facing version of this, plus what to do when a set time changes or something looks wrong mid-event, is `docs/SHOW_DAY_RUNBOOK.md`. Keep the two in step — if a procedure changes, change both in the same commit.
 
 ### A claim is not a delivery record (#1152)

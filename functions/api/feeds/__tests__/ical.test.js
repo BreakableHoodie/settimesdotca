@@ -154,8 +154,12 @@ describe("GET /api/feeds/ical", () => {
     expect(icalData).toContain("SUMMARY:Test Band");
     // iCal format escapes commas in LOCATION
     expect(icalData).toContain("LOCATION:Test Venue\\");
-    expect(icalData).toMatch(/DTSTART:\d{8}T\d{6}/);
-    expect(icalData).toMatch(/DTEND:\d{8}T\d{6}/);
+    expect(icalData).toMatch(/DTSTART;TZID=America\/Toronto:\d{8}T\d{6}/);
+    expect(icalData).toMatch(/DTEND;TZID=America\/Toronto:\d{8}T\d{6}/);
+    // Bound to Toronto, never floating: a floating time follows the
+    // subscriber's own zone, so a traveller saw every set at the wrong hour.
+    expect(icalData).toContain("BEGIN:VTIMEZONE\r\nTZID:America/Toronto");
+    expect(icalData.split("BEGIN:VEVENT").slice(1).join("")).not.toMatch(/^DT(START|END):/m);
   });
 
   it("should generate valid empty calendar when no events", async () => {
@@ -392,11 +396,11 @@ describe("GET /api/feeds/ical — day-aware performance_date (real-DB)", () => {
     const day2Compact = day2.replace(/-/g, "");
     const day1Compact = day1.replace(/-/g, "");
 
-    expect(icalData).toContain(`DTSTART:${day2Compact}T140000`);
-    expect(icalData).toContain(`DTEND:${day2Compact}T150000`);
+    expect(icalData).toContain(`DTSTART;TZID=America/Toronto:${day2Compact}T140000`);
+    expect(icalData).toContain(`DTEND;TZID=America/Toronto:${day2Compact}T150000`);
     expect(icalData).toContain(`UID:performance-${day2Perf.id}-${day2}@settimes.ca`);
     // Must not be stamped with the event's start date — that's the bug this fixes.
-    expect(icalData).not.toContain(`DTSTART:${day1Compact}T140000`);
+    expect(icalData).not.toContain(`DTSTART;TZID=America/Toronto:${day1Compact}T140000`);
   });
 
   test("after-midnight set (01:00) stored on day 1 is stamped with day 2's calendar date", async () => {
@@ -435,9 +439,9 @@ describe("GET /api/feeds/ical — day-aware performance_date (real-DB)", () => {
     // previously asserted day 1, which put every after-midnight set in
     // subscribers' calendars the night BEFORE it happened. The UID keeps the
     // festival date so existing calendar entries move rather than duplicate.
-    expect(icalData).toContain(`DTSTART:${day2.replace(/-/g, "")}T010000`);
-    expect(icalData).toContain(`DTEND:${day2.replace(/-/g, "")}T020000`);
-    expect(icalData).not.toContain(`DTSTART:${day1.replace(/-/g, "")}T010000`);
+    expect(icalData).toContain(`DTSTART;TZID=America/Toronto:${day2.replace(/-/g, "")}T010000`);
+    expect(icalData).toContain(`DTEND;TZID=America/Toronto:${day2.replace(/-/g, "")}T020000`);
+    expect(icalData).not.toContain(`DTSTART;TZID=America/Toronto:${day1.replace(/-/g, "")}T010000`);
     expect(icalData).toContain(`UID:performance-${lateNightPerf.id}-${day1}@settimes.ca`);
   });
 
@@ -538,9 +542,9 @@ describe("GET /api/feeds/ical — midnight-straddling DTEND rolls to the next da
     expect(response.status).toBe(200);
     const icalData = await response.text();
 
-    expect(icalData).toContain("DTSTART:20990301T233000");
-    expect(icalData).toContain("DTEND:20990302T003000");
-    expect(icalData).not.toContain("DTEND:20990301T003000");
+    expect(icalData).toContain("DTSTART;TZID=America/Toronto:20990301T233000");
+    expect(icalData).toContain("DTEND;TZID=America/Toronto:20990302T003000");
+    expect(icalData).not.toContain("DTEND;TZID=America/Toronto:20990301T003000");
   });
 
   test("month boundary: 23:00–00:15 on March 31 stamps DTEND April 1", async () => {
@@ -569,8 +573,8 @@ describe("GET /api/feeds/ical — midnight-straddling DTEND rolls to the next da
     expect(response.status).toBe(200);
     const icalData = await response.text();
 
-    expect(icalData).toContain("DTSTART:20990331T230000");
-    expect(icalData).toContain("DTEND:20990401T001500");
+    expect(icalData).toContain("DTSTART;TZID=America/Toronto:20990331T230000");
+    expect(icalData).toContain("DTEND;TZID=America/Toronto:20990401T001500");
   });
 });
 
@@ -646,7 +650,7 @@ describe("GET /api/feeds/ical — an unscheduled set is not a calendar entry (#1
     const icalData = await response.text();
 
     expect(icalData).toContain("Timed Band");
-    expect(icalData).toContain("DTSTART:20990505T210000");
+    expect(icalData).toContain("DTSTART;TZID=America/Toronto:20990505T210000");
     expect(icalData).not.toContain("Untimed Band");
     // Skipping one row must not skip the rest of the loop.
     expect((icalData.match(/BEGIN:VEVENT/g) || []).length).toBe(1);
@@ -672,9 +676,9 @@ describe("GET /api/feeds/ical — an unscheduled set is not a calendar entry (#1
     const response = await onRequestGet({ request: new Request("https://example.test/api/feeds/ical"), env });
     const icalData = await response.text();
 
-    expect(icalData).toContain("DTSTART:20990505T230000");
-    expect(icalData).toContain("DTEND:20990506T000000");
-    expect(icalData).not.toContain("DTEND:20990506T210000");
+    expect(icalData).toContain("DTSTART;TZID=America/Toronto:20990505T230000");
+    expect(icalData).toContain("DTEND;TZID=America/Toronto:20990506T000000");
+    expect(icalData).not.toContain("DTEND;TZID=America/Toronto:20990506T210000");
   });
 });
 
@@ -789,8 +793,8 @@ describe("GET /api/feeds/ical — after-midnight sets land on the next calendar 
         .map((block) => [
           block.match(/^SUMMARY:(.*)$/m)[1].trim(),
           {
-            start: block.match(/^DTSTART:(.*)$/m)[1].trim(),
-            end: block.match(/^DTEND:(.*)$/m)[1].trim(),
+            start: block.match(/^DTSTART;TZID=America\/Toronto:(.*)$/m)[1].trim(),
+            end: block.match(/^DTEND;TZID=America\/Toronto:(.*)$/m)[1].trim(),
             uid: block.match(/^UID:(.*)$/m)[1].trim(),
           },
         ]),
@@ -863,5 +867,51 @@ describe("GET /api/feeds/ical — genre filter matches within free-text genres (
     seed(rawDb);
 
     expect(await summaries(env, "?genre=%25")).toEqual([]);
+  });
+});
+
+// Vol 18 show night: the feed filtered on SQLite's date('now'), which is UTC,
+// so at 8 PM Eastern on the event's own day every set vanished from it. The
+// cutoff is the Toronto FESTIVAL day: the event stays until 06:00 local the
+// morning after its last day.
+describe("GET /api/feeds/ical — an event stays in the feed through its own festival day", () => {
+  const seed = (rawDb) => {
+    const event = insertEvent(rawDb, { name: "Show Night", slug: "show-night", date: "2026-10-11" });
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id=?").run(event.id);
+    const venue = insertVenue(rawDb, { name: "Blue Room" });
+    insertBand(rawDb, {
+      name: "Headliner",
+      event_id: event.id,
+      venue_id: venue.id,
+      start_time: "23:00",
+      end_time: "23:45",
+    });
+  };
+
+  const veventCountAt = async (iso) => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(iso));
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    seed(rawDb);
+    const res = await onRequestGet({ request: new Request("https://example.test/api/feeds/ical"), env });
+    expect(res.status).toBe(200);
+    return (await res.text()).split("BEGIN:VEVENT").length - 1;
+  };
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test("8:12 PM Eastern on show night (UTC already the next day) still lists the sets", async () => {
+    expect(await veventCountAt("2026-10-12T00:12:00Z")).toBe(1);
+  });
+
+  test("5:59 AM Eastern the morning after is still the festival day", async () => {
+    expect(await veventCountAt("2026-10-12T09:59:00Z")).toBe(1);
+  });
+
+  test("06:00 Eastern the morning after, the event leaves the feed", async () => {
+    expect(await veventCountAt("2026-10-12T10:00:00Z")).toBe(0);
   });
 });

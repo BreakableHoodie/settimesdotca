@@ -12,11 +12,16 @@ on:
 
 jobs:
   claude:
+    # Humans only. GitHub's contains() is case-insensitive, so a bot comment
+    # citing "@CLAUDE.md" (CodeRabbit's review prompts do) matched '@claude'
+    # and the action then failed the run: "Workflow initiated by non-human
+    # actor". That red check stopped a merge on 2026-10-13 (#1261).
     if: |
+      github.event.sender.type != 'Bot' && (
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude'))))
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     permissions:
       contents: read

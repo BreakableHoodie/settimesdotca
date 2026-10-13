@@ -194,3 +194,33 @@ describe("Structured Logger", () => {
     });
   });
 });
+
+// #1247 (code scanning #37): metadata may add context to a log line but must
+// never rewrite its own fields. Before, `Object.assign(entry, meta)` let a meta
+// key named `level` or `message` overwrite the line, so an error could be
+// recorded as "debug" or say something it did not.
+describe("logger metadata cannot overwrite the entry's own fields", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("keeps level, message and timestamp when meta carries the same keys", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    logger.error("real failure", {
+      level: "debug",
+      message: "forged",
+      timestamp: "1970-01-01T00:00:00.000Z",
+      extra: 1,
+    });
+    const line = JSON.parse(spy.mock.calls[0][0]);
+    expect(line.level).toBe("error");
+    expect(line.message).toBe("real failure");
+    expect(line.timestamp).not.toBe("1970-01-01T00:00:00.000Z");
+    expect(line.extra).toBe(1);
+  });
+
+  it("treats a __proto__ key as plain data, not a prototype change", () => {
+    const spy = vi.spyOn(console, "info").mockImplementation(() => {});
+    logger.info("probe", JSON.parse('{"__proto__": {"polluted": true}}'));
+    expect({}.polluted).toBeUndefined();
+    expect(JSON.parse(spy.mock.calls[0][0]).message).toBe("probe");
+  });
+});

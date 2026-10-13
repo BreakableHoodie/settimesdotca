@@ -35,7 +35,8 @@ const KNOWN_OVERRIDE_CONFLICTS = {
     "audit alerts (#327); @lhci 0.15.1 is the latest and still declares ^3 (#1208)",
   "frontend/package-lock.json|node_modules/body-parser|qs": "Dependabot alerts (#1182)",
   "frontend/package-lock.json|node_modules/external-editor|tmp": "January 2026 release (#21)",
-  "frontend/package-lock.json|node_modules/node-gyp|undici": "audit alerts (#327)",
+  "frontend/package-lock.json|node_modules/miniflare|sharp":
+    "GHSA-wq5f-xc86-pv6w (#1247); miniflare in wrangler 4.147 pins 0.35.4 exactly. EXPIRES ~2026-10-13: wrangler >=4.148 (miniflare pins 0.35.5) clears min-release-age then, so delete the sharp override and this line",
   "frontend/package-lock.json|node_modules/puppeteer-core|@puppeteer/browsers":
     "drops extract-zip (#819); puppeteer-core 24.43.1 pins 2.13.2 exactly (#1208)",
   "frontend/package-lock.json|node_modules/puppeteer-core|ws": "audit alerts (#327), via the lighthouse ws override",

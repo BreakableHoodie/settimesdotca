@@ -37,6 +37,22 @@ describe("POST /api/auth/resend-activation", () => {
     expect(user.activation_token_expires_at).toBeTruthy();
   });
 
+  it("finds a lowercased account when the request uses mixed case", async () => {
+    const { env, rawDb } = createTestEnv();
+    insertInactiveUser(rawDb, { email: "mixed@example.com" });
+
+    const request = new Request(BASE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "  Mixed@Example.COM " }),
+    });
+
+    const response = await resendActivationHandler.onRequestPost({ request, env });
+    expect(response.status).toBe(200);
+    const user = rawDb.prepare("SELECT activation_token FROM users WHERE email = ?").get("mixed@example.com");
+    expect(user.activation_token).toBeTruthy();
+  });
+
   it("stores activation_token_expires_at with a space separator, no ISO 'T' (SEC-F1 class, #670)", async () => {
     // Same invariant as signup.js's write site (CLAUDE.md "SQLite datetime
     // format"): a stored `T` silently breaks the `activation_token_expires_at

@@ -29,7 +29,10 @@ export async function onRequestPost(context) {
         },
       );
     }
-    const { email, password, name, firstName, lastName, role, inviteCode } = body;
+    const { email: rawEmail, password, name, firstName, lastName, role, inviteCode } = body;
+    // login.js lowercases the email it looks up, so an account stored as typed
+    // ("Jay@Example.com") could never sign in. Normalise the same way here.
+    const email = typeof rawEmail === "string" ? rawEmail.trim().toLowerCase() : rawEmail;
 
     // SECURITY: Require invite code for all signups
     if (!inviteCode) {
@@ -254,7 +257,7 @@ export async function onRequestPost(context) {
       SELECT 1 FROM invite_codes
       WHERE code = ? AND is_active = 1 AND expires_at > datetime('now') AND used_by_user_id IS NULL
     )`;
-    const [created] = await DB.batch([
+    const [created, claimed] = await DB.batch([
       DB.prepare(
         `INSERT INTO users (email, password_hash, name, first_name, last_name, role, is_active, activation_token, activation_token_expires_at)
          SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
@@ -309,6 +312,14 @@ export async function onRequestPost(context) {
       .first();
     if (!user) {
       throw new Error("signup: user row missing after a committed create");
+    }
+
+    // The claim fires exactly when the INSERT did, so this should be
+    // unreachable. The batch has committed and cannot be rolled back; make a
+    // reusable invite loud rather than silent. (Never log the code itself:
+    // an unclaimed invite is a live credential.)
+    if (claimed?.meta?.changes === 0) {
+      console.error(`signup: user ${user.id} created but their invite was not claimed; deactivate it by hand`);
     }
 
     // Also an audit row, not just an auth attempt (#1143). An admin creating a

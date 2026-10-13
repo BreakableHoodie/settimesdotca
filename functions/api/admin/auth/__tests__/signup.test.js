@@ -180,6 +180,30 @@ describe("admin signup", () => {
     expect(invite.used_by_user_id).toBe(user.id);
   });
 
+  // login.js lowercases the email it looks up. An account stored as typed
+  // could never sign in.
+  it("stores the email lowercased and trimmed so login can find it", async () => {
+    const { env, rawDb } = createTestEnv({ role: "editor" });
+    env.ALLOW_ADMIN_SIGNUP = "true";
+    const inviteCode = "MIXED-CASE-EMAIL-1252";
+    rawDb
+      .prepare("INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES (?, ?, ?, ?)")
+      .run(inviteCode, "editor", daysFromNow(7), 1);
+
+    const response = await signupHandler.onRequestPost({
+      request: new Request("https://example.test/api/admin/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: " Jay@Example.COM ", password: "StrongPass1!", name: "Jay Doe", inviteCode }),
+      }),
+      env,
+    });
+
+    expect(response.status).toBe(201);
+    const stored = rawDb.prepare("SELECT email FROM users WHERE email LIKE '%example.com'").all();
+    expect(stored).toEqual([{ email: "jay@example.com" }]);
+  });
+
   it("rejects an expired invite code (T4)", async () => {
     const { env, rawDb } = createTestEnv({ role: "editor" });
     env.ALLOW_ADMIN_SIGNUP = "true";

@@ -10,7 +10,9 @@ export async function onRequestPost(context) {
   const { DB } = env;
 
   const body = await parseJsonObjectBody(request);
-  const email = body?.email;
+  // Users are stored lowercased (signup, users.js); match that or a
+  // mixed-case request never finds its account.
+  const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : body?.email;
 
   if (!email || typeof email !== "string") {
     return new Response(

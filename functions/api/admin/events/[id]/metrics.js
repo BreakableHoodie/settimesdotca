@@ -32,7 +32,7 @@ export async function onRequestGet(context) {
     ] = await DB.batch([
       DB.prepare(
         `SELECT COUNT(*) as total_schedule_builds,
-                COUNT(DISTINCT user_session) as route_builders,
+                COUNT(DISTINCT visitor_hash) as route_builders,
                 MAX(created_at) as last_updated
          FROM schedule_builds WHERE event_id = ?`,
       ).bind(eventId),
@@ -46,10 +46,10 @@ export async function onRequestGet(context) {
                   END AS bucket,
                   COUNT(*) AS route_count
            FROM (
-             SELECT user_session, COUNT(*) AS route_size
-             FROM schedule_builds
-             WHERE event_id = ?
-             GROUP BY user_session
+              SELECT visitor_hash, COUNT(*) AS route_size
+              FROM schedule_builds
+              WHERE event_id = ?
+              GROUP BY visitor_hash
            )
            GROUP BY bucket
            ORDER BY CASE bucket

@@ -147,7 +147,15 @@ describe("public events queries use the shared visibility predicate", () => {
   //  - utils/timeConflicts.js — imported ONLY by functions/api/admin/**, which
   //    legitimately sees drafts. Gating it would break conflict detection on
   //    exactly the unpublished events admins are building.
-  const UNGATED_BY_DESIGN = new Set(["api/metrics.js", "utils/timeConflicts.js"]);
+  //  - scheduled/anonymize-schedule-builds.js — a privacy RETENTION job (#1245),
+  //    reached only from the cron, returning nothing to anyone. It must see
+  //    drafts: an event moved back to draft after it ran still holds visitor
+  //    pseudonyms, and gating on status would leave them un-anonymised forever.
+  const UNGATED_BY_DESIGN = new Set([
+    "api/metrics.js",
+    "utils/timeConflicts.js",
+    "scheduled/anonymize-schedule-builds.js",
+  ]);
 
   const QUERIES_EVENTS_RE = /\b(?:FROM|JOIN)\s+events\b/;
   const USES_HELPER_RE = /EventStatusSql|concludedEventSql/;

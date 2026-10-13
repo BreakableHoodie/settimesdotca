@@ -8,6 +8,12 @@ import { publicEventStatusSql } from "../../utils/eventVisibility.js";
 const MAX_USER_SESSION_LENGTH = 128;
 const MAX_PERFORMANCE_IDS = 50;
 
+export async function hashScheduleVisitor(userSession, eventId) {
+  const input = new TextEncoder().encode(`${userSession}|${eventId}`);
+  const digest = await crypto.subtle.digest("SHA-256", input);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 function isSafeSessionId(value) {
   if (!value || typeof value !== "string") return false;
   return /^[A-Za-z0-9_-]+$/.test(value);
@@ -115,33 +121,18 @@ export async function onRequestPost(context) {
       });
     }
 
+    const visitorHash = await hashScheduleVisitor(userSession, eventId);
+
     const statements = allowedIds.map((performanceId) =>
       DB.prepare(
         `
-        INSERT OR IGNORE INTO schedule_builds (event_id, performance_id, user_session)
+        INSERT OR IGNORE INTO schedule_builds (event_id, performance_id, visitor_hash)
         VALUES (?, ?, ?)
       `,
-      ).bind(eventId, performanceId, userSession),
+      ).bind(eventId, performanceId, visitorHash),
     );
 
-    try {
-      await DB.batch(statements);
-    } catch (error) {
-      if (!String(error).includes("performance_id")) {
-        throw error;
-      }
-
-      const legacyStatements = allowedIds.map((performanceId) =>
-        DB.prepare(
-          `
-          INSERT OR IGNORE INTO schedule_builds (event_id, band_id, user_session)
-          VALUES (?, ?, ?)
-        `,
-        ).bind(eventId, performanceId, userSession),
-      );
-
-      await DB.batch(legacyStatements);
-    }
+    await DB.batch(statements);
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,

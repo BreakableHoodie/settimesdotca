@@ -29,7 +29,7 @@ export default function PrivacyPage() {
         </div>
 
         <h1 className="text-text-primary text-3xl font-bold mb-2">Privacy Policy</h1>
-        <p className="text-text-tertiary text-sm mb-10">Last updated: June 2026</p>
+        <p className="text-text-tertiary text-sm mb-10">Last updated: October 2026</p>
 
         <div className="space-y-8 text-text-secondary leading-relaxed">
           <section>
@@ -47,12 +47,16 @@ export default function PrivacyPage() {
             <h3 className="text-text-secondary font-medium mb-2 mt-4">If you just browse</h3>
             <p>
               We count anonymous page views and artist profile visits (including social link clicks, ticket link clicks,
-              event views, and schedule builds) to understand which features are useful. These metrics are aggregated
-              and do not identify individual visitors. We use Cloudflare Analytics Engine — a privacy-safe, aggregate,
-              first-party metrics sink on our infrastructure provider (Cloudflare) — rather than third-party tracking
-              scripts or tracking pixels. Limited request metadata may be processed briefly by Cloudflare for security
-              and abuse prevention, but public browsing is not tied to a persistent account or profiling identifier in
-              our application data.
+              event views, and schedule builds) to understand which features are useful. When you add sets to your
+              schedule, including by importing a shared one, the site sends which sets you picked plus a random browser
+              id. The server stores your picks under a one-way code that is different for each event, so they cannot be
+              linked across events. Thirty days after the event, that code is replaced by an anonymous sequence number.
+              Database backups may hold the earlier code for up to 30 days more. The counts show how many people plan
+              schedules and which sets are popular. None of this identifies you. We use Cloudflare Analytics Engine — a
+              privacy-safe, aggregate, first-party metrics sink on our infrastructure provider (Cloudflare) — rather
+              than third-party tracking scripts or tracking pixels. Limited request metadata may be processed briefly by
+              Cloudflare for security and abuse prevention, but public browsing is not tied to a persistent account or
+              profiling identifier in our application data.
             </p>
 
             <h3 className="text-text-secondary font-medium mb-2 mt-4">
@@ -111,6 +115,10 @@ export default function PrivacyPage() {
                     <td className="py-2">90 days</td>
                   </tr>
                   <tr>
+                    <td className="py-2 pr-4">Schedule-build visitor codes</td>
+                    <td className="py-2">Anonymised 30 days after the event</td>
+                  </tr>
+                  <tr>
                     <td className="py-2 pr-4">Admin action log</td>
                     <td className="py-2">1 year</td>
                   </tr>
@@ -131,19 +139,23 @@ export default function PrivacyPage() {
             <ul className="list-disc list-outside pl-5 space-y-1">
               <li>
                 <code className="text-accent-400 text-sm">selectedBandsByEvent</code> — bands you have added to your
-                personal schedule (never sent to our servers)
+                personal schedule; selected sets are sent when schedule-build metrics are recorded
               </li>
               <li>
                 <code className="text-accent-400 text-sm">theme</code> — your preferred colour theme
               </li>
               <li>
                 <code className="text-accent-400 text-sm">scheduleSessionId</code> — an anonymous session identifier
-                used to associate your schedule share links
+                sent with selected sets when schedule-build metrics are recorded
               </li>
               <li>Saved route state used for navigation continuity</li>
               <li>Privacy banner acknowledgement</li>
             </ul>
-            <p className="mt-3">This data is stored only on your device and is not transmitted to our servers.</p>
+            <p className="mt-3">
+              Theme and saved route state stay on your device. Your selected sets are sent when schedule-build metrics
+              are recorded or when you create a share link. The random schedule session id is sent only with
+              schedule-build metrics, never with a share link.
+            </p>
           </section>
 
           <section>

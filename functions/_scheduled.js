@@ -1,10 +1,12 @@
 import { scheduled as aggregateStats } from "./scheduled/aggregate-stats.js";
 import { expireShareLinks } from "./scheduled/expire-share-links.js";
+import { anonymizeScheduleBuilds } from "./scheduled/anonymize-schedule-builds.js";
 import { flushAnnounceDigest } from "./utils/announceDigest.js";
 
 export async function scheduled(event, env, ctx) {
   await aggregateStats(event, env, ctx);
   await expireShareLinks(event, env, ctx);
+  await anonymizeScheduleBuilds(event, env, ctx);
   try {
     await flushAnnounceDigest(env, env.DB);
   } catch (err) {

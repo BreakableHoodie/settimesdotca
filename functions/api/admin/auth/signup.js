@@ -243,12 +243,13 @@ export async function onRequestPost(context) {
     // an account at the invite's role, which can be admin.
     //
     // Now the INSERT only fires while the invite is STILL unclaimed (the same
-    // predicate as the validation SELECT), and the claim UPDATE carries that
-    // SAME predicate, so it fires exactly when the INSERT did. A narrower one
-    // (`used_by_user_id IS NULL` alone) stamped used_at on an invite that
-    // expired or was deactivated mid-request, with no user behind it. D1 runs a batch as one transaction and serialises
-    // writers, so of two racing batches only the first inserts anyone; the
-    // second inserts nothing and reports changes === 0.
+    // predicate as the validation SELECT), and the claim UPDATE fires exactly
+    // when the INSERT did, because it requires the user that INSERT created.
+    // A claim keyed only on `used_by_user_id IS NULL` stamped used_at on an
+    // invite that closed mid-request, with no user behind it. D1 runs a batch
+    // as one transaction and serialises writers, so of two racing batches only
+    // the first inserts anyone; the second inserts nothing and reports
+    // changes === 0.
     const INVITE_STILL_OPEN = `EXISTS (
       SELECT 1 FROM invite_codes
       WHERE code = ? AND is_active = 1 AND expires_at > datetime('now') AND used_by_user_id IS NULL
@@ -270,11 +271,17 @@ export async function onRequestPost(context) {
         activationExpires,
         inviteCode,
       ),
+      // The claim is keyed on the user THIS batch inserted (found by this
+      // request's fresh activation token), not on a second clock check. D1
+      // keeps datetime('now') stable within a statement, not across them: an
+      // invite expiring between the two would let the INSERT commit while the
+      // claim matched nothing, returning 201 with the invite still open.
       DB.prepare(
         `UPDATE invite_codes
-         SET used_by_user_id = (SELECT id FROM users WHERE email = ?), used_at = datetime('now')
-         WHERE code = ? AND ${INVITE_STILL_OPEN}`,
-      ).bind(email, inviteCode, inviteCode),
+         SET used_by_user_id = (SELECT id FROM users WHERE activation_token = ?), used_at = datetime('now')
+         WHERE code = ? AND used_by_user_id IS NULL
+           AND EXISTS (SELECT 1 FROM users WHERE activation_token = ?)`,
+      ).bind(activationToken, inviteCode, activationToken),
     ]);
 
     // Only an EXPLICIT changes === 0 means "lost the race" (CLAUDE.md: an

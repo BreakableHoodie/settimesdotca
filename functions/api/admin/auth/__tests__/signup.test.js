@@ -146,6 +146,40 @@ describe("admin signup", () => {
     expect(invite).toEqual({ used_at: null, used_by_user_id: null });
   });
 
+  // The clock is stable within one statement, not across a batch. An invite
+  // expiring between the INSERT and the claim must still be claimed by the
+  // user that INSERT created; a claim re-checking expiry left a 201 signup
+  // with its invite open for reuse.
+  it("claims the invite for the inserted user even if it expires mid-batch", async () => {
+    const { env, rawDb } = createTestEnv({ role: "editor" });
+    env.ALLOW_ADMIN_SIGNUP = "true";
+    const inviteCode = "EXPIRES-MID-BATCH-1252";
+    rawDb
+      .prepare("INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES (?, ?, ?, ?)")
+      .run(inviteCode, "editor", daysFromNow(7), 1);
+    const batch = env.DB.batch.bind(env.DB);
+    env.DB.batch = async ([insertUser, claimInvite, ...rest]) => {
+      const first = await batch([insertUser]);
+      rawDb.prepare("UPDATE invite_codes SET expires_at = ? WHERE code = ?").run(daysFromNow(-1), inviteCode);
+      const second = await batch([claimInvite, ...rest]);
+      return [...first, ...second];
+    };
+
+    const response = await signupHandler.onRequestPost({
+      request: new Request("https://example.test/api/admin/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "edge@example.com", password: "StrongPass1!", name: "Edge Case", inviteCode }),
+      }),
+      env,
+    });
+
+    expect(response.status).toBe(201);
+    const user = rawDb.prepare("SELECT id FROM users WHERE email = 'edge@example.com'").get();
+    const invite = rawDb.prepare("SELECT used_by_user_id FROM invite_codes WHERE code = ?").get(inviteCode);
+    expect(invite.used_by_user_id).toBe(user.id);
+  });
+
   it("rejects an expired invite code (T4)", async () => {
     const { env, rawDb } = createTestEnv({ role: "editor" });
     env.ALLOW_ADMIN_SIGNUP = "true";

@@ -458,7 +458,7 @@ export default function AdminPanel({ currentUser, onLogout }) {
               />
             )}
 
-            {activeTab === 'venues' && <VenuesTab showToast={showToast} readOnly={!canEdit} />}
+            {activeTab === 'venues' && <VenuesTab showToast={showToast} readOnly={!canEdit} canManage={isAdmin} />}
 
             {activeTab === 'lineup' && selectedEventId && (
               <LineupTab

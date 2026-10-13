@@ -21,7 +21,7 @@ function SortIcon({ col, sortConfig }) {
  * - Delete venue (disabled if bands exist with tooltip)
  * - Mobile-responsive cards
  */
-export default function VenuesTab({ showToast, readOnly = false }) {
+export default function VenuesTab({ showToast, readOnly = false, canManage = false }) {
   const [venues, setVenues] = useState([])
   const [loading, setLoading] = useState(true)
   const [showAddForm, setShowAddForm] = useState(false)
@@ -507,7 +507,9 @@ export default function VenuesTab({ showToast, readOnly = false }) {
                     >
                       Bands <SortIcon col="band_count" sortConfig={sortConfig} />
                     </th>
-                    {!readOnly && <th className="px-4 py-3 text-right text-white font-semibold">Actions</th>}
+                    {!readOnly && canManage && (
+                      <th className="px-4 py-3 text-right text-white font-semibold">Actions</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-accent-500/10">
@@ -520,7 +522,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
                         <td className="px-4 py-3 text-white/70">{venue.phone || '-'}</td>
                         <td className="px-4 py-3 text-white/70">{venue.contact_email || '-'}</td>
                         <td className="px-4 py-3 text-center text-white/70">{venue.band_count || 0}</td>
-                        {!readOnly && (
+                        {!readOnly && canManage && (
                           <td className="px-4 py-3">
                             <div className="flex justify-end gap-2">
                               <button
@@ -572,7 +574,7 @@ export default function VenuesTab({ showToast, readOnly = false }) {
                       </div>
                     </div>
 
-                    {!readOnly && (
+                    {!readOnly && canManage && (
                       <div className="flex gap-2 pt-2">
                         <button
                           onClick={() => startEdit(venue)}

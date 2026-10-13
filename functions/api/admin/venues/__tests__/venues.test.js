@@ -77,6 +77,57 @@ describe("Admin venues API - CRUD operations", () => {
   });
 });
 
+// Owner decision 2026-10-10: an editor builds editions, so an editor can CREATE
+// a venue. Editing and deleting stay admin-only (a rename or delete rewrites
+// every past edition held at that venue). Each role boundary is asserted from
+// both sides, so loosening or tightening either gate fails a test.
+describe("Admin venues API - role boundaries", () => {
+  const post = (headers) =>
+    new Request("https://example.test/api/admin/venues", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify({ name: "Editor Hall", address: "1 King St N" }),
+    });
+
+  it("an editor can create a venue", async () => {
+    const { env, headers } = createTestEnv({ role: "editor" });
+    const res = await venuesHandler.onRequestPost({ request: post(headers), env });
+    expect(res.status).toBe(201);
+    expect((await res.json()).venue.name).toBe("Editor Hall");
+  });
+
+  it("a viewer cannot create a venue", async () => {
+    const { env, headers } = createTestEnv({ role: "viewer" });
+    const res = await venuesHandler.onRequestPost({ request: post(headers), env });
+    expect(res.status).toBe(403);
+  });
+
+  it("an editor cannot edit an existing venue", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const v = insertVenue(rawDb, { name: "Keep Me" });
+    const req = new Request(`https://example.test/api/admin/venues/${v.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify({ name: "Renamed" }),
+    });
+    const res = await venueIdHandler.onRequestPut({ request: req, env });
+    expect(res.status).toBe(403);
+    expect(rawDb.prepare("SELECT name FROM venues WHERE id = ?").get(v.id).name).toBe("Keep Me");
+  });
+
+  it("an editor cannot delete a venue", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const v = insertVenue(rawDb, { name: "Still Here" });
+    const req = new Request(`https://example.test/api/admin/venues/${v.id}`, {
+      method: "DELETE",
+      headers: { ...headers },
+    });
+    const res = await venueIdHandler.onRequestDelete({ request: req, env });
+    expect(res.status).toBe(403);
+    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM venues WHERE id = ?").get(v.id).n).toBe(1);
+  });
+});
+
 describe("Admin venues API - Validation", () => {
   it("create validation fails when name is missing", async () => {
     const { env, headers } = createTestEnv({ role: "admin" });

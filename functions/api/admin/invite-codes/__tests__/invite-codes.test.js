@@ -87,6 +87,40 @@ describe("Admin invite codes API", () => {
     expect(res.status).toBe(409);
   });
 
+  it("rejects an existing user's email in a different case", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    rawDb
+      .prepare("INSERT INTO users (email, role, password_hash) VALUES (?, ?, 'placeholder')")
+      .run("existing-user@example.com", "viewer");
+
+    const res = await inviteCodesHandler.onRequestPost({
+      request: new Request("https://example.test/api/admin/invite-codes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({ email: " Existing-User@Example.COM " }),
+      }),
+      env,
+    });
+    expect(res.status).toBe(409);
+  });
+
+  // A blank email trimmed to "" would read as "no email" and mint an OPEN
+  // invite the admin never asked for.
+  it("rejects a whitespace-only email instead of minting an open invite", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+
+    const res = await inviteCodesHandler.onRequestPost({
+      request: new Request("https://example.test/api/admin/invite-codes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({ email: "   " }),
+      }),
+      env,
+    });
+    expect(res.status).toBe(400);
+    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM invite_codes").get().n).toBe(0);
+  });
+
   it("revokes an invite code", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "admin" });
 

@@ -81,7 +81,9 @@ export async function onRequestPost(context) {
     }
     const { email: rawEmail = null, role = "editor", expiresInDays = 7 } = body;
     // Users are stored lowercased, so the existing-user check must compare lowercased.
-    const email = typeof rawEmail === "string" ? rawEmail.trim().toLowerCase() : rawEmail;
+    // A whitespace-only string is left as is so it fails validation below:
+    // trimmed to "" it would read as "no email" and silently mint an OPEN invite.
+    const email = typeof rawEmail === "string" && rawEmail.trim() ? rawEmail.trim().toLowerCase() : rawEmail;
 
     // Validation using centralized utilities
     if (!isValidRole(role)) {

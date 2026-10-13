@@ -7,14 +7,12 @@ import { publicEventStatusSql } from "../../utils/eventVisibility.js";
 import { AFTER_MIDNIGHT_THRESHOLD_TIME, eventLocalFestivalToday, nextCalendarDay } from "../../utils/eventDay.js";
 
 /**
- * A set's default duration when no end time was recorded: one hour after the
- * start, wrapping past midnight (23:30 -> 00:30). The caller's endDate roll
- * turns that wrap into the next calendar day, so DTEND stays after DTSTART.
+ * A set with no recorded end lasts one hour, stated as a DURATION rather than
+ * a computed wall-clock DTEND. On the night Toronto repeats 01:00 (first Sunday
+ * of November), 01:30 + one wall-clock hour is a two-hour event; a DURATION is
+ * elapsed time, so it stays one hour (RFC 5545 3.8.2.5).
  */
-function addOneHour(hhmm) {
-  const [h, m] = hhmm.split(":").map(Number);
-  return `${String((h + 1) % 24).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-}
+const DEFAULT_SET_DURATION_LINE = "DURATION:PT1H";
 
 function sanitizeFilenamePart(value) {
   return (
@@ -190,11 +188,10 @@ function generateICal(bands, calendarName) {
     if (!band.start_time) continue;
 
     const startTime = band.start_time; // HH:MM
-    // Derived from the start, never a constant. A literal "21:00" against a
-    // 23:00 start is BEFORE it, which the endDate roll below then reads as a
-    // midnight straddle -- turning a missing end time into a 22-hour event.
-    // No such row exists in production today; nothing stops one being written.
-    const endTime = band.end_time || addOneHour(startTime);
+    // A missing end is never a constant. A literal "21:00" against a 23:00
+    // start is BEFORE it, which the endDate roll below reads as a midnight
+    // straddle -- turning a missing end time into a 22-hour event.
+    const endTime = band.end_time;
 
     // `eventDate` is the FESTIVAL day. A set starting before the after-midnight
     // threshold belongs to that evening but happens on the NEXT calendar day
@@ -208,11 +205,13 @@ function generateICal(bands, calendarName) {
     // DTSTART, an invalid VEVENT some clients reject (#601). Zero-padded HH:MM
     // compares lexicographically, mirroring prepareBands()'s `endMs < startMs`
     // +1-day roll.
-    const endDate = endTime < startTime ? nextCalendarDay(startDate) : startDate;
+    const endDate = endTime && endTime < startTime ? nextCalendarDay(startDate) : startDate;
 
     // Convert to iCal format (YYYYMMDDTHHMMSS)
     const dtstart = `${startDate.replace(/-/g, "")}T${startTime.replace(/:/g, "")}00`;
-    const dtend = `${endDate.replace(/-/g, "")}T${endTime.replace(/:/g, "")}00`;
+    const endLine = endTime
+      ? `DTEND;TZID=${TORONTO_TZID}:${endDate.replace(/-/g, "")}T${endTime.replace(/:/g, "")}00`
+      : DEFAULT_SET_DURATION_LINE;
 
     // Generate unique ID using performance ID to ensure uniqueness per band.
     // Keyed on the festival date, not startDate: a subscribed calendar matches
@@ -234,7 +233,7 @@ function generateICal(bands, calendarName) {
       `UID:${uid}`,
       `DTSTAMP:${now}`,
       `DTSTART;TZID=${TORONTO_TZID}:${dtstart}`,
-      `DTEND;TZID=${TORONTO_TZID}:${dtend}`,
+      endLine,
       `SUMMARY:${escapeIcal(band.band_name)}`,
       `LOCATION:${escapeIcal(location)}`,
       `DESCRIPTION:${escapeIcal(description)}`,

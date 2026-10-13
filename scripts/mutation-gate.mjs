@@ -303,10 +303,10 @@ export const MUTATIONS = [
   {
     id: "ical-end-time-derived-not-constant",
     invariant:
-      "CLAUDE.md 'Pulling a band from a live lineup' — a missing end_time is derived from the start, never a constant that can precede it (#1079)",
+      "CLAUDE.md 'Pulling a band from a live lineup' — a missing end_time is a one-hour DURATION, never a constant that can precede the start (#1079, #1261)",
     file: "functions/api/feeds/ical.js",
-    find: "band.end_time || addOneHour(startTime)",
-    replace: 'band.end_time || "21:00"',
+    find: "const endTime = band.end_time;",
+    replace: 'const endTime = band.end_time || "21:00";',
     tests: ["functions/api/feeds/__tests__/ical.test.js"],
   },
   {

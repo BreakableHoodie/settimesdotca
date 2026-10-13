@@ -1,5 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { cwd as currentWorkingDirectory } from "node:process";
+import { realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ALERT_AGE_DAYS = 7;
@@ -22,16 +24,21 @@ const REPOSITORY = "BreakableHoodie/settimesdotca";
 // Same discipline as the override ratchet (scripts/__tests__/overrideRanges.test.js):
 // add an entry only for a recorded decision, and remove entries the digest
 // reports as no longer flagged.
+//
+// Keyed `lockfile|package|advisory`, never by package alone: one package can
+// carry several advisories, so a package-level acceptance silently accepts the
+// NEXT advisory published against it. That happened before this list shipped:
+// the September decision to accept the Lighthouse CI toolchain (#1208) would
+// have covered basic-ftp and compression advisories published in October.
 export const ACCEPTED_NPM_AUDIT = {
-  "frontend/package-lock.json|@lhci/cli":
-    "Lighthouse CI dev toolchain; forcing it in range made the audit worse (#1208)",
-  "frontend/package-lock.json|basic-ftp": "Lighthouse CI dev toolchain, only via @lhci/cli (#1208)",
-  "frontend/package-lock.json|compression": "Lighthouse CI dev toolchain, only via @lhci/cli (#1208)",
-  "frontend/package-lock.json|get-uri": "Lighthouse CI dev toolchain, only via @lhci/cli (#1208)",
-  "frontend/package-lock.json|pac-proxy-agent": "Lighthouse CI dev toolchain, only via @lhci/cli (#1208)",
-  "frontend/package-lock.json|proxy-addr": "Lighthouse CI dev toolchain, only via @lhci/cli (#1208)",
-  "frontend/package-lock.json|proxy-agent": "Lighthouse CI dev toolchain, only via @lhci/cli (#1208)",
+  "frontend/package-lock.json|postcss-selector-parser|GHSA-rj75-hqrm-r3gf":
+    "build-time only, pinned by @tailwindcss/typography; re-check on its next release (#1267)",
 };
+
+// The issue lists at most this many alerts. GitHub rejects an issue body over
+// 65,536 characters (~400 alert lines), which would fail the digest exactly
+// when the backlog is largest. The counts above the list stay exact.
+const MAX_LISTED_ALERTS = 50;
 
 function ageInDays(createdAt, now) {
   const timestamp = Date.parse(createdAt);
@@ -108,19 +115,23 @@ export function buildDigest({ now, dependabot = [], codeScanning = [], analyses 
       (sum, count) => sum + Number(count || 0),
       0,
     );
-    const packages = summary.packages ?? [];
-    const unaccepted = packages.filter(({ name }) => !(`${summary.lockfile}|${name}` in ACCEPTED_NPM_AUDIT));
+    const findings = summary.findings ?? [];
+    const keyOf = ({ name, advisory }) => `${summary.lockfile}|${name}|${advisory}`;
+    // A finding with no advisory id can never match an acceptance.
+    const unaccepted = findings.filter((finding) => !finding.advisory || !(keyOf(finding) in ACCEPTED_NPM_AUDIT));
     if (unaccepted.length > 0) {
       problems.push(
         `${summary.lockfile}: ${unaccepted.length} npm audit advisor${unaccepted.length === 1 ? "y" : "ies"} not on the accepted list: ` +
-          unaccepted.map(({ name, severity }) => `${name} (${severity})`).join(", "),
+          unaccepted
+            .map(({ name, advisory, severity }) => `${name} ${advisory || "(no advisory id)"} (${severity})`)
+            .join(", "),
       );
-    } else if (total > 0 && packages.length === 0) {
-      // Counts the digest cannot attribute to a package cannot be judged
+    } else if (total > 0 && findings.length === 0) {
+      // Counts the digest cannot attribute to an advisory cannot be judged
       // accepted. Fail closed rather than assume they are the known ones.
-      problems.push(`${summary.lockfile} reports ${total} npm audit vulnerabilities with no package detail`);
+      problems.push(`${summary.lockfile} reports ${total} npm audit vulnerabilities with no advisory detail`);
     }
-    const flagged = new Set(packages.map(({ name }) => `${summary.lockfile}|${name}`));
+    const flagged = new Set(findings.map(keyOf));
     for (const key of Object.keys(ACCEPTED_NPM_AUDIT)) {
       if (key.startsWith(`${summary.lockfile}|`) && !flagged.has(key)) acceptedNoLongerFlagged.push(key);
     }
@@ -151,7 +162,19 @@ export function buildDigest({ now, dependabot = [], codeScanning = [], analyses 
     "",
     "### Open alerts",
     "",
-    alerts.length > 0 ? alerts.map((alert) => formatAlert(alert, currentTime)).join("\n") : "- None",
+    alerts.length > 0
+      ? alerts
+          .slice(0, MAX_LISTED_ALERTS)
+          .map((alert) => formatAlert(alert, currentTime))
+          .concat(
+            alerts.length > MAX_LISTED_ALERTS
+              ? [
+                  `- …and ${alerts.length - MAX_LISTED_ALERTS} more, newest first above; see https://github.com/${REPOSITORY}/security`,
+                ]
+              : [],
+          )
+          .join("\n")
+      : "- None",
   ].join("\n");
 
   return {
@@ -200,13 +223,21 @@ function auditSummary(lockfile, audit) {
     throw new Error(`npm audit (${lockfile}) returned an invalid JSON report`);
   }
   const counts = audit.metadata?.vulnerabilities ?? {};
-  const packages = Object.entries(audit.vulnerabilities ?? {}).map(([name, detail]) => ({
-    name,
-    severity: detail?.severity ?? "unknown",
-  }));
+  // One finding per ADVISORY. A string in `via` names the dependency that
+  // carries the advisory; that dependency's own entry reports it, so only the
+  // advisory objects are findings.
+  const findings = Object.entries(audit.vulnerabilities ?? {}).flatMap(([name, detail]) =>
+    (detail?.via ?? [])
+      .filter((via) => via && typeof via === "object")
+      .map((via) => ({
+        name,
+        advisory: (typeof via.url === "string" && via.url.split("/").pop()) || (via.source ? `npm-${via.source}` : ""),
+        severity: via.severity ?? detail?.severity ?? "unknown",
+      })),
+  );
   return {
     lockfile,
-    packages,
+    findings,
     critical: counts.critical ?? 0,
     high: counts.high ?? 0,
     moderate: counts.moderate ?? 0,
@@ -305,7 +336,18 @@ export function main({ runner = defaultRunner, now = new Date(), root = currentW
   return digest;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Real paths, not `file://${argv[1]}`: import.meta.url is percent-encoded AND
+// symlink-resolved, so a checkout path with a space, a #, or a symlink in it
+// never matched, and the job "succeeded" without running.
+function isEntryPoint() {
+  try {
+    return Boolean(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (isEntryPoint()) {
   try {
     main();
   } catch (error) {

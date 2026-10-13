@@ -256,19 +256,22 @@ export async function onRequestPatch(context) {
     // into two batches would let a failure between them leave a demoted or
     // deactivated user with live API keys and sessions and no audit row,
     // which is the exact hole the revocation below exists to close.
+    //
+    // The condition always requires the row to EXIST, even when no last-admin
+    // guard applies: a user deleted between the read above and this batch
+    // makes the UPDATE match nothing, and an unconditional audit insert would
+    // still record a change that never happened before the 404.
     const appliedConditions = [];
     const appliedBinds = [userId];
-    if (demotingAdmin) {
+    if (roleChanged) {
       appliedConditions.push("role = ?");
       appliedBinds.push(role);
     }
-    if (deactivatingAdmin) appliedConditions.push("is_active = 0");
-    const applied = protectsLastAdmin
-      ? {
-          sql: `EXISTS (SELECT 1 FROM users WHERE id = ? AND ${appliedConditions.join(" AND ")})`,
-          binds: appliedBinds,
-        }
-      : { sql: "1", binds: [] };
+    if (deactivating) appliedConditions.push("is_active = 0");
+    const applied = {
+      sql: `EXISTS (SELECT 1 FROM users WHERE id = ?${appliedConditions.map((c) => ` AND ${c}`).join("")})`,
+      binds: appliedBinds,
+    };
 
     const mutationStatements = [
       DB.prepare(

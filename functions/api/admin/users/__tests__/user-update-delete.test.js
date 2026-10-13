@@ -32,6 +32,37 @@ describe("Admin user item API", () => {
     expect(audit).toBeTruthy();
   });
 
+  // The read happens before the batch. A user deleted in between makes the
+  // UPDATE match nothing; the audit row must not claim the change happened.
+  test("a user deleted mid-request gets a 404 and no audit row", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    rawDb
+      .prepare("INSERT INTO users (email, role, name, password_hash) VALUES (?, ?, ?, 'placeholder')")
+      .run("gone@test.com", "viewer", "Gone Soon");
+    const target = rawDb.prepare("SELECT id FROM users WHERE email = ?").get("gone@test.com");
+    const batch = env.DB.batch.bind(env.DB);
+    env.DB.batch = (statements) => {
+      rawDb.prepare("DELETE FROM users WHERE id = ?").run(target.id);
+      return batch(statements);
+    };
+
+    const response = await userItemHandler.onRequestPatch({
+      request: new Request(`https://example.test/api/admin/users/${target.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({ role: "editor" }),
+      }),
+      env,
+      params: { id: String(target.id) },
+    });
+
+    expect(response.status).toBe(404);
+    const audit = rawDb
+      .prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action = 'user.updated' AND resource_id = ?")
+      .get(target.id);
+    expect(audit.n).toBe(0);
+  });
+
   test("cannot demote last admin", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "admin" });
     const soleAdmin = rawDb.prepare("SELECT * FROM users WHERE role = 'admin'").get();

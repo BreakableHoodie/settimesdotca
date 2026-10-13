@@ -142,12 +142,27 @@ function discoverHandlers() {
 // Every row of every table, not just counts: a handler that UPDATES an
 // existing row before refusing changes no count, and only the contents show it.
 // Table names come from sqlite_master, never from input.
+//
+// One column is excluded: session validation stamps
+// lucia_sessions.last_activity_at with datetime('now') on EVERY request, before
+// any handler runs. It changes whenever the clock crosses a second mid-test
+// (it did in CI, never locally), and it is the middleware's write, not the
+// route's. The rest of the sessions table is still compared.
+const BOOKKEEPING_COLUMNS = { lucia_sessions: ["last_activity_at"] };
+
 function tableSnapshot(rawDb) {
   const tables = rawDb
     .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
     .all();
   return Object.fromEntries(
-    tables.map(({ name }) => [name, rawDb.prepare(`SELECT * FROM "${name.replaceAll('"', '""')}" ORDER BY 1`).all()]),
+    tables.map(({ name }) => {
+      const rows = rawDb.prepare(`SELECT * FROM "${name.replaceAll('"', '""')}" ORDER BY 1`).all();
+      const skip = BOOKKEEPING_COLUMNS[name] ?? [];
+      return [
+        name,
+        rows.map((row) => Object.fromEntries(Object.entries(row).filter(([column]) => !skip.includes(column)))),
+      ];
+    }),
   );
 }
 

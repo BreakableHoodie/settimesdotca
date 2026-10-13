@@ -329,8 +329,12 @@ export async function onRequestPatch(context) {
     const [userUpdate] = await DB.batch(mutationStatements);
     // Only an EXPLICIT changes === 0 means the guard refused (CLAUDE.md: an
     // absent meta must not turn a committed write into a false failure).
-    if (userUpdate?.meta?.changes === 0 && !protectsLastAdmin) {
-      // The unguarded UPDATE matched nothing: the user was deleted mid-request.
+    // Zero changes means the user was deleted mid-request, OR the last-admin
+    // guard refused. Only a guarded update can be the latter, so ask the row.
+    const deletedMidRequest =
+      userUpdate?.meta?.changes === 0 &&
+      (!protectsLastAdmin || !(await DB.prepare("SELECT 1 FROM users WHERE id = ?").bind(userId).first()));
+    if (deletedMidRequest) {
       return new Response(JSON.stringify({ error: "Not found", message: "User not found" }), {
         status: 404,
         headers: { "Content-Type": "application/json" },

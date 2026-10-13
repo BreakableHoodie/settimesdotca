@@ -63,6 +63,33 @@ describe("Admin user item API", () => {
     expect(audit.n).toBe(0);
   });
 
+  // A guarded change (demoting an admin) that finds its target deleted must
+  // still answer 404, not the last-admin 400.
+  test("an admin deleted mid-demotion gets a 404, not the last-admin error", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    rawDb
+      .prepare("INSERT INTO users (email, role, name, password_hash, is_active) VALUES (?, ?, ?, 'placeholder', 1)")
+      .run("second-admin@test.com", "admin", "Second Admin");
+    const target = rawDb.prepare("SELECT id FROM users WHERE email = ?").get("second-admin@test.com");
+    const batch = env.DB.batch.bind(env.DB);
+    env.DB.batch = (statements) => {
+      rawDb.prepare("DELETE FROM users WHERE id = ?").run(target.id);
+      return batch(statements);
+    };
+
+    const response = await userItemHandler.onRequestPatch({
+      request: new Request(`https://example.test/api/admin/users/${target.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({ role: "viewer" }),
+      }),
+      env,
+      params: { id: String(target.id) },
+    });
+
+    expect(response.status).toBe(404);
+  });
+
   test("cannot demote last admin", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "admin" });
     const soleAdmin = rawDb.prepare("SELECT * FROM users WHERE role = 'admin'").get();

@@ -534,6 +534,15 @@ export const MUTATIONS = [
     replace: "const params = [new Date().toISOString().slice(0, 10)];",
     tests: ["functions/api/feeds/__tests__/ical.test.js"],
   },
+  {
+    id: "no-utc-calendar-day-in-functions",
+    invariant:
+      "CLAUDE.md 'Server-side' (today/now is Toronto-local) — a UTC calendar day anywhere in functions/ fails the source-scanning guard",
+    file: "functions/api/events/timeline.js",
+    find: "const today = eventLocalToday(); // YYYY-MM-DD",
+    replace: "const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD",
+    tests: ["functions/utils/__tests__/utcCalendarDayGuard.test.js"],
+  },
 ];
 
 // ============================================================================

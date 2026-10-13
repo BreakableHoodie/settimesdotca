@@ -806,21 +806,26 @@ Omitting is both the honest shape and the consistent one: the feed is
 _performance_-driven, so it already reports an event with no lineup as no `VEVENT`s,
 and an unscheduled set is that same case one row down. An absent entry is
 recoverable; a wrong entry in a calendar someone trusts is not. A missing `end_time`
-is likewise derived (`start + 1h`), never a constant -- a literal `"21:00"` against a
-23:00 start is _before_ it, which the midnight-straddle roll then reads as spanning
-into the next day, turning an absent end time into a 22-hour event.
+is never a constant -- a literal `"21:00"` against a 23:00 start is _before_ it,
+which the midnight-straddle roll then reads as spanning into the next day, turning an
+absent end time into a 22-hour event. In the calendar files it is stated as
+`DURATION:PT1H`, not a computed `DTEND`: on the night Toronto repeats 01:00, 01:30
+plus one wall-clock hour is a two-hour event, while a `DURATION` is elapsed time.
 
 **The frontend derives it the same way** (`DEFAULT_SET_DURATION_MS` in
 `frontend/src/utils/bandUtils.js`, applied in `prepareBands`). Until the Vol. 18
 readiness pass it left `endMs = 0`, so an open-ended closer ("12:25 – END") was
 "upcoming" forever, never "playing now", and dropped from My Route as finished.
-Keep the two surfaces in step: one hour, derived from the start.
+Keep the surfaces in step: one hour from the start.
 
-**A third surface: the My Route calendar export** (`frontend/src/utils/routeIcs.js`, #1251). It builds an `.ics` of only the fan's picked sets, entirely in the browser, and must follow the feed's rules exactly: after-midnight sets dated on the next calendar day, no start time omitted, a missing end derived as start + 1 hour, cancelled sets as `STATUS:CANCELLED`, and the same UID scheme. Change one and you change both. `DESCRIPTION` lines are joined with a real newline and escaped ONCE; joining with a literal `"\\n"` and then escaping produced `\\n`, which calendars show as the text "\n" (the server feed shipped that bug).
+**A third surface: the My Route calendar export** (`frontend/src/utils/routeIcs.js`, #1251). It builds an `.ics` of only the fan's picked sets, entirely in the browser, and must follow the feed's rules exactly: after-midnight sets dated on the next calendar day, no start time omitted, a missing end stated as a one-hour `DURATION`, cancelled sets as `STATUS:CANCELLED`, and the same UID scheme. Change one and you change both. `DESCRIPTION` lines are joined with a real newline and escaped ONCE; joining with a literal `"\\n"` and then escaping produced `\\n`, which calendars show as the text "\n" (the server feed shipped that bug).
 
-Both are in the mutation gate. A fallback is invisible to every happy-path test by
-construction, which is how the constant survived in a file that already had four
-describe blocks.
+The server feed's two fallbacks -- an unscheduled set is omitted, and a missing end
+is never a constant (`ical-no-fabricated-start-time`, `ical-end-time-derived-not-constant`)
+-- are in the mutation gate. The My Route export is NOT: the gate covers `functions/`
+only, so its tests in `frontend/src/utils/__tests__/routeIcs.test.js` are the guard
+there. A fallback is invisible to every happy-path test by construction, which is how
+the constant survived in a file that already had four describe blocks.
 
 **Every calendar time is bound to Toronto (`DTSTART;TZID=America/Toronto` plus a
 `VTIMEZONE`), never floating.** A DTSTART without a TZID floats under RFC 5545,

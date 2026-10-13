@@ -1,9 +1,8 @@
 import { AFTER_MIDNIGHT_THRESHOLD_HOUR } from './festivalDays'
 import { DEFAULT_SET_DURATION_MS } from './bandUtils'
 
-// Wall-clock arithmetic in UTC, which has no DST. The device's own zone must
-// never apply: a London phone adding an hour across ITS spring-forward would
-// shift a Toronto set's end time.
+// Calendar-date arithmetic in UTC, which has no DST, so the device's own zone
+// can never shift a Toronto date.
 function dateFromParts(date) {
   const [year, month, day] = date.split('-').map(Number)
   return new Date(Date.UTC(year, month - 1, day))
@@ -17,16 +16,6 @@ function nextCalendarDay(date) {
   const next = dateFromParts(date)
   next.setUTCDate(next.getUTCDate() + 1)
   return formatDate(next)
-}
-
-function addMinutes(date, time, minutes) {
-  const [hour, minute] = time.split(':').map(Number)
-  const result = dateFromParts(date)
-  result.setUTCHours(hour, minute + minutes, 0, 0)
-  return {
-    date: formatDate(result),
-    time: `${String(result.getUTCHours()).padStart(2, '0')}:${String(result.getUTCMinutes()).padStart(2, '0')}`,
-  }
 }
 
 // Set times are Toronto wall-clock times. Without a TZID, RFC 5545 reads
@@ -92,10 +81,11 @@ export function buildRouteIcs({ event, sets }) {
     if (!set.startTime || !festivalDate) continue
 
     const startDate = calendarDateForSet(set, eventDate)
-    const hasEnd = Boolean(set.endTime)
-    const derivedEnd = hasEnd ? null : addMinutes(startDate, set.startTime, DEFAULT_SET_DURATION_MS / 60000)
-    const endTime = set.endTime || derivedEnd.time
-    const endDate = hasEnd && endTime < set.startTime ? nextCalendarDay(startDate) : derivedEnd?.date || startDate
+    // No recorded end: a DURATION (elapsed time), never a computed wall-clock
+    // DTEND, which is a two-hour event on the night Toronto repeats 01:00.
+    const endLine = set.endTime
+      ? `DTEND;TZID=${TORONTO_TZID}:${(set.endTime < set.startTime ? nextCalendarDay(startDate) : startDate).replace(/-/g, '')}T${set.endTime.replace(/:/g, '')}00`
+      : `DURATION:PT${DEFAULT_SET_DURATION_MS / 60000}M`
     const performanceId = set.performance_id ?? set.id
     const name = set.name || set.band_name || 'Unknown performer'
     const venue = set.venue || set.venue_name || 'TBD'
@@ -111,7 +101,7 @@ export function buildRouteIcs({ event, sets }) {
       `UID:performance-${performanceId}-${festivalDate}@settimes.ca`,
       `DTSTAMP:${now}`,
       `DTSTART;TZID=${TORONTO_TZID}:${startDate.replace(/-/g, '')}T${set.startTime.replace(/:/g, '')}00`,
-      `DTEND;TZID=${TORONTO_TZID}:${endDate.replace(/-/g, '')}T${endTime.replace(/:/g, '')}00`,
+      endLine,
       `SUMMARY:${escapeIcal(name)}`,
       `LOCATION:${escapeIcal(venue)}`,
       `DESCRIPTION:${escapeIcal(description)}`,

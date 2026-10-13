@@ -656,7 +656,7 @@ describe("GET /api/feeds/ical — an unscheduled set is not a calendar entry (#1
     expect((icalData.match(/BEGIN:VEVENT/g) || []).length).toBe(1);
   });
 
-  test("a missing end_time is one hour after the start, not a constant 21:00", async () => {
+  test("a missing end_time is a one-hour DURATION, not a constant 21:00", async () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
     const event = seedEvent(rawDb);
@@ -676,9 +676,12 @@ describe("GET /api/feeds/ical — an unscheduled set is not a calendar entry (#1
     const response = await onRequestGet({ request: new Request("https://example.test/api/feeds/ical"), env });
     const icalData = await response.text();
 
-    expect(icalData).toContain("DTSTART;TZID=America/Toronto:20990505T230000");
-    expect(icalData).toContain("DTEND;TZID=America/Toronto:20990506T000000");
-    expect(icalData).not.toContain("DTEND;TZID=America/Toronto:20990506T210000");
+    // A DURATION, not a wall-clock DTEND: one elapsed hour even on the night
+    // Toronto repeats 01:00, where a computed DTEND is a two-hour event.
+    const vevent = icalData.split("BEGIN:VEVENT")[1];
+    expect(vevent).toContain("DTSTART;TZID=America/Toronto:20990505T230000");
+    expect(vevent).toContain("DURATION:PT1H");
+    expect(vevent).not.toMatch(/^DTEND/m);
   });
 });
 
@@ -794,7 +797,8 @@ describe("GET /api/feeds/ical — after-midnight sets land on the next calendar 
           block.match(/^SUMMARY:(.*)$/m)[1].trim(),
           {
             start: block.match(/^DTSTART;TZID=America\/Toronto:(.*)$/m)[1].trim(),
-            end: block.match(/^DTEND;TZID=America\/Toronto:(.*)$/m)[1].trim(),
+            // A set with no recorded end carries DURATION instead of DTEND.
+            end: (block.match(/^DTEND;TZID=America\/Toronto:(.*)$/m) ?? block.match(/^(DURATION:.*)$/m))[1].trim(),
             uid: block.match(/^UID:(.*)$/m)[1].trim(),
           },
         ]),
@@ -808,8 +812,8 @@ describe("GET /api/feeds/ical — after-midnight sets land on the next calendar 
 
     const events = await eventsByName(env);
     expect(events.Closer.start).toBe("20990705T002500");
-    // No end time: derived as start + 1h, on the same (next) calendar day.
-    expect(events.Closer.end).toBe("20990705T012500");
+    // No end time: one hour stated as a DURATION, never a computed DTEND.
+    expect(events.Closer.end).toBe("DURATION:PT1H");
   });
 
   test("evening sets and a midnight straddle keep their existing dates", async () => {

@@ -47,17 +47,21 @@ describe('buildRouteIcs', () => {
     expect(ical).toContain('DTSTART;TZID=America/Toronto:20261011T200000')
   })
 
-  // 01:30 on 2026-03-29 does not exist in London (UK springs forward that
-  // night) but does in Toronto. Deriving the end in the device zone moved it.
-  it('derives an end time without applying the device time zone', () => {
+  // Toronto repeats 01:00 on 2026-11-01. A computed wall-clock DTEND for a
+  // 01:30 start (02:30) would be a two-hour event; a DURATION stays one hour,
+  // and involves no clock arithmetic for the device's own zone to distort.
+  it('states a missing end as a one-hour DURATION, including across a clock change', () => {
     const previous = process.env.TZ
     process.env.TZ = 'Europe/London'
     try {
       const ical = buildRouteIcs({
-        event: { ...event, date: '2026-03-28' },
-        sets: [set({ date: '2026-03-28', startTime: '00:30', endTime: null })],
+        event: { ...event, date: '2026-10-31' },
+        sets: [set({ date: '2026-10-31', startTime: '01:30', endTime: null })],
       })
-      expect(ical).toContain('DTEND;TZID=America/Toronto:20260329T013000')
+      const vevent = ical.split('BEGIN:VEVENT')[1]
+      expect(vevent).toContain('DTSTART;TZID=America/Toronto:20261101T013000')
+      expect(vevent).toContain('DURATION:PT60M')
+      expect(vevent).not.toMatch(/^DTEND/m)
     } finally {
       if (previous === undefined) delete process.env.TZ
       else process.env.TZ = previous
@@ -71,8 +75,8 @@ describe('buildRouteIcs', () => {
     expect(ical).not.toContain('BEGIN:VEVENT')
   })
 
-  it('derives a missing end time as exactly one hour after the start', () => {
-    const ical = buildRouteIcs({ event, sets: [set({ startTime: '23:30', endTime: null })] })
+  it('keeps a recorded end that straddles midnight on the next day', () => {
+    const ical = buildRouteIcs({ event, sets: [set({ startTime: '23:30', endTime: '00:30' })] })
 
     expect(ical).toContain('DTSTART;TZID=America/Toronto:20261011T233000')
     expect(ical).toContain('DTEND;TZID=America/Toronto:20261012T003000')

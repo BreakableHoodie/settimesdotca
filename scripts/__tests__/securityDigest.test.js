@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { ACCEPTED_NPM_AUDIT, buildDigest, collectSecurityData, main } from "../security-digest.mjs";
+import {
+  ACCEPTED_NPM_AUDIT,
+  buildDigest,
+  collectSecurityData,
+  defaultRunner,
+  main,
+  RUNNER_LIMITS,
+} from "../security-digest.mjs";
 
 const NOW = new Date("2026-10-10T12:00:00Z");
 
@@ -189,6 +196,36 @@ describe("security digest", () => {
     expect(digest.body).toContain("critical 1");
     expect(digest.shouldOpen).toBe(true);
     expect(calls.filter(([file]) => file === "npm")).toHaveLength(2);
+  });
+
+  it("creates its label before opening the first digest issue", () => {
+    const ghCalls = [];
+    const runner = (file, args) => {
+      if (file === "gh") {
+        ghCalls.push(args);
+        return { status: 0, stdout: "[]" };
+      }
+      return { status: 1, stdout: JSON.stringify({ metadata: { vulnerabilities: { critical: 1 } } }) };
+    };
+    main({ runner, now: NOW });
+    const labelAt = ghCalls.findIndex((args) => args[0] === "label" && args[1] === "create");
+    const createAt = ghCalls.findIndex((args) => args[0] === "issue" && args[1] === "create");
+    expect(labelAt).toBeGreaterThanOrEqual(0);
+    expect(ghCalls[labelAt]).toContain("--force");
+    expect(labelAt).toBeLessThan(createAt);
+  });
+
+  it("the default runner reads more than execFileSync's 1 MiB default", () => {
+    const result = defaultRunner(process.execPath, ["-e", "process.stdout.write('x'.repeat(2 * 1024 * 1024))"]);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toHaveLength(2 * 1024 * 1024);
+  });
+
+  it("the default runner is bounded, and a timed-out command fails with a reason", () => {
+    expect(Number.isFinite(RUNNER_LIMITS.timeout)).toBe(true);
+    const result = defaultRunner(process.execPath, ["-e", "setTimeout(() => {}, 10_000)"], { timeout: 200 });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/ETIMEDOUT|timed out/i);
   });
 
   it("fails closed when npm audit returns JSON without a report", () => {

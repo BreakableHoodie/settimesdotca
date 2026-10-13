@@ -162,14 +162,20 @@ export function buildDigest({ now, dependabot = [], codeScanning = [], analyses 
   };
 }
 
-function defaultRunner(file, args, options = {}) {
+// execFileSync's defaults are a 1 MiB stdout cap and no timeout. Paginated
+// alert lists outgrow 1 MiB exactly when alerts pile up, and a stalled gh/npm
+// would hold the job until the runner kills it.
+export const RUNNER_LIMITS = { maxBuffer: 64 * 1024 * 1024, timeout: 120_000 };
+
+export function defaultRunner(file, args, options = {}) {
   try {
-    return { status: 0, stdout: execFileSync(file, args, { encoding: "utf8", ...options }) };
+    return { status: 0, stdout: execFileSync(file, args, { encoding: "utf8", ...RUNNER_LIMITS, ...options }) };
   } catch (error) {
     return {
+      // A buffer overflow or timeout has no exit status; still a failure.
       status: error.status ?? 1,
       stdout: error.stdout?.toString() ?? "",
-      stderr: error.stderr?.toString() ?? "",
+      stderr: error.stderr?.toString() || error.message,
     };
   }
 }
@@ -268,6 +274,22 @@ export function main({ runner = defaultRunner, now = new Date(), root = currentW
   const issue = issues[0];
 
   if (digest.shouldOpen && !issue) {
+    // gh issue create fails outright on a label the repo does not have, so the
+    // first digest that needs to open would fail. --force makes this idempotent.
+    runGh(
+      runner,
+      [
+        "label",
+        "create",
+        "security-digest",
+        "--force",
+        "--color",
+        "B60205",
+        "--description",
+        "Opened by the weekly security digest",
+      ],
+      root,
+    );
     runGh(
       runner,
       ["issue", "create", "--title", digest.title, "--body", digest.body, "--label", "security-digest"],

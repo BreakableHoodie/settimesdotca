@@ -125,6 +125,33 @@ export async function onRequestGet(context) {
  *   sentinels, and letting them travel this far is how `all all Shows` reached
  *   subscribers' sidebars (#1096).
  */
+// Set times are Toronto wall-clock times. A DTSTART with no TZID is FLOATING
+// under RFC 5545, so a subscriber travelling to Vancouver saw a 20:00 set at
+// 20:00 Vancouver time, three hours late. X-WR-TIMEZONE is a non-standard hint
+// that does not change that. Canada's rules since 2007. The on-device route
+// export (#1261) carries the same block; Pages Functions cannot import from
+// frontend/, so keep the two in step.
+const TORONTO_TZID = "America/Toronto";
+const TORONTO_VTIMEZONE = [
+  "BEGIN:VTIMEZONE",
+  `TZID:${TORONTO_TZID}`,
+  "BEGIN:DAYLIGHT",
+  "TZOFFSETFROM:-0500",
+  "TZOFFSETTO:-0400",
+  "TZNAME:EDT",
+  "DTSTART:19700308T020000",
+  "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU",
+  "END:DAYLIGHT",
+  "BEGIN:STANDARD",
+  "TZOFFSETFROM:-0400",
+  "TZOFFSETTO:-0500",
+  "TZNAME:EST",
+  "DTSTART:19701101T020000",
+  "RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU",
+  "END:STANDARD",
+  "END:VTIMEZONE",
+];
+
 function generateICal(bands, calendarName) {
   const now = new Date().toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
 
@@ -136,6 +163,7 @@ function generateICal(bands, calendarName) {
     "X-WR-TIMEZONE:America/Toronto",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
+    ...TORONTO_VTIMEZONE,
   ];
 
   for (const band of bands) {
@@ -205,8 +233,8 @@ function generateICal(bands, calendarName) {
       "BEGIN:VEVENT",
       `UID:${uid}`,
       `DTSTAMP:${now}`,
-      `DTSTART:${dtstart}`,
-      `DTEND:${dtend}`,
+      `DTSTART;TZID=${TORONTO_TZID}:${dtstart}`,
+      `DTEND;TZID=${TORONTO_TZID}:${dtend}`,
       `SUMMARY:${escapeIcal(band.band_name)}`,
       `LOCATION:${escapeIcal(location)}`,
       `DESCRIPTION:${escapeIcal(description)}`,

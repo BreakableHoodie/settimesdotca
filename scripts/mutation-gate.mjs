@@ -480,6 +480,42 @@ export const MUTATIONS = [
     replace: "WHERE code = ? AND used_by_user_id IS NULL AND expires_at > datetime('now')\n",
     tests: ["functions/api/admin/auth/__tests__/signup.test.js"],
   },
+  {
+    id: "event-edit-slug-validated",
+    invariant:
+      "CLAUDE.md 'Security Notes' — PUT /events/:id/edit enforces the event schema's slug format (#1276); a slug lands unescaped in sitemap <loc> and email hrefs",
+    file: "functions/api/admin/events/[id]/edit.js",
+    find: "if (!identity.valid) {",
+    replace: "if (false) {",
+    tests: ["functions/api/admin/events/__tests__/edit.test.js"],
+  },
+  {
+    id: "event-duplicate-slug-validated",
+    invariant:
+      "CLAUDE.md 'Security Notes' — POST /events/:id/duplicate enforces the event schema's slug format (#1276)",
+    file: "functions/api/admin/events/[id]/duplicate.js",
+    find: "if (!identity.valid) {",
+    replace: "if (false) {",
+    tests: ["functions/api/admin/events/__tests__/events.test.js"],
+  },
+  {
+    id: "sitemap-escapes-event-slug",
+    invariant:
+      "CLAUDE.md 'Security Notes' — every value interpolated into sitemap XML is escaped; a legacy slug with XML metacharacters must not reach <loc> raw (#1276)",
+    file: "functions/sitemap.xml.js",
+    find: "<loc>https://settimes.ca/event/${escapeXml(event.slug)}</loc>",
+    replace: "<loc>https://settimes.ca/event/${event.slug}</loc>",
+    tests: ["functions/__tests__/sitemap.test.js"],
+  },
+  {
+    id: "sitemap-escapes-recap-slug",
+    invariant:
+      "CLAUDE.md 'Security Notes' — the recap <loc> escapes the event slug as well as the event <loc> does (#1276)",
+    file: "functions/sitemap.xml.js",
+    find: "<loc>https://settimes.ca/events/${escapeXml(event.slug)}/recap</loc>",
+    replace: "<loc>https://settimes.ca/events/${event.slug}/recap</loc>",
+    tests: ["functions/__tests__/sitemap.test.js"],
+  },
 ];
 
 // ============================================================================

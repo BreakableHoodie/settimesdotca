@@ -168,8 +168,10 @@ export async function serveWithInjectedMeta(context, { title = null, metaTags = 
     let html = await indexResponse.text();
 
     html = html.replace(DEFAULT_META_RE, "");
+    // Function replacers throughout: a string replacement interprets $', $` and
+    // $& in the injected (data-bearing) text and splices the page into itself.
     if (title) {
-      html = html.replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeAttr(title)}</title>`);
+      html = html.replace(/<title>[\s\S]*?<\/title>/i, () => `<title>${escapeAttr(title)}</title>`);
     }
 
     const headParts = [...metaTags];
@@ -182,7 +184,7 @@ export async function serveWithInjectedMeta(context, { title = null, metaTags = 
       const json = JSON.stringify(schema).replace(/</g, "\\u003c");
       headParts.push(`<script type="application/ld+json">${json}</script>`);
     }
-    const injected = html.replace("</head>", `    ${headParts.join("\n    ")}\n  </head>`);
+    const injected = html.replace("</head>", () => `    ${headParts.join("\n    ")}\n  </head>`);
 
     // Preserve the asset's policy headers (CSP, etc.); override cache.
     const headers = headersForRewrittenShell(indexResponse.headers);

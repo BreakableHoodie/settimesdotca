@@ -2,6 +2,7 @@
  * Dynamic XML sitemap generated from the database.
  * Includes all published events and band profiles with at least one published performance.
  */
+import { escapeHtml as escapeXml } from "./utils/html.js";
 import { getPublicDataGateResponse } from "./utils/publicGate.js";
 import { eventLocalFestivalToday } from "./utils/eventDay.js";
 import { concludedEventSql, publicEventStatusSql } from "./utils/eventVisibility.js";
@@ -142,8 +143,8 @@ export async function onRequestGet(context) {
       // passing with it removed.
       const upcoming = !event.is_concluded;
       rows.push(`  <url>
-    <loc>https://settimes.ca/event/${event.slug}</loc>
-    <lastmod>${event.last_modified.slice(0, 10)}</lastmod>
+    <loc>https://settimes.ca/event/${escapeXml(event.slug)}</loc>
+    <lastmod>${escapeXml(event.last_modified.slice(0, 10))}</lastmod>
     <changefreq>${upcoming ? "daily" : "monthly"}</changefreq>
     <priority>${upcoming ? "1.0" : "0.5"}</priority>
   </url>`);
@@ -154,8 +155,8 @@ export async function onRequestGet(context) {
       // so this agrees with the recap API and SSR route by construction.
       if (event.is_concluded) {
         rows.push(`  <url>
-    <loc>https://settimes.ca/events/${event.slug}/recap</loc>
-    <lastmod>${event.last_modified.slice(0, 10)}</lastmod>
+    <loc>https://settimes.ca/events/${escapeXml(event.slug)}/recap</loc>
+    <lastmod>${escapeXml(event.last_modified.slice(0, 10))}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>`);
@@ -164,7 +165,7 @@ export async function onRequestGet(context) {
 
     for (const band of bands) {
       rows.push(`  <url>
-    <loc>https://settimes.ca/band/${band.id}</loc>
+    <loc>https://settimes.ca/band/${escapeXml(band.id)}</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>`);
@@ -172,7 +173,7 @@ export async function onRequestGet(context) {
 
     for (const venue of venues) {
       rows.push(`  <url>
-    <loc>https://settimes.ca/venue/${venue.id}</loc>
+    <loc>https://settimes.ca/venue/${escapeXml(venue.id)}</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>`);

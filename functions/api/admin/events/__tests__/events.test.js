@@ -1055,6 +1055,24 @@ describe("Event API - handler integration", () => {
     expect(data.bands_copied).toBeGreaterThanOrEqual(2);
   });
 
+  it("duplicate endpoint rejects a markup-bearing slug with 400 and creates no event (#1276)", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+    const original = insertEvent(rawDb, { name: "Original", slug: "original" });
+
+    const request = new Request(`https://example.test/api/admin/events/${original.id}/duplicate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+      body: JSON.stringify({ name: "Copy", date: "2026-01-01", slug: 'x</loc><script>alert(1)</script>"' }),
+    });
+
+    const res = await duplicateHandler.onRequestPost({ request, env, params: { id: String(original.id) } });
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).fields.slug).toMatch(/lowercase letters, numbers, and hyphens/);
+    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM events").get().n).toBe(1);
+  });
+
   it("duplicate endpoint does NOT copy doors_json to the new event (#569)", async () => {
     const rawDb = createTestDB();
     const env = { DB: createDBEnv(rawDb) };

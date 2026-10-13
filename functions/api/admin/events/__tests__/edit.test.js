@@ -169,7 +169,7 @@ describe("PUT /api/admin/events/:id/edit", () => {
 
     const res = await onRequestPut({
       request: putRequest(event.id, {
-        name: "E",
+        name: "Event",
         date: "2026-10-01",
         slug: "bad-ticket-slug",
         ticket_url: "not-a-url",
@@ -188,7 +188,7 @@ describe("PUT /api/admin/events/:id/edit", () => {
     const { env } = createTestEnv({ role: "editor" });
 
     const res = await onRequestPut({
-      request: putRequest(999999, { name: "N", date: "2026-10-01", slug: "ghost-slug" }),
+      request: putRequest(999999, { name: "Ghost", date: "2026-10-01", slug: "ghost-slug" }),
       env,
       params: { id: "999999" },
       data: { user: authedUser("editor", 2) },
@@ -232,5 +232,54 @@ describe("PUT /api/admin/events/:id/edit", () => {
     expect(res.status).toBe(200);
     const row = rawDb.prepare("SELECT name FROM events WHERE id = ?").get(event.id);
     expect(row.name).toBe("Same Slug Renamed");
+  });
+});
+
+// #1276: the edit route skipped the schema create enforces, so a slug like
+// `x</loc><script>...` was stored and later landed unescaped in the sitemap and
+// in email hrefs. Format is enforced; renaming stays allowed.
+describe("PUT /api/admin/events/:id/edit — slug format (#1276)", () => {
+  test("rejects a slug containing markup with 400 and leaves the stored slug unchanged", async () => {
+    const { env, rawDb } = createTestEnv({ role: "editor" });
+    const event = insertEvent(rawDb, { name: "Clean Event", slug: "clean-slug", date: "2026-10-01" });
+
+    // The <script> slug is the attack payload this test proves is REJECTED; it
+    // is never rendered. The rule cannot tell a fixture from output.
+    const res = await onRequestPut({
+      // nosemgrep: unknown-value-with-script-tag
+      request: putRequest(event.id, {
+        name: "Clean Event",
+        date: "2026-10-01",
+        slug: "x</loc><script>alert(1)</script>",
+      }),
+      env,
+      // nosemgrep: unknown-value-with-script-tag
+      params: { id: String(event.id) },
+      data: { user: authedUser("editor", 2) },
+    });
+
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toBe("Validation error");
+    expect(data.fields.slug).toMatch(/lowercase letters, numbers, and hyphens/);
+
+    const row = rawDb.prepare("SELECT slug FROM events WHERE id = ?").get(event.id);
+    expect(row.slug).toBe("clean-slug");
+    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action = 'event.updated'").get().n).toBe(0);
+  });
+
+  test("a valid slug rename still succeeds", async () => {
+    const { env, rawDb } = createTestEnv({ role: "editor" });
+    const event = insertEvent(rawDb, { name: "Rename Me", slug: "old-slug-2", date: "2026-10-01" });
+
+    const res = await onRequestPut({
+      request: putRequest(event.id, { name: "Rename Me", date: "2026-10-01", slug: "new-slug-2" }),
+      env,
+      params: { id: String(event.id) },
+      data: { user: authedUser("editor", 2) },
+    });
+
+    expect(res.status).toBe(200);
+    expect(rawDb.prepare("SELECT slug FROM events WHERE id = ?").get(event.id).slug).toBe("new-slug-2");
   });
 });

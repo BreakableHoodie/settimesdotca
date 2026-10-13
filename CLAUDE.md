@@ -1284,6 +1284,7 @@ gh pr create --label "bug,priority:p1"   # example
 - Session invalidation: `lucia.invalidateUserSessions(userId)` must be called before `lucia.createSession(user.id, {})` on re-authentication (login, MFA verify). This kills stale sessions from prior compromised contexts. Both methods live on the object returned by `initializeLucia()` in `functions/utils/auth.js`.
 - CSRF cookie must be regenerated whenever a new session is created (see `functions/api/admin/sessions/revoke-all.js`).
 - `params.id` from Cloudflare Pages Functions URL params is a string; always run it through `validateId()` from `functions/utils/validation.js` before using it in a DB query.
+- **Every route that writes `events.slug` validates it against `VALIDATION_SCHEMAS.event.slug`** (create, wizard, `edit.js`, `duplicate.js`; PATCH refuses slug changes). Until #1276, `edit.js` and `duplicate.js` stored any string, and the slug reached `sitemap.xml`'s `<loc>` unescaped. Only the document CSP stopped a stored script from running there. Output is now escaped as well (sitemap, email `href`s), but the validation is the primary control. A new slug writer must reuse the schema field, not retype the regex. Both checks and the sitemap escaping are in the mutation gate.
 
 ### The security tooling this repo actually has
 

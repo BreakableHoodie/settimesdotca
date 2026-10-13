@@ -106,6 +106,22 @@ describe("ssrMeta.serveWithInjectedMeta", () => {
     expect(html).toContain('id="root"'); // SPA shell intact
   });
 
+  it("treats $-sequences in injected title and meta as literal text (#1276)", async () => {
+    const nasty = "A $' $& $` B";
+    const res = await serveWithInjectedMeta(makeContext(), {
+      title: nasty,
+      metaTags: [`<meta property="og:title" content="${escapeAttr(nasty)}" />`],
+    });
+    const html = await res.text();
+
+    // `$'` / `$&` / `$\`` in a string replacement splice the surrounding page
+    // into itself; a function replacer inserts the text verbatim.
+    expect(html.split(`<title>${escapeAttr(nasty)}</title>`)).toHaveLength(2);
+    expect(html.split(`content="${escapeAttr(nasty)}"`)).toHaveLength(2);
+    expect(html.match(/<!doctype/gi)).toHaveLength(1);
+    expect(html.match(/<\/head>/g)).toHaveLength(1);
+  });
+
   it("escapes </script> inside JSON-LD to prevent breakout", async () => {
     const res = await serveWithInjectedMeta(makeContext(), {
       jsonLd: { "@type": "MusicGroup", name: "evil </script><script>alert(1)</script>" },

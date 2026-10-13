@@ -202,7 +202,7 @@ export async function flushAnnounceDigest(env, DB) {
     const unsubHtml = claimed
       .map(
         (item) =>
-          `<a href="${publicUrl}/api/bands/${item.band_profile_id}/unfollow?token=${item.unsubscribe_token}">Unfollow ${escapeHtml(item.band_name)}</a>`,
+          `<a href="${escapeHtml(`${publicUrl}/api/bands/${item.band_profile_id}/unfollow?token=${item.unsubscribe_token}`)}">Unfollow ${escapeHtml(item.band_name)}</a>`,
       )
       .join(" · ");
 
@@ -213,8 +213,8 @@ export async function flushAnnounceDigest(env, DB) {
 
     const html =
       bands.length === 1
-        ? `<p><strong>${escapeHtml(bands[0])}</strong> is now on the lineup for <strong>${escapeHtml(event_name)}</strong>.</p><p><a href="${eventUrl}">View the schedule</a></p><p style="font-size:0.85em">${unsubHtml}</p>`
-        : `<p><strong>${bands.length} bands you follow</strong> just joined the lineup for <strong>${escapeHtml(event_name)}</strong>:</p><ul>${bandListHtml}</ul><p><a href="${eventUrl}">View the schedule</a></p><p style="font-size:0.85em">${unsubHtml}</p>`;
+        ? `<p><strong>${escapeHtml(bands[0])}</strong> is now on the lineup for <strong>${escapeHtml(event_name)}</strong>.</p><p><a href="${escapeHtml(eventUrl)}">View the schedule</a></p><p style="font-size:0.85em">${unsubHtml}</p>`
+        : `<p><strong>${bands.length} bands you follow</strong> just joined the lineup for <strong>${escapeHtml(event_name)}</strong>:</p><ul>${bandListHtml}</ul><p><a href="${escapeHtml(eventUrl)}">View the schedule</a></p><p style="font-size:0.85em">${unsubHtml}</p>`;
 
     sendTasks.push({
       email,

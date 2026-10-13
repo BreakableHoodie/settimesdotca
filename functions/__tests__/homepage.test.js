@@ -149,3 +149,16 @@ describe("GET / — injected event route contract", () => {
     expect(href).toMatch(new RegExp(`^${routePath.replace(":slug", "[^/]+")}$`));
   });
 });
+
+describe("GET / — $-sequences in event data are literal (#1276)", () => {
+  test("an event name containing $' $& stays verbatim and does not splice the shell", async () => {
+    const { rawDb, context } = createHomepageEnv();
+    const name = "Fest $' $& $` End";
+    insertEvent(rawDb, { name, slug: "dollar-fest", date: "2099-10-11", status: "published" });
+
+    const html = await (await onRequestGet(context)).text();
+
+    expect(html.split(">Fest $' $&amp; $` End</a>")).toHaveLength(2);
+    expect(html.match(/<!doctype/gi)).toHaveLength(1);
+  });
+});

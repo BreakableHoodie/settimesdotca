@@ -88,7 +88,7 @@ export async function onRequestPost(context) {
           to: email,
           subject: `Confirm your follow of ${band.name} on SetTimes`,
           text: `Someone (hopefully you) asked to follow ${band.name} on SetTimes.\n\nConfirm to be notified when they join a lineup:\n${confirmUrl}\n\nIf this wasn't you, ignore this email — you won't be subscribed.`,
-          html: `<p>Someone (hopefully you) asked to follow <strong>${escapeHtml(band.name)}</strong> on SetTimes.</p><p><a href="${confirmUrl}">Confirm your follow</a> to be notified when they join a lineup.</p><p>If this wasn't you, just ignore this email — you won't be subscribed.</p>`,
+          html: `<p>Someone (hopefully you) asked to follow <strong>${escapeHtml(band.name)}</strong> on SetTimes.</p><p><a href="${escapeHtml(confirmUrl)}">Confirm your follow</a> to be notified when they join a lineup.</p><p>If this wasn't you, just ignore this email — you won't be subscribed.</p>`,
         })
           .then((emailResult) => {
             if (!emailResult?.delivered) {

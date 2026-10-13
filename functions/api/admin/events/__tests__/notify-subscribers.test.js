@@ -344,3 +344,19 @@ describe("POST /api/admin/events/[id]/notify-subscribers", () => {
     expect(errorSpy).toHaveBeenCalled();
   });
 });
+
+describe("subscriber email hrefs are HTML-escaped (#1276)", () => {
+  it("a legacy slug containing a quote cannot break out of the href attribute", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, { name: "Vol. 18", slug: 'x" onmouseover="alert(1)' });
+    publish(rawDb, ev.id);
+    sub(rawDb, { email: "yes@example.com", verified: 1 });
+
+    const res = await post(env, headers, ev.id, { kind: "schedule_announced" });
+    expect(res.status).toBe(200);
+
+    const { html } = sendEmail.mock.calls[0][1];
+    expect(html).toContain("/event/x&quot; onmouseover=&quot;alert(1)");
+    expect(html).not.toContain('onmouseover="alert(1)');
+  });
+});

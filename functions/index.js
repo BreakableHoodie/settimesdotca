@@ -36,11 +36,14 @@ export async function onRequestGet(context) {
     // shell's ETag/Content-Length are NOT, because this body is different.
     const headers = headersForRewrittenShell(assetResponse.headers);
 
-    return new Response(html.replace(CURRENT_EVENT_MARKER, links), {
-      status: assetResponse.status,
-      statusText: assetResponse.statusText,
-      headers,
-    });
+    return new Response(
+      html.replace(CURRENT_EVENT_MARKER, () => links),
+      {
+        status: assetResponse.status,
+        statusText: assetResponse.statusText,
+        headers,
+      },
+    );
   } catch (error) {
     console.error("Homepage event-link injection error:", error);
     return env.ASSETS.fetch(request);

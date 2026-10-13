@@ -4,7 +4,19 @@
 
 const SALT_LENGTH = 16;
 const LEGACY_ITERATIONS = 100000;
-const DEFAULT_ITERATIONS = 600000;
+
+// The production Workers runtime REFUSES PBKDF2 above 100,000 iterations:
+//   NotSupportedError: Pbkdf2 failed: iteration counts above 100000 are not
+//   supported (requested 600000).
+// Measured on the live edge 2026-10-10. Node (unit tests) and local workerd
+// (wrangler dev) both accept higher counts, so no local run can catch this.
+// #426 raised the default to 600,000 and every hashPassword call in
+// production threw from 2026-06-28 to 2026-10-10: signup and password reset
+// were broken, and login's opportunistic rehash failed silently. OWASP's
+// 600k recommendation is not reachable on this platform; 100k is the ceiling
+// (docs/adr/0005-pbkdf2-password-hashing.md).
+export const WORKERS_PBKDF2_MAX_ITERATIONS = 100000;
+export const DEFAULT_ITERATIONS = WORKERS_PBKDF2_MAX_ITERATIONS;
 const KEY_LENGTH = 32;
 
 export function timingSafeEqual(a, b) {
@@ -80,6 +92,16 @@ export async function verifyPassword(password, storedHash) {
       saltBase64 = parts[2];
       hashBase64 = parts[3];
       if (!iterations || !saltBase64 || !hashBase64) {
+        return false;
+      }
+      // Refuse before deriving: the edge would throw on an over-cap count, and
+      // the catch below would report it as a wrong password while the account
+      // collects failed-login rows toward its lockout. This is a data problem,
+      // not a bad password, so say so at error level.
+      if (iterations > WORKERS_PBKDF2_MAX_ITERATIONS) {
+        console.error(
+          `Password verification refused: stored hash uses ${iterations} PBKDF2 iterations, above the Workers cap of ${WORKERS_PBKDF2_MAX_ITERATIONS}`,
+        );
         return false;
       }
     } else {

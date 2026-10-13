@@ -1,5 +1,6 @@
 // API key utilities use a different hash strategy from password utilities.
-// PBKDF2's 600,000 iterations cost about 105 ms per verification here, while
+// PBKDF2 measured about 105 ms per verification at 600,000 iterations locally
+// (production Workers refuse more than 100,000 anyway; see crypto.js), while
 // a plain SHA-256 digest costs about 0.161 ms. API keys are verified on every
 // request, so paying that cost forever would consume Workers CPU for no
 // security benefit: this key contains 256 bits from getRandomValues and cannot

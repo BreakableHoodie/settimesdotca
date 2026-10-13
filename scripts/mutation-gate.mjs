@@ -405,6 +405,45 @@ export const MUTATIONS = [
     replace: "eventDate",
     tests: ["functions/api/feeds/__tests__/ical.test.js"],
   },
+  {
+    id: "pbkdf2-workers-iteration-cap",
+    invariant:
+      "CLAUDE.md 'PBKDF2, not bcrypt' — production Workers refuse PBKDF2 above 100,000 iterations, so hashPassword must stay at or under the cap (600,000 broke signup and password reset from #426 until 2026-10-10)",
+    file: "functions/utils/crypto.js",
+    find: "export const DEFAULT_ITERATIONS = WORKERS_PBKDF2_MAX_ITERATIONS;",
+    replace: "export const DEFAULT_ITERATIONS = 600000;",
+    tests: ["functions/utils/__tests__/crypto.test.js"],
+  },
+  {
+    id: "signup-invite-single-redeem",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — an invite code creates at most one account: the user INSERT fires only while the invite is still unclaimed, in the same batch as the claim (#1255)",
+    file: "functions/api/admin/auth/signup.js",
+    // Keeps ONE bind parameter so the mutant fails on the race, not on a
+    // bind-count error (CLAUDE.md "Hand-rolled mutation runs").
+    find: "WHERE ${INVITE_STILL_OPEN}`,",
+    replace: "WHERE ? IS NOT NULL`,",
+    tests: ["functions/api/admin/auth/__tests__/signup.test.js"],
+  },
+  {
+    id: "signup-invite-claim-requires-inserted-user",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — the invite claim fires only for the user this batch inserted, so an invite that closes mid-request is never stamped used with no user behind it (#1252 review)",
+    file: "functions/api/admin/auth/signup.js",
+    // Keeps the bind count so the mutant fails on the assertion, not a bind error.
+    find: "AND EXISTS (SELECT 1 FROM users WHERE activation_token = ?)`,",
+    replace: "AND ? IS NOT NULL`,",
+    tests: ["functions/api/admin/auth/__tests__/signup.test.js"],
+  },
+  {
+    id: "signup-invite-claim-no-second-clock-check",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — the invite claim does not re-check expiry; datetime('now') is not stable across a batch, so an invite expiring between INSERT and claim would leave a 201 signup with its invite reusable (#1252 review)",
+    file: "functions/api/admin/auth/signup.js",
+    find: "WHERE code = ? AND used_by_user_id IS NULL\n",
+    replace: "WHERE code = ? AND used_by_user_id IS NULL AND expires_at > datetime('now')\n",
+    tests: ["functions/api/admin/auth/__tests__/signup.test.js"],
+  },
 ];
 
 // ============================================================================

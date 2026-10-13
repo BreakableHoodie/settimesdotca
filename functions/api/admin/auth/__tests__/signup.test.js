@@ -63,21 +63,145 @@ describe("admin signup", () => {
     expect(payload.requiresActivation).toBe(true);
     expect(payload.user).toBeUndefined();
 
-    // Verify the invite code was marked as used
-    const usedInvite = rawDb.prepare("SELECT * FROM invite_codes WHERE code = ?").get(inviteCode);
-    expect(usedInvite.used_by_user_id).toBeDefined();
-    expect(usedInvite.used_at).toBeDefined();
-
     const createdUser = rawDb
       .prepare(
-        "SELECT email, is_active, activation_token, activation_token_expires_at, activated_at FROM users WHERE email = ?",
+        "SELECT id, email, is_active, activation_token, activation_token_expires_at, activated_at FROM users WHERE email = ?",
       )
       .get("new.user@example.com");
     expect(createdUser).toBeDefined();
+
+    // The invite is claimed BY THIS USER. (toBeDefined() was vacuous here:
+    // null is defined, so an unclaimed invite passed.)
+    const usedInvite = rawDb.prepare("SELECT * FROM invite_codes WHERE code = ?").get(inviteCode);
+    expect(usedInvite.used_by_user_id).toBe(createdUser.id);
+    expect(usedInvite.used_at).toBeTruthy();
     expect(createdUser.is_active).toBe(0);
     expect(createdUser.activation_token).toBeTruthy();
     expect(createdUser.activation_token_expires_at).toBeTruthy();
     expect(createdUser.activated_at).toBeNull();
+  });
+
+  // #1255: two signups racing ONE open (not email-restricted) invite. The
+  // handler awaits a password hash between validating the invite and writing
+  // the user, so both requests pass validation before either writes. Exactly
+  // one may create an account; the other must be refused, with no second user
+  // and the invite claimed by the winner.
+  it("lets exactly one of two concurrent signups redeem a single invite (#1255)", async () => {
+    const { env, rawDb } = createTestEnv({ role: "editor" });
+    env.ALLOW_ADMIN_SIGNUP = "true";
+    const inviteCode = "RACE-INVITE-CODE-1255";
+    rawDb
+      .prepare("INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES (?, ?, ?, ?)")
+      .run(inviteCode, "admin", daysFromNow(7), 1);
+
+    const signup = (email) =>
+      signupHandler.onRequestPost({
+        request: new Request("https://example.test/api/admin/auth/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password: "StrongPass1!", name: "Race Runner", inviteCode }),
+        }),
+        env,
+      });
+
+    const [a, b] = await Promise.all([signup("racer.a@example.com"), signup("racer.b@example.com")]);
+    expect([a.status, b.status].sort()).toEqual([201, 403]);
+
+    const racers = rawDb
+      .prepare("SELECT id, email FROM users WHERE email IN ('racer.a@example.com', 'racer.b@example.com')")
+      .all();
+    expect(racers).toHaveLength(1);
+    const invite = rawDb.prepare("SELECT used_by_user_id FROM invite_codes WHERE code = ?").get(inviteCode);
+    expect(invite.used_by_user_id).toBe(racers[0].id);
+  });
+
+  // The claim UPDATE must carry the INSERT's predicate. An invite deactivated
+  // after validation but before the batch skips the INSERT; a claim keyed only
+  // on "unclaimed" would still stamp used_at with no user behind it.
+  it("leaves an invite untouched when it closes between validation and the write", async () => {
+    const { env, rawDb } = createTestEnv({ role: "editor" });
+    env.ALLOW_ADMIN_SIGNUP = "true";
+    const inviteCode = "CLOSES-MID-REQUEST-1252";
+    rawDb
+      .prepare("INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES (?, ?, ?, ?)")
+      .run(inviteCode, "editor", daysFromNow(7), 1);
+    const batch = env.DB.batch.bind(env.DB);
+    env.DB.batch = (statements) => {
+      rawDb.prepare("UPDATE invite_codes SET is_active = 0 WHERE code = ?").run(inviteCode);
+      return batch(statements);
+    };
+
+    const response = await signupHandler.onRequestPost({
+      request: new Request("https://example.test/api/admin/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "late@example.com", password: "StrongPass1!", name: "Late Comer", inviteCode }),
+      }),
+      env,
+    });
+
+    expect(response.status).toBe(403);
+    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM users WHERE email = 'late@example.com'").get().n).toBe(0);
+    const invite = rawDb.prepare("SELECT used_at, used_by_user_id FROM invite_codes WHERE code = ?").get(inviteCode);
+    expect(invite).toEqual({ used_at: null, used_by_user_id: null });
+  });
+
+  // The clock is stable within one statement, not across a batch. An invite
+  // expiring between the INSERT and the claim must still be claimed by the
+  // user that INSERT created; a claim re-checking expiry left a 201 signup
+  // with its invite open for reuse.
+  it("claims the invite for the inserted user even if it expires mid-batch", async () => {
+    const { env, rawDb } = createTestEnv({ role: "editor" });
+    env.ALLOW_ADMIN_SIGNUP = "true";
+    const inviteCode = "EXPIRES-MID-BATCH-1252";
+    rawDb
+      .prepare("INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES (?, ?, ?, ?)")
+      .run(inviteCode, "editor", daysFromNow(7), 1);
+    const batch = env.DB.batch.bind(env.DB);
+    env.DB.batch = async ([insertUser, claimInvite, ...rest]) => {
+      const first = await batch([insertUser]);
+      rawDb.prepare("UPDATE invite_codes SET expires_at = ? WHERE code = ?").run(daysFromNow(-1), inviteCode);
+      const second = await batch([claimInvite, ...rest]);
+      return [...first, ...second];
+    };
+
+    const response = await signupHandler.onRequestPost({
+      request: new Request("https://example.test/api/admin/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "edge@example.com", password: "StrongPass1!", name: "Edge Case", inviteCode }),
+      }),
+      env,
+    });
+
+    expect(response.status).toBe(201);
+    const user = rawDb.prepare("SELECT id FROM users WHERE email = 'edge@example.com'").get();
+    const invite = rawDb.prepare("SELECT used_by_user_id FROM invite_codes WHERE code = ?").get(inviteCode);
+    expect(invite.used_by_user_id).toBe(user.id);
+  });
+
+  // login.js lowercases the email it looks up. An account stored as typed
+  // could never sign in.
+  it("stores the email lowercased and trimmed so login can find it", async () => {
+    const { env, rawDb } = createTestEnv({ role: "editor" });
+    env.ALLOW_ADMIN_SIGNUP = "true";
+    const inviteCode = "MIXED-CASE-EMAIL-1252";
+    rawDb
+      .prepare("INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES (?, ?, ?, ?)")
+      .run(inviteCode, "editor", daysFromNow(7), 1);
+
+    const response = await signupHandler.onRequestPost({
+      request: new Request("https://example.test/api/admin/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: " Jay@Example.COM ", password: "StrongPass1!", name: "Jay Doe", inviteCode }),
+      }),
+      env,
+    });
+
+    expect(response.status).toBe(201);
+    const stored = rawDb.prepare("SELECT email FROM users WHERE email LIKE '%example.com'").all();
+    expect(stored).toEqual([{ email: "jay@example.com" }]);
   });
 
   it("rejects an expired invite code (T4)", async () => {

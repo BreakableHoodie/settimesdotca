@@ -53,6 +53,9 @@ jobs:
     # (2 CPUs per job). That job's end-to-end duration was 803s, ~11% under the
     # old 15-min limit. Diff-aware PR scans are far shorter.
     timeout-minutes: 25
+    permissions:
+      contents: read
+      security-events: write
     steps:
       # fetch-depth: 0 because the diff-aware scan needs the PR's base commit
       # LOCALLY: with persist-credentials: false nothing can be fetched later
@@ -157,7 +160,7 @@ jobs:
           # Capture to a file and cat it, NOT `| tee ... || true`: under pipefail
           # the `|| true` runs and resets PIPESTATUS to (0), recording a failure
           # as success (CLAUDE.md, "Verify guards against the failure...").
-          env -u GITHUB_ACTIONS semgrep ci --json --output=semgrep.json >semgrep.log 2>&1 || rc=$?
+          env -u GITHUB_ACTIONS semgrep ci --json --output=semgrep.json --sarif-output=semgrep.sarif >semgrep.log 2>&1 || rc=$?
           cat semgrep.log
           echo "semgrep exit: $rc"
           # The outage signature is checked FIRST, whatever the exit code: seen
@@ -223,3 +226,10 @@ jobs:
               print("::error::This PR introduces Semgrep findings. Fix them, or suppress one with a `nosemgrep: <rule-id>` comment that states why.")
               sys.exit(1)
           PY
+
+      - name: Upload Semgrep SARIF
+        if: steps.token.outputs.present == 'true' && (github.event_name == 'push' || github.event_name == 'schedule') && hashFiles('semgrep.sarif') != ''
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep

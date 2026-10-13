@@ -75,7 +75,8 @@ WINDOW_SECONDS=3600
 # than no hook at all.
 #
 # LIMIT tracks the most recent observed footer. It was 1, then 4, then 3, then
-# 5; it is 2 because 2026-09-24 says so. The rule is unchanged:
+# 5, then 2 (2026-09-24); it is 5 because the footers of 2026-10-11 and
+# 2026-10-12 say so (#1266). The rule is unchanged:
 # move it only against a CURRENT footer, never from memory. The value being
 # an OBSERVATION WITH A DATE is the point -- if these comments are stale, the
 # number above them is too.
@@ -83,7 +84,7 @@ WINDOW_SECONDS=3600
 # Erring low is not free. Blocking a push when three reviews are genuinely
 # available teaches you to reach for CODERABBIT_OVERAGE reflexively, and an
 # override you always use is not a guard.
-LIMIT=2
+LIMIT=5
 WARN_AT=2
 DEFAULT_BRANCH=main
 # Overridable only so the tests can exercise a hung lookup in about a second.

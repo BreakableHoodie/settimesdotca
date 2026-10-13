@@ -21,6 +21,8 @@ import { join, resolve } from "node:path";
  * these tests (CLAUDE.md "Verify guards against the failure they guard").
  */
 const HOOK = resolve(__dirname, "../../.githooks/pre-push");
+// Read from the hook so a change to the allowance is a one-line edit there.
+const LIMIT = Number(/^LIMIT=(\d+)$/m.exec(readFileSync(HOOK, "utf8"))?.[1]);
 const SHA = "a".repeat(40);
 const ZERO = "0".repeat(40);
 // Everything the hook runs that is not a shell builtin. PATH is built from
@@ -140,8 +142,12 @@ describe("pre-push draft lookup", () => {
     expect(push().ms).toBeLessThan(900);
   });
 
+  it("reads a numeric LIMIT from the hook", () => {
+    expect(Number.isInteger(LIMIT) && LIMIT > 0).toBe(true);
+  });
+
   it("lets a draft push through at the limit, and still blocks a ready one", () => {
-    seed(2); // LIMIT=2
+    seed(LIMIT);
     fakeGh("echo true");
     expect(push().status).toBe(0);
     fakeGh("echo false");

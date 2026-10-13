@@ -50,6 +50,27 @@ describe("GET /api/feeds/ical", () => {
     expect(icalData).toContain("END:VEVENT");
   });
 
+  // A line break in DESCRIPTION is encoded ONCE (RFC 5545 "\n"). The parts
+  // used to be joined with a literal "\\n" and then escaped again, so the live
+  // feed served "\\n" and every calendar showed the text "\n" in the notes.
+  // No test asserted on DESCRIPTION at all, which is how it shipped.
+  it("separates DESCRIPTION lines with a single-escaped newline, not a double-escaped one", async () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    seedMockData(
+      mockDB,
+      [createMockEvent({ date: tomorrow.toLocaleDateString("en-CA") })],
+      [createMockVenue()],
+      [createMockBand({ start_time: "20:00", end_time: "21:00" })],
+    );
+
+    const response = await onRequestGet({ request: new Request("http://localhost/api/feeds/ical"), env: mockEnv });
+    const description = (await response.text()).split("\r\n").find((line) => line.startsWith("DESCRIPTION:"));
+
+    expect(description).toMatch(/^DESCRIPTION:The Replacements\\nVenue: The Analog Cafe/);
+    expect(description).not.toContain("\\\\n");
+  });
+
   it("should return text/calendar Content-Type header", async () => {
     const event = createMockEvent();
     const venue = createMockVenue();

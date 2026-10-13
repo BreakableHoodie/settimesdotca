@@ -189,10 +189,12 @@ function generateICal(bands, calendarName) {
     // Location
     const location = band.venue_name ? `${band.venue_name}${band.address ? ", " + band.address : ""}` : "TBD";
 
-    // Description
+    // Description. Joined with a REAL newline: escapeIcal encodes it once as
+    // "\\n". Joining with a literal "\\n" and escaping again served "\\\\n",
+    // which calendars showed as the text "\\n" (#1251 review).
     const description = [band.band_name, band.venue_name ? `Venue: ${band.venue_name}` : "", band.description || ""]
       .filter(Boolean)
-      .join("\\n");
+      .join("\n");
 
     ical.push(
       "BEGIN:VEVENT",

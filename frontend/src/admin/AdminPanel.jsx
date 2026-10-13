@@ -128,8 +128,9 @@ export default function AdminPanel({ currentUser, onLogout }) {
   }, [loadEvents])
 
   const isAdmin = currentUser?.role === 'admin'
-  const isViewer = currentUser?.role === 'viewer'
-  const canEdit = !isViewer
+  // Explicit roles, never "not a viewer": an unknown role must get no write
+  // controls, matching checkPermission's fail-closed server side.
+  const canEdit = isAdmin || currentUser?.role === 'editor'
   const canManageUsers = isAdmin
 
   // Listen for custom filter events from event detail view
@@ -454,7 +455,8 @@ export default function AdminPanel({ currentUser, onLogout }) {
                 selectedEvent={selectedEvent}
                 onEventFilterChange={setSelectedEventId}
                 readOnly={!canEdit}
-                canArchiveEvents={isAdmin}
+                canArchiveEvents={canEdit}
+                canDeleteEvents={isAdmin}
               />
             )}
 

@@ -94,6 +94,16 @@ describe('AdminPanel', () => {
     expect(screen.queryByRole('button', { name: 'Create Event' })).not.toBeInTheDocument()
   })
 
+  // Write controls follow explicit roles: an unknown role gets none, matching
+  // the server's fail-closed checkPermission (it was "anything but viewer").
+  it('gives an unknown role no write controls', async () => {
+    renderPanel('superuser')
+    await screen.findByText('Events tab (4)')
+
+    expect(screen.queryByRole('tab', { name: 'Users' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Create Event' })).not.toBeInTheDocument()
+  })
+
   it('switches tabs from the desktop navigation and mobile navigation', async () => {
     renderPanel()
     await screen.findByText('Events tab (4)')

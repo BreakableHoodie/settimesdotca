@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import VenuesTab from '../VenuesTab'
 
@@ -46,6 +46,26 @@ describe('VenuesTab role gating', () => {
     expect(within(row).queryByRole('button', { name: 'Edit' })).toBeNull()
     expect(within(row).queryByRole('button', { name: 'Delete' })).toBeNull()
     expect(screen.queryAllByRole('button', { name: 'Edit' })).toHaveLength(0)
+  })
+
+  // Losing admin while an edit form is open must not leave a form that can only
+  // 403, nor hide Add Venue, which an editor may still use.
+  it('closes an open edit form when the user loses admin, and offers Add Venue again', async () => {
+    const showToast = vi.fn()
+    const { rerender } = render(<VenuesTab showToast={showToast} readOnly={false} canManage />)
+    const row = (await screen.findAllByText(VENUE.name))[0].closest('tr')
+    fireEvent.click(within(row).getByRole('button', { name: 'Edit' }))
+    expect(screen.getByRole('heading', { name: 'Edit Venue' })).toBeInTheDocument()
+
+    rerender(<VenuesTab showToast={showToast} readOnly={false} canManage={false} />)
+
+    const addVenue = await screen.findByRole('button', { name: /add venue/i })
+    expect(screen.queryByRole('heading', { name: 'Edit Venue' })).toBeNull()
+
+    // The leftover edit must not prefill Add, or it would be saved as a new venue.
+    fireEvent.click(addVenue)
+    expect(screen.getByRole('heading', { name: 'Add New Venue' })).toBeInTheDocument()
+    expect(screen.queryByDisplayValue(VENUE.name)).toBeNull()
   })
 
   it('a viewer sees no write controls at all', async () => {

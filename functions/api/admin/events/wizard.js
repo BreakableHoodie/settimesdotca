@@ -2,7 +2,7 @@
 // POST /api/admin/events/wizard
 //
 // Accepts { event, venues, bands } and creates all three entity types.
-// Requires admin role — venue creation is admin-only throughout the app.
+// Requires editor role; editors may create venues while existing venue records remain admin-only.
 // Venue inserts use find-or-create (reuses an existing venue by name).
 // Performance inserts are wrapped in a single DB.batch() for atomicity.
 // bands[].venueIndex is a 0-based index into the venues array (not a DB ID).
@@ -49,8 +49,7 @@ export async function onRequestPost(context) {
   const { DB } = env;
   const ipAddress = getClientIP(request);
 
-  // Venue creation is admin-only throughout the app — require admin here too.
-  const permCheck = await checkPermission(context, "admin");
+  const permCheck = await checkPermission(context, "editor");
   if (permCheck.error) return permCheck.response;
   const currentUser = permCheck.user;
 

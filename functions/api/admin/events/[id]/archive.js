@@ -5,15 +5,15 @@ import { checkPermission, auditLog } from "../../_middleware.js";
 import { getClientIP, getUrlId } from "../../../../utils/request.js";
 import { safeReflectSocialLinksString } from "../../../../utils/validation.js";
 
-// POST - Archive event (admin only)
+// POST - Archive event (editor and above; owner decision 2026-10-10)
 export async function onRequestPost(context) {
   const { request, env } = context;
   const { DB } = env;
   const ipAddress = getClientIP(request);
 
   try {
-    // Check permission (admin only)
-    const permCheck = await checkPermission(context, "admin");
+    // Editors run editions end to end, including non-destructive archiving.
+    const permCheck = await checkPermission(context, "editor");
     if (permCheck.error) {
       return permCheck.response;
     }

@@ -60,6 +60,21 @@ const editorGuardNext = async (ctx) => {
 };
 
 describe("API key authentication path (#744 part 3)", () => {
+  it("fails closed when an admin is checked against an unknown role literal", async () => {
+    const { env } = createTestEnv({ role: "admin" });
+    const permission = await checkPermission(
+      {
+        request: new Request(BASE_URL),
+        env,
+        data: { user: { userId: 1, role: "admin" } },
+      },
+      "Admin",
+    );
+
+    expect(permission.error).toBe(true);
+    expect(permission.response.status).toBe(403);
+  });
+
   it("authenticates a valid key and reaches the endpoint", async () => {
     const { env, rawDb } = createTestEnv({ role: "admin" });
     const key = await seedKey(rawDb, { role: "viewer" });

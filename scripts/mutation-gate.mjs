@@ -543,6 +543,23 @@ export const MUTATIONS = [
     replace: "const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD",
     tests: ["functions/utils/__tests__/utcCalendarDayGuard.test.js"],
   },
+  {
+    id: "rbac-publish-requires-editor",
+    invariant: "CLAUDE.md 'RBAC Roles' — publishing an event requires editor permission or higher",
+    file: "functions/api/admin/events/[id]/publish.js",
+    find: 'checkPermission(context, "editor")',
+    replace: 'checkPermission(context, "viewer")',
+    tests: ["functions/api/admin/__tests__/rbacBoundaries.test.js"],
+  },
+  {
+    id: "rbac-caller-role-own-key",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — checkPermission looks up the caller's role as an own key; a bare lookup lets a role named constructor or __proto__ pass every check",
+    file: "functions/api/admin/_middleware.js",
+    find: "Object.hasOwn(roleHierarchy, role) ? roleHierarchy[role] : 0",
+    replace: "roleHierarchy[role] || 0",
+    tests: ["functions/api/admin/__tests__/checkPermissionCallerRole.test.js"],
+  },
 ];
 
 // ============================================================================

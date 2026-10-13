@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import EventsTab from '../EventsTab'
 
@@ -47,6 +47,49 @@ const DRAFT_EVENT_NO_BANDS = {
   status: 'draft',
   band_count: 0,
 }
+
+const EVENT_WITH_LINEUP = {
+  ...DRAFT_EVENT_NO_BANDS,
+  name: 'Event with lineup',
+  slug: 'event-with-lineup',
+  band_count: 1,
+}
+
+describe('EventsTab — event deletion visibility', () => {
+  it('shows Delete to admins but not editors within the event row and card', () => {
+    const { unmount } = render(
+      <EventsTab
+        events={[EVENT_WITH_LINEUP]}
+        onEventsChange={vi.fn()}
+        showToast={vi.fn()}
+        readOnly={false}
+        canArchiveEvents={true}
+        canDeleteEvents={true}
+      />
+    )
+
+    const desktopRow = screen.getAllByRole('row')[1]
+    const mobileCard = screen.getAllByText(EVENT_WITH_LINEUP.name)[1].closest('.p-4')
+    expect(within(desktopRow).getByRole('button', { name: 'Delete' })).toBeInTheDocument()
+    expect(within(mobileCard).getByRole('button', { name: 'Delete' })).toBeInTheDocument()
+
+    unmount()
+    render(
+      <EventsTab
+        events={[EVENT_WITH_LINEUP]}
+        onEventsChange={vi.fn()}
+        showToast={vi.fn()}
+        readOnly={false}
+        canArchiveEvents={true}
+        canDeleteEvents={false}
+      />
+    )
+
+    expect(within(screen.getAllByRole('row')[1]).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+    const editorMobileCard = screen.getAllByText(EVENT_WITH_LINEUP.name)[1].closest('.p-4')
+    expect(within(editorMobileCard).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+  })
+})
 
 describe('EventsTab — publish without a lineup (empty-lineup override)', () => {
   beforeEach(() => {

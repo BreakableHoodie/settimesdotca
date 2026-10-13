@@ -26,6 +26,11 @@ export default function VenuesTab({ showToast, readOnly = false, canManage = fal
   const [loading, setLoading] = useState(true)
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
+  // Editing an existing venue is admin-only. Derived rather than cleared in an
+  // effect: if the role drops while a form is open, the form disappears and
+  // "Add Venue" (still allowed for editors) comes back, instead of a form that
+  // can only 403.
+  const activeEditId = canManage ? editingId : null
   const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' })
   const [searchTerm, setSearchTerm] = useState('')
   const [formData, setFormData] = useState({
@@ -251,9 +256,14 @@ export default function VenuesTab({ showToast, readOnly = false, canManage = fal
             placeholder="Search name, city, phone, email"
             className="min-h-[44px] px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-hidden w-56"
           />
-          {!showAddForm && !editingId && !readOnly && (
+          {!showAddForm && !activeEditId && !readOnly && (
             <button
-              onClick={() => setShowAddForm(true)}
+              onClick={() => {
+                // Start from an empty form: a leftover edit (e.g. after losing
+                // admin mid-edit) would otherwise be submitted as a NEW venue.
+                resetForm()
+                setShowAddForm(true)
+              }}
               className="px-4 py-2 min-h-[44px] bg-accent-500 text-bg-navy rounded hover:bg-accent-600 transition-colors"
             >
               + Add Venue
@@ -263,11 +273,11 @@ export default function VenuesTab({ showToast, readOnly = false, canManage = fal
       </div>
 
       {/* Add/Edit Form */}
-      {(showAddForm || editingId) && !readOnly && (
+      {(showAddForm || activeEditId) && !readOnly && (
         <div className="bg-bg-purple p-6 rounded-lg border border-accent-500/20">
-          <h3 className="text-lg font-bold text-accent-400 mb-4">{editingId ? 'Edit Venue' : 'Add New Venue'}</h3>
+          <h3 className="text-lg font-bold text-accent-400 mb-4">{activeEditId ? 'Edit Venue' : 'Add New Venue'}</h3>
 
-          <form onSubmit={editingId ? handleUpdate : handleAdd}>
+          <form onSubmit={activeEditId ? handleUpdate : handleAdd}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
                 <label htmlFor="venue-name" className="block text-white mb-2 text-sm">
@@ -448,7 +458,7 @@ export default function VenuesTab({ showToast, readOnly = false, canManage = fal
                 disabled={submitting}
                 className="px-4 py-2 min-h-[44px] bg-accent-500 text-bg-navy rounded hover:bg-accent-600 disabled:opacity-50 transition-colors"
               >
-                {submitting ? 'Saving...' : editingId ? 'Update Venue' : 'Add Venue'}
+                {submitting ? 'Saving...' : activeEditId ? 'Update Venue' : 'Add Venue'}
               </button>
               <button
                 type="button"

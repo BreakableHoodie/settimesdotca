@@ -258,7 +258,12 @@ export default function VenuesTab({ showToast, readOnly = false, canManage = fal
           />
           {!showAddForm && !activeEditId && !readOnly && (
             <button
-              onClick={() => setShowAddForm(true)}
+              onClick={() => {
+                // Start from an empty form: a leftover edit (e.g. after losing
+                // admin mid-edit) would otherwise be submitted as a NEW venue.
+                resetForm()
+                setShowAddForm(true)
+              }}
               className="px-4 py-2 min-h-[44px] bg-accent-500 text-bg-navy rounded hover:bg-accent-600 transition-colors"
             >
               + Add Venue

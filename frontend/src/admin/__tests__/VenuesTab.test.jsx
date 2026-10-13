@@ -59,8 +59,13 @@ describe('VenuesTab role gating', () => {
 
     rerender(<VenuesTab showToast={showToast} readOnly={false} canManage={false} />)
 
-    expect(await screen.findByRole('button', { name: /add venue/i })).toBeInTheDocument()
+    const addVenue = await screen.findByRole('button', { name: /add venue/i })
     expect(screen.queryByRole('heading', { name: 'Edit Venue' })).toBeNull()
+
+    // The leftover edit must not prefill Add, or it would be saved as a new venue.
+    fireEvent.click(addVenue)
+    expect(screen.getByRole('heading', { name: 'Add New Venue' })).toBeInTheDocument()
+    expect(screen.queryByDisplayValue(VENUE.name)).toBeNull()
   })
 
   it('a viewer sees no write controls at all', async () => {

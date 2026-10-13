@@ -90,6 +90,10 @@ function stripComments(source) {
 
 const SQL_DATE_NOW_RE = /\bdate\(\s*(['"])now\1((?:\s*,\s*(['"])[^'"]*\3)*)\s*\)/gi;
 const ROLLING_WINDOW_MODIFIER_RE = /^[+-]?\d+\s+(?:days?|months?|years?)$/i;
+// SQLite reads an argument-less date() as date('now'). Case-sensitive on
+// purpose, and not after "." or an identifier, so JS `new Date()`, `Date()`
+// and `obj.date()` are not SQL.
+const SQL_DATE_NO_ARGS_RE = /(?<![.\w])(?:date|DATE)\(\s*\)/g;
 // `date('now', '+0 days')` is a no-op: still today's UTC date, not a window.
 const ZERO_OFFSET_MODIFIER_RE = /^[+-]?0+\s+(?:days?|months?|years?)$/i;
 const ISO_DATE_SLICE_RE =
@@ -106,6 +110,7 @@ function findUtcCalendarDays(source) {
       modifiers.some((m) => !ZERO_OFFSET_MODIFIER_RE.test(m));
     if (!isRollingWindow) hits.push(match[0]);
   }
+  for (const match of code.matchAll(SQL_DATE_NO_ARGS_RE)) hits.push(match[0]);
   // Every occurrence, not the first: the allowlist approves exact counts.
   for (const match of code.matchAll(ISO_DATE_SLICE_RE)) hits.push(match[0]);
   return hits;
@@ -132,6 +137,8 @@ describe("no UTC calendar day in functions/ (Toronto-local, never UTC-sliced)", 
       "WHERE d >= date('now', '-6 hours')",
       "WHERE d >= date( 'now' , '-1 day', '+4 hours')",
       "WHERE d = date('now', '+0 days')",
+      "WHERE event_date <= date()",
+      "WHERE event_date <= DATE( )",
       "WHERE d = date('now', '-00 months')",
       "const today = new Date().toISOString().slice(0, 10);",
       "const today = new Date().toISOString().split('T')[0];",
@@ -153,6 +160,9 @@ describe("no UTC calendar day in functions/ (Toronto-local, never UTC-sliced)", 
       "/* date('now') flips at 8 PM */",
       "  * `COALESCE(end_date, date) >= date('now','-6 hours')`",
       "const stamp = new Date().toISOString();",
+      "const d = Date();",
+      "const day = moment.date();",
+      "const updated = updatedDate();",
       "const now = new Date().toISOString().replace(/[-:]/g, '').split('.')[0];",
     ];
     for (const sample of safe) {

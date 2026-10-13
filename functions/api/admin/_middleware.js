@@ -198,6 +198,11 @@ async function enforceSession(request, env) {
 export async function checkPermission(context, requiredRole) {
   const { request, env, data } = context;
   const roleHierarchy = { admin: 3, editor: 2, viewer: 1 };
+  // Own keys only, for the CALLER's role as for the required one. A bare
+  // lookup of "constructor" or "__proto__" returns an inherited function or
+  // object, `x < requiredLevel` is then false, and the request is ALLOWED.
+  // users.role has no CHECK constraint, so one bad write would be a full bypass.
+  const levelOf = (role) => (Object.hasOwn(roleHierarchy, role) ? roleHierarchy[role] : 0);
 
   if (!Object.hasOwn(roleHierarchy, requiredRole)) {
     logger.error("Unknown required role", { requiredRole });
@@ -215,7 +220,7 @@ export async function checkPermission(context, requiredRole) {
 
   if (data && data.user) {
     const user = data.user;
-    const userLevel = roleHierarchy[user.role] || 0;
+    const userLevel = levelOf(user.role);
     const requiredLevel = roleHierarchy[requiredRole];
 
     if (userLevel < requiredLevel) {
@@ -240,7 +245,7 @@ export async function checkPermission(context, requiredRole) {
   }
 
   const normalizedUser = normalizeUser(auth.result.user);
-  const userLevel = roleHierarchy[normalizedUser.role] || 0;
+  const userLevel = levelOf(normalizedUser.role);
   const requiredLevel = roleHierarchy[requiredRole];
 
   if (userLevel < requiredLevel) {

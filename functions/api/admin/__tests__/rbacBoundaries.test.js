@@ -163,6 +163,17 @@ describe("admin route policy matches the code (#1255)", () => {
     expect(CASES.length).toBeGreaterThanOrEqual(30);
   });
 
+  // HANDLER_PATTERN matches one spelling (`export async function onRequestX(context) {`).
+  // A handler written any other way (`export const onRequestPost = ...`, a
+  // `(ctx)` parameter) would be invisible to every check below. Count every
+  // exported onRequest* by a looser pattern and require the two to agree.
+  it("sees every exported handler, however it is written", () => {
+    const loose = listHandlerFiles(ADMIN_ROOT).flatMap((filePath) => [
+      ...readFileSync(filePath, "utf8").matchAll(/^export\s+(?:async\s+)?(?:function|const|let)\s+(onRequest\w*)/gm),
+    ]);
+    expect(loose.length).toBe(HANDLERS.length);
+  });
+
   it("every admin handler has a declared policy (a new route must state who may call it)", () => {
     const undeclared = HANDLERS.filter((h) => !(h.key in POLICY)).map((h) => `${h.key} (code: ${h.codeRole})`);
     expect(undeclared).toEqual([]);

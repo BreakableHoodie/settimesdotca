@@ -551,6 +551,15 @@ export const MUTATIONS = [
     replace: 'checkPermission(context, "viewer")',
     tests: ["functions/api/admin/__tests__/rbacBoundaries.test.js"],
   },
+  {
+    id: "rbac-caller-role-own-key",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — checkPermission looks up the caller's role as an own key; a bare lookup lets a role named constructor or __proto__ pass every check",
+    file: "functions/api/admin/_middleware.js",
+    find: "Object.hasOwn(roleHierarchy, role) ? roleHierarchy[role] : 0",
+    replace: "roleHierarchy[role] || 0",
+    tests: ["functions/api/admin/__tests__/checkPermissionCallerRole.test.js"],
+  },
 ];
 
 // ============================================================================

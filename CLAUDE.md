@@ -1431,7 +1431,7 @@ cannot reach the network. Band photos and posters arrive as file uploads, never
 as "import from URL", and stored artist links are rendered, never visited.
 
 `functions/utils/__tests__/outboundFetchGuard.test.js` enforces it by parsing
-every file: `fetch`, `WebSocket` and `EventSource` may take only a secure
+every JavaScript and TypeScript file under `functions/` (test directories excluded): `fetch`, `WebSocket` and `EventSource` may take only a secure
 (HTTPS or WSS) string literal, or a module-level `const` bound to one and not
 shadowed. Any other argument (a variable, an interpolated template, a property read),
 another binding's `.fetch`, or a `cloudflare:sockets` import fails the build.

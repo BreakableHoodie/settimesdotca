@@ -1,0 +1,173 @@
+name: Edge E2E
+
+# Runs the auth E2E specs against a Pages PREVIEW deployment: the real Workers
+# runtime, bound only to the scratch D1 (wrangler.toml [env.preview]). Node and
+# local wrangler do not enforce the edge's limits, which is how a PBKDF2
+# iteration count the edge refuses broke signup in production for 3 months
+# while every test passed (#1292). See CLAUDE.md "Edge E2E against a preview".
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "functions/**"
+      - "frontend/src/**"
+      - "migrations/**"
+      - "database/**"
+      - "e2e/**"
+      - "wrangler.toml"
+      - "playwright.config.js"
+      - "scripts/reset-e2e-db.mjs"
+      - ".github/workflows/edge-e2e.yml"
+
+# One shared scratch D1: runs must queue, never overlap or cancel mid-reset.
+concurrency:
+  group: edge-e2e
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: 22
+  PAGES_PROJECT: settimesdotca
+  # The branch alias always points at the newest edge-e2e deployment, and runs
+  # are serialized, so it is this run's deployment. Tests use the alias rather
+  # than the per-deployment hostname because the middleware's Origin allowlist
+  # needs a stable origin: the preview env's CORS_ALLOWED_ORIGINS names this one.
+  PREVIEW_URL: https://edge-e2e.longweekend-bandcrawl.pages.dev
+
+jobs:
+  not-run:
+    name: Preview edge E2E (not run)
+    if: github.actor == 'dependabot[bot]' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork)
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    steps:
+      - name: Report skipped run
+        run: |
+          echo "::notice::Edge E2E NOT RUN: fork and Dependabot pull requests receive no deployment secrets."
+          echo "Edge E2E: **NOT RUN** (fork or Dependabot pull request, no secrets)." >> "$GITHUB_STEP_SUMMARY"
+
+  edge-e2e:
+    name: Preview edge E2E
+    if: github.actor != 'dependabot[bot]' && !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork)
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm ci --prefix frontend
+
+      - name: Install Playwright Chromium
+        # Bounded: install-deps shells out to apt-get, which can hang (#881).
+        run: timeout -k 30s 300s npx playwright install chromium --with-deps
+
+      - name: Build frontend
+        working-directory: frontend
+        env:
+          # Cloudflare's always-pass TEST site key; pairs with the preview's test secret.
+          VITE_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+        run: npm run build
+
+      - name: Reset scratch D1 and seed E2E accounts
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_PAGES_API_TOKEN }}
+          E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+          E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+        run: node scripts/reset-e2e-db.mjs
+
+      - name: Deploy preview
+        id: deploy
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_PAGES_API_TOKEN }}
+        run: |
+          set -o pipefail
+          ./frontend/node_modules/.bin/wrangler pages deploy frontend/dist \
+            --project-name "$PAGES_PROJECT" --branch edge-e2e | tee /tmp/deploy.txt
+          # The deploy prints its per-deployment URL; `deployment list --json`
+          # maps that URL to the full Id that `deployment delete` needs. Keys are
+          # capitalised (Id, Branch, Deployment), verified 2026-10-14.
+          url=$(grep -oE 'https://[a-f0-9]{8}\.longweekend-bandcrawl\.pages\.dev' /tmp/deploy.txt | tail -1)
+          if [ -z "$url" ]; then echo "::error::No deployment URL in wrangler output"; exit 1; fi
+          ./frontend/node_modules/.bin/wrangler pages deployment list \
+            --project-name "$PAGES_PROJECT" --environment preview --json > /tmp/deployments.json
+          id=$(DEPLOY_URL="$url" node -e '
+            const list = JSON.parse(require("fs").readFileSync("/tmp/deployments.json", "utf8"));
+            const hit = list.find((d) => d.Deployment === process.env.DEPLOY_URL && d.Branch === "edge-e2e");
+            if (!hit?.Id) { console.error("deployment " + process.env.DEPLOY_URL + " not in the list"); process.exit(1); }
+            process.stdout.write(hit.Id);
+          ')
+          echo "deployment_id=$id" >> "$GITHUB_OUTPUT"
+          echo "Deployed $url ($id)"
+
+      - name: Wait for preview
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error --location --max-time 10 "$PREVIEW_URL/" > /dev/null; then
+              echo "Preview is ready: $PREVIEW_URL"
+              exit 0
+            fi
+            echo "Waiting for preview ($attempt/30)..."
+            sleep 5
+          done
+          echo "::error::Preview did not return HTTP 200 within 150 seconds: $PREVIEW_URL"
+          exit 1
+
+      - name: Run auth and user-management E2E on the edge
+        env:
+          CI: "true"
+          PLAYWRIGHT_BASE_URL: ${{ env.PREVIEW_URL }}
+          E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+          E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+        # user-management creates users, which runs hashPassword ON THE EDGE.
+        run: >-
+          npx playwright test --project=setup --project=chromium-unauth --project=chromium
+          e2e/auth.setup.js e2e/login.spec.js e2e/user-management.spec.js
+
+      - name: Upload Playwright failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: edge-e2e-playwright-failures
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # Stale previews piling up is what #1295 cleaned up. A failed delete fails
+      # the job so it is seen, never a silent leftover.
+      - name: Delete preview deployment
+        if: always() && steps.deploy.outputs.deployment_id != ''
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_PAGES_API_TOKEN }}
+          DEPLOYMENT_ID: ${{ steps.deploy.outputs.deployment_id }}
+        run: |
+          if ! ./frontend/node_modules/.bin/wrangler pages deployment delete "$DEPLOYMENT_ID" \
+            --project-name "$PAGES_PROJECT" --force; then
+            echo "::error::Failed to delete preview deployment $DEPLOYMENT_ID; delete it in the Pages dashboard."
+            exit 1
+          fi
+
+      - name: Report a deploy that could not be identified
+        if: always() && steps.deploy.outcome == 'failure' && steps.deploy.outputs.deployment_id == ''
+        run: echo "::warning::The preview deploy step failed before recording a deployment id. If a deployment was created, delete the newest edge-e2e preview in the Pages dashboard."

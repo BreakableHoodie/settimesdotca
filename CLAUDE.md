@@ -971,6 +971,17 @@ Requires a running wrangler dev server or uses it automatically via `playwright.
 
 Post-deploy probes check iCal, sitemap, and SSR identity metadata without writing; `/s/` is excluded because share links expire via cron and no fixed slug is safe to probe. They run after **production** deploys only: a `dev` deploy goes to a Pages preview, which binds no D1 (#1295), so they would fail on missing data rather than on a broken release.
 
+### Edge E2E against a preview (#1292)
+
+Node and local `wrangler` do not enforce the Workers runtime's limits, which is how a PBKDF2 count the edge refuses broke signup for three months with every test green. `.github/workflows/edge-e2e.yml` runs the login and user-management specs against a real Pages **preview** deployment.
+
+- **Data:** previews bind only the scratch D1 `settimes-e2e-db`. `scripts/reset-e2e-db.mjs` rebuilds it from `database/setup-complete.sql` each run. It refuses any target other than that exact name and id, deletes the schema file's local test accounts, and seeds the E2E admin plus a `viewer@settimes.ca` whose password is random and discarded.
+- **Drop order:** children are dropped before their parents. D1 ignores `foreign_keys = OFF`, and a child's implicit DELETE fails once its parent is gone.
+- **Production code paths:** previews set `ENVIRONMENT=preview`, which `isDevRequest` treats as production (secure cookies, real CSRF). They use Cloudflare's always-pass Turnstile test keys and no email provider.
+- **Origin:** tests hit the branch alias `edge-e2e.longweekend-bandcrawl.pages.dev`, because the middleware's Origin allowlist needs a stable origin. The preview env's `CORS_ALLOWED_ORIGINS` names exactly that alias.
+- **Queueing and teardown:** one shared database, so runs queue (`cancel-in-progress: false`). Every run deletes its deployment, and a failed delete fails the job, so stale previews (#1295) cannot pile up.
+- **Not run** for fork or Dependabot PRs, which get no secrets. The job says so; it never passes silently.
+
 ### Testing Safari/WebKit locally — `upgrade-insecure-requests` breaks it, silently
 
 Playwright WebKit against `http://localhost:8788` renders a **blank page** with no error: the `/*` document CSP in `frontend/public/_headers` carries `upgrade-insecure-requests`, so WebKit rewrites every subresource to `https://`, where the dev server has no TLS. Chromium treats `localhost` as trustworthy and skips the upgrade, which is why this only shows up in Safari. **It is not HSTS** (RFC 6797 §7.2 ignores STS over http — verified by experiment). **Production is unaffected; do not weaken the directive or HSTS.**
@@ -1482,15 +1493,15 @@ you where to go:
 | **Account** resources    | Cloudflare account                                                                  | D1 databases                                                                                 |
 | **This repository**      | `frontend/public/_headers`                                                          | **HSTS** — listed only because the zone toggle reading "off" is correct and looks like a gap |
 
-- **Preview deployments bind nothing** (2026-10-13). `wrangler.toml` ends with
-  an empty `[env.preview]` block, because Pages otherwise applies the top-level
+- **Preview deployments bind only the scratch D1** (2026-10-13). `wrangler.toml`
+  ends with an `[env.preview]` block, because Pages otherwise applies the top-level
   D1, R2 and Analytics Engine bindings to previews too, and every deploy
   overwrites the dashboard. Until then every preview was bound to
   `settimes-production-db` and the production photo bucket: 40 stale previews
   from Nov 2025 to Feb 2026, running code from before the pen-test fixes (#86)
   with no secrets set, sat on `*.longweekend-bandcrawl.pages.dev` against
   production data. They were deleted the same day. Never bind a production
-  resource under `env.preview`; edge E2E (#1292) gets a scratch D1 there.
+  resource under `env.preview`; edge E2E (#1292) gets only the scratch D1 there.
   `scripts/__tests__/previewBindings.test.js` enforces both halves.
 - **Rocket Loader: disabled** — see the bullet above.
 - **`www` → apex 301 redirect rule** (#984, added 2026-08-29). A zone

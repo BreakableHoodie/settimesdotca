@@ -22,13 +22,26 @@ function validateHeaders(headers) {
     throw new Error("headers must be a plain object");
   }
   for (const [name, value] of Object.entries(headers)) {
-    if (typeof name !== "string" || typeof value !== "string" || /[\r\n]/.test(name) || /[\r\n]/.test(value)) {
-      throw new Error("headers must contain string names and values without CR or LF");
+    // Only the headers this module builds. A free-form name would let a future
+    // caller set From, Reply-To or Bcc, which some providers honour.
+    if (!ALLOWED_EXTRA_HEADERS.has(name)) {
+      throw new Error(`header not allowed: ${JSON.stringify(name)}`);
+    }
+    // Control characters (CR/LF above all) would let a value start a new header.
+    if (typeof value !== "string" || /[\x00-\x08\x0a-\x1f\x7f]/.test(value)) {
+      throw new Error("headers must contain string values without control characters");
     }
   }
 }
 
+const ALLOWED_EXTRA_HEADERS = new Set(["List-Unsubscribe", "List-Unsubscribe-Post"]);
+
 export function listUnsubscribeHeaders(url) {
+  // RFC 2369 wraps each URI in <...> and separates URIs with commas, so a URL
+  // carrying either would split into extra targets.
+  if (typeof url !== "string" || !/^https?:\/\/[^\s<>,]+$/.test(url)) {
+    throw new Error("List-Unsubscribe URL must be an http(s) URL without whitespace, <, > or comma");
+  }
   return {
     "List-Unsubscribe": `<${url}>`,
     "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",

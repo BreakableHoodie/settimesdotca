@@ -160,9 +160,39 @@ describe("sendEmail — preconditions", () => {
     const env = { EMAIL_PROVIDER: "mailchannels", EMAIL_FROM: "noreply@settimes.ca" };
 
     await expect(sendEmail(env, { ...PAYLOAD, headers: { "List-Unsubscribe": value } })).rejects.toThrow(
-      "headers must contain string names and values without CR or LF",
+      "headers must contain string values without control characters",
     );
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it.each(["Bcc", "Reply-To", "From", "X-Anything"])(
+    "rejects a header outside the List-Unsubscribe pair (%s) before any request",
+    async (name) => {
+      const fetchSpy = vi.fn();
+      vi.stubGlobal("fetch", fetchSpy);
+      const env = { EMAIL_PROVIDER: "mailchannels", EMAIL_FROM: "noreply@settimes.ca" };
+
+      await expect(sendEmail(env, { ...PAYLOAD, headers: { [name]: "attacker@example.com" } })).rejects.toThrow(
+        "header not allowed",
+      );
+      expect(fetchSpy).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    "https://settimes.ca/u?token=a>,<https://evil.example/",
+    "https://settimes.ca/u?token=a b",
+    "javascript:alert(1)",
+    "",
+  ])("listUnsubscribeHeaders refuses a URL that could split or escape the header: %s", (url) => {
+    expect(() => listUnsubscribeHeaders(url)).toThrow("List-Unsubscribe URL");
+  });
+
+  it("listUnsubscribeHeaders wraps a well-formed URL", () => {
+    expect(listUnsubscribeHeaders("https://settimes.ca/api/bands/7/unfollow?token=abc123")).toEqual({
+      "List-Unsubscribe": "<https://settimes.ca/api/bands/7/unfollow?token=abc123>",
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    });
   });
 
   it.each([

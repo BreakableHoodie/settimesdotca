@@ -857,4 +857,14 @@ export const usersApi = {
     })
     return handleResponse(response)
   },
+
+  // Recovery for a lost authenticator (#1253): the user re-enrols on next login.
+  async resetMfa(userId) {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/users/${userId}/reset-mfa`, {
+      method: 'POST',
+      headers: getHeaders(),
+      credentials: 'include',
+    })
+    return handleResponse(response)
+  },
 }

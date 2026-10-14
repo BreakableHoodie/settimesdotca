@@ -103,7 +103,7 @@ bucket_name = "settimes-band-photos"
 # custom_domain = false
 
 # ---------------------------------------------------------------------------
-# Preview deployments bind NOTHING. Do not add production bindings here.
+# Preview deployments bind ONLY the scratch D1. Do not add production bindings here.
 #
 # Cloudflare Pages applies top-level bindings to BOTH production and preview
 # when no [env.preview] block exists, and a deploy with this file overwrites
@@ -114,8 +114,23 @@ bucket_name = "settimes-band-photos"
 # ENVIRONMENT set) sat on *.longweekend-bandcrawl.pages.dev reading and
 # writing production data. They were deleted that day.
 #
-# Environment blocks do not inherit bindings, so this empty block gives a
-# preview no D1, R2 or Analytics Engine. Edge E2E (#1292) will bind a scratch
-# D1 here, never the production database_id. Guarded by
+# Environment blocks do not inherit bindings, so this block gives previews
+# only the scratch D1, never R2 or Analytics Engine. Guarded by
 # scripts/__tests__/previewBindings.test.js.
 [env.preview]
+
+[[env.preview.d1_databases]]
+binding = "DB"
+database_name = "settimes-e2e-db"
+database_id = "c06cc3e7-92e3-4044-a705-608330c1f4ba"
+
+# Plain-text vars MUST live here, not in the dashboard: a deploy with this file
+# replaces the dashboard's plain-text vars (measured 2026-10-14 -- the first
+# edge-e2e deploy wiped all three) and keeps only secrets. Secrets
+# (CSRF_SECRET, MFA_TOTP_ENCRYPTION_KEY, TURNSTILE_SECRET_KEY) stay in the
+# dashboard. ENVIRONMENT=preview is deliberately NOT a dev value: isDevRequest
+# fails closed on it, so previews run production code paths.
+[env.preview.vars]
+ENVIRONMENT = "preview"
+PUBLIC_DATA_PUBLISH_ENABLED = "true"
+CORS_ALLOWED_ORIGINS = "https://edge-e2e.longweekend-bandcrawl.pages.dev"

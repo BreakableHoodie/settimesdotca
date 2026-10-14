@@ -19,6 +19,8 @@ const toml = readFileSync(path.join(repoRoot, "wrangler.toml"), "utf8");
 
 const PRODUCTION_D1_ID = "c6c8b4a6-f951-47c1-a787-aab0a61ca09b";
 const PRODUCTION_NAMES = ["settimes-production-db", "settimes-band-photos", "settimes_metrics"];
+const SCRATCH_D1_ID = "c06cc3e7-92e3-4044-a705-608330c1f4ba";
+const SCRATCH_D1_NAME = "settimes-e2e-db";
 
 // Each non-comment line paired with the table header it sits under ("" = top level).
 function linesWithTable(source) {
@@ -37,6 +39,8 @@ function linesWithTable(source) {
 describe("preview deployments never bind production data", () => {
   const lines = linesWithTable(toml);
 
+  const previewD1 = lines.filter(({ table }) => table === "env.preview.d1_databases");
+
   it("declares an [env.preview] block, so top-level bindings do not apply to previews", () => {
     expect(lines.some(({ line }) => line === "[env.preview]")).toBe(true);
   });
@@ -47,6 +51,30 @@ describe("preview deployments never bind production data", () => {
         table.startsWith("env.") && (line.includes(PRODUCTION_D1_ID) || PRODUCTION_NAMES.some((n) => line.includes(n))),
     );
     expect(leaks).toEqual([]);
+  });
+
+  it("binds exactly the scratch D1 and no other preview resource", () => {
+    expect(previewD1).toEqual([
+      { table: "env.preview.d1_databases", line: "[[env.preview.d1_databases]]" },
+      { table: "env.preview.d1_databases", line: 'binding = "DB"' },
+      { table: "env.preview.d1_databases", line: `database_name = "${SCRATCH_D1_NAME}"` },
+      { table: "env.preview.d1_databases", line: `database_id = "${SCRATCH_D1_ID}"` },
+    ]);
+    // The only other preview table is [env.preview.vars]; no R2, no Analytics Engine.
+    expect(
+      [...new Set(lines.filter(({ table }) => table.startsWith("env.preview.")).map(({ table }) => table))].sort(),
+    ).toEqual(["env.preview.d1_databases", "env.preview.vars"]);
+  });
+
+  // isDevRequest allowlists development/dev/test; any of those on a public
+  // preview would switch off secure cookies, CSRF and Turnstile there.
+  it("previews declare a non-dev ENVIRONMENT and allow only the edge-e2e origin", () => {
+    const vars = lines.filter(({ table, line }) => table === "env.preview.vars" && line !== "[env.preview.vars]");
+    expect(vars.map(({ line }) => line)).toEqual([
+      'ENVIRONMENT = "preview"',
+      'PUBLIC_DATA_PUBLISH_ENABLED = "true"',
+      'CORS_ALLOWED_ORIGINS = "https://edge-e2e.longweekend-bandcrawl.pages.dev"',
+    ]);
   });
 
   it("still finds the production binding it protects (not passing vacuously)", () => {

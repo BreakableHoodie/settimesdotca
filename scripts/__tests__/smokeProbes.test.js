@@ -83,6 +83,13 @@ describe("smoke probe checkers", () => {
     expect(checkSsrIdentity(twoCanonicals, homepageTitle).ok).toBe(false);
   });
 
+  // A title whose text is literally "&lt;x&gt;" (served as &amp;lt;x&amp;gt;)
+  // is not the title "<x>". Decoding &amp; first would make them equal.
+  it("does not double-unescape titles when comparing with the homepage title", () => {
+    const page = validSsr.replace("Some Event | SetTimes", "&amp;lt;x&amp;gt;");
+    expect(checkSsrIdentity(page, "<x>")).toEqual({ ok: true });
+  });
+
   it("rejects SSR pages using the homepage title", () => {
     expect(checkSsrIdentity(validSsr.replace("Some Event | SetTimes", homepageTitle), homepageTitle).ok).toBe(false);
   });

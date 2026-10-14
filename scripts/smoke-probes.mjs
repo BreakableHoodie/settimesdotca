@@ -82,7 +82,8 @@ export function checkSsrIdentity(body, homepageTitle, status = 200) {
 }
 
 function decodeHtmlEntities(value) {
-  return value.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+  // &amp; last: decoding it first turns "&amp;lt;" into "<" (double unescape).
+  return value.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
 }
 
 export async function readHomepageTitle() {

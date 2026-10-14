@@ -111,9 +111,32 @@ export async function onRequestPost(context) {
           .bind(existing[0].id)
           .run();
 
-        if (expired.meta.changes === 0) {
+        // Nothing deleted means the row was still live -- or a concurrent
+        // request already replaced it. Re-read, so a re-send always carries the
+        // token that is stored NOW rather than one read before that request
+        // rotated it (which would email a link that can never work).
+        const current =
+          expired.meta.changes === 0
+            ? (
+                await env.DB.prepare(
+                  `SELECT id, verified, verification_token FROM email_subscriptions
+                   WHERE email = ? AND city = ? AND genre = ?`,
+                )
+                  .bind(email, city, genre)
+                  .all()
+              ).results[0]
+            : null;
+
+        if (current?.verified) {
+          return new Response(JSON.stringify({ error: "You are already subscribed to this feed" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        if (current) {
           // Re-send verification email
-          const emailResult = await sendVerificationEmail(env, email, existing[0].verification_token);
+          const emailResult = await sendVerificationEmail(env, email, current.verification_token);
 
           if (!emailResult.delivered && emailResult.reason === "not_configured") {
             return subscriptionResponse(

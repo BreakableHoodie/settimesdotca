@@ -71,6 +71,36 @@ describe("subscription confirmation window, real SQLite (#1291)", () => {
     expect(await res.text()).not.toMatch(/already verified/i);
   });
 
+  // Two re-subscribes race on the same expired row: the other request deletes
+  // it and inserts a fresh one between this request's lookup and its DELETE.
+  // The re-send must carry the token stored NOW, not the stale one it read.
+  it("a re-send after a concurrent re-subscribe carries the current token", async () => {
+    const { env, rawDb } = createTestEnv();
+    seedPending(rawDb, { email: "racer@example.com", token: "tok-stale", ageDays: 8 });
+    const prepare = env.DB.prepare.bind(env.DB);
+    env.DB.prepare = (sql) => {
+      if (sql.includes("DELETE FROM email_subscriptions") && sql.includes("WHERE id = ?")) {
+        rawDb.prepare("DELETE FROM email_subscriptions WHERE email = 'racer@example.com'").run();
+        seedPending(rawDb, { email: "racer@example.com", token: "tok-current", ageDays: 0 });
+      }
+      return prepare(sql);
+    };
+
+    const res = await subscribe({
+      request: new Request("https://example.test/api/subscriptions/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "CF-Connecting-IP": "203.0.113.9" },
+        body: JSON.stringify({ email: "racer@example.com", city: "portland", genre: "punk", frequency: "weekly" }),
+      }),
+      env,
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.verificationUrl).toContain("tok-current");
+    expect(body.verificationUrl).not.toContain("tok-stale");
+  });
+
   it("re-subscribing after expiry issues a fresh token; a verified row is never replaced", async () => {
     const { env, rawDb } = createTestEnv();
     seedPending(rawDb, { email: "again@example.com", token: "tok-stale", ageDays: 8 });

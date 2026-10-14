@@ -189,6 +189,12 @@ describe("sendEmail — preconditions", () => {
     expect(() => listUnsubscribeHeaders(url)).toThrow("List-Unsubscribe URL");
   });
 
+  // RFC 8058: one-click is defined for HTTPS only. Plain HTTP yields no
+  // headers (the email still sends with its body link) rather than an error.
+  it("listUnsubscribeHeaders returns no headers for a plain-HTTP URL", () => {
+    expect(listUnsubscribeHeaders("http://localhost:8788/api/bands/7/unfollow?token=abc")).toBeUndefined();
+  });
+
   it("listUnsubscribeHeaders wraps a well-formed URL", () => {
     expect(listUnsubscribeHeaders("https://settimes.ca/api/bands/7/unfollow?token=abc123")).toEqual({
       "List-Unsubscribe": "<https://settimes.ca/api/bands/7/unfollow?token=abc123>",

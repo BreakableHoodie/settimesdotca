@@ -51,6 +51,9 @@ export function listUnsubscribeHeaders(url) {
   if (typeof url !== "string" || !/^https?:\/\/[!-~]+$/.test(url) || /[<>,]/.test(url)) {
     throw new Error("List-Unsubscribe URL must be a printable-ASCII http(s) URL without <, > or comma");
   }
+  // RFC 8058 one-click requires HTTPS. A plain-HTTP base URL (local dev) sends
+  // the email with its body link and no one-click headers, rather than failing.
+  if (new URL(url).protocol !== "https:") return undefined;
   return {
     "List-Unsubscribe": `<${url}>`,
     "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",

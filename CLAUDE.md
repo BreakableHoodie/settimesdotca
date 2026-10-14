@@ -935,6 +935,8 @@ Corporate mail scanners fetch email links with GET, so confirmation and unsubscr
 
 When a performance is announced (`is_announced` 0→1), verified followers of that band are emailed once. Delivery is tracked **per-follower** in `band_follow_notifications (performance_id, band_follow_id)`: the announce records each _successful_ send. Failed sends leave no row, so `POST /api/admin/bands/:id/resend-announcement` recovers them by emailing only followers without a notification row (never double-sending). Shared send+record logic lives in `functions/utils/bandFollowNotify.js`. **Do not reintroduce a fire-once latch without per-follower tracking** — it silently drops fans whose first send failed (the bug this replaced).
 
+Follow, subscriber, and single-band digest mail carries RFC 8058 one-click unsubscribe headers whose URL is the same link shown in the body. Multi-band digests deliberately carry no one-click headers because one click must not silently remove only one of several follows.
+
 Bot protection on the public email-input endpoints (follow, subscribe) goes through `verifyTurnstile()` in `functions/utils/turnstile.js`, which **fails closed in production**: if `TURNSTILE_SECRET_KEY` is unset it allows only local-dev requests and rejects everything else (mirrors `CSRF_SECRET`). The secret **must** be configured in the production Pages project.
 
 ### Proof of consent is recorded at confirmation (#1289)

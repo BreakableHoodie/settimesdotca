@@ -22,7 +22,7 @@
 // Sends are dispatched in bounded-concurrency chunks (SEND_CONCURRENCY) so
 // a large queue does not exhaust the Worker subrequest cap or wall-clock limit.
 
-import { sendEmail } from "./email.js";
+import { listUnsubscribeHeaders, sendEmail } from "./email.js";
 import { logger } from "./logger.js";
 import { escapeHtml } from "./html.js";
 import { getPublicBaseUrl } from "./publicUrl.js";
@@ -194,17 +194,13 @@ export async function flushAnnounceDigest(env, DB) {
 
     const bandListText = bands.map((b) => `• ${b}`).join("\n");
     const bandListHtml = bands.map((b) => `<li>${escapeHtml(b)}</li>`).join("");
-    const unsubText = claimed
-      .map(
-        (item) =>
-          `Unfollow ${item.band_name}: ${publicUrl}/api/bands/${item.band_profile_id}/unfollow?token=${item.unsubscribe_token}`,
-      )
-      .join("\n");
-    const unsubHtml = claimed
-      .map(
-        (item) =>
-          `<a href="${escapeHtml(`${publicUrl}/api/bands/${item.band_profile_id}/unfollow?token=${item.unsubscribe_token}`)}">Unfollow ${escapeHtml(item.band_name)}</a>`,
-      )
+    const unsubLinks = claimed.map((item) => ({
+      item,
+      url: `${publicUrl}/api/bands/${item.band_profile_id}/unfollow?token=${item.unsubscribe_token}`,
+    }));
+    const unsubText = unsubLinks.map(({ item, url }) => `Unfollow ${item.band_name}: ${url}`).join("\n");
+    const unsubHtml = unsubLinks
+      .map(({ item, url }) => `<a href="${escapeHtml(url)}">Unfollow ${escapeHtml(item.band_name)}</a>`)
       .join(" · ");
 
     const text =
@@ -223,6 +219,8 @@ export async function flushAnnounceDigest(env, DB) {
       text,
       html,
       claimed,
+      // A one-click digest must not silently unsubscribe only one of several bands.
+      headers: unsubLinks.length === 1 ? listUnsubscribeHeaders(unsubLinks[0].url) : undefined,
       idempotencyKey: await buildAnnounceDigestIdempotencyKey(
         email,
         claimed.map((item) => item.performance_id),
@@ -253,6 +251,7 @@ export async function flushAnnounceDigest(env, DB) {
         subject: task.subject,
         text: task.text,
         html: task.html,
+        ...(task.headers !== undefined ? { headers: task.headers } : {}),
         idempotencyKey: task.idempotencyKey,
       });
     } catch (sendError) {

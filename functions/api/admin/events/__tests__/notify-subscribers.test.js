@@ -4,7 +4,9 @@ import * as handler from "../[id]/notify-subscribers.js";
 import { MAX_PER_INVOCATION, notifySubscribers, pendingSubscribers } from "../../../../utils/subscriberNotify.js";
 import { logger } from "../../../../utils/logger.js";
 
-vi.mock("../../../../utils/email.js", () => ({
+vi.mock("../../../../utils/email.js", async (importOriginal) => ({
+  // The real header builder, so these tests cannot drift from its format.
+  listUnsubscribeHeaders: (await importOriginal()).listUnsubscribeHeaders,
   sendEmail: vi.fn(),
   isEmailConfigured: () => true,
 }));
@@ -163,8 +165,9 @@ describe("POST /api/admin/events/[id]/notify-subscribers", () => {
 
     await post(env, headers, ev.id, { kind: "schedule_announced" });
     const mail = sendEmail.mock.calls[0][1];
-    expect(mail.text).toContain("/api/subscriptions/unsubscribe?token=");
-    expect(mail.html).toContain("/api/subscriptions/unsubscribe?token=");
+    const bodyUrl = mail.text.match(/Unsubscribe: (\S+)/)[1];
+    expect(mail.html).toContain(bodyUrl);
+    expect(mail.headers["List-Unsubscribe"]).toBe(`<${bodyUrl}>`);
   });
 
   it("caps one invocation and reports what is left", async () => {

@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../../test-utils.js";
 import { flushAnnounceDigest } from "../../../../utils/announceDigest.js";
 
-vi.mock("../../../../utils/email.js", () => ({
+vi.mock("../../../../utils/email.js", async (importOriginal) => ({
+  // The real header builder, so these tests cannot drift from its format.
+  listUnsubscribeHeaders: (await importOriginal()).listUnsubscribeHeaders,
   sendEmail: vi.fn(() => Promise.resolve({ delivered: true })),
   isEmailConfigured: () => true,
 }));

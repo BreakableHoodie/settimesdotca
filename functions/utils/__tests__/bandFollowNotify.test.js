@@ -1,6 +1,8 @@
 import { describe, expect, test, vi, afterEach } from "vitest";
 
-vi.mock("../email.js", () => ({
+vi.mock("../email.js", async (importOriginal) => ({
+  // The real header builder, so these tests cannot drift from its format.
+  listUnsubscribeHeaders: (await importOriginal()).listUnsubscribeHeaders,
   sendEmail: vi.fn(),
 }));
 
@@ -53,6 +55,9 @@ describe("notifyBandFollowers", () => {
 
     expect(result).toEqual({ sent: 1, failed: 1 });
     expect(sendEmail.mock.calls[0][1].idempotencyKey).toBe(`band-follow:${perf.id}:${f1}`);
+    const mail = sendEmail.mock.calls[0][1];
+    const bodyUrl = mail.text.match(/Unfollow: (\S+)/)[1];
+    expect(mail.headers["List-Unsubscribe"]).toBe(`<${bodyUrl}>`);
 
     const notified = rawDb
       .prepare("SELECT band_follow_id FROM band_follow_notifications WHERE performance_id = ? ORDER BY band_follow_id")

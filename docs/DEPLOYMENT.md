@@ -1,813 +1,179 @@
 # SetTimes Production Deployment Guide
 
-**Deploying to Cloudflare Pages + Functions + D1**
+SetTimes runs on Cloudflare Pages, Pages Functions, D1, and R2. The supported release path is a merge to `main` after CI passes.
 
----
+## Targets
 
-## Table of Contents
+- `main` deploys production at `https://settimes.ca`.
+- Other branches do not deploy from this repository.
+- `.github/workflows/edge-e2e.yml` creates the dedicated preview used for edge authentication tests.
 
-1. [Overview](#overview)
-2. [Prerequisites](#prerequisites)
-3. [Initial Setup](#initial-setup)
-4. [Database Setup](#database-setup)
-5. [Environment Configuration](#environment-configuration)
-6. [First Deployment](#first-deployment)
-7. [Custom Domain Setup](#custom-domain-setup)
-8. [Post-Deployment](#post-deployment)
-9. [Continuous Deployment](#continuous-deployment)
-10. [Rollback & Recovery](#rollback--recovery)
-11. [Monitoring & Maintenance](#monitoring--maintenance)
-
----
-
-## Overview
-
-SetTimes is deployed as a full-stack application on Cloudflare's edge network:
-
-**Architecture:**
-
-- **Frontend:** React SPA built with Vite, hosted on Cloudflare Pages
-- **Backend API:** Cloudflare Pages Functions (serverless)
-- **Database:** Cloudflare D1 (SQLite at the edge)
-- **CDN:** Cloudflare CDN (automatic)
-- **SSL:** Automatic HTTPS with Cloudflare
-
-**Deployment Targets:**
-
-- **Production:** `settimes.ca` (main branch)
-- **Development:** `dev.settimes.ca` (dev branch)
-- **Preview:** Automatic preview deployments for PRs
-
-**Deployment Method:**
-
-- **Continuous Deployment:** Automatic on git push
-- **Manual Deployment:** Via `wrangler` CLI
-- **Rollback:** One-click in Cloudflare Dashboard
-
----
+There is no supported `dev` branch or `dev.settimes.ca` environment. Do not configure production data or secrets for a branch preview.
 
 ## Prerequisites
 
-### Required Accounts & Access
+- Node.js 22.12+ (or a version allowed by `package.json`)
+- Cloudflare access to the Pages project and D1 database
+- GitHub access to merge to `main`
+- Wrangler, installed through the frontend dependencies
 
-- [ ] **Cloudflare Account** (with Pages enabled)
-- [ ] **GitHub Account** (with repo access)
-- [ ] **Domain** (e.g., settimes.ca) managed by Cloudflare DNS
-- [ ] **Node.js 22.12+** installed locally (or 24.x / 26+; the `engines` range in `package.json`)
-- [ ] **Wrangler CLI** installed (`npm install -g wrangler`)
-
-### Install Wrangler
+Install locally with:
 
 ```bash
-# Install globally
-npm install -g wrangler
-
-# Verify installation
-wrangler --version
-
-# Login to Cloudflare
-wrangler login
+npm ci
+npm --prefix frontend ci
 ```
 
----
+## Cloudflare Configuration
 
-## Initial Setup
+The top-level D1 binding in `wrangler.toml` is:
 
-### 1. Clone Repository
-
-```bash
-git clone https://github.com/BreakableHoodie/settimesdotca.git
-cd settimesdotca
+```toml
+[[d1_databases]]
+binding = "DB"
+database_name = "settimes-production-db"
 ```
 
-### 2. Install Dependencies
+The production Pages project also binds the R2 bucket as `BAND_PHOTOS` and the Analytics Engine dataset as `ANALYTICS`.
 
-```bash
-# Install frontend dependencies
-cd frontend
-npm install
+### Production runtime variables
 
-# Return to root
-cd ..
-```
-
-### 3. Verify Local Build
-
-```bash
-cd frontend
-npm run build
-```
-
-**Expected output:**
+Set production runtime values in Cloudflare Pages **Settings -> Environment Variables**. Secrets must be entered as secrets, not committed to the repository:
 
 ```text
-✓ 1234 modules transformed.
-dist/index.html                  1.23 kB
-dist/assets/index-abc123.js      456.78 kB
-✓ built in 12.34s
+ENVIRONMENT=production
+PUBLIC_URL=https://settimes.ca
+PUBLIC_DATA_PUBLISH_ENABLED=true
+CSRF_SECRET=<secret>
+MFA_TOTP_ENCRYPTION_KEY=<secret; never rotate after encrypted TOTP data exists>
+TURNSTILE_SECRET_KEY=<secret; production fails closed when absent>
+CRON_SECRET=<secret>
+EMAIL_PROVIDER=postmark|mailchannels|resend
+EMAIL_FROM=<sender address>
+POSTMARK_API_TOKEN=<secret when using Postmark>
+RESEND_API_KEY=<secret when using Resend>
+CSP_ENFORCE=true
+CORS_ALLOWED_ORIGINS=<optional comma-separated extra origins>
 ```
 
----
+`ADMIN_EMAIL` is an optional fallback sender. `CF_ACCOUNT_ID` and `CF_PAGES_API_TOKEN` are GitHub Actions secrets, not application runtime variables. Do not add `DATABASE_ID` or `SESSION_SECRET`; the application reads neither.
+
+The `[env.preview.vars]` block in `wrangler.toml` is reserved for the edge-E2E preview. A Wrangler deploy can replace dashboard plain-text variables, so production values that must survive deploys belong in the dashboard as secrets.
 
 ## Database Setup
 
-### 1. Create Production Database
+The numbered files in `migrations/` are the authoritative schema. `database/setup-complete.sql` is the generated local bootstrap reference, not a production seed dump.
 
-Run the setup script which guides you through the process:
-
-```bash
-./scripts/setup-prod-db.sh
-```
-
-Or manually:
+Production CI applies and verifies migrations before the Pages deploy:
 
 ```bash
-# Create production D1 database
-wrangler d1 create settimes-production-db
+wrangler d1 migrations apply settimes-production-db --remote
+node scripts/verify-remote-d1-schema.mjs
 ```
 
-**Output:**
+The checked-in workflow performs those steps automatically. Do not apply old `database/schema.sql`, `database/migration-*.sql`, or a nonexistent `database/seed-production.sql`.
 
-```text
-✅ Successfully created DB 'settimes-production-db'
-
-[[d1_databases]]
-binding = "DATABASE"
-database_name = "settimes-production-db"
-database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-```
-
-**Important:** Copy the `database_id` - you'll need it for `wrangler.toml`.
-
-### 2. Create Development Database (Optional)
+For local setup, use the repository's bootstrap script or the documented local D1 workflow:
 
 ```bash
-wrangler d1 create settimes-dev-db
+npm run migrate:local
+./scripts/setup-local-db.sh
 ```
 
-### 3. Update wrangler.toml
+Create accounts through invite codes. Do not insert password hashes manually. Passwords use PBKDF2-SHA256 through Web Crypto.
 
-Edit `wrangler.toml` in project root:
+## Release Flow
 
-```toml
-name = "settimes"
-compatibility_date = "2025-01-01"
+1. Make the change on a branch.
+2. Run `make gate`.
+3. Open a pull request and wait for every check to pass.
+4. Merge the pull request to `main`.
+5. CI runs tests, builds the frontend, applies D1 migrations, verifies the schema, deploys Pages, and runs smoke checks.
 
-# Production environment
-[env.production]
-name = "settimes-production"
-
-[env.production.vars]
-ENVIRONMENT = "production"
-
-[[env.production.d1_databases]]
-binding = "DATABASE"
-database_name = "settimes-production-db"
-database_id = "YOUR_PRODUCTION_DB_ID_HERE"  # From step 1
-
-# Development environment
-[env.development]
-name = "settimes-development"
-
-[env.development.vars]
-ENVIRONMENT = "development"
-
-[[env.development.d1_databases]]
-binding = "DATABASE"
-database_name = "settimes-dev-db"
-database_id = "YOUR_DEV_DB_ID_HERE"  # From step 2 (optional)
-```
-
-### 4. Run Database Migrations & Seed Data
-
-If you didn't use the setup script, run:
+The Pages deployment command used by CI is equivalent to:
 
 ```bash
-# Apply migrations to production
-wrangler d1 migrations apply settimes-production-db --env production
-
-# Seed with Long Weekend Band Crawl seasonal data
-wrangler d1 execute settimes-production-db --env production --file=database/seed-production.sql
+./frontend/node_modules/.bin/wrangler pages deploy frontend/dist --project-name settimesdotca --branch main
 ```
 
-**Expected output:**
+Do not bypass the migration and verification stages with a manual production deploy.
 
-```text
-🌀 Applying migration 001_initial_schema.sql
-🌀 Applying migration 002_add_audit_logs.sql
-🌀 Applying migration 003_add_sessions.sql
-✅ Successfully applied 3 migration(s)
-```
+## Post-Deploy Checks
 
-### 5. Create Initial Admin User
+The production smoke job verifies:
 
-The system uses invite codes for admin account creation — do **not** insert password hashes directly into the database. The hash algorithm is PBKDF2 (not bcrypt), so any manually inserted bcrypt hash will fail authentication.
+- `/` returns the public HTML shell
+- `/admin` returns the admin shell
+- `/api/events/timeline` returns valid JSON
+- `/api/schedule?event=current` returns the expected 200, 404, or 503 state
+- `scripts/smoke-probes.mjs` can read the iCal feed, sitemap, and SSR identity metadata
 
-> **Note:** `ALLOW_ADMIN_SIGNUP` is a test-only env var that bypasses invite codes. It does not exist in the production functions and must **never** be set in a production environment.
-
-**Production bootstrap procedure (one-time):**
-
-1. After deploying, open the Cloudflare D1 dashboard (or use `wrangler d1 execute`) and insert a bootstrap invite code:
-
-   ```sql
-   INSERT INTO invite_codes (code, email, role, created_by_user_id, expires_at)
-   VALUES (
-     'REPLACE-WITH-SECURE-UUID',
-     'admin@yourdomain.com',
-     'admin',
-     NULL,
-     datetime('now', '+7 days')
-   );
-   ```
-
-   Generate a secure UUID locally (e.g. `node -e "console.log(crypto.randomUUID())"`).
-
-2. Navigate to `/admin/signup?code=REPLACE-WITH-SECURE-UUID` and complete account creation. The password is hashed with PBKDF2 automatically.
-
-3. Once logged in, generate additional invite codes from the admin panel under **Settings → Invite Codes** for any other admins.
-
-4. The bootstrap invite code is consumed on use and expires automatically — no cleanup needed.
-
----
-
-## Environment Configuration
-
-### Cloudflare Pages Environment Variables
-
-**In Cloudflare Dashboard:**
-
-1. Go to **Pages** → **Your Project** → **Settings** → **Environment Variables**
-
-2. Add the following variables:
-
-**Production:**
-
-```text
-DATABASE_ID = your-production-db-id
-ENVIRONMENT = production
-SESSION_SECRET = random-64-char-string  # Generate securely
-ADMIN_EMAIL = admin@settimes.ca
-PUBLIC_DATA_PUBLISH_ENABLED = false
-CSP_ENFORCE = true  # optional override (defaults to true in production)
-EMAIL_PROVIDER = postmark
-EMAIL_FROM = no-reply@settimes.ca
-POSTMARK_API_TOKEN = <secret>
-PUBLIC_URL = https://settimes.ca
-```
-
-**Preview (optional):**
-
-```text
-DATABASE_ID = your-dev-db-id
-ENVIRONMENT = development
-SESSION_SECRET = different-random-string
-```
-
-**Generate SESSION_SECRET:**
+Useful read-only checks:
 
 ```bash
-# Generate random 64-character string
-openssl rand -base64 48
+curl --fail https://settimes.ca
+curl --fail https://settimes.ca/api/events/timeline
+curl --fail https://settimes.ca/sitemap.xml
 ```
 
----
+Do not use a smoke check to mutate production data.
 
-## First Deployment
+## Rollback and Recovery
 
-## Promote Local Data to Production (one-time)
+### Pages rollback
 
-1. Build + run local Pages dev so the local D1 contains your latest data:
-
-   ```bash
-   npm --prefix frontend run build
-   npx wrangler pages dev frontend/dist --port 8788
-   ```
-
-2. Export local data to a production seed file:
-
-   ```bash
-   ./scripts/export-local-data.sh
-   ```
-
-3. Commit `database/seed-production.sql`, then push to `origin/main`.
-4. Import into production D1 (one-time):
-
-   ```bash
-   ./scripts/import-production-data.sh
-   ```
-
-5. Keep `PUBLIC_DATA_PUBLISH_ENABLED=false` until you’re ready to go live.
-
-### Option 1: Deploy via Cloudflare Dashboard (Recommended for first deploy)
-
-1. **Go to Cloudflare Dashboard**
-   - Navigate to **Pages**
-   - Click **Create a project**
-
-2. **Connect GitHub Repository**
-   - Select **Connect to Git**
-   - Authorize Cloudflare
-   - Select repository: `BreakableHoodie/settimesdotca`
-
-3. **Configure Build Settings**
-
-   ```text
-   Production branch: main
-   Preview branches: dev, develop
-
-   Build command: cd frontend && npm install && npm run build
-   Build output directory: frontend/dist
-   Root directory: / (leave blank)
-
-   Environment variables:
-   - DATABASE_ID = [your-production-db-id]
-   - ENVIRONMENT = production
-   - SESSION_SECRET = [your-generated-secret]
-   ```
-
-4. **Configure Functions**
-   - Functions directory: `functions` (auto-detected)
-   - Compatibility date: `2025-01-01`
-
-5. **Deploy**
-   - Click **Save and Deploy**
-   - Wait 2-3 minutes for build
-   - Note the deployment URL: `settimes-xxx.pages.dev`
-
-### Option 2: Deploy via Wrangler CLI
+Use the Cloudflare Pages deployment history to roll back a bad asset release, or list and roll back with Wrangler:
 
 ```bash
-# Build frontend
-cd frontend
-npm run build
-cd ..
-
-# Deploy to production
-wrangler pages deploy frontend/dist --project-name=settimes --branch=main
-
-# Deploy to development
-wrangler pages deploy frontend/dist --project-name=settimes --branch=dev
+wrangler pages deployment list --project-name settimesdotca
+wrangler pages deployment rollback <deployment-id> --project-name settimesdotca
 ```
 
----
+### D1 recovery
 
-## Custom Domain Setup
-
-### 1. Add Custom Domain
-
-**In Cloudflare Dashboard:**
-
-1. Go to **Pages** → **Your Project** → **Custom domains**
-2. Click **Set up a custom domain**
-3. Enter: `settimes.ca`
-4. Click **Continue**
-
-### 2. Configure DNS
-
-Cloudflare will automatically configure DNS if domain is managed by Cloudflare:
-
-**Automatic DNS Record:**
-
-```text
-Type: CNAME
-Name: settimes.ca
-Target: settimes-xxx.pages.dev
-Proxy: Enabled (orange cloud)
-```
-
-**If using external DNS:**
-
-```text
-Type: CNAME
-Name: settimes.ca (or www)
-Target: settimes-xxx.pages.dev
-```
-
-### 3. Add www Subdomain (Optional)
-
-```text
-Type: CNAME
-Name: www
-Target: settimes.ca
-Proxy: Enabled
-```
-
-### 4. Configure SPA Asset Routing
-
-SPA navigation fallback is handled in `wrangler.toml` via:
-
-```toml
-[assets]
-directory = "./frontend/dist"
-not_found_handling = "single-page-application"
-```
-
-Do not add `/* /index.html 200` to `frontend/public/_redirects`; Wrangler rejects that pattern because HTML handling already rewrites `/index.html` and `/index`, which creates a redirect loop during local Pages runs.
-
-If you need host-level redirects such as `www` to apex, configure them in Cloudflare dashboard rules or your DNS/proxy layer instead of using a blanket SPA fallback rule.
-
-### 5. Verify SSL Certificate
-
-- SSL certificate auto-provisioned by Cloudflare
-- Usually takes 5-15 minutes
-- Check: `https://settimes.ca` (should show padlock)
-
----
-
-## Post-Deployment
-
-### 1. Verify Deployment
-
-**Check Frontend:**
+An exported SQL file is a backup artifact, not a safe restore procedure over live data. Use D1 Time Travel for production recovery:
 
 ```bash
-curl https://settimes.ca
-# Should return HTML
+wrangler d1 time-travel info settimes-production-db
+wrangler d1 time-travel restore settimes-production-db --timestamp=<ISO-8601-timestamp>
 ```
 
-**Check API:**
+See Cloudflare's D1 Time Travel documentation for the retention window available on your plan. Confirm the target and recovery point before restoring.
 
-```bash
-curl https://settimes.ca/api/schedule?event=current
-# Should return JSON with either:
-# - HTTP 200 and { event, bands } when a current/upcoming published event exists
-# - HTTP 404 and { error: "Event not found", message: "No published events available" } when none exists
+## Scheduled Maintenance
+
+Cloudflare Pages does not provide native cron triggers for this project. `.github/workflows/scheduled-jobs.yml` calls `/api/internal/run-scheduled` daily with `CRON_SECRET`. The job runs popularity aggregation, retention cleanup, share-link expiry, schedule-build anonymisation, and announcement digest delivery.
+
+The admin cleanup endpoint runs the same retention cleanup for expired sessions, MFA challenges, reset tokens, trusted devices, login attempts, unconfirmed consent rows, and short-lived API-key request audit rows. Retention is automatic: ordinary audit rows are kept for one year and `api_key.request` rows for 90 days.
+
+Use `lucia_sessions` and Unix-epoch comparisons for session inspection:
+
+```sql
+SELECT COUNT(*)
+FROM lucia_sessions
+WHERE expires_at > unixepoch();
 ```
 
-**Check Database:**
+## Troubleshooting
 
-```bash
-wrangler d1 execute settimes-production-db --env production --command="SELECT COUNT(*) FROM users"
-# Should return count of users
-```
+### Missing D1 binding
 
-### 2. Test Admin Login
+The binding is `DB`, not `DATABASE`. Confirm the top-level `d1_databases` block in `wrangler.toml` and redeploy through CI.
 
-1. Go to `https://settimes.ca/admin`
-2. Log in with admin credentials
-3. Verify dashboard loads
-4. Create test event
+### Missing table
 
-### 3. Run Smoke Tests
+Confirm that CI applied the numbered migrations and that the live database is `settimes-production-db`. Use the schema verification step rather than replaying an old SQL file.
 
-The GitHub Actions release workflow now runs an automated smoke suite after every successful `main` and `dev` deployment. It verifies:
+### Function errors
 
-- `/` returns the public app HTML
-- `/admin` returns the admin shell HTML
-- `/api/schedule?event=current` returns valid JSON for the current publish state (`200`, `404`, or `503` depending on environment and available events)
+Inspect the Pages deployment logs and confirm the production secrets above are present. `CSRF_SECRET`, `MFA_TOTP_ENCRYPTION_KEY`, `TURNSTILE_SECRET_KEY`, and `CRON_SECRET` fail closed when required values are missing.
 
-Manual post-release testing is still recommended for login, publishing, and other data-changing admin flows.
+## Related Docs
 
-**Checklist:**
+- [D1 Setup](D1_SETUP.md)
+- [Admin Handbook](ADMIN_HANDBOOK.md)
+- [API Documentation](API_DOCUMENTATION.md)
+- [Troubleshooting](TROUBLESHOOTING.md)
+- [Security](SECURITY.md)
 
-- [ ] Homepage loads (/)
-- [ ] Admin panel loads (/admin)
-- [ ] Can log in successfully
-- [ ] Can create event
-- [ ] Can create venue
-- [ ] Can create performer
-- [ ] Can publish event
-- [ ] Public schedule shows event (/api/schedule)
-- [ ] Band profile pages work (/bands/[event]/[band])
-- [ ] Mobile responsive (test on phone)
-- [ ] PWA installable (mobile)
-- [ ] HTTPS works (green padlock)
-- [ ] www redirects to non-www
-
-### 4. Configure Headers
-
-Verify `frontend/public/_headers` is deployed correctly:
-
-```bash
-curl -I https://settimes.ca
-# Check for:
-# - Strict-Transport-Security
-# - X-Frame-Options
-# - Content-Security-Policy
-```
-
-### 5. Set Up Monitoring
-
-**Enable Cloudflare Web Analytics:**
-
-1. Go to **Analytics** → **Web Analytics**
-2. Add site: `settimes.ca`
-3. Copy tracking code
-4. Add to `frontend/index.html` (if not already present)
-
-**Configure Alerts:**
-
-1. Go to **Notifications**
-2. Create alerts for:
-   - High error rate (>5%)
-   - Traffic spike (unusual patterns)
-   - SSL certificate expiration
-   - Low performance score
-
----
-
-## Continuous Deployment
-
-### Automatic Deployments
-
-**On Push to main:**
-
-- Runs CI, applies remote D1 migrations, verifies the live D1 schema, deploys to Pages, and runs smoke checks against production
-- Deploys to `settimes.ca`
-- Takes ~2-3 minutes
-
-**On Push to dev:**
-
-- Runs CI, applies remote D1 migrations, verifies the live D1 schema, deploys to Pages, and runs smoke checks against development
-- Deploys to `dev.settimes.ca`
-- Takes ~2-3 minutes
-
-**On Pull Request:**
-
-- Runs the same build and test pipeline, but does not perform a direct Pages deployment from GitHub Actions
-- Any preview deployment behavior is controlled by Cloudflare dashboard Git integration, not by the checked-in workflow
-
-### GitHub Actions Release Inputs
-
-The checked-in release workflow expects these repository secrets:
-
-- `CF_ACCOUNT_ID`
-- `CF_PAGES_API_TOKEN`
-- `CRON_SECRET` — required by `.github/workflows/scheduled-jobs.yml` (daily scheduled tasks). Generate a strong random value (e.g. `openssl rand -base64 32`) and set it **both** here as a GitHub Actions repository secret **and** in Cloudflare Pages → Settings → Environment Variables (Production) with the same value. The `/api/internal/run-scheduled` endpoint fails closed (503) if this variable is missing from the Pages environment.
-
-The workflow also supports these repository variables:
-
-- `CF_PAGES_PROJECT_NAME` (default: `settimesdotca`)
-- `CF_D1_PRODUCTION_DATABASE_NAME` (default: `settimes-production-db`)
-- `CF_D1_DEVELOPMENT_DATABASE_NAME` (optional; defaults to `CF_D1_PRODUCTION_DATABASE_NAME` when unset)
-- `CF_PRODUCTION_SMOKE_URL` (default: `https://settimes.ca`)
-- `CF_DEVELOPMENT_SMOKE_URL` (default: `https://dev.settimes.ca`)
-
-If development uses a separate D1 database, set `CF_D1_DEVELOPMENT_DATABASE_NAME` explicitly. If development intentionally shares the production database, leave it unset or set it to the same value as production.
-
-### Manual Deployment
-
-**Via Wrangler:**
-
-```bash
-npm --prefix frontend ci
-npm --prefix frontend run build
-./frontend/node_modules/.bin/wrangler pages deploy frontend/dist --project-name=settimesdotca --branch=main
-```
-
-**Via Git:**
-
-```bash
-git push origin main
-# Wait for CI, D1 migration, schema verification, deploy, and smoke checks to finish
-```
-
-### Deployment Status
-
-**Check via Dashboard:**
-
-- Go to **Pages** → **Your Project** → **Deployments**
-- View build logs, deployment history
-
-**Check via CLI:**
-
-```bash
-wrangler pages deployment list --project-name=settimes
-```
-
----
-
-## Rollback & Recovery
-
-### Rollback to Previous Deployment
-
-**Via Dashboard:**
-
-1. Go to **Pages** → **Your Project** → **Deployments**
-2. Find previous successful deployment
-3. Click **⋯** → **Rollback to this deployment**
-4. Confirm rollback
-
-**Takes effect immediately** (no rebuild required).
-
-### Rollback via CLI
-
-```bash
-# List deployments
-wrangler pages deployment list --project-name=settimes
-
-# Rollback to specific deployment
-wrangler pages deployment rollback <deployment-id> --project-name=settimes
-```
-
-### Database Recovery
-
-**Restore from Backup:**
-
-```bash
-# Export current database (backup)
-wrangler d1 export settimes-production-db --output=backup-$(date +%Y%m%d).sql
-
-# Restore from backup
-wrangler d1 execute settimes-production-db --file=backup-20251119.sql
-```
-
-**Point-in-Time Recovery:**
-
-Contact Cloudflare support for point-in-time recovery (Enterprise feature).
-
----
-
-## Monitoring & Maintenance
-
-### Daily Checks
-
-```bash
-# Check error logs
-wrangler pages deployment tail --project-name=settimes --status error
-
-# Check database size
-wrangler d1 info settimes-production-db
-
-# Check active sessions
-wrangler d1 execute settimes-production-db --command="
-  SELECT COUNT(*) FROM sessions WHERE expires_at > datetime('now')
-"
-```
-
-### Weekly Maintenance
-
-```bash
-# Clean up expired sessions
-wrangler d1 execute settimes-production-db --command="
-  DELETE FROM sessions WHERE expires_at < datetime('now', '-7 days')
-"
-
-# Export database backup
-wrangler d1 export settimes-production-db --output=backups/weekly-$(date +%Y%m%d).sql
-
-# Review audit logs
-wrangler d1 execute settimes-production-db --command="
-  SELECT * FROM audit_logs
-  WHERE created_at > datetime('now', '-7 days')
-  ORDER BY created_at DESC LIMIT 100
-" > logs/audit-$(date +%Y%m%d).log
-```
-
-### Monthly Maintenance
-
-- [ ] Update npm dependencies (`npm update`)
-- [ ] Run security audit (`npm audit`)
-- [ ] Review Cloudflare analytics
-- [ ] Test disaster recovery plan
-- [ ] Archive old audit logs (>90 days)
-- [ ] Review and optimize database queries
-- [ ] Check SSL certificate status
-- [ ] Review rate limiting effectiveness
-
-### Performance Monitoring
-
-**Core Web Vitals:**
-
-```bash
-# Run Lighthouse audit
-cd frontend
-npm run lighthouse
-```
-
-**API Performance:**
-
-```bash
-# Check API response times
-curl -w "@curl-format.txt" -o /dev/null -s https://settimes.ca/api/schedule
-
-# curl-format.txt contents:
-# time_total:  %{time_total}s
-# time_namelookup:  %{time_namelookup}s
-# time_connect:  %{time_connect}s
-```
-
----
-
-## Troubleshooting Deployment Issues
-
-### Build Fails
-
-**Error:** "npm install failed"
-
-**Solution:**
-
-- Check Node version in Cloudflare settings (set to 20+)
-- Verify `package.json` and `package-lock.json` are committed
-- Check build logs for specific npm errors
-
----
-
-**Error:** "Build command exited with code 1"
-
-**Solution:**
-
-- Run build locally: `cd frontend && npm run build`
-- Fix any TypeScript/lint errors
-- Check for missing dependencies
-
----
-
-### Database Connection Issues
-
-**Error:** "DATABASE binding not found"
-
-**Solution:**
-
-- Verify `wrangler.toml` has correct `d1_databases` binding
-- Ensure `DATABASE` binding name matches code
-- Redeploy after fixing `wrangler.toml`
-
----
-
-**Error:** "no such table: users"
-
-**Solution:**
-
-- Run migrations: `wrangler d1 migrations apply settimes-production-db`
-- Verify migrations ran successfully
-- Check migration files in `migrations/` directory
-
----
-
-### Domain & SSL Issues
-
-**Error:** "This site can't provide a secure connection"
-
-**Solution:**
-
-- Wait 15 minutes for SSL provisioning
-- Verify DNS is correctly configured
-- Check Cloudflare SSL/TLS setting (should be "Full" or "Full (strict)")
-
----
-
-**Error:** "DNS_PROBE_FINISHED_NXDOMAIN"
-
-**Solution:**
-
-- Verify CNAME record points to `settimes-xxx.pages.dev`
-- Wait for DNS propagation (up to 48 hours, usually minutes)
-- Use `dig settimes.ca` to check DNS resolution
-
----
-
-### Function Errors
-
-**Error:** "500 Internal Server Error" on API endpoints
-
-**Solution:**
-
-- Check function logs: `wrangler pages deployment tail`
-- Verify environment variables are set
-- Check database connection
-- Review function code for errors
-
----
-
-## Security Checklist
-
-**Before Production:**
-
-- [ ] SESSION_SECRET is strong and unique
-- [ ] Admin password is strong (12+ characters)
-- [ ] HTTPS is enabled (Cloudflare SSL)
-- [ ] HSTS header is set (`_headers` file)
-- [ ] CSP header is configured
-- [ ] CSRF protection is enabled
-- [ ] Rate limiting is configured
-- [ ] Audit logging is enabled
-- [ ] Database backups are automated
-- [ ] No secrets in git repository
-
----
-
-## Additional Resources
-
-**Documentation:**
-
-- [Cloudflare Pages Docs](https://developers.cloudflare.com/pages/)
-- [Cloudflare D1 Docs](https://developers.cloudflare.com/d1/)
-- [Wrangler CLI Docs](https://developers.cloudflare.com/workers/wrangler/)
-
-**SetTimes Docs:**
-
-- [Admin Handbook](./ADMIN_HANDBOOK.md) - System administration
-- [User Guide](./USER_GUIDE.md) - For event organizers
-- [API Documentation](./API_DOCUMENTATION.md) - API reference
-- [Troubleshooting](./TROUBLESHOOTING.md) - Common issues
-
----
-
-**Version:** 2.1
-**Last Updated:** January 2026
-**Target Event:** Long Weekend Band Crawl (Feb 15, 2026)
-
----
-
-**Ready to deploy?** Follow this guide step-by-step for a successful production deployment!
+**Last updated:** 2026-10-14

@@ -8,12 +8,11 @@ This site is generated from the Markdown in [`docs/`](https://github.com/Breakab
 
 **New to the project?**
 
-- [Quick Start](QUICK_START.md) — clone, install, and get a local dev environment running in about 10 minutes
+- [Quick Start](QUICK_START.md) — organizer walkthrough for creating, publishing, and checking an event
 - [Contributing](CONTRIBUTING.md) — local development workflow and conventions
 
 **Understanding how it's built:**
 
-- [Backend Framework](BACKEND_FRAMEWORK.md) — Cloudflare Pages Functions structure and patterns
 - [Database](DATABASE.md) — D1 schema, tables, and migration source of truth
 
 **Working with the API:**

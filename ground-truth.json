@@ -1,6 +1,6 @@
 {
   "_comment": "Machine-readable project canon for agents and humans. Slow-moving facts only — live data (lineups, band profiles, counts) belongs to the database, not this file. Update via PR when canon changes; bump verified_at when a human or agent re-verifies against production.",
-  "verified_at": "2026-08-28",
+  "verified_at": "2026-10-14",
   "project": {
     "name": "SetTimes",
     "domain": "https://settimes.ca",
@@ -23,17 +23,17 @@
     "db_id": 37,
     "date": "2026-10-11",
     "end_date": null,
-    "status": "published",
+    "status": "archived",
     "band_count": 0,
     "reveal_mode": 0,
-    "_note": "Published 2026-08-28 with an EMPTY lineup — the supported 'Lineup TBA' state, live to the public now. Doors/show/ages/venues are not set — do not carry Vol. 17's forward as if they were. reveal_mode is 0, so is_announced never gates visibility: a performance row is publicly visible the instant it is written, and the is_announced 0→1 transition can fire follower email. Adding the lineup IS the announcement, not a step toward it."
+    "_note": "Ran 2026-10-11 and was archived 2026-10-13. No edition is published now; the next edition is expected in February 2027."
   },
   "season_state": {
-    "state": "published_lineup_tba",
-    "explanation": "Vol. 18 is published with ZERO performances, so surfaces split by which layer they read. EVENT-driven surfaces are populated: /api/events/public (defaults upcoming=true) returns 1, /api/events/timeline returns now 0 / upcoming 1 / past 10. PERFORMANCE-driven surfaces are still empty: the iCal feed LEFT JOINs performances, so it emits no VEVENTs. That iCal zero reads identically to the between-seasons zero and means something different — published event, lineup not announced. Diagnose the two apart by asking which layer a surface reads, never by the number. Before calling any such zero a bug, check BOTH halves: is an event published, AND does it have performances?",
-    "published_count": 1,
+    "state": "between_seasons",
+    "explanation": "Vol. 18 ran 2026-10-11 and was archived 2026-10-13. No edition is published now. Event-driven surfaces return 0 upcoming events and 10 past events; the iCal feed returns 0 VEVENTs because it joins performances. When the next edition is published with no lineup, the iCal zero reads identically but means something different: a published event whose lineup is not announced. Diagnose the two by asking which layer a surface reads, not by the number.",
+    "published_count": 0,
     "performance_count_upcoming": 0,
-    "between_seasons_note": "'between_seasons' was the state until 2026-08-28 and will be again after Vol. 18 is archived. EventTimeline still has its dedicated empty state for it; that path is dormant, not gone."
+    "between_seasons_note": "EventTimeline has a dedicated between-seasons empty state and auto-expands Past. Check both whether an event is published and whether it has performances before calling a zero a bug."
   },
   "venues_vol17": [
     { "db_id": 16, "name": "Blue Room (Inside Revive Karaoke)", "address": "28 King St N, Waterloo" },
@@ -48,11 +48,9 @@
     "jane_bond": "Jane Bond (db_id 17) is Vol-16 only",
     "historical_2022": "Vol 1/2 venues (Dive Bar 85 King N, Revive Game Bar 90 King N, Pin Up Arcade Bar 8-247 King N) have no venue rows — they live in events.venue_info JSON; 85 King N is now Roost, Revive later moved to 28"
   },
-  "published_events": [
-    { "db_id": 37, "slug": "lwbc18", "name": "Long Weekend Band Crawl Vol. 18", "date": "2026-10-11" }
-  ],
+  "published_events": [],
   "draft_events": [],
-  "_archived_events_note": "Chronological ascending. Every past edition is archived — 19 events as of 2026-08-28, and they are what /api/stats/public and the recap pages are built from. The public catalogue is these PLUS the published lwbc18, which the sitemap also carries; only the archive feeds the stats and recaps.",
+  "_archived_events_note": "Chronological ascending. Every past edition is archived — 19 events as of 2026-10-14, and they are what /api/stats/public and the recap pages are built from.",
   "archived_events": [
     { "db_id": 33, "slug": "lwbc01", "date": "2022-05-22" },
     { "db_id": 34, "slug": "lwbc02", "date": "2022-07-31" },
@@ -72,7 +70,8 @@
     { "db_id": 20, "slug": "lwbc16", "date": "2026-05-17" },
     { "db_id": 35, "slug": "blr3", "name": "Bad Livin' Roadshow 3", "date": "2026-07-10", "end_date": "2026-07-12" },
     { "db_id": 21, "slug": "lwbc17", "name": "Long Weekend Band Crawl - Vol. 17", "date": "2026-08-02" },
-    { "db_id": 36, "slug": "buddiesfest2", "name": "Buddies Fest 2", "date": "2026-08-07", "end_date": "2026-08-09" }
+    { "db_id": 36, "slug": "buddiesfest2", "name": "Buddies Fest 2", "date": "2026-08-07", "end_date": "2026-08-09" },
+    { "db_id": 37, "slug": "lwbc18", "name": "Long Weekend Band Crawl Vol. 18", "date": "2026-10-11" }
   ],
   "constants": {
     "timezone": "America/Toronto",

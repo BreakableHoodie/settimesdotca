@@ -8,13 +8,13 @@ This document outlines SQL safety practices implemented in the Long Weekend Band
 
 ```javascript
 // ✅ CORRECT - Parameterized query
-const result = await DB.prepare("SELECT * FROM bands WHERE id = ?")
+const result = await DB.prepare("SELECT * FROM performances WHERE id = ?")
   .bind(bandId)
   .first();
 
 // ❌ WRONG - String concatenation (SQL injection risk)
 const result = await DB.prepare(
-  `SELECT * FROM bands WHERE id = ${bandId}`,
+  `SELECT * FROM performances WHERE id = ${bandId}`,
 ).first();
 ```
 
@@ -25,7 +25,7 @@ Use multiple placeholders with `.bind()` in the same order:
 ```javascript
 const result = await DB.prepare(
   `
-  SELECT * FROM bands
+  SELECT * FROM performances
   WHERE event_id = ?
   AND venue_id = ?
   AND start_time > ?
@@ -44,7 +44,7 @@ Use transactions and parameterized queries for bulk inserts:
 ```javascript
 // ✅ CORRECT - Safe batch insert
 const insertStmt = DB.prepare(`
-  INSERT INTO bands (name, event_id, venue_id, start_time, end_time)
+  INSERT INTO performances (band_profile_id, event_id, venue_id, start_time, end_time)
   VALUES (?, ?, ?, ?, ?)
 `);
 
@@ -61,9 +61,9 @@ Never build dynamic WHERE clauses from user input:
 
 ```javascript
 // ✅ CORRECT - Individual parameterized updates
-for (const band of bands) {
-  await DB.prepare("UPDATE bands SET name = ? WHERE id = ?")
-    .bind(band.name, band.id)
+for (const set of sets) {
+  await DB.prepare("UPDATE performances SET start_time = ? WHERE id = ?")
+    .bind(set.start_time, set.id)
     .run();
 }
 
@@ -78,7 +78,7 @@ Use prepared statements in loops or batch operations:
 
 ```javascript
 // ✅ CORRECT - Parameterized batch delete
-const deleteStmt = DB.prepare("DELETE FROM bands WHERE id = ?");
+const deleteStmt = DB.prepare("DELETE FROM performances WHERE id = ?");
 
 await DB.batch(bandIds.map((id) => deleteStmt.bind(id)));
 ```

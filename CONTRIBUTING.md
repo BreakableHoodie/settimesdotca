@@ -16,7 +16,7 @@ npm ci
 cd frontend && npm ci && cd ..
 
 # 3. Create local dev vars (never commit this file)
-cp .dev.vars.example .dev.vars   # then fill in CSRF_SECRET, etc.
+cp .env.example .dev.vars        # then fill in CSRF_SECRET, etc.
 
 # 4. Apply migrations to the local SQLite emulator
 npm run migrate:local
@@ -63,7 +63,7 @@ To add a migration, create the next numbered file in `migrations/` and run `npm 
 
 ## Pull requests
 
-1. Branch from `main` (for features/fixes) or `dev` (for staged rollout).
+1. Branch from `main`. Only merges to `main` deploy production; other branches do not deploy from this repository, except for the dedicated edge-E2E preview workflow.
 2. Keep PRs focused — one logical change per PR makes review easier.
 3. All CI checks must pass: tests, lint, format, OpenAPI validation, and build.
 4. Security-sensitive files (auth, CSRF, migrations, CI workflows) require owner review per `CODEOWNERS`.

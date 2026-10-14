@@ -56,14 +56,11 @@ plugins:
 exclude_docs: |
   code-review/
   prompts/
-  ux/
+  archive/
   superpowers/
   adr/adr-*.md
   REPORT_CARD_REVIEW.md
   field-notes/
-  SETTIMES_V2_IMPLEMENTATION_PLAN.md
-  SETTIMES_V2_UX_BRIEF.md
-  SETTIMES_V2_WIREFRAMES.md
   /README.md
   requirements.txt
 
@@ -73,27 +70,21 @@ nav:
       - Quick Start: QUICK_START.md
       - Contributing: CONTRIBUTING.md
   - Architecture:
-      - Backend Framework: BACKEND_FRAMEWORK.md
       - Database: DATABASE.md
       - Session Management: SESSION_MANAGEMENT.md
   - API Reference:
       - API Documentation: API_DOCUMENTATION.md
       - Interactive OpenAPI Explorer: api-reference/openapi.md
-      - Admin API Usage Examples: frontend/ADMIN_INTEGRATION_EXAMPLE.md
   - Admin & Users:
       - Admin Handbook: ADMIN_HANDBOOK.md
-      - Admin Panel Guide: admin/README.md
       - User Guide: USER_GUIDE.md
   - Operations:
       - Deployment: DEPLOYMENT.md
-      - Frontend Deploy Branches: frontend/DEPLOY.md
-      - Frontend Deployment Notes: frontend/DEPLOYMENT_NOTES.md
       - D1 Setup: D1_SETUP.md
       - Testing: TESTING.md
       - Troubleshooting: TROUBLESHOOTING.md
       - Security: SECURITY.md
       - SQL Safety: SQL_SAFETY.md
-      - Performance Recommendations: PERFORMANCE_RECOMMENDATIONS.md
   - Design System:
       - Design System: design-system/DESIGN_SYSTEM.md
       - Component Usage: design-system/COMPONENT_USAGE.md

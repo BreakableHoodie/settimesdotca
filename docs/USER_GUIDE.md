@@ -203,7 +203,7 @@ On mobile devices:
 1. Go to the **📅 Events** tab
 2. Find your draft event (marked with a "Draft" badge)
 3. Click "Edit"
-4. Check the "Published" checkbox
+4. Set the **Status** dropdown to **Published**
 5. Click "Save Changes"
 
 **Important:** Only publish when ALL information is correct! Once published, attendees can see it on the public timeline.
@@ -216,18 +216,11 @@ Events display color-coded status badges:
 - **Published** (green) - Live and visible
 - **Archived** (orange) - Past event, read-only
 
-### Unpublishing
+### Editing a Published Event
 
-Need to make changes to a published event?
+Published events can be edited directly. Save ordinary event, venue, band, and schedule changes without unpublishing.
 
-1. Go to the **📅 Events** tab
-2. Find your event
-3. Click "Edit"
-4. Uncheck "Published"
-5. Make your changes
-6. Re-publish when ready
-
-**Tip:** Unpublishing removes the event from the public timeline immediately.
+**Emergency stop:** Unpublishing hides the whole event and should not be used to pull one set. During a show, use the per-set **Cancel** toggle in the Lineup tab; see [Show-Day Runbook](SHOW_DAY_RUNBOOK.md).
 
 ---
 
@@ -301,10 +294,10 @@ SetTimes is WCAG 2.1 AA compliant:
 Every band/performer automatically gets a public profile page at:
 
 ```text
-settimes.ca/bands/[event-slug]/[band-name]
+   settimes.ca/band/[id-or-slug]
 ```
 
-**Example:** `settimes.ca/bands/spring-2025/the-sunset-trio`
+**Example:** `settimes.ca/band/42` or `settimes.ca/band/the-sunset-trio`
 
 ### Profile Features
 
@@ -540,7 +533,7 @@ Before announcing:
 2. Check the event slug is correct (no spaces or special characters)
 3. Verify the band is assigned to that event
 4. Wait 1-2 minutes for cache updates
-5. Check the full URL format: `settimes.ca/bands/[event-slug]/[band-name-slug]`
+5. Check the full URL format: `settimes.ca/band/[id-or-slug]`
 
 ---
 
@@ -650,9 +643,9 @@ On mobile devices, use the bottom navigation bar:
 
 **Add Band:** Performers tab → Add Performer → Fill form → Save
 
-**Publish:** Events tab → Edit event → Check "Published" → Save
+**Publish:** Events tab → Edit event → Set Status to "Published" → Save
 
-**Emergency Stop:** Events tab → Edit event → Uncheck "Published" → Save
+**Emergency Stop:** Lineup tab → set the affected performance to "Cancelled". Unpublishing hides the entire event.
 
 ---
 
@@ -673,7 +666,7 @@ SetTimes uses industry-standard security:
 
 **Passwords:**
 
-- Use a strong, unique password (min. 8 characters)
+- Use a strong, unique password (min. 12 characters)
 - Include uppercase, lowercase, and numbers
 - Never share your credentials
 - Change passwords quarterly

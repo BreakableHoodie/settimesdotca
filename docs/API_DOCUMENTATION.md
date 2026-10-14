@@ -76,8 +76,8 @@ SetTimes no longer uses the earlier shared-password admin flow. Admin access is 
 | Route                               | Method | Notes                                                                                                                                                     |
 | ----------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `/api/subscriptions/subscribe`      | `POST` | Body: `{ email, city, genre, frequency, turnstileToken? }`. `frequency` must be `daily`, `weekly`, or `monthly`.                                          |
-| `/api/subscriptions/verify`         | `GET`  | Verifies a subscription via `?token=` and redirects to `/subscribe?verified=true` on success.                                                             |
-| `/api/subscriptions/unsubscribe`    | `GET`  | Removes a subscription via `?token=` and returns an HTML confirmation page.                                                                               |
+| `/api/subscriptions/verify`         | `GET`  | Renders a confirmation button and writes nothing. `POST` verifies the token from the form body or query string and redirects to `/subscribe?verified=true`. Tokens expire after 7 days. |
+| `/api/subscriptions/unsubscribe`    | `GET`  | Renders an unsubscribe button and writes nothing. `POST` removes the subscription using the token from the form body or query string. Supports RFC 8058 one-click form delivery. |
 | `/api/auth/activate`                | `POST` | Body: `{ token }`. Activates an invited user account.                                                                                                     |
 | `/api/auth/resend-activation`       | `POST` | Body: `{ email }`. Always returns a generic success payload to avoid account enumeration.                                                                 |
 | `/api/auth/reset-password/validate` | `POST` | Body: `{ token }`. Validates a reset token without placing it in the URL.                                                                                 |
@@ -92,10 +92,10 @@ Following a band is **double opt-in**: a follow is created unverified and only a
 | Route                              | Method | Notes                                                                                                                                                                                  |
 | ---------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `/api/bands/{name}/follow`         | `POST` | Body: `{ email, turnstileToken? }`. Bot-protected by Turnstile. Always returns `200` for valid input (no enumeration). `confirmUrl` is returned only when email is unconfigured (dev). |
-| `/api/bands/{name}/confirm-follow` | `GET`  | Verifies a pending follow via `?token=` and renders an HTML page. Idempotent; messaging is generic to avoid leaking token validity.                                                    |
-| `/api/bands/{name}/unfollow`       | `GET`  | Deletes the follow tied to the unsubscribe `?token=` and renders an HTML page. Returns `200` whether or not the token existed.                                                         |
+| `/api/bands/{name}/confirm-follow` | `GET`  | Renders a confirmation button and writes nothing. `POST` confirms the token from the form body or query string. Tokens expire after 7 days. |
+| `/api/bands/{name}/unfollow`       | `GET`  | Renders an unfollow button and writes nothing. `POST` deletes the follow using the token from the form body or query string. |
 | `/api/bands/follow-batch`          | `POST` | Body: `{ email, performance_ids: number[], turnstileToken? }`. Resolves performance IDs to bands; inserts one `verified=0` row per band (INSERT OR IGNORE), all sharing a `batch_token`. Sends **exactly one** combined confirmation email (amplification mitigation). Always returns `200` for valid input; `confirmUrl` only in dev. |
-| `/api/bands/confirm-follow-batch`  | `GET`  | `?token=<batch_token>` — flips all rows sharing that token to `verified=1` and clears the token (idempotent). Generic HTML page; no enumeration of token validity.                    |
+| `/api/bands/confirm-follow-batch`  | `GET`  | Renders a confirmation button and writes nothing. `POST` confirms all rows sharing `?token=<batch_token>` from the form body or query string. Tokens expire after 7 days. |
 
 ### Public request notes
 
@@ -172,13 +172,13 @@ All admin routes require a valid session cookie. State-changing routes also requ
 | `/api/admin/events/{id}`             | `DELETE` | admin        | Deletes an event. If performances exist, repeat with `confirmCascade=true` in the body or query string.                                                                |
 | `/api/admin/events/{id}/edit`        | `PUT`    | editor       | Narrow event-edit route for `{ name, date, slug, ticket_url }`.                                                                                                        |
 | `/api/admin/events/{id}/publish`     | `POST`   | editor       | Body: `{ publish: boolean }`. Refuses to publish an event with no performances.                                                                                        |
-| `/api/admin/events/{id}/archive`     | `POST`   | admin        | Sets `status = 'archived'` and stamps `archived_at`. One-way: no route un-archives an event. 409 if it was archived concurrently.                                       |
+| `/api/admin/events/{id}/archive`     | `POST`   | editor       | Sets `status = 'archived'` and stamps `archived_at`. One-way: no route un-archives an event. 409 if it was archived concurrently.                                       |
 | `/api/admin/events/{id}/metrics`     | `GET`    | viewer       | Schedule-build analytics for one event.                                                                                                                                |
 | `/api/admin/events/{id}/duplicate`   | `POST`   | editor       | Body: `{ name, date, slug }`. Copies the event's performances into a new unpublished draft.                                                                            |
-| `/api/admin/events/wizard`           | `POST`   | admin        | One-shot creation of a draft event, its venues (find-or-create by name), and lineup. Body: `{ event, venues[], bands[] }`; each `bands[].venueIndex` indexes `venues`. |
+| `/api/admin/events/wizard`           | `POST`   | editor       | One-shot creation of a draft event, its venues (find-or-create by name), and lineup. Body: `{ event, venues[], bands[] }`; each `bands[].venueIndex` indexes `venues`. |
 | `/api/admin/events/{id}/reveal-mode` | `POST`   | editor       | Body: `{ reveal_mode: boolean }`. Toggles the lineup embargo flag for the event.                                                                                       |
 | `/api/admin/venues`                  | `GET`    | viewer       | Lists venues with band counts. Contact details are redacted for viewers.                                                                                               |
-| `/api/admin/venues`                  | `POST`   | admin        | Creates a new venue.                                                                                                                                                   |
+| `/api/admin/venues`                  | `POST`   | editor       | Creates a new venue.                                                                                                                                                   |
 | `/api/admin/venues/{id}`             | `PUT`    | admin        | Updates a venue.                                                                                                                                                       |
 | `/api/admin/venues/{id}`             | `DELETE` | admin        | Deletes a venue.                                                                                                                                                       |
 | `/api/admin/bands`                   | `GET`    | viewer       | Lists performances. Supports `event_id`, `limit`, and `offset`. Without `event_id`, profile-only rows are returned as synthetic IDs like `profile_123`.                |
@@ -188,6 +188,7 @@ All admin routes require a valid session cookie. State-changing routes also requ
 | `/api/admin/bands/bulk-preview`      | `POST`   | editor       | Preview bulk venue moves, time changes, or deletions before applying them.                                                                                             |
 | `/api/admin/bands/bulk`              | `POST`   | editor       | Adds existing band profiles to an event lineup. Body: `{ band_profile_ids, event_id, venue_id, start_time?, end_time? }`.                                              |
 | `/api/admin/bands/bulk`              | `DELETE` | editor       | Bulk deletes performances or profile-only rows. Body: `{ band_ids }`.                                                                                                  |
+| `/api/admin/bands/bulk`              | `PATCH`  | editor       | Bulk updates performance fields such as venue, time, announcement, or cancellation state.                                                                            |
 | `/api/admin/bands/photos`            | `POST`   | editor       | `multipart/form-data` upload with `photo` and optional `band_id`. Stores assets in R2 and can update `photo_url`.                                                      |
 | `/api/admin/bands/stats/{name}`      | `GET`    | viewer       | Internal stats and history view for a band profile.                                                                                                                    |
 
@@ -207,7 +208,10 @@ All admin routes require a valid session cookie. State-changing routes also requ
 | `/api/admin/audit-log`                    | `GET`    | admin        | Query: `user_id`, `action`, `resource_type`, `limit` (max 100), and `offset`.                                                                                                                               |
 | `/api/admin/analytics/subscriptions`      | `GET`    | admin        | Aggregate subscription analytics only; no subscriber PII is exposed.                                                                                                                                        |
 | `/api/admin/flush-announce-digest`        | `POST`   | editor       | Groups the pending `band_announce_queue` by `(email, event)` and sends one digest email per fan per event, recording each successful send in the per-follower ledger. Requires a configured email provider. |
-| `/api/admin/maintenance/cleanup-sessions` | `POST`   | admin        | Runs the retention cleanup for expired sessions, MFA challenges, reset tokens, trusted devices, and security telemetry.                                                                                     |
+| `/api/admin/maintenance/cleanup-sessions` | `POST`   | admin        | Runs the full retention cleanup for expired sessions, MFA challenges, reset tokens, trusted devices, login attempts, unconfirmed sign-ups, and security telemetry. |
+| `/api/admin/api-keys`                     | `GET`/`POST` | admin    | Lists API-key metadata or creates a key. The plaintext key is returned exactly once and cannot be recovered. |
+| `/api/admin/events/{id}/schedule`         | `PUT`    | editor       | Atomically updates multiple schedule rows and checks the final merged state for conflicts. |
+| `/api/internal/run-scheduled`             | `POST`   | internal secret | Runs the full scheduled job. Returns `200 { ok: true, ranAt, durationMs }`; failed steps return `500 { ok: false, failedSteps, ranAt, durationMs }`. |
 
 ## Error handling
 

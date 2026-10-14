@@ -159,16 +159,16 @@ npx playwright test --project=chromium
 
 ## Deployment Overview
 
-Production and development releases are driven by `.github/workflows/cloudflare-pages.yml`.
+Production releases are driven by `.github/workflows/cloudflare-pages.yml`.
 
 The workflow gates deployment in this order:
 
 1. CI and validation
-2. Release target resolution (`main` -> production, `dev` -> development)
+2. Release target resolution (`main` -> production)
 3. Remote D1 migrations
 4. Remote schema verification
 5. Pages deploy
-6. Post-deploy smoke checks
+6. Post-deploy smoke checks, including read-only iCal, sitemap, and SSR metadata probes
 
 Required GitHub configuration is documented in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). The key repository secrets and variables are:
 
@@ -176,11 +176,9 @@ Required GitHub configuration is documented in [docs/DEPLOYMENT.md](docs/DEPLOYM
 - `CF_PAGES_API_TOKEN`
 - `CF_PAGES_PROJECT_NAME`
 - `CF_D1_PRODUCTION_DATABASE_NAME`
-- `CF_D1_DEVELOPMENT_DATABASE_NAME` (optional when using a separate dev DB)
 - `CF_PRODUCTION_SMOKE_URL`
-- `CF_DEVELOPMENT_SMOKE_URL`
 
-Public discovery endpoints remain disabled until `PUBLIC_DATA_PUBLISH_ENABLED=true` is set explicitly in the target environment.
+Public discovery endpoints remain disabled until `PUBLIC_DATA_PUBLISH_ENABLED=true` is set explicitly in production.
 
 For local Pages development, prefer `npm run pages:dev:public` when you want to inspect real public routes without changing the repo-local default in `.dev.vars`.
 

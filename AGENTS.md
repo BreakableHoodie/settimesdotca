@@ -8,12 +8,12 @@ workflow and the full invariant catalogue live in `CLAUDE.md` — read it before
 
 settimes.ca — a **lean, highly performant** multi-venue live-music event platform for Waterloo
 Region, ON. Fan-facing (schedule builder, band profiles, archives) and admin tooling are equal
-priority. Next edition: **Long Weekend Band Crawl Vol. 18 — October 11, 2026**, **published
-since 2026-08-28 with an empty lineup** (the supported "Lineup TBA" state) and live to the public
-now. Vol. 17 and Buddies Fest 2 both shipped in August 2026 and are archived. Event-driven
-surfaces are populated again; the iCal feed is still empty because it joins performances, and
-that zero is not the between-seasons zero. See `season_state` in the canon below before calling
-any such zero a bug.
+ priority. The most recent edition, **Long Weekend Band Crawl Vol. 18 — October 11, 2026**, ran
+ and was archived on 2026-10-13. No edition is published; the site is **between seasons**, with
+ the next edition expected in February 2027. Event-driven surfaces have 0 upcoming events and
+ 10 past events; the iCal feed has 0 VEVENTs because it joins performances. When the next edition
+ is published with no lineup, that same iCal zero means "lineup not announced", not "between
+ seasons". See `season_state` in the canon before calling any such zero a bug.
 
 Machine-readable canon (venues, events, constants, doctrines): **`ground-truth.json`**.
 Read it before asserting facts about events, venues, or dates — do not re-derive or guess.
@@ -36,6 +36,8 @@ Use the Makefile — it exists so every agent runs the same gates with real exit
 - **Codebase report card** — `docs/REPORT_CARD_REVIEW.md`. Whole-repo grade + safe fixes, run at the start of a release cycle or ~quarterly. Not a per-PR gate; it reads the whole tree. See CLAUDE.md for cadence and caveats.
 - `make schema-check` — after touching `migrations/`: regenerates `setup-complete.sql` and checks drift (its schema section is generated — never hand-edit)
 - `make validate-openapi` — if `docs/api-spec.yaml` changed
+
+Backend unit tests use `better-sqlite3` and run natively on Apple Silicon.
 
 Never pipe a gate command through `tail`/`grep` inside a `&&` chain — the pipe's exit code
 masks failures (this shipped a red lint to CI once). `make` propagates failures natively.

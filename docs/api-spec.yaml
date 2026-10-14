@@ -1938,6 +1938,7 @@ paths:
       tags:
         - Admin - Events
       summary: Archive an event
+      description: Requires the `editor` role or higher. Archiving is one-way.
       security:
         - AdminSessionCookie: []
           CsrfToken: []
@@ -2132,7 +2133,7 @@ paths:
         creates a **draft** event, find-or-creates each venue by name, upserts
         band profiles, and batch-inserts performances atomically. Each
         `bands[].venueIndex` is a 0-based index into the submitted `venues`
-        array. **Requires the `admin` role** (venue creation is admin-only).
+        array. **Requires the `editor` role**. Editors may create venues; editing or deleting an existing venue remains admin-only.
         Rejects intra-submission time conflicts (`409`) and past draft dates.
       security:
         - AdminSessionCookie: []
@@ -2255,6 +2256,7 @@ paths:
       tags:
         - Admin - Venues
       summary: Create a venue
+      description: Requires the `editor` role. Editing or deleting an existing venue requires `admin`.
       security:
         - AdminSessionCookie: []
           CsrfToken: []

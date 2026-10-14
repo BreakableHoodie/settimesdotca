@@ -8,7 +8,7 @@ import { verifyTurnstile } from "../../utils/turnstile.js";
 import { escapeHtml } from "../../utils/html.js";
 import { getPublicBaseUrl } from "../../utils/publicUrl.js";
 import { parseJsonObjectBody } from "../../utils/request.js";
-import { CONSENT_VERSION } from "../../utils/consent.js";
+import { CONSENT_VERSION, pendingConfirmationLiveSql } from "../../utils/consent.js";
 import { isDevRequest } from "../../utils/auth.js";
 
 const FREQUENCY_OPTIONS = new Set(["daily", "weekly", "monthly"]);
@@ -104,30 +104,39 @@ export async function onRequestPost(context) {
           },
         );
       } else {
-        // Re-send verification email
-        const emailResult = await sendVerificationEmail(env, email, existing[0].verification_token);
+        const expired = await env.DB.prepare(
+          `DELETE FROM email_subscriptions
+           WHERE id = ? AND verified = 0 AND NOT (${pendingConfirmationLiveSql()})`,
+        )
+          .bind(existing[0].id)
+          .run();
 
-        if (!emailResult.delivered && emailResult.reason === "not_configured") {
-          return subscriptionResponse(
+        if (expired.meta.changes === 0) {
+          // Re-send verification email
+          const emailResult = await sendVerificationEmail(env, email, existing[0].verification_token);
+
+          if (!emailResult.delivered && emailResult.reason === "not_configured") {
+            return subscriptionResponse(
+              {
+                message: "Email delivery is not configured. Use the link below to verify your subscription.",
+              },
+              200,
+              emailResult,
+              request,
+              env,
+            );
+          }
+
+          return new Response(
+            JSON.stringify({
+              message: "Verification email sent. Please check your inbox.",
+            }),
             {
-              message: "Email delivery is not configured. Use the link below to verify your subscription.",
+              status: 200,
+              headers: { "Content-Type": "application/json" },
             },
-            200,
-            emailResult,
-            request,
-            env,
           );
         }
-
-        return new Response(
-          JSON.stringify({
-            message: "Verification email sent. Please check your inbox.",
-          }),
-          {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          },
-        );
       }
     }
 

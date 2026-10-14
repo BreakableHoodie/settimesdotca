@@ -121,4 +121,70 @@ describe("/api/bands/:name/confirm-follow", () => {
     const res = await confirmHandler.onRequestGet({ request: req, env, params: { name: "1" } });
     expect(res.status).toBe(200);
   });
+
+  it("rejects an expired pending follow but confirms one within the window", async () => {
+    const { env, rawDb } = createTestEnv();
+    const ev = insertEvent(rawDb, { name: "Vol6", slug: "vol6-confirm-expiry" });
+    const band = insertBand(rawDb, { name: "Expiry Band", event_id: ev.id });
+    const insert = rawDb.prepare(
+      "INSERT INTO band_follows (email, band_profile_id, verification_token, unsubscribe_token, created_at) VALUES (?, ?, ?, ?, datetime('now', ?))",
+    );
+    insert.run("old@example.com", band.band_profile_id, "old-token", "old-unsub", "-8 days");
+    insert.run("new@example.com", band.band_profile_id, "new-token", "new-unsub", "-6 days");
+
+    const post = (token) =>
+      confirmHandler.onRequestPost({
+        request: new Request(`https://example.test/api/bands/${band.band_profile_id}/confirm-follow`, {
+          method: "POST",
+          body: new URLSearchParams({ token }),
+        }),
+        env,
+        params: { name: String(band.band_profile_id) },
+      });
+    await post("old-token");
+    await post("new-token");
+
+    const rows = rawDb.prepare("SELECT email, verified FROM band_follows ORDER BY email").all();
+    expect(rows).toEqual([
+      { email: "new@example.com", verified: 1 },
+      { email: "old@example.com", verified: 0 },
+    ]);
+  });
+
+  it("keeps the update expiry guard when a stale lookup slips through", async () => {
+    const { env, rawDb } = createTestEnv();
+    const ev = insertEvent(rawDb, { name: "Vol6", slug: "vol6-confirm-race" });
+    const band = insertBand(rawDb, { name: "Race Band", event_id: ev.id });
+    rawDb
+      .prepare(
+        "INSERT INTO band_follows (email, band_profile_id, verification_token, unsubscribe_token, created_at) VALUES (?, ?, ?, ?, datetime('now', '-8 days'))",
+      )
+      .run("race@example.com", band.band_profile_id, "race-token", "race-unsub");
+
+    const prepare = env.DB.prepare.bind(env.DB);
+    env.DB.prepare = (sql) =>
+      prepare(
+        sql.includes("SELECT bf.id")
+          ? sql.replace(
+              "AND (bf.verified = 1 OR (bf.verified = 0 AND bf.created_at >= datetime('now', '-7 days')))",
+              "",
+            )
+          : sql,
+      );
+
+    const res = await confirmHandler.onRequestPost({
+      request: new Request(`https://example.test/api/bands/${band.band_profile_id}/confirm-follow`, {
+        method: "POST",
+        body: new URLSearchParams({ token: "race-token" }),
+      }),
+      env,
+      params: { name: String(band.band_profile_id) },
+    });
+
+    expect(rawDb.prepare("SELECT verified FROM band_follows WHERE email = ?").get("race@example.com").verified).toBe(0);
+    // And the page must not tell the fan they follow a band they don't.
+    const html = await res.text();
+    expect(html).not.toMatch(/you&apos;re following/i);
+    expect(html).toMatch(/invalid or has already been used/i);
+  });
 });

@@ -126,6 +126,12 @@ export default function PrivacyPage() {
                     <td className="py-2 pr-4">Email subscribers / band followers (incl. consent IP)</td>
                     <td className="py-2">Until unsubscribe / unfollow</td>
                   </tr>
+                  <tr>
+                    <td className="py-2 pr-4">
+                      Unconfirmed follow or subscription requests (email address, IP address)
+                    </td>
+                    <td className="py-2">7 days, then deleted</td>
+                  </tr>
                 </tbody>
               </table>
             </div>

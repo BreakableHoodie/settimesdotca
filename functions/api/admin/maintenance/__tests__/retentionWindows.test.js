@@ -22,6 +22,23 @@ function seedAudit(rawDb, action, ageDays) {
     .run(action, `-${ageDays} days`);
 }
 
+function seedFollow(rawDb, email, ageDays, verified = 0) {
+  const band = rawDb.prepare("SELECT id FROM band_profiles LIMIT 1").get();
+  rawDb
+    .prepare(
+      "INSERT INTO band_follows (email, band_profile_id, verified, verification_token, unsubscribe_token, created_at) VALUES (?, ?, ?, ?, ?, datetime('now', ?))",
+    )
+    .run(email, band.id, verified, `${email}-verify`, `${email}-unsubscribe`, `-${ageDays} days`);
+}
+
+function seedSubscription(rawDb, email, ageDays, verified = 0) {
+  rawDb
+    .prepare(
+      "INSERT INTO email_subscriptions (email, city, genre, verification_token, unsubscribe_token, verified, created_at) VALUES (?, 'all', 'all', ?, ?, ?, datetime('now', ?))",
+    )
+    .run(email, `${email}-verify`, `${email}-unsubscribe`, verified, `-${ageDays} days`);
+}
+
 describe("retention windows published in the privacy policy", () => {
   test("login attempts (emails, IPs) are kept 30 days and no longer", async () => {
     const { env, rawDb } = createTestEnv({ role: "admin" });
@@ -58,5 +75,36 @@ describe("retention windows published in the privacy policy", () => {
       { action: "api_key.request", age: 89 },
       { action: "event.updated", age: 91 },
     ]);
+  });
+
+  test("unconfirmed follow and subscription requests are kept 7 days, while verified rows are retained", async () => {
+    const { env, rawDb } = createTestEnv({ role: "admin" });
+    const band = rawDb
+      .prepare("INSERT INTO band_profiles (name, name_normalized) VALUES ('Retention Band', 'retention-band')")
+      .run();
+    expect(band.lastInsertRowid).toBeTruthy();
+    seedFollow(rawDb, "old-follow@example.test", 8);
+    seedFollow(rawDb, "recent-follow@example.test", 6);
+    seedFollow(rawDb, "verified-follow@example.test", 365, 1);
+    seedSubscription(rawDb, "old-subscription@example.test", 8);
+    seedSubscription(rawDb, "recent-subscription@example.test", 6);
+    seedSubscription(rawDb, "verified-subscription@example.test", 365, 1);
+
+    const result = await runRetentionCleanup(env);
+
+    expect(result.band_follows_deleted).toBe(1);
+    expect(result.email_subscriptions_deleted).toBe(1);
+    expect(
+      rawDb
+        .prepare("SELECT email FROM band_follows ORDER BY email")
+        .all()
+        .map((r) => r.email),
+    ).toEqual(["recent-follow@example.test", "verified-follow@example.test"]);
+    expect(
+      rawDb
+        .prepare("SELECT email FROM email_subscriptions ORDER BY email")
+        .all()
+        .map((r) => r.email),
+    ).toEqual(["recent-subscription@example.test", "verified-subscription@example.test"]);
   });
 });

@@ -7,7 +7,7 @@ import { normalizeBandName } from "../../../utils/bandName.js";
 import { escapeHtml } from "../../../utils/html.js";
 import { getPublicBaseUrl } from "../../../utils/publicUrl.js";
 import { parseJsonObjectBody } from "../../../utils/request.js";
-import { CONSENT_VERSION } from "../../../utils/consent.js";
+import { CONSENT_VERSION, pendingConfirmationLiveSql } from "../../../utils/consent.js";
 import { isDevRequest } from "../../../utils/auth.js";
 
 const MAX_EMAIL_LENGTH = 320;
@@ -70,12 +70,16 @@ export async function onRequestPost(context) {
     const unsubscribeToken = generateToken();
     const verificationToken = generateToken();
     const consentIp = request.headers.get("CF-Connecting-IP") ?? null;
-    const result = await DB.prepare(
-      `INSERT OR IGNORE INTO band_follows (email, band_profile_id, verified, verification_token, unsubscribe_token, consent_ip, consent_method, consent_version)
-       VALUES (?, ?, 0, ?, ?, ?, 'web_form', ?)`,
-    )
-      .bind(email, band.id, verificationToken, unsubscribeToken, consentIp, CONSENT_VERSION)
-      .run();
+    const [, result] = await DB.batch([
+      DB.prepare(
+        `DELETE FROM band_follows
+         WHERE email = ? AND band_profile_id = ? AND verified = 0 AND NOT (${pendingConfirmationLiveSql()})`,
+      ).bind(email, band.id),
+      DB.prepare(
+        `INSERT OR IGNORE INTO band_follows (email, band_profile_id, verified, verification_token, unsubscribe_token, consent_ip, consent_method, consent_version)
+         VALUES (?, ?, 0, ?, ?, ?, 'web_form', ?)`,
+      ).bind(email, band.id, verificationToken, unsubscribeToken, consentIp, CONSENT_VERSION),
+    ]);
 
     // changes=0 → this email already follows the band (verified or pending). Say
     // nothing further: don't leak follow state and don't re-send on every POST.

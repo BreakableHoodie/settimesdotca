@@ -13,6 +13,13 @@ export class MockD1Database {
     this.idCounter = 1;
   }
 
+  _isPendingConfirmationLive(createdAt) {
+    return (
+      Date.parse(createdAt.replace(" ", "T") + (createdAt.includes("Z") ? "" : "Z")) >=
+      Date.now() - 7 * 24 * 60 * 60 * 1000
+    );
+  }
+
   prepare(query) {
     return {
       bind: (...params) => ({
@@ -40,6 +47,13 @@ export class MockD1Database {
       if (queryLower.includes("where verification_token = ?")) {
         const [token] = params;
         results = results.filter((sub) => sub.verification_token === token);
+      }
+
+      if (
+        queryLower.includes("verified = 1 or (verified = 0") ||
+        (queryLower.includes("verified = 0") && queryLower.includes("created_at >="))
+      ) {
+        results = results.filter((sub) => sub.verified || this._isPendingConfirmationLive(sub.created_at));
       }
 
       // WHERE unsubscribe_token = ?
@@ -146,7 +160,10 @@ export class MockD1Database {
       if (queryLower.includes("where verification_token = ?")) {
         const [token] = params;
         const subscription = this.data.email_subscriptions.find(
-          (sub) => sub.verification_token === token && !sub.verified,
+          (sub) =>
+            sub.verification_token === token &&
+            !sub.verified &&
+            (!queryLower.includes("created_at >=") || this._isPendingConfirmationLive(sub.created_at)),
         );
 
         if (subscription) {
@@ -177,7 +194,11 @@ export class MockD1Database {
       const [id] = params;
       const index = this.data.email_subscriptions.findIndex((sub) => sub.id === id);
 
-      if (index !== -1) {
+      if (
+        index !== -1 &&
+        (!queryLower.includes("created_at >=") ||
+          !this._isPendingConfirmationLive(this.data.email_subscriptions[index].created_at))
+      ) {
         this.data.email_subscriptions.splice(index, 1);
         return { success: true, meta: { changes: 1 } };
       }

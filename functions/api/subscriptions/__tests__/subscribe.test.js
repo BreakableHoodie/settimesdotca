@@ -222,6 +222,31 @@ describe("POST /api/subscriptions/subscribe", () => {
     expect(mockDB.data.email_subscriptions).toHaveLength(1);
   });
 
+  it("replaces an expired pending subscription with a fresh token", async () => {
+    mockDB.data.email_subscriptions.push({
+      id: 1,
+      email: "test@example.com",
+      city: "portland",
+      genre: "punk",
+      frequency: "weekly",
+      verified: false,
+      verification_token: "expired-token",
+      unsubscribe_token: "expired-unsub",
+      created_at: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+
+    const response = await onRequestPost({
+      ...mockContext,
+      request: createMockRequest("POST", "/api/subscriptions/subscribe", VALID_SUBSCRIPTION),
+    });
+    const data = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(mockDB.data.email_subscriptions).toHaveLength(1);
+    expect(mockDB.data.email_subscriptions[0].verification_token).not.toBe("expired-token");
+    expect(data.verificationUrl).toContain(mockDB.data.email_subscriptions[0].verification_token);
+  });
+
   it("should generate unique verification and unsubscribe tokens", async () => {
     const request = createMockRequest("POST", "/api/subscriptions/subscribe", VALID_SUBSCRIPTION);
     mockContext.request = request;

@@ -21,6 +21,8 @@
 //                    give a buffer against races. Uses unixepoch() because the
 //                    column stores integer seconds, not ISO text.
 
+import { pendingConfirmationLiveSql } from "../../../utils/consent.js";
+
 export async function runRetentionCleanup(env) {
   const { DB } = env;
   const nowUnix = Math.floor(Date.now() / 1000);
@@ -36,6 +38,8 @@ export async function runRetentionCleanup(env) {
     adminAudit,
     apiKeyRequests,
     rateLimits,
+    bandFollows,
+    emailSubscriptions,
   ] = await Promise.all([
     DB.prepare("DELETE FROM lucia_sessions WHERE expires_at < ?").bind(nowUnix).run(),
     DB.prepare("DELETE FROM mfa_challenges WHERE used = 1 OR expires_at < datetime('now')").run(),
@@ -51,6 +55,8 @@ export async function runRetentionCleanup(env) {
       "DELETE FROM audit_log WHERE action = 'api_key.request' AND created_at < datetime('now', '-90 days')",
     ).run(),
     DB.prepare("DELETE FROM rate_limits WHERE updated_at < unixepoch() - 1800").run(),
+    DB.prepare(`DELETE FROM band_follows WHERE verified = 0 AND NOT (${pendingConfirmationLiveSql()})`).run(),
+    DB.prepare(`DELETE FROM email_subscriptions WHERE verified = 0 AND NOT (${pendingConfirmationLiveSql()})`).run(),
   ]);
 
   return {
@@ -64,5 +70,7 @@ export async function runRetentionCleanup(env) {
     audit_log_deleted: adminAudit.meta.changes,
     api_key_requests_deleted: apiKeyRequests.meta.changes,
     rate_limits_deleted: rateLimits.meta.changes,
+    band_follows_deleted: bandFollows.meta.changes,
+    email_subscriptions_deleted: emailSubscriptions.meta.changes,
   };
 }

@@ -28,10 +28,19 @@ function validateHeaders(headers) {
       throw new Error(`header not allowed: ${JSON.stringify(name)}`);
     }
     // Control characters (CR/LF above all) would let a value start a new header.
-    if (typeof value !== "string" || /[\x00-\x08\x0a-\x1f\x7f]/.test(value)) {
+    if (typeof value !== "string" || hasControlCharacter(value)) {
       throw new Error("headers must contain string values without control characters");
     }
   }
+}
+
+// Tab (9) is legal folding whitespace; every other C0 control and DEL is not.
+function hasControlCharacter(value) {
+  for (const char of value) {
+    const code = char.charCodeAt(0);
+    if ((code < 32 && code !== 9) || code === 127) return true;
+  }
+  return false;
 }
 
 const ALLOWED_EXTRA_HEADERS = new Set(["List-Unsubscribe", "List-Unsubscribe-Post"]);
@@ -39,8 +48,8 @@ const ALLOWED_EXTRA_HEADERS = new Set(["List-Unsubscribe", "List-Unsubscribe-Pos
 export function listUnsubscribeHeaders(url) {
   // RFC 2369 wraps each URI in <...> and separates URIs with commas, so a URL
   // carrying either would split into extra targets.
-  if (typeof url !== "string" || !/^https?:\/\/[^\s<>,]+$/.test(url)) {
-    throw new Error("List-Unsubscribe URL must be an http(s) URL without whitespace, <, > or comma");
+  if (typeof url !== "string" || !/^https?:\/\/[!-~]+$/.test(url) || /[<>,]/.test(url)) {
+    throw new Error("List-Unsubscribe URL must be a printable-ASCII http(s) URL without <, > or comma");
   }
   return {
     "List-Unsubscribe": `<${url}>`,

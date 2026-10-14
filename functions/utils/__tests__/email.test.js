@@ -182,7 +182,8 @@ describe("sendEmail — preconditions", () => {
   it.each([
     "https://settimes.ca/u?token=a>,<https://evil.example/",
     "https://settimes.ca/u?token=a b",
-    "javascript:alert(1)",
+    "ftp://settimes.ca/unfollow?token=a",
+    "https://settimes.ca/u?token=a\u0000",
     "",
   ])("listUnsubscribeHeaders refuses a URL that could split or escape the header: %s", (url) => {
     expect(() => listUnsubscribeHeaders(url)).toThrow("List-Unsubscribe URL");

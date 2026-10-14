@@ -969,7 +969,7 @@ Requires a running wrangler dev server or uses it automatically via `playwright.
 
 ### Post-deploy probes are read-only (#1292)
 
-Post-deploy probes check iCal, sitemap, and SSR identity metadata without writing; `/s/` is excluded because share links expire via cron and no fixed slug is safe to probe.
+Post-deploy probes check iCal, sitemap, and SSR identity metadata without writing; `/s/` is excluded because share links expire via cron and no fixed slug is safe to probe. They run after **production** deploys only: a `dev` deploy goes to a Pages preview, which binds no D1 (#1295), so they would fail on missing data rather than on a broken release.
 
 ### Testing Safari/WebKit locally — `upgrade-insecure-requests` breaks it, silently
 

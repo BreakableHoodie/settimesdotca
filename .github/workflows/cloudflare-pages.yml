@@ -435,17 +435,21 @@ jobs:
           EOF
 
       - name: Checkout repository for read-surface probes
+        # Production only: previews bind no D1 (#1295), so these probes would fail on data, not code.
+        if: needs.resolve-release.outputs.environment_name == 'production'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
           persist-credentials: false
 
       - name: Set up Node.js for read-surface probes
+        if: needs.resolve-release.outputs.environment_name == 'production'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Verify read surfaces (iCal, sitemap, SSR meta)
+        if: needs.resolve-release.outputs.environment_name == 'production'
         env:
           SMOKE_URL: ${{ needs.resolve-release.outputs.smoke_url }}
         run: node scripts/smoke-probes.mjs "$SMOKE_URL"

@@ -980,6 +980,7 @@ Node and local `wrangler` do not enforce the Workers runtime's limits, which is 
 - **Plain-text vars live in `wrangler.toml` (`[env.preview.vars]`), never the dashboard.** A deploy with that file replaces the dashboard's plain-text vars and keeps only secrets; the first run lost all three that way. Secrets stay in the dashboard. Production is unaffected only because every production var is a secret.
 - **Production code paths:** previews set `ENVIRONMENT=preview`, which `isDevRequest` treats as production (secure cookies, real CSRF). They use Cloudflare's always-pass Turnstile test keys and no email provider.
 - **Origin:** tests hit the branch alias `edge-e2e.longweekend-bandcrawl.pages.dev`, because the middleware's Origin allowlist needs a stable origin. The preview env's `CORS_ALLOWED_ORIGINS` names exactly that alias.
+- **Rate limits are production's** (5 logins per minute per IP), so the run is two phases with no retries: user management on one stored session, then `login.spec` after the window clears.
 - **Queueing and teardown:** one shared database, so runs queue (`cancel-in-progress: false`). Every run deletes its deployment, and a failed delete fails the job, so stale previews (#1295) cannot pile up.
 - **Not run** for fork or Dependabot PRs, which get no secrets. The job says so; it never passes silently.
 

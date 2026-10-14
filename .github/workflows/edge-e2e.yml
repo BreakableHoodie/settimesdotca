@@ -131,16 +131,31 @@ jobs:
           echo "::error::Preview did not return HTTP 200 within 150 seconds: $PREVIEW_URL"
           exit 1
 
-      - name: Run auth and user-management E2E on the edge
+      # Previews run PRODUCTION rate limits: 5 logins per minute per IP
+      # (functions/utils/rateLimit.js). login.spec logs in again, which
+      # invalidates the setup session by design, so running it alongside
+      # user-management turned every test into a fresh login and hit the limit.
+      # Phase 1 shares one stored session; phase 2 runs after the window clears.
+      # --retries=0: each retry is another login against the same budget, and a
+      # retry would hide an edge-only flake, which is what this job exists to see.
+      - name: "E2E on the edge, phase 1: user management (hashPassword on the edge)"
         env:
           CI: "true"
           PLAYWRIGHT_BASE_URL: ${{ env.PREVIEW_URL }}
           E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
           E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
-        # user-management creates users, which runs hashPassword ON THE EDGE.
-        run: >-
-          npx playwright test --project=setup --project=chromium-unauth --project=chromium
-          e2e/auth.setup.js e2e/login.spec.js e2e/user-management.spec.js
+        run: npx playwright test --retries=0 --project=setup --project=chromium e2e/auth.setup.js e2e/user-management.spec.js
+
+      - name: "E2E on the edge, phase 2: login"
+        if: success() || failure()
+        env:
+          CI: "true"
+          PLAYWRIGHT_BASE_URL: ${{ env.PREVIEW_URL }}
+          E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+          E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+        run: |
+          sleep 65  # let the 60-second login window from phase 1 expire
+          npx playwright test --retries=0 --project=chromium-unauth e2e/login.spec.js --output=test-results/phase2
 
       - name: Upload Playwright failure artifacts
         if: failure()

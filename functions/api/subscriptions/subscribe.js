@@ -9,6 +9,7 @@ import { escapeHtml } from "../../utils/html.js";
 import { getPublicBaseUrl } from "../../utils/publicUrl.js";
 import { parseJsonObjectBody } from "../../utils/request.js";
 import { CONSENT_VERSION } from "../../utils/consent.js";
+import { isDevRequest } from "../../utils/auth.js";
 
 const FREQUENCY_OPTIONS = new Set(["daily", "weekly", "monthly"]);
 const MAX_EMAIL_LENGTH = 320;
@@ -18,9 +19,9 @@ const MAX_FREQUENCY_LENGTH = 20;
 
 // Build a JSON Response, merging an optional verificationUrl when email
 // delivery was skipped so local/dev environments can verify without email.
-function subscriptionResponse(body, status, emailResult) {
+function subscriptionResponse(body, status, emailResult, request, env) {
   const payload =
-    !emailResult.delivered && emailResult.reason === "not_configured"
+    !emailResult.delivered && emailResult.reason === "not_configured" && isDevRequest(request, env)
       ? { ...body, verificationUrl: emailResult.verifyUrl }
       : body;
   return new Response(JSON.stringify(payload), {
@@ -113,6 +114,8 @@ export async function onRequestPost(context) {
             },
             200,
             emailResult,
+            request,
+            env,
           );
         }
 
@@ -160,6 +163,8 @@ export async function onRequestPost(context) {
         },
         201,
         emailResult,
+        request,
+        env,
       );
     }
 

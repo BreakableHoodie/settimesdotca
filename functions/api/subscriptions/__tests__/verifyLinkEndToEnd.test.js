@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { onRequestPost as subscribe } from "../subscribe.js";
-import { onRequestGet as verify } from "../verify.js";
+import { onRequestPost as verify } from "../verify.js";
 import { MockD1Database } from "./mocks/d1.js";
 import { createMockContext, createMockRequest, VALID_SUBSCRIPTION } from "./helpers.js";
 
@@ -36,10 +36,14 @@ describe("the emailed verification link reaches the verify handler", () => {
     const { verificationUrl } = await (await subscribe(context)).json();
     expect(mockDB.data.email_subscriptions[0].verified).toBe(false);
 
-    context.request = new Request(verificationUrl);
+    context.request = new Request(verificationUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ token: new URL(verificationUrl).searchParams.get("token") }),
+    });
     const response = await verify(context);
 
-    expect(response.status).toBe(302);
+    expect(response.status).toBe(303);
     expect(new URL(response.headers.get("Location")).pathname).toBe("/subscribe");
     expect(new URL(response.headers.get("Location")).searchParams.get("verified")).toBe("true");
     expect(mockDB.data.email_subscriptions[0].verified).toBe(true);

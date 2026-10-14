@@ -1,29 +1,36 @@
-// GET /api/bands/:name/confirm-follow?token=...
-// Confirms a pending (double opt-in) band follow: sets verified=1 and clears the
-// one-time verification token. Only verified follows receive announcement emails
-// (see admin/bands/[id].js + resend-announcement.js). Returns a friendly HTML
-// page; messaging is generic to avoid leaking whether a given token was valid.
+// GET /api/bands/:name/confirm-follow?token=... renders the confirmation page.
+// POST confirms the pending double opt-in band follow.
 
 import { escapeHtml } from "../../../utils/html.js";
-
-const htmlPage = (heading, body) =>
-  new Response(
-    `<html><head><meta charset="utf-8"></head><body style="font-family:sans-serif;padding:2rem"><h2>${heading}</h2><p>${body}</p></body></html>`,
-    {
-      status: 200,
-      headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
-    },
-  );
+import { emailActionPage, emailResultPage, readEmailActionToken } from "../../../utils/emailActionPage.js";
 
 export async function onRequestGet(context) {
+  const { request } = context;
+  const token = await readEmailActionToken(request);
+  if (!token) {
+    return new Response("Invalid token.", {
+      status: 400,
+      headers: { "Content-Type": "text/plain" },
+    });
+  }
+
+  return emailActionPage({
+    action: new URL(request.url).pathname,
+    token,
+    heading: "Confirm your follow",
+    message: "Click the button below to confirm your follow.",
+    buttonLabel: "Confirm my follow",
+  });
+}
+
+export async function onRequestPost(context) {
   const { request, env } = context;
   const { DB } = env;
 
   try {
-    const url = new URL(request.url);
-    const token = url.searchParams.get("token");
+    const token = await readEmailActionToken(request);
 
-    if (!token || token.length > 256) {
+    if (!token) {
       return new Response("Invalid token.", {
         status: 400,
         headers: { "Content-Type": "text/plain" },
@@ -42,9 +49,9 @@ export async function onRequestGet(context) {
 
     if (!row) {
       // Token invalid, already used, or expired — keep it generic.
-      return htmlPage(
-        "Link expired",
-        "This confirmation link is invalid or has already been used. If you already confirmed, you're all set.",
+      return emailResultPage(
+        `Link expired`,
+        `This confirmation link is invalid or has already been used. If you already confirmed, you're all set.`,
       );
     }
 
@@ -56,9 +63,9 @@ export async function onRequestGet(context) {
       .bind(row.id)
       .run();
 
-    return htmlPage(
-      `You're following ${escapeHtml(row.band_name)}`,
-      "We'll email you when they join a lineup. You can unsubscribe anytime from those emails.",
+    return emailResultPage(
+      `You&apos;re following ${escapeHtml(row.band_name)}`,
+      `We'll email you when they join a lineup. You can unsubscribe anytime from those emails.`,
     );
   } catch (err) {
     console.error("[band-confirm-follow] Error:", err);

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createTestEnv, insertBand, insertEvent } from "../../test-utils";
 import * as followBatchHandler from "../follow-batch.js";
 import * as confirmBatchHandler from "../confirm-follow-batch.js";
@@ -90,6 +90,28 @@ describe("POST /api/bands/follow-batch", () => {
     expect(data.success).toBe(true);
     // Dev env: email not configured → confirmUrl included
     expect(data.confirmUrl).toMatch(/\/api\/bands\/confirm-follow-batch\?token=/);
+  });
+
+  it("does not echo a confirm URL when email is unconfigured in production", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.ENVIRONMENT = "production";
+    env.TURNSTILE_SECRET_KEY = "test-secret";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true }))));
+    const ev = insertEvent(rawDb, { name: "Vol17", slug: "vol17-confirmurl-prod", status: "published" });
+    const band = insertBand(rawDb, { name: "Production Batch Band", event_id: ev.id });
+    const req = new Request("https://example.test/api/bands/follow-batch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "prod-batch@example.com",
+        performance_ids: [band.id],
+        turnstileToken: "test-token",
+      }),
+    });
+
+    const data = await (await followBatchHandler.onRequestPost({ request: req, env, waitUntil })).json();
+    expect(data.confirmUrl).toBeUndefined();
+    vi.unstubAllGlobals();
   });
 
   it("is idempotent — re-submitting the same email returns 200 with no duplicate rows", async () => {
@@ -247,8 +269,8 @@ describe("POST /api/bands/follow-batch", () => {
   });
 });
 
-describe("GET /api/bands/confirm-follow-batch", () => {
-  it("verifies all pending follows in the batch and clears batch_token", async () => {
+describe("/api/bands/confirm-follow-batch", () => {
+  it("GET renders a confirmation form without changing rows, then POST confirms the batch", async () => {
     const { env, rawDb } = createTestEnv();
     const ev = insertEvent(rawDb, { name: "Vol17", slug: "vol17-confirm-batch", status: "published" });
     const b1 = insertBand(rawDb, { name: "Confirm A", event_id: ev.id });
@@ -278,15 +300,32 @@ describe("GET /api/bands/confirm-follow-batch", () => {
     const pending = rawDb.prepare("SELECT verified FROM band_follows WHERE email = ?").all("confirmbatch@example.com");
     expect(pending.every((r) => r.verified === 0)).toBe(true);
 
-    // Confirm the batch
+    // A scanner GET must not confirm the batch.
     const confirmReq = new Request(`https://example.test/api/bands/confirm-follow-batch?token=${batchToken}`);
-    const confirmRes = await confirmBatchHandler.onRequestGet({
+    const getRes = await confirmBatchHandler.onRequestGet({
       request: confirmReq,
       env,
     });
+    expect(getRes.status).toBe(200);
+    const html = await getRes.text();
+    expect(html).toMatch(/confirm your lineup/i);
+    expect(html).toContain('method="post"');
+    expect(
+      rawDb
+        .prepare("SELECT verified FROM band_follows WHERE email = ?")
+        .all("confirmbatch@example.com")
+        .every((r) => r.verified === 0),
+    ).toBe(true);
+
+    const confirmRes = await confirmBatchHandler.onRequestPost({
+      request: new Request(confirmReq, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ token: batchToken }),
+      }),
+      env,
+    });
     expect(confirmRes.status).toBe(200);
-    const html = await confirmRes.text();
-    expect(html).toMatch(/you're all set/i);
 
     // All rows now verified=1, batch_token cleared
     const confirmed = rawDb
@@ -310,8 +349,11 @@ describe("GET /api/bands/confirm-follow-batch", () => {
       )
       .run("old@example.com", band.band_profile_id, "reused-batch-token", "2026-01-01 00:00:00", "old-unsub");
 
-    const res = await confirmBatchHandler.onRequestGet({
-      request: new Request("https://example.test/api/bands/confirm-follow-batch?token=reused-batch-token"),
+    const res = await confirmBatchHandler.onRequestPost({
+      request: new Request("https://example.test/api/bands/confirm-follow-batch?token=reused-batch-token", {
+        method: "POST",
+        body: new URLSearchParams({ token: "reused-batch-token" }),
+      }),
       env,
     });
 
@@ -343,8 +385,14 @@ describe("GET /api/bands/confirm-follow-batch", () => {
 
     const makeConfirmReq = () => new Request(`https://example.test/api/bands/confirm-follow-batch?token=${batchToken}`);
 
-    const first = await confirmBatchHandler.onRequestGet({ request: makeConfirmReq(), env });
-    const second = await confirmBatchHandler.onRequestGet({ request: makeConfirmReq(), env });
+    const first = await confirmBatchHandler.onRequestPost({
+      request: new Request(makeConfirmReq(), { method: "POST", body: new URLSearchParams({ token: batchToken }) }),
+      env,
+    });
+    const second = await confirmBatchHandler.onRequestPost({
+      request: new Request(makeConfirmReq(), { method: "POST", body: new URLSearchParams({ token: batchToken }) }),
+      env,
+    });
 
     expect(first.status).toBe(200);
     expect(second.status).toBe(200);
@@ -376,7 +424,25 @@ describe("GET /api/bands/confirm-follow-batch", () => {
     // Unknown token: changes=0, but we still show the success page (generic/no-enumeration)
     expect(res.status).toBe(200);
     const html = await res.text();
-    expect(html).toMatch(/you're all set/i);
+    expect(html).toMatch(/confirm your lineup/i);
+  });
+
+  // The button is a deliberate press now (#1291), so a POST that confirmed
+  // nothing must not claim success. Same generic wording as the single route.
+  it("POST with an unknown token does not claim the follows were confirmed", async () => {
+    const { env } = createTestEnv();
+    const res = await confirmBatchHandler.onRequestPost({
+      request: new Request("https://example.test/api/bands/confirm-follow-batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ token: "nonexistent-batch-token" }),
+      }),
+      env,
+    });
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).not.toMatch(/all set!/i);
+    expect(html).toMatch(/invalid or has already been used/i);
   });
 });
 

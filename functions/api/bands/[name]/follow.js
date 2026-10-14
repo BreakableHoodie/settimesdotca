@@ -8,6 +8,7 @@ import { escapeHtml } from "../../../utils/html.js";
 import { getPublicBaseUrl } from "../../../utils/publicUrl.js";
 import { parseJsonObjectBody } from "../../../utils/request.js";
 import { CONSENT_VERSION } from "../../../utils/consent.js";
+import { isDevRequest } from "../../../utils/auth.js";
 
 const MAX_EMAIL_LENGTH = 320;
 
@@ -106,7 +107,7 @@ export async function onRequestPost(context) {
     // so the follow can still be verified — mirrors the subscriptions endpoint.
     // In production email IS configured, so the token is never returned here.
     const responseBody = { success: true };
-    if (isNewFollow && !isEmailConfigured(env)) {
+    if (isNewFollow && !isEmailConfigured(env) && isDevRequest(request, env)) {
       responseBody.confirmUrl = confirmUrl;
     }
 

@@ -2,11 +2,24 @@
 // GET /api/subscriptions/unsubscribe?token=xxx
 
 import { escapeHtml } from "../../utils/html.js";
+import { emailActionPage, readEmailActionToken } from "../../utils/emailActionPage.js";
 
 export async function onRequestGet(context) {
+  const { request } = context;
+  const token = await readEmailActionToken(request);
+  if (!token) return new Response("Missing unsubscribe token", { status: 400 });
+  return emailActionPage({
+    action: new URL(request.url).pathname,
+    token,
+    heading: "Unsubscribe",
+    message: "Click the button below to stop receiving SetTimes show announcements.",
+    buttonLabel: "Unsubscribe",
+  });
+}
+
+export async function onRequestPost(context) {
   const { request, env } = context;
-  const url = new URL(request.url);
-  const token = url.searchParams.get("token");
+  const token = await readEmailActionToken(request);
 
   if (!token) {
     return new Response("Missing unsubscribe token", { status: 400 });
@@ -93,7 +106,11 @@ export async function onRequestGet(context) {
       </html>
     `,
       {
-        headers: { "Content-Type": "text/html; charset=utf-8" },
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-store",
+          "X-Robots-Tag": "noindex",
+        },
       },
     );
   } catch (error) {

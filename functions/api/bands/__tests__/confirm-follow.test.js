@@ -5,8 +5,8 @@ import * as confirmHandler from "../[name]/confirm-follow.js";
 
 const waitUntil = () => {};
 
-describe("GET /api/bands/:name/confirm-follow", () => {
-  it("verifies a pending follow and clears the one-time token", async () => {
+describe("/api/bands/:name/confirm-follow", () => {
+  it("GET renders a confirmation form without changing the pending follow, then POST confirms it", async () => {
     const { env, rawDb } = createTestEnv();
     const ev = insertEvent(rawDb, { name: "Vol6", slug: "vol6-confirm" });
     const band = insertBand(rawDb, { name: "Confirm Band", event_id: ev.id });
@@ -32,12 +32,25 @@ describe("GET /api/bands/:name/confirm-follow", () => {
     expect(pending.verified).toBe(0);
     expect(pending.verification_token).toBeTruthy();
 
-    // Confirm via the verification token.
+    // A scanner GET must not confirm the follow.
     const confirmReq = new Request(
       `https://example.test/api/bands/${band.band_profile_id}/confirm-follow?token=${pending.verification_token}`,
     );
-    const res = await confirmHandler.onRequestGet({
+    const getRes = await confirmHandler.onRequestGet({
       request: confirmReq,
+      env,
+      params: { name: String(band.band_profile_id) },
+    });
+    expect(getRes.status).toBe(200);
+    expect(await getRes.text()).toContain('method="post"');
+    expect(rawDb.prepare("SELECT verified FROM band_follows WHERE email=?").get("fan@example.com").verified).toBe(0);
+
+    const res = await confirmHandler.onRequestPost({
+      request: new Request(confirmReq, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ token: pending.verification_token }),
+      }),
       env,
       params: { name: String(band.band_profile_id) },
     });
@@ -76,8 +89,16 @@ describe("GET /api/bands/:name/confirm-follow", () => {
 
     const url = `https://example.test/api/bands/${band.band_profile_id}/confirm-follow?token=${token}`;
     const params = { name: String(band.band_profile_id) };
-    const first = await confirmHandler.onRequestGet({ request: new Request(url), env, params });
-    const second = await confirmHandler.onRequestGet({ request: new Request(url), env, params });
+    const first = await confirmHandler.onRequestPost({
+      request: new Request(url, { method: "POST", body: new URLSearchParams({ token }) }),
+      env,
+      params,
+    });
+    const second = await confirmHandler.onRequestPost({
+      request: new Request(url, { method: "POST", body: new URLSearchParams({ token }) }),
+      env,
+      params,
+    });
 
     expect(first.status).toBe(200);
     expect(second.status).toBe(200); // generic "link expired" page, still verified=1

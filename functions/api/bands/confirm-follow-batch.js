@@ -1,5 +1,5 @@
-// GET /api/bands/confirm-follow-batch?token=<batch_token>
-// Confirms all pending (verified=0) band follows that share the given batch_token.
+// GET /api/bands/confirm-follow-batch?token=<batch_token> renders the page.
+// POST confirms all pending (verified=0) band follows that share the token.
 //
 // The batch_token is shared across every band_follows row created by a single
 // POST /api/bands/follow-batch request. One click here verifies all of them.
@@ -9,24 +9,31 @@
 // page without any error. Messaging is generic to avoid revealing whether a given
 // token was valid (no enumeration).
 
-const htmlPage = (heading, body) =>
-  new Response(
-    `<html><head><meta charset="utf-8"></head><body style="font-family:sans-serif;padding:2rem"><h2>${heading}</h2><p>${body}</p></body></html>`,
-    {
-      status: 200,
-      headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
-    },
-  );
+import { emailActionPage, emailResultPage, readEmailActionToken } from "../../utils/emailActionPage.js";
 
 export async function onRequestGet(context) {
+  const { request } = context;
+  const token = await readEmailActionToken(request);
+  if (!token) {
+    return new Response("Invalid token.", { status: 400, headers: { "Content-Type": "text/plain" } });
+  }
+  return emailActionPage({
+    action: new URL(request.url).pathname,
+    token,
+    heading: "Confirm your lineup",
+    message: "Click the button below to confirm your follows.",
+    buttonLabel: "Confirm my follow",
+  });
+}
+
+export async function onRequestPost(context) {
   const { request, env } = context;
   const { DB } = env;
 
   try {
-    const url = new URL(request.url);
-    const token = url.searchParams.get("token");
+    const token = await readEmailActionToken(request);
 
-    if (!token || token.length > 256) {
+    if (!token) {
       return new Response("Invalid token.", {
         status: 400,
         headers: { "Content-Type": "text/plain" },
@@ -34,9 +41,11 @@ export async function onRequestGet(context) {
     }
 
     // Verify all pending follows in this batch and clear the shared token in one
-    // statement. Idempotent: on a second click the batch_token is already NULL so
-    // no rows match, changes=0, and the fan still sees the success page.
-    await DB.prepare(
+    // statement. A second click finds batch_token already NULL, so no rows match.
+    // changes=0 gets the same generic page as an unknown token: now that this
+    // runs on a deliberate button press, "You're all set" for a token that
+    // confirmed nothing would be a false success.
+    const result = await DB.prepare(
       `UPDATE band_follows
        SET verified = 1, confirmed_at = datetime('now'), verification_token = NULL, batch_token = NULL
        WHERE batch_token = ? AND verified = 0`,
@@ -44,9 +53,16 @@ export async function onRequestGet(context) {
       .bind(token)
       .run();
 
-    return htmlPage(
-      "You're all set!",
-      "We'll email you when your bands join a lineup. You can unsubscribe anytime from those emails.",
+    if (!result?.meta?.changes) {
+      return emailResultPage(
+        "Link expired",
+        "This confirmation link is invalid or has already been used. If you already confirmed, you&apos;re all set.",
+      );
+    }
+
+    return emailResultPage(
+      `You&apos;re all set!`,
+      `We'll email you when your bands join a lineup. You can unsubscribe anytime from those emails.`,
     );
   } catch (err) {
     console.error("[band-confirm-follow-batch] Error:", err);

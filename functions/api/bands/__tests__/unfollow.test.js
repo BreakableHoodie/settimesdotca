@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { createTestEnv, insertBand, insertEvent } from "../../test-utils";
-import { onRequestGet } from "../[name]/unfollow.js";
+import { onRequestGet, onRequestPost } from "../[name]/unfollow.js";
 
-describe("GET /api/bands/:name/unfollow", () => {
-  it("deletes the follow row for a valid token and names the band in the response", async () => {
+describe("/api/bands/:name/unfollow", () => {
+  it("GET renders a form without deleting the follow, then POST deletes it", async () => {
     const { env, rawDb } = createTestEnv();
     const ev = insertEvent(rawDb, { name: "Vol6", slug: "vol6-unfollow" });
     const band = insertBand(rawDb, { name: "Witchrot", event_id: ev.id });
@@ -11,8 +11,20 @@ describe("GET /api/bands/:name/unfollow", () => {
       .prepare("INSERT INTO band_follows (email, band_profile_id, unsubscribe_token) VALUES (?, ?, ?)")
       .run("fan@example.com", band.band_profile_id, "valid-token-abc");
 
-    const res = await onRequestGet({
+    const getRes = await onRequestGet({
       request: new Request("https://example.test/api/bands/1/unfollow?token=valid-token-abc"),
+      env,
+    });
+    expect(getRes.status).toBe(200);
+    expect(await getRes.text()).toContain('method="post"');
+    expect(rawDb.prepare("SELECT * FROM band_follows WHERE unsubscribe_token=?").get("valid-token-abc")).toBeTruthy();
+
+    const res = await onRequestPost({
+      request: new Request("https://example.test/api/bands/1/unfollow?token=valid-token-abc", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ token: "valid-token-abc" }),
+      }),
       env,
     });
 
@@ -25,6 +37,29 @@ describe("GET /api/bands/:name/unfollow", () => {
 
     const row = rawDb.prepare("SELECT * FROM band_follows WHERE unsubscribe_token=?").get("valid-token-abc");
     expect(row).toBeUndefined();
+  });
+
+  it("POST supports RFC 8058 query-string token fallback", async () => {
+    const { env, rawDb } = createTestEnv();
+    const ev = insertEvent(rawDb, { name: "Vol6", slug: "vol6-unfollow-one-click" });
+    const band = insertBand(rawDb, { name: "One Click Band", event_id: ev.id });
+    rawDb
+      .prepare("INSERT INTO band_follows (email, band_profile_id, unsubscribe_token) VALUES (?, ?, ?)")
+      .run("fan@example.com", band.band_profile_id, "one-click-token");
+
+    const res = await onRequestPost({
+      request: new Request("https://example.test/api/bands/1/unfollow?token=one-click-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: "List-Unsubscribe=One-Click",
+      }),
+      env,
+    });
+
+    expect(res.status).toBe(200);
+    expect(
+      rawDb.prepare("SELECT * FROM band_follows WHERE unsubscribe_token=?").get("one-click-token"),
+    ).toBeUndefined();
   });
 
   it("returns 200 even when the token does not exist (avoids enumeration)", async () => {

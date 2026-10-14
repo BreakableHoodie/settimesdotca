@@ -752,10 +752,9 @@ paths:
         - Public
       summary: Confirm a pending band follow
       description: |
-        Verifies a double opt-in band follow via its one-time `token` and
-        renders a friendly HTML page. Idempotent: a second click changes
-        nothing. Messaging is generic so the response never reveals whether a
-        given token was valid.
+        Renders a confirmation form for the one-time `token`. GET never writes;
+        submit the form with POST to verify the follow. Messaging is generic so
+        the response never reveals whether a given token was valid.
       parameters:
         - name: name
           in: path
@@ -771,23 +770,39 @@ paths:
             type: string
       responses:
         "200":
-          description: HTML confirmation page (valid, already-used, or expired)
+          description: HTML confirmation page with one button that POSTs the token back. Writes nothing and does not look the token up.
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Missing token, or token longer than 256 characters
+          content:
+            text/plain:
+              schema:
+                type: string
+    post:
+      tags:
+        - Public
+      summary: Confirm a pending band follow
+      description: Confirms the token submitted by the confirmation form.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/EmailActionTokenRequest"
+      responses:
+        "200":
+          description: HTML confirmation result
           content:
             text/html:
               schema:
                 type: string
         "400":
           description: Missing or malformed token
-          content:
-            text/plain:
-              schema:
-                type: string
         "500":
-          description: Server error
-          content:
-            text/plain:
-              schema:
-                type: string
+          $ref: "#/components/responses/ServerError"
 
   /api/bands/{name}/unfollow:
     get:
@@ -795,9 +810,9 @@ paths:
         - Public
       summary: Unsubscribe from a band's emails
       description: |
-        Deletes the band follow tied to the `token` (the unsubscribe token from
-        an email footer) and renders an HTML confirmation page. Returns `200`
-        whether or not the token existed (no enumeration).
+        Renders an unsubscribe form for the `token` from an email footer. GET
+        never writes; submit the form with POST to delete the follow. The POST
+        returns `200` whether or not the token existed (no enumeration).
       parameters:
         - name: name
           in: path
@@ -813,23 +828,38 @@ paths:
             type: string
       responses:
         "200":
-          description: HTML unsubscribe confirmation page
+          description: HTML unfollow page with one button that POSTs the token back. Writes nothing and does not look the token up.
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Missing token, or token longer than 256 characters
+          content:
+            text/plain:
+              schema:
+                type: string
+    post:
+      tags:
+        - Public
+      summary: Unfollow a band
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/EmailActionTokenRequest"
+      responses:
+        "200":
+          description: HTML unsubscribe result
           content:
             text/html:
               schema:
                 type: string
         "400":
           description: Missing or malformed token
-          content:
-            text/plain:
-              schema:
-                type: string
         "500":
-          description: Server error
-          content:
-            text/plain:
-              schema:
-                type: string
+          $ref: "#/components/responses/ServerError"
 
   /api/bands/follow-batch:
     post:
@@ -876,11 +906,10 @@ paths:
         - Public
       summary: Confirm a pending batch band follow
       description: |
-        Verifies all pending (`verified=0`) `band_follows` rows that share the
-        given `batch_token`, setting `verified=1` and clearing the token in one
-        statement. Idempotent: a second click finds no matching rows (token is
-        `NULL` after the first confirm) and returns the same success page.
-        Messaging is generic to avoid revealing whether the token was valid.
+        Renders a confirmation form for the shared `batch_token`. GET never
+        writes; POST verifies all pending (`verified=0`) rows sharing the token,
+        setting `verified=1` and clearing it in one statement. Messaging is
+        generic to avoid revealing whether the token was valid.
       parameters:
         - name: token
           in: query
@@ -891,23 +920,38 @@ paths:
             maxLength: 256
       responses:
         "200":
-          description: HTML confirmation page (success or already-confirmed)
+          description: HTML confirmation page with one button that POSTs the token back. Writes nothing and does not look the token up.
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Missing token, or token longer than 256 characters
+          content:
+            text/plain:
+              schema:
+                type: string
+    post:
+      tags:
+        - Public
+      summary: Confirm a pending batch band follow
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/EmailActionTokenRequest"
+      responses:
+        "200":
+          description: HTML confirmation result
           content:
             text/html:
               schema:
                 type: string
         "400":
           description: Missing or oversized token
-          content:
-            text/plain:
-              schema:
-                type: string
         "500":
-          description: Server error
-          content:
-            text/plain:
-              schema:
-                type: string
+          $ref: "#/components/responses/ServerError"
 
   /api/feeds/ical:
     get:
@@ -1098,39 +1142,7 @@ paths:
       tags:
         - Public - Subscriptions
       summary: Verify a subscription token
-      parameters:
-        - name: token
-          in: query
-          required: true
-          schema:
-            type: string
-      responses:
-        "302":
-          description: Verification succeeded and the client is redirected to the subscribe page
-        "400":
-          description: Invalid or expired token
-          content:
-            text/plain:
-              schema:
-                type: string
-        "404":
-          description: Token not found
-          content:
-            text/plain:
-              schema:
-                type: string
-        "500":
-          description: Verification failed
-          content:
-            text/plain:
-              schema:
-                type: string
-
-  /api/subscriptions/unsubscribe:
-    get:
-      tags:
-        - Public - Subscriptions
-      summary: Unsubscribe from email updates
+      description: GET renders a confirmation form; POST verifies the subscription.
       parameters:
         - name: token
           in: query
@@ -1139,29 +1151,91 @@ paths:
             type: string
       responses:
         "200":
-          description: HTML unsubscribe confirmation page
+          description: HTML verification page with one button that POSTs the token back. Writes nothing and does not look the token up.
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Missing token, or token longer than 256 characters
+          content:
+            text/plain:
+              schema:
+                type: string
+    post:
+      tags:
+        - Public - Subscriptions
+      summary: Verify a subscription token
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/EmailActionTokenRequest"
+      responses:
+        "200":
+          description: Subscription was already verified; nothing changed
+          content:
+            text/plain:
+              schema:
+                type: string
+        "303":
+          description: Verification succeeded and the client is redirected to the subscribe page
+        "400":
+          description: Missing or malformed token
+        "404":
+          description: Token not found
+        "500":
+          description: Verification failed
+
+  /api/subscriptions/unsubscribe:
+    get:
+      tags:
+        - Public - Subscriptions
+      summary: Unsubscribe from email updates
+      description: GET renders a confirmation form; POST performs the unsubscribe.
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: HTML unsubscribe page with one button that POSTs the token back. Writes nothing and does not look the token up.
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Missing token, or token longer than 256 characters
+          content:
+            text/plain:
+              schema:
+                type: string
+    post:
+      tags:
+        - Public - Subscriptions
+      summary: Unsubscribe from email updates
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/EmailActionTokenRequest"
+      responses:
+        "200":
+          description: HTML unsubscribe result
           content:
             text/html:
               schema:
                 type: string
         "400":
           description: Missing token
-          content:
-            text/plain:
-              schema:
-                type: string
         "404":
           description: Unknown token
-          content:
-            text/plain:
-              schema:
-                type: string
         "500":
           description: Unsubscribe failed
-          content:
-            text/plain:
-              schema:
-                type: string
 
   /api/auth/activate:
     post:
@@ -3647,7 +3721,7 @@ components:
         presented_by_url:
           type: string
           format: uri
-          pattern: '^[Hh][Tt][Tt][Pp][Ss]?://'
+          pattern: "^[Hh][Tt][Tt][Pp][Ss]?://"
           nullable: true
           maxLength: 500
           description: >-
@@ -4028,7 +4102,7 @@ components:
         presented_by_url:
           type: string
           format: uri
-          pattern: '^[Hh][Tt][Tt][Pp][Ss]?://'
+          pattern: "^[Hh][Tt][Tt][Pp][Ss]?://"
           nullable: true
           maxLength: 500
           description: >-
@@ -4098,7 +4172,7 @@ components:
         presented_by_url:
           type: string
           format: uri
-          pattern: '^[Hh][Tt][Tt][Pp][Ss]?://'
+          pattern: "^[Hh][Tt][Tt][Pp][Ss]?://"
           nullable: true
           maxLength: 500
           description: >-
@@ -4331,6 +4405,15 @@ components:
         turnstileToken:
           type: string
           description: Cloudflare Turnstile token; required in production
+
+    EmailActionTokenRequest:
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          type: string
+          maxLength: 256
 
     BandFollowResponse:
       type: object

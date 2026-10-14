@@ -195,6 +195,14 @@ function findViolations(source) {
       visit(node.object);
       return;
     }
+    // Destructuring renames are aliasing too: `const { fetch: f } = globalThis`.
+    if (node.type === "ObjectPattern") {
+      for (const p of node.properties) {
+        if (p.type !== "Property") continue;
+        if (isNamed(p.key, NETWORK_GLOBALS)) violations.push(`destructured ${source.slice(p.key.start, p.key.end)}`);
+        else if (p.computed && p.key.type !== "Literal") violations.push("destructuring with a computed key");
+      }
+    }
     if ((node.type === "Property" || node.type === "MethodDefinition") && !node.computed) {
       visit(node.value);
       return;
@@ -248,6 +256,9 @@ describe("server requests go only to addresses fixed in code (SSRF guard)", () =
     expect(flagged('await globalThis["fetch"](body.url);')).toBe(true);
     expect(flagged("await env.OTHER[`fetch`](req);")).toBe(true);
     expect(flagged("const outbound = globalThis.fetch;\nawait outbound(body.url);")).toBe(true);
+    expect(flagged("const { fetch: outbound } = globalThis;\nawait outbound(body.url);")).toBe(true);
+    expect(flagged("const { WebSocket: WS } = globalThis;\nnew WS(body.url);")).toBe(true);
+    expect(flagged("const { [body.key]: f } = globalThis;\nawait f(body.url);")).toBe(true);
     expect(flagged("await globalThis[body.method](body.url);")).toBe(true);
     expect(flagged("const ws = new WebSocket(body.url);")).toBe(true);
     expect(flagged('await import("cloudflare:sockets");')).toBe(true);

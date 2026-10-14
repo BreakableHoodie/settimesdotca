@@ -281,11 +281,17 @@ export function createDBEnv(db) {
   };
 }
 
-export function createTestEnv({ role = "editor" } = {}) {
+// mfaEnrolled: admins and editors must have 2FA to use the admin area (#1253),
+// so by default their test user is enrolled, as every real one will be. Pass
+// `mfaEnrolled: false` to test enrolment itself or the MFA_SETUP_REQUIRED gate.
+export function createTestEnv({ role = "editor", mfaEnrolled = role === "admin" || role === "editor" } = {}) {
   const rawDb = createTestDB();
 
   // Create a valid session for the test user
   const userId = role === "admin" ? 1 : role === "editor" ? 2 : 3;
+  if (mfaEnrolled) {
+    rawDb.prepare("UPDATE users SET totp_enabled = 1 WHERE id = ?").run(userId);
+  }
   const sessionId = crypto.randomUUID();
   const expiresAt = Math.floor(Date.now() / 1000) + 24 * 60 * 60;
 

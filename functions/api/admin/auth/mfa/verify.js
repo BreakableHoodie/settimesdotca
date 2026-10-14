@@ -9,6 +9,7 @@ import { initializeLucia } from "../../../../utils/auth.js";
 import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../../utils/authAttempts.js";
 import { loadTotpSecret } from "../../../../utils/mfaSecrets.js";
 import { createTrustedDevice, createTrustedDeviceCookie } from "../../../../utils/trustedDevice.js";
+import { mfaRequiredForRole } from "../../../../utils/mfaPolicy.js";
 
 function parseBackupCodes(raw) {
   if (!raw) return [];
@@ -350,6 +351,8 @@ export async function onRequestPost(context) {
           email: challenge.email,
           name: challenge.name,
           role: challenge.role,
+          mfaEnabled: true,
+          mfaRequired: mfaRequiredForRole(challenge.role),
         },
       }),
       {

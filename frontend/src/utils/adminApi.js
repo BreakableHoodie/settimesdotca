@@ -56,6 +56,18 @@ function notifyUnauthorized() {
   })
 }
 
+// Admins and editors must enrol in 2FA before using the admin area (#1253);
+// the server answers every other admin route with 403 MFA_SETUP_REQUIRED.
+function notifyMfaSetupRequired() {
+  authStateSubscribers.forEach(subscriber => {
+    try {
+      subscriber.onMfaSetupRequired?.()
+    } catch (err) {
+      console.error('[adminApi] onMfaSetupRequired subscriber threw:', err)
+    }
+  })
+}
+
 function parseSessionTiming(response) {
   const rawTime = response.headers.get('X-Session-Expires-In')
   const rawIdle = response.headers.get('X-Session-Idle-Expires-In')
@@ -231,6 +243,9 @@ async function handleResponse(response) {
     }
     if (response.status === 401) {
       notifyUnauthorized()
+    }
+    if (response.status === 403 && data?.code === 'MFA_SETUP_REQUIRED') {
+      notifyMfaSetupRequired()
     }
     const error = new Error(data.message || data.error || 'API request failed')
     error.status = response.status

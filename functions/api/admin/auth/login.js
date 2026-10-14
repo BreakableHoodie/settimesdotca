@@ -16,6 +16,7 @@ import {
 import { loadTotpSecret } from "../../../utils/mfaSecrets.js";
 import { getTrustedDeviceToken, validateTrustedDevice } from "../../../utils/trustedDevice.js";
 import { logger } from "../../../utils/logger.js";
+import { mfaRequiredForRole } from "../../../utils/mfaPolicy.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -391,6 +392,8 @@ export async function onRequestPost(context) {
           firstName: user.first_name || null,
           lastName: user.last_name || null,
           role: user.role,
+          mfaEnabled: Number(user.totp_enabled) === 1,
+          mfaRequired: mfaRequiredForRole(user.role),
         },
       }),
       {

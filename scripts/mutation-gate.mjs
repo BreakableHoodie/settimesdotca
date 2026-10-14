@@ -798,6 +798,32 @@ export const MUTATIONS = [
     replace: '        env?.ENVIRONMENT === "production";',
     tests: ["functions/__tests__/environmentFailsClosed.test.js"],
   },
+  {
+    id: "mfa-required-middleware-gate",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — an admin or editor without 2FA reaches only the enrolment routes; every other admin route answers 403 MFA_SETUP_REQUIRED (#1253)",
+    file: "functions/api/admin/_middleware.js",
+    find: "    const mfaResponse = mfaSetupRequiredResponse(request, normalizedUser);",
+    replace: "    const mfaResponse = null;",
+    tests: ["functions/api/admin/__tests__/mfaRequired.test.js"],
+  },
+  {
+    id: "mfa-required-checkpermission-fallback",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — checkPermission's own session fallback enforces the same 2FA enrolment rule as the middleware (#1253)",
+    file: "functions/api/admin/_middleware.js",
+    find: "  const fallbackMfaResponse = mfaSetupRequiredResponse(request, normalizedUser);",
+    replace: "  const fallbackMfaResponse = null;",
+    tests: ["functions/api/admin/__tests__/mfaRequired.test.js"],
+  },
+  {
+    id: "mfa-disable-refused-for-required-roles",
+    invariant: "CLAUDE.md 'RBAC Roles' — admins and editors cannot turn 2FA off (#1253)",
+    file: "functions/api/admin/mfa/disable.js",
+    find: "  if (mfaRequiredForRole(auth.user.role)) {",
+    replace: "  if (false) {",
+    tests: ["functions/api/admin/mfa/__tests__/mfa-settings.test.js"],
+  },
 ];
 
 // ============================================================================

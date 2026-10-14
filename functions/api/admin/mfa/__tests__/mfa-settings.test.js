@@ -16,7 +16,7 @@ const buildAuthHeaders = (baseHeaders = {}) => ({
 
 describe("admin mfa settings", () => {
   it("returns status and setup flow toggles setupPending", async () => {
-    const { env, headers, rawDb } = createTestEnv({ role: "admin" });
+    const { env, headers, rawDb } = createTestEnv({ role: "admin", mfaEnrolled: false });
 
     const statusReq = new Request("https://example.test/api/admin/mfa/status", {
       method: "GET",
@@ -64,7 +64,7 @@ describe("admin mfa settings", () => {
   });
 
   it("enables MFA and issues backup codes", async () => {
-    const { env, headers, rawDb } = createTestEnv({ role: "admin" });
+    const { env, headers, rawDb } = createTestEnv({ role: "admin", mfaEnrolled: false });
     const setupReq = new Request("https://example.test/api/admin/mfa/setup", {
       method: "POST",
       headers: buildAuthHeaders(headers),
@@ -95,8 +95,10 @@ describe("admin mfa settings", () => {
     expect(user.backup_codes).toBeTruthy();
   });
 
+  // A viewer: 2FA stays optional below editor, so a viewer may still turn it
+  // off. Admins and editors cannot (#1253, covered below).
   it("regenerates backup codes and disables MFA", async () => {
-    const { env, headers, rawDb } = createTestEnv({ role: "admin" });
+    const { env, headers, rawDb } = createTestEnv({ role: "viewer" });
     const setupReq = new Request("https://example.test/api/admin/mfa/setup", {
       method: "POST",
       headers: buildAuthHeaders(headers),
@@ -144,11 +146,47 @@ describe("admin mfa settings", () => {
 
     const disableAttempt = rawDb
       .prepare("SELECT success FROM auth_attempts WHERE user_id = ? AND attempt_type = ? ORDER BY id DESC LIMIT 1")
-      .get(1, AUTH_ATTEMPT_TYPES.mfaDisable);
+      .get(3, AUTH_ATTEMPT_TYPES.mfaDisable);
     expect(disableAttempt.success).toBe(1);
 
-    const user = rawDb.prepare("SELECT totp_enabled, totp_secret FROM users WHERE id = 1").get();
+    const user = rawDb.prepare("SELECT totp_enabled, totp_secret FROM users WHERE id = 3").get();
     expect(user.totp_enabled).toBe(0);
     expect(user.totp_secret).toBeNull();
+  });
+
+  it.each(["admin", "editor"])("refuses to disable MFA for an %s and leaves it enabled (#1253)", async (role) => {
+    const { env, headers, rawDb } = createTestEnv({ role, mfaEnrolled: false });
+    const userId = role === "admin" ? 1 : 2;
+    const setupRes = await mfaSetupHandler.onRequestPost({
+      request: new Request("https://example.test/api/admin/mfa/setup", {
+        method: "POST",
+        headers: buildAuthHeaders(headers),
+        body: JSON.stringify({}),
+      }),
+      env,
+    });
+    const { secret } = await setupRes.json();
+    await mfaEnableHandler.onRequestPost({
+      request: new Request("https://example.test/api/admin/mfa/enable", {
+        method: "POST",
+        headers: buildAuthHeaders(headers),
+        body: JSON.stringify({ code: await generateTotpCode(secret) }),
+      }),
+      env,
+    });
+
+    const disableRes = await mfaDisableHandler.onRequestPost({
+      request: new Request("https://example.test/api/admin/mfa/disable", {
+        method: "POST",
+        headers: buildAuthHeaders(headers),
+        body: JSON.stringify({ code: await generateTotpCode(secret) }),
+      }),
+      env,
+    });
+    expect(disableRes.status).toBe(403);
+    expect((await disableRes.json()).code).toBe("MFA_REQUIRED_FOR_ROLE");
+    const user = rawDb.prepare("SELECT totp_enabled, totp_secret FROM users WHERE id = ?").get(userId);
+    expect(user.totp_enabled).toBe(1);
+    expect(user.totp_secret).toBeTruthy();
   });
 });

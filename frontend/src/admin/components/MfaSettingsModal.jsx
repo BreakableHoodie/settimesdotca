@@ -3,7 +3,18 @@ import { QRCodeSVG } from 'qrcode.react'
 import { mfaApi } from '../../utils/adminApi'
 import { Modal, Button, Alert } from '../../components/ui'
 
-export default function MfaSettingsModal({ isOpen, onClose }) {
+// `required`: the user's role must have 2FA (#1253). The modal cannot be
+// dismissed until it is enabled; the only ways out are finishing setup
+// (onEnabled) or logging out (onLogout). `canDisable` hides the disable
+// control for roles the server refuses it for.
+export default function MfaSettingsModal({
+  isOpen,
+  onClose,
+  required = false,
+  canDisable = true,
+  onEnabled,
+  onLogout,
+}) {
   const [status, setStatus] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -134,7 +145,14 @@ export default function MfaSettingsModal({ isOpen, onClose }) {
   const totpEnabled = status?.totpEnabled
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Multi-Factor Authentication" size="lg">
+    <Modal
+      isOpen={isOpen}
+      onClose={required ? () => {} : onClose}
+      showCloseButton={!required}
+      closeOnBackdropClick={!required}
+      title={required ? 'Set up two-factor authentication' : 'Multi-Factor Authentication'}
+      size="lg"
+    >
       {error && (
         <Alert variant="error" className="mb-4">
           {error}
@@ -147,7 +165,9 @@ export default function MfaSettingsModal({ isOpen, onClose }) {
         <>
           <div className="mb-6">
             <p className="text-text-secondary">
-              Add an authenticator app to secure your account. You will use a 6-digit code each time you sign in.
+              {required
+                ? 'Your role requires two-factor authentication. Add an authenticator app to continue. You will use a 6-digit code each time you sign in.'
+                : 'Add an authenticator app to secure your account. You will use a 6-digit code each time you sign in.'}
             </p>
           </div>
 
@@ -245,15 +265,19 @@ export default function MfaSettingsModal({ isOpen, onClose }) {
                 </Button>
               </div>
 
-              <div className="bg-white/5 border border-white/10 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-text-primary mb-2">Disable MFA</h3>
-                <p className="text-text-secondary text-sm mb-3">
-                  Disabling MFA removes the extra sign-in step for this account.
-                </p>
-                <Button onClick={handleDisable} variant="danger" size="sm" disabled={loading || !verificationCode}>
-                  Disable MFA
-                </Button>
-              </div>
+              {canDisable ? (
+                <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-text-primary mb-2">Disable MFA</h3>
+                  <p className="text-text-secondary text-sm mb-3">
+                    Disabling MFA removes the extra sign-in step for this account.
+                  </p>
+                  <Button onClick={handleDisable} variant="danger" size="sm" disabled={loading || !verificationCode}>
+                    Disable MFA
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-text-tertiary text-sm">Admins and editors keep two-factor authentication on.</p>
+              )}
             </div>
           )}
 
@@ -280,6 +304,19 @@ export default function MfaSettingsModal({ isOpen, onClose }) {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {required && (
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+              <Button onClick={onLogout} variant="secondary" size="sm">
+                Log out
+              </Button>
+              {totpEnabled && (
+                <Button onClick={onEnabled} variant="primary" size="sm">
+                  I&apos;ve saved my backup codes. Continue
+                </Button>
+              )}
             </div>
           )}
         </>

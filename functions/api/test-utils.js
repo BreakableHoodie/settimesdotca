@@ -290,7 +290,11 @@ export function createTestEnv({ role = "editor", mfaEnrolled = role === "admin" 
   // Create a valid session for the test user
   const userId = role === "admin" ? 1 : role === "editor" ? 2 : 3;
   if (mfaEnrolled) {
-    rawDb.prepare("UPDATE users SET totp_enabled = 1 WHERE id = ?").run(userId);
+    // A real secret, so "enrolled" means what it means in production: a
+    // login or backup-code test reaches the real flow, not the "enabled but
+    // no secret" 500 branch. Stored in the legacy plaintext form, which
+    // loadTotpSecret still accepts.
+    rawDb.prepare("UPDATE users SET totp_enabled = 1, totp_secret = 'JBSWY3DPEHPK3PXP' WHERE id = ?").run(userId);
   }
   const sessionId = crypto.randomUUID();
   const expiresAt = Math.floor(Date.now() / 1000) + 24 * 60 * 60;

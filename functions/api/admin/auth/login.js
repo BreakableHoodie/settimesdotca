@@ -393,7 +393,7 @@ export async function onRequestPost(context) {
           lastName: user.last_name || null,
           role: user.role,
           mfaEnabled: Number(user.totp_enabled) === 1,
-          mfaRequired: mfaRequiredForRole(user.role),
+          mfaEnrolmentRequired: mfaRequiredForRole(user.role),
         },
       }),
       {

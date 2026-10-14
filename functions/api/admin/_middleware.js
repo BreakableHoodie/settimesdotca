@@ -148,7 +148,7 @@ function normalizeUser(user) {
     lastName: user.lastName || null,
     isActive: user.isActive,
     mfaEnabled: user.mfaEnabled === true,
-    mfaRequired: mfaRequiredForRole(user.role),
+    mfaEnrolmentRequired: mfaRequiredForRole(user.role),
   };
 }
 
@@ -157,7 +157,7 @@ function normalizeUser(user) {
 // 403 MFA_SETUP_REQUIRED. Checked on BOTH session paths: the middleware and
 // checkPermission's own enforceSession fallback.
 function mfaSetupRequiredResponse(request, user) {
-  if (!user.mfaRequired || user.mfaEnabled) return null;
+  if (!user.mfaEnrolmentRequired || user.mfaEnabled) return null;
   if (MFA_ENROLMENT_ROUTES.has(routePath(request))) return null;
   return new Response(
     JSON.stringify({

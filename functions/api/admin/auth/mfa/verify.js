@@ -352,7 +352,7 @@ export async function onRequestPost(context) {
           name: challenge.name,
           role: challenge.role,
           mfaEnabled: true,
-          mfaRequired: mfaRequiredForRole(challenge.role),
+          mfaEnrolmentRequired: mfaRequiredForRole(challenge.role),
         },
       }),
       {

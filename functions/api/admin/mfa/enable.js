@@ -8,6 +8,8 @@ import { verifyTotp, generateBackupCodes, hashBackupCode } from "../../../utils/
 import { loadTotpSecret } from "../../../utils/mfaSecrets.js";
 import { getClientIP, parseJsonObjectBody } from "../../../utils/request.js";
 import { revokeAllTrustedDevices } from "../../../utils/trustedDevice.js";
+import { initializeLucia } from "../../../utils/auth.js";
+import { generateCSRFToken, setCSRFCookie } from "../../../utils/csrf.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -146,10 +148,12 @@ export async function onRequestPost(context) {
   const backupCodes = generateBackupCodes();
   const hashedCodes = await Promise.all(backupCodes.map((codeValue) => hashBackupCode(codeValue)));
 
-  await DB.prepare(
+  // `AND totp_enabled = 0`: two concurrent enables with the same code must not
+  // both succeed, or the second overwrites the backup codes the first showed.
+  const written = await DB.prepare(
     `UPDATE users
      SET totp_enabled = 1, backup_codes = ?, totp_secret = ?
-     WHERE id = ?`,
+     WHERE id = ? AND totp_enabled = 0`,
   )
     .bind(
       JSON.stringify(hashedCodes),
@@ -158,7 +162,32 @@ export async function onRequestPost(context) {
     )
     .run();
 
+  if (written?.meta?.changes === 0) {
+    return new Response(
+      JSON.stringify({
+        error: "Conflict",
+        message: "MFA is already enabled for this account",
+      }),
+      { status: 409, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
   await revokeAllTrustedDevices(DB, userId);
+
+  // Every session opened before enrolment was opened with the password alone,
+  // and the 2FA gate reads the LIVE totp_enabled, so without this a session
+  // an attacker opened with a phished password would gain full access the
+  // moment the real owner enrolled (#1253 review). Revoke them all and give
+  // this request a fresh session, as revoke-all.js does.
+  const lucia = context.data?.lucia ?? auth.lucia ?? initializeLucia(DB, request, env);
+  await lucia.invalidateUserSessions(userId);
+  const newSession = await lucia.createSession(userId, {});
+  await DB.prepare("UPDATE lucia_sessions SET ip_address = ?, user_agent = ?, remember_me = 0 WHERE id = ?")
+    .bind(ipAddress, request.headers.get("User-Agent"), newSession.id)
+    .run();
+  const sessionHeaders = new Headers({ "Content-Type": "application/json" });
+  sessionHeaders.append("Set-Cookie", lucia.createSessionCookie(newSession.id).serialize());
+  sessionHeaders.append("Set-Cookie", setCSRFCookie(generateCSRFToken(request, env, newSession.id), request, env));
 
   await writeAuthAttempt(DB, {
     attemptType: AUTH_ATTEMPT_TYPES.mfaEnable,
@@ -178,7 +207,7 @@ export async function onRequestPost(context) {
     }),
     {
       status: 200,
-      headers: { "Content-Type": "application/json" },
+      headers: sessionHeaders,
     },
   );
 }

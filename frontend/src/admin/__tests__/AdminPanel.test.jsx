@@ -175,13 +175,19 @@ describe('AdminPanel', () => {
 // #1253: admins and editors must enrol in 2FA before using the admin area.
 describe('AdminPanel 2FA enrolment', () => {
   it('opens the required enrolment modal for an admin without 2FA', async () => {
-    render(<AdminPanel currentUser={{ role: 'admin', mfaRequired: true, mfaEnabled: false }} onLogout={vi.fn()} />)
+    render(
+      <AdminPanel currentUser={{ role: 'admin', mfaEnrolmentRequired: true, mfaEnabled: false }} onLogout={vi.fn()} />
+    )
     expect(await screen.findByText('MFA enrolment required')).toBeInTheDocument()
   })
 
   it('does not open it for an enrolled admin or a viewer without 2FA', async () => {
-    render(<AdminPanel currentUser={{ role: 'admin', mfaRequired: true, mfaEnabled: true }} onLogout={vi.fn()} />)
-    render(<AdminPanel currentUser={{ role: 'viewer', mfaRequired: false, mfaEnabled: false }} onLogout={vi.fn()} />)
+    render(
+      <AdminPanel currentUser={{ role: 'admin', mfaEnrolmentRequired: true, mfaEnabled: true }} onLogout={vi.fn()} />
+    )
+    render(
+      <AdminPanel currentUser={{ role: 'viewer', mfaEnrolmentRequired: false, mfaEnabled: false }} onLogout={vi.fn()} />
+    )
     await screen.findAllByLabelText('Filter:')
     expect(screen.queryByText('MFA enrolment required')).not.toBeInTheDocument()
   })

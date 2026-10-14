@@ -100,7 +100,7 @@ export default function AdminPanel({ currentUser, onLogout }) {
   // Admins and editors must enrol in 2FA first (#1253). Known from the
   // session user, and also learned from any 403 MFA_SETUP_REQUIRED.
   const [mfaGateHit, setMfaGateHit] = useState(false)
-  const mustEnrolMfa = Boolean(currentUser?.mfaRequired && !currentUser?.mfaEnabled) || mfaGateHit
+  const mustEnrolMfa = Boolean(currentUser?.mfaEnrolmentRequired && !currentUser?.mfaEnabled) || mfaGateHit
 
   useEffect(() => subscribeAdminAuthState({ onMfaSetupRequired: () => setMfaGateHit(true) }), [])
 
@@ -547,7 +547,7 @@ export default function AdminPanel({ currentUser, onLogout }) {
         <MfaSettingsModal
           isOpen={showMfaModal}
           onClose={() => setShowMfaModal(false)}
-          canDisable={!currentUser?.mfaRequired}
+          canDisable={!currentUser?.mfaEnrolmentRequired}
         />
       )}
 

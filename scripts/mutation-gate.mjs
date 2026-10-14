@@ -824,6 +824,15 @@ export const MUTATIONS = [
     replace: "  if (false) {",
     tests: ["functions/api/admin/mfa/__tests__/mfa-settings.test.js"],
   },
+  {
+    id: "mfa-enable-revokes-password-only-sessions",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — enrolling in 2FA revokes every session opened with the password alone, so a phished pre-enrolment session cannot inherit full access (#1253 review)",
+    file: "functions/api/admin/mfa/enable.js",
+    find: "  await lucia.invalidateUserSessions(userId);",
+    replace: "  // sessions kept",
+    tests: ["functions/api/admin/__tests__/mfaRequired.test.js"],
+  },
 ];
 
 // ============================================================================

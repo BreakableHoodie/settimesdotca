@@ -306,20 +306,22 @@ export default function MfaSettingsModal({
               </div>
             </div>
           )}
-
-          {required && (
-            <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-              <Button onClick={onLogout} variant="secondary" size="sm">
-                Log out
-              </Button>
-              {totpEnabled && (
-                <Button onClick={onEnabled} variant="primary" size="sm">
-                  I&apos;ve saved my backup codes. Continue
-                </Button>
-              )}
-            </div>
-          )}
         </>
+      )}
+
+      {/* Outside the loading branch: an undismissable modal must always offer
+          a way out, even if the status request never returns. */}
+      {required && (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+          <Button onClick={onLogout} variant="secondary" size="sm">
+            Log out
+          </Button>
+          {totpEnabled && (
+            <Button onClick={onEnabled} variant="primary" size="sm">
+              I&apos;ve saved my backup codes. Continue
+            </Button>
+          )}
+        </div>
       )}
     </Modal>
   )

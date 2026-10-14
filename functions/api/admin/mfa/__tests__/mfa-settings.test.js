@@ -14,6 +14,15 @@ const buildAuthHeaders = (baseHeaders = {}) => ({
   "Content-Type": "application/json",
 });
 
+// Enabling MFA revokes every existing session and issues a fresh one (#1253
+// review), so a test that keeps going after enable must switch to it.
+function adoptSessionFrom(response, headers) {
+  const cookie = response.headers.getSetCookie().find((value) => /session_token=/.test(value));
+  if (!cookie) throw new Error("enable did not issue a session cookie");
+  const sessionId = cookie.split(";")[0].split("=")[1];
+  headers.Authorization = `Bearer ${sessionId}`;
+}
+
 describe("admin mfa settings", () => {
   it("returns status and setup flow toggles setupPending", async () => {
     const { env, headers, rawDb } = createTestEnv({ role: "admin", mfaEnrolled: false });
@@ -116,7 +125,8 @@ describe("admin mfa settings", () => {
       headers: buildAuthHeaders(headers),
       body: JSON.stringify({ code }),
     });
-    await mfaEnableHandler.onRequestPost({ request: enableReq, env });
+    const enableRes = await mfaEnableHandler.onRequestPost({ request: enableReq, env });
+    adoptSessionFrom(enableRes, headers);
 
     const regenCode = await generateTotpCode(setupPayload.secret);
     const regenReq = new Request("https://example.test/api/admin/mfa/backup-codes", {
@@ -166,7 +176,7 @@ describe("admin mfa settings", () => {
       env,
     });
     const { secret } = await setupRes.json();
-    await mfaEnableHandler.onRequestPost({
+    const enableRes = await mfaEnableHandler.onRequestPost({
       request: new Request("https://example.test/api/admin/mfa/enable", {
         method: "POST",
         headers: buildAuthHeaders(headers),
@@ -174,6 +184,7 @@ describe("admin mfa settings", () => {
       }),
       env,
     });
+    adoptSessionFrom(enableRes, headers);
 
     const disableRes = await mfaDisableHandler.onRequestPost({
       request: new Request("https://example.test/api/admin/mfa/disable", {

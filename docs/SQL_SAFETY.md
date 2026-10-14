@@ -162,9 +162,10 @@ Always validate input before database operations:
 import { isValidTime } from "../utils/validation/datetime.js";
 
 function validateSetInput(data) {
-  // isValidTime checks the HH:MM shape AND the 0-23 / 0-59 ranges.
+  // isValidTime checks the HH:MM shape AND the 0-23 / 0-59 ranges. It
+  // returns { valid, error }, never a boolean: test .valid.
   // Never re-implement it with an inline regex (see CLAUDE.md, #1089).
-  if (data.start_time && !isValidTime(data.start_time)) {
+  if (data.start_time && !isValidTime(data.start_time).valid) {
     throw new Error("Invalid time");
   }
   // ... more validation

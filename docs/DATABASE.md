@@ -92,6 +92,9 @@ One row per band-crawl event (e.g. Vol. 16, Vol. 17).
 | `description`        | TEXT    | Nullable                                                                                                          |
 | `city`               | TEXT    | Nullable                                                                                                          |
 | `ticket_url`         | TEXT    | Nullable                                                                                                          |
+| `ticket_price`       | REAL    | Nullable                                                                                                          |
+| `presented_by`       | TEXT    | Nullable                                                                                                          |
+| `presented_by_url`   | TEXT    | Nullable                                                                                                          |
 | `venue_info`         | TEXT    | Nullable (JSON)                                                                                                   |
 | `social_links`       | TEXT    | Nullable (JSON)                                                                                                   |
 | `theme_colors`       | TEXT    | Nullable (JSON)                                                                                                   |
@@ -257,6 +260,8 @@ Added in migration 0035.
 | `consent_ip`         | TEXT    | Nullable — added in migration 0045                                                                                                                                       |
 | `consent_method`     | TEXT    | NOT NULL, DEFAULT `'web_form'` — added in migration 0045                                                                                                                 |
 | `batch_token`        | TEXT    | Nullable — added in migration 0047; ties together rows from one batch-follow submission so a multi-band follow sends a single confirmation email instead of one per band |
+| `confirmed_at`       | TEXT    | Nullable — set when the double opt-in is confirmed |
+| `consent_version`    | TEXT    | Nullable — wording/version shown when consent was given |
 
 Constraint: `UNIQUE(email, band_profile_id)`. Indexes:
 `idx_band_follows_band(band_profile_id)`, `idx_band_follows_email(email)`,
@@ -273,13 +278,12 @@ fans whose first send failed.
 | `id`             | INTEGER | PK, autoincrement                                   |
 | `performance_id` | INTEGER | NOT NULL, FK → `performances(id)` ON DELETE CASCADE |
 | `band_follow_id` | INTEGER | NOT NULL, FK → `band_follows(id)` ON DELETE CASCADE |
-| `notified_at`    | TEXT    | NOT NULL, DEFAULT `datetime('now')`                 |
+| `claimed_at`     | TEXT    | NOT NULL, DEFAULT `datetime('now')` — claim time, not delivery proof |
+| `delivered_at`   | TEXT    | Nullable — set only after the provider confirms delivery |
 
-Constraint: `UNIQUE(performance_id, band_follow_id)` — an `INSERT OR IGNORE`
-against this constraint is how `notifyBandFollowers()`
-(`functions/utils/bandFollowNotify.js`) atomically claims a follower before
-sending, and deletes the row again if the send fails so a later resend can
-retry. Index: `idx_band_follow_notifications_performance(performance_id)`.
+Constraint: `UNIQUE(performance_id, band_follow_id)`. An undelivered claim past
+the lease is retryable; a delivered row is permanent. Index:
+`idx_band_follow_notifications_lookup(performance_id, band_follow_id, delivered_at, claimed_at)`.
 
 #### `band_announce_queue`
 
@@ -367,6 +371,8 @@ Created by `POST /api/subscriptions/subscribe`.
 | `last_email_sent`    | TEXT    | Nullable                                                               |
 | `consent_ip`         | TEXT    | Nullable — added in migration 0045                                     |
 | `consent_method`     | TEXT    | NOT NULL, DEFAULT `'web_form'` — added in migration 0045               |
+| `confirmed_at`       | TEXT    | Nullable — set when the subscription is confirmed                     |
+| `consent_version`    | TEXT    | Nullable — wording/version shown when consent was given               |
 
 Constraint: `UNIQUE(email, city, genre)`. Indexes:
 `idx_subscriptions_email(email)`, `idx_subscriptions_city_genre(city, genre)`,
@@ -401,6 +407,24 @@ Unsubscribe log for metrics (`functions/api/subscriptions/unsubscribe.js`).
 
 No indexes.
 
+#### `subscription_notifications`
+
+Per-subscription, per-event delivery claims. `claimed_at` is not proof of
+delivery; undelivered claims past the lease are retryable, while
+`delivered_at` makes a successful delivery permanent.
+
+| Column            | Type    | Notes |
+| ----------------- | ------- | ----- |
+| `id`              | INTEGER | PK |
+| `subscription_id` | INTEGER | NOT NULL, FK → `email_subscriptions(id)` ON DELETE CASCADE |
+| `event_id`        | INTEGER | NOT NULL, FK → `events(id)` ON DELETE CASCADE |
+| `kind`            | TEXT    | NOT NULL |
+| `claimed_at`      | TEXT    | NOT NULL, default `datetime('now')` |
+| `delivered_at`    | TEXT    | Nullable |
+
+Constraint: `UNIQUE(subscription_id, event_id, kind)`. Index:
+`idx_subscription_notifications_lookup(event_id, kind, subscription_id)`.
+
 #### `schedule_builds`
 
 One row per (event, performance, anonymous session), recorded when a fan adds
@@ -412,14 +436,13 @@ admin event metrics endpoint.
 | `id`             | INTEGER | PK, autoincrement                                   |
 | `event_id`       | INTEGER | NOT NULL, FK → `events(id)` ON DELETE CASCADE       |
 | `performance_id` | INTEGER | NOT NULL, FK → `performances(id)` ON DELETE CASCADE |
-| `user_session`   | TEXT    | NOT NULL — anonymous session identifier (no PII)    |
+| `visitor_hash`   | TEXT    | NOT NULL — per-event pseudonym derived from the schedule session, never the raw session ID |
 | `created_at`     | TEXT    | NOT NULL, DEFAULT `datetime('now')`                 |
 
 Indexes: `idx_schedule_builds_event(event_id)`,
-`idx_schedule_builds_session(user_session)`,
 `idx_schedule_builds_created(created_at)`, plus the UNIQUE index
-`idx_schedule_builds_unique(event_id, performance_id, user_session)` added in
-migration 0014 to deduplicate rows and prevent spam.
+`idx_schedule_builds_unique(event_id, performance_id, visitor_hash)`. Visitor
+hashes are anonymised 30 days after the event.
 
 ### Auth & admin
 
@@ -663,6 +686,25 @@ per-IP-only `rate_limit` table above. Added in migration 0028.
 
 Index: `idx_rate_limits_updated_at(updated_at)`.
 
+#### `api_keys`
+
+Machine credentials issued by admins. The plaintext key is returned once and
+only its hash is stored. The creator reference is `ON DELETE RESTRICT`, so
+deleting a user who owns a key is refused until the account is deactivated.
+
+| Column       | Type    | Notes |
+| ------------ | ------- | ----- |
+| `id`         | INTEGER | PK, autoincrement |
+| `name`       | TEXT    | NOT NULL |
+| `key_prefix` | TEXT    | NOT NULL, non-secret display prefix |
+| `key_hash`   | TEXT    | NOT NULL, UNIQUE |
+| `role`       | TEXT    | NOT NULL, `viewer` / `editor` / `admin` |
+| `created_by` | INTEGER | NOT NULL, FK → `users(id)` ON DELETE RESTRICT |
+| `created_at` | TEXT    | NOT NULL, default `datetime('now')` |
+| `expires_at` | TEXT    | NOT NULL, SQLite datetime with a space separator |
+| `last_used_at` | TEXT  | Nullable |
+| `revoked_at` | TEXT    | Nullable |
+
 ### Metrics
 
 #### `artist_daily_stats`
@@ -696,6 +738,21 @@ Per-page, per-day aggregate view counter. Added in migration 0039.
 | `views` | INTEGER | DEFAULT 0              |
 
 Constraint: `UNIQUE(page, date)`. Index: `idx_page_views_date(date)`.
+
+#### `event_daily_stats`
+
+Per-event, per-day aggregate counters.
+
+| Column         | Type    | Notes |
+| -------------- | ------- | ----- |
+| `id`           | INTEGER | PK, autoincrement |
+| `event_id`     | INTEGER | NOT NULL |
+| `date`         | TEXT    | NOT NULL, `YYYY-MM-DD` |
+| `event_views`  | INTEGER | DEFAULT 0 |
+| `ticket_clicks`| INTEGER | DEFAULT 0 |
+| `created_at`   | TEXT    | DEFAULT `datetime('now')` |
+
+Constraint: `UNIQUE(event_id, date)`. Index: `idx_event_daily_stats_date(date)`.
 
 ## Relationships
 
@@ -793,12 +850,30 @@ WHERE sl.slug = ? AND sl.expires_at > datetime('now');
 concurrent resend requests:
 
 ```sql
+-- 1. Claim. changes === 0 means a row already exists for this follower.
 INSERT OR IGNORE INTO band_follow_notifications (performance_id, band_follow_id)
 VALUES (?, ?);
--- changes === 0 means another request already claimed this follower.
--- If the subsequent email send fails, the claim is released:
+
+-- 2. Only when step 1 claimed nothing: take over an ABANDONED claim
+--    (undelivered and older than the 15-minute lease). A delivered row or a
+--    live claim matches nothing, so at most one request wins.
+UPDATE band_follow_notifications
+   SET claimed_at = datetime('now')
+ WHERE performance_id = ? AND band_follow_id = ?
+   AND delivered_at IS NULL
+   AND claimed_at <= datetime('now', '-15 minutes');
+
+-- 3a. Send succeeded: record the delivery. Mandatory, because an unmarked
+--     claim becomes retryable once its lease expires.
+UPDATE band_follow_notifications SET delivered_at = datetime('now')
+ WHERE performance_id = ? AND band_follow_id = ?;
+
+-- 3b. Send failed: release the claim so a resend can retry at once.
 DELETE FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?;
 ```
+
+The lease is `CLAIM_LEASE_MINUTES`. Every reader that asks "has this follower
+been handled?" uses `claimIsLiveSql()` from the same file.
 
 **Compensating delete on a non-batchable mutation**
 (`functions/api/admin/events/[id]/duplicate.js`) — D1 has no transactions, so
@@ -820,14 +895,14 @@ alongside `performances` and `band_profiles` in one `DB.batch()`:
 
 ```sql
 SELECT COUNT(*) as total_schedule_builds,
-       COUNT(DISTINCT user_session) as route_builders,
+       COUNT(DISTINCT visitor_hash) as route_builders,
        MAX(created_at) as last_updated
 FROM schedule_builds WHERE event_id = ?;
 ```
 
 Note the two counters measure different things, and neither is a visitor
 count. `schedule_builds` holds **one row per performance picked**, so
-`COUNT(*)` is total picks while `COUNT(DISTINCT user_session)` is the number
+`COUNT(*)` is total picks while `COUNT(DISTINCT visitor_hash)` is the number
 of fans who built a route. The latter was called `unique_visitors` until
 #704 — a misnomer, since a session only lands in this table once it has
 already picked a set, so every fan who viewed the page and bounced was

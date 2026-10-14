@@ -128,30 +128,19 @@ This handbook is for system administrators managing the SetTimes platform. It co
 4. Share code with new user
 5. User signs up with code
 
-**Direct Creation (Admin Only):**
-
-```javascript
-// Via admin API
-POST /api/admin/users
-{
-  "email": "user@example.com",
-  "name": "New User",
-  "role": "editor",
-  "password": "temporary123"
-}
-```
+There is no password-based direct creation flow. The admin creates an invite; the recipient signs up with that invite and receives an activation link by email.
 
 ### Role Hierarchy
 
 | Role       | Level | Permissions                         |
 | ---------- | ----- | ----------------------------------- |
 | **Admin**  | 3     | Full system access, user management |
-| **Editor** | 2     | Create/edit events, venues, bands   |
+| **Editor** | 2     | Create/edit events and bands, create venues, archive events |
 | **Viewer** | 1     | Read-only access                    |
 
 **Permission Model:**
 
-- `checkPermission(request, env, requiredRole)`
+- `checkPermission(context, requiredRole)`
 - User role level must be ≥ required level
 - Example: Admin (3) ≥ Editor (2) = Access granted
 
@@ -178,9 +167,9 @@ POST /api/admin/users
 
 1. Users tab → Select user
 2. Click "Delete" (requires confirmation)
-3. User data removed (irreversible)
+3. User data removed if no API keys are owned by the user
 
-**Note:** Cannot delete users with active sessions unless force-logout is enabled.
+**Note:** Deletion is rejected with `409 USER_OWNS_API_KEYS` when the user owns API keys. Deactivate the user instead; deactivation revokes sessions and keys.
 
 ### Password Management
 
@@ -188,14 +177,13 @@ POST /api/admin/users
 
 1. Users tab → Select user
 2. Click "Reset Password"
-3. System generates temporary password
-4. Send to user via secure channel
-5. User must change on first login
+3. System creates a one-time reset token
+4. User receives a password-reset link by email
+5. User sets a new password through the link
 
 **Password Requirements:**
 
-- Minimum 8 characters
-- Must include: uppercase, lowercase, number
+- Minimum 12 characters
 - Hashed using PBKDF2-SHA256 via the Web Crypto API (not bcrypt — Workers cannot run native bcrypt)
 
 ---
@@ -212,7 +200,10 @@ POST /api/admin/users
 - `venues` - Performance venues
 - `band_profiles` - Artist/band profiles
 - `performances` - Links a band profile to an event, venue, and set time
-- `audit_logs` - Security audit trail
+- `audit_log` - Security audit trail
+- `api_keys` - Machine credentials and revocation state
+- `subscription_notifications` - Subscription delivery claims
+- `event_daily_stats` - Daily event aggregates
 - `invite_codes` - User invite system
 
 **Schema Location:** numbered migrations in `migrations/` (with `database/setup-complete.sql` as the consolidated reference)
@@ -273,7 +264,7 @@ SELECT
   al.details,
   al.ip_address,
   al.created_at
-FROM audit_logs al
+FROM audit_log al
 JOIN users u ON al.user_id = u.id
 WHERE al.created_at > datetime('now', '-7 days')
 ORDER BY al.created_at DESC
@@ -294,12 +285,17 @@ LIMIT 100;
 wrangler d1 export settimes-production-db --output=backup-$(date +%Y%m%d).sql
 ```
 
-**Restore from Backup:**
+**Restore from a recovery point:**
 
 ```bash
-# Restore database
-wrangler d1 execute settimes-production-db --file=backup-20251119.sql
+# Inspect available recovery points
+wrangler d1 time-travel info settimes-production-db
+
+# Restore a confirmed recovery point
+wrangler d1 time-travel restore settimes-production-db --timestamp=<ISO-8601-timestamp>
 ```
+
+An exported SQL file is a backup artifact, not a live restore procedure. See Cloudflare's D1 Time Travel documentation for the retention window on your plan.
 
 **Backup Schedule:**
 
@@ -385,19 +381,20 @@ X-CSRF-Token: <token_from_cookie>
 
 **Audit Log Retention:**
 
-- Keep for 90 days minimum
-- Archive older logs to R2/S3
+- Retention runs automatically through the daily maintenance job.
+- Ordinary `audit_log` rows are retained for one year.
+- `api_key.request` rows are retained for 90 days.
 
 **Review Logs Regularly:**
 
 ```sql
 -- Failed logins (potential attacks)
-SELECT * FROM audit_logs
+SELECT * FROM audit_log
 WHERE action LIKE '%login%failed%'
 AND created_at > datetime('now', '-1 day');
 
 -- Admin actions
-SELECT * FROM audit_logs al
+SELECT * FROM audit_log al
 JOIN users u ON al.user_id = u.id
 WHERE u.role = 'admin'
 ORDER BY al.created_at DESC
@@ -456,7 +453,7 @@ wrangler tail --status error
 **Log Locations:**
 
 - **API Logs**: Cloudflare Workers logs (via `wrangler tail`)
-- **Audit Logs**: D1 `audit_logs` table
+- **Audit Logs**: D1 `audit_log` table
 - **Error Logs**: Console errors (browser dev tools)
 
 ### Performance Monitoring
@@ -584,21 +581,10 @@ Service Worker    → no-cache
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
 CREATE INDEX IF NOT EXISTS idx_bands_event_id ON bands(event_id);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log(user_id);
 ```
 
-**Cleanup Old Data:**
-
-```sql
--- Remove old sessions
-DELETE FROM lucia_sessions WHERE expires_at < unixepoch('now', '-7 days');
-
--- Archive old audit logs
-INSERT INTO audit_logs_archive SELECT * FROM audit_logs
-WHERE created_at < datetime('now', '-90 days');
-
-DELETE FROM audit_logs WHERE created_at < datetime('now', '-90 days');
-```
+**Cleanup Old Data:** Retention cleanup is automatic. Do not manually delete audit rows; the daily job enforces the published retention windows.
 
 ---
 
@@ -618,7 +604,7 @@ SELECT * FROM users WHERE email = 'user@example.com';
 SELECT is_active FROM users WHERE email = 'user@example.com';
 
 -- Check failed login attempts
-SELECT * FROM audit_logs
+SELECT * FROM audit_log
 WHERE action LIKE '%login%'
 AND details LIKE '%user@example.com%'
 ORDER BY created_at DESC LIMIT 10;
@@ -745,14 +731,9 @@ wrangler tail --format=pretty
 ### Useful Commands
 
 ```bash
-# Deploy to production
-cd frontend && npm run deploy:prod
+# Deployments happen by merging to main after CI passes.
 
-# Deploy to development
-cd frontend && npm run deploy:dev
-
-# Run migrations
-wrangler d1 migrations apply settimes-production-db
+# CI applies migrations before deployment.
 
 # Check database size
 wrangler d1 info settimes-production-db
@@ -766,17 +747,7 @@ wrangler d1 execute settimes-production-db --command="DELETE FROM lucia_sessions
 
 ### Environment Variables
 
-**Required in wrangler.toml:**
-
-```toml
-[env.production.vars]
-DATABASE_ID = "settimes-production-db"
-ENVIRONMENT = "production"
-
-[env.development.vars]
-DATABASE_ID = "settimes-dev-db"
-ENVIRONMENT = "development"
-```
+The production database is the top-level `DB` binding in `wrangler.toml`; runtime secrets are configured in the Pages dashboard.
 
 ---
 

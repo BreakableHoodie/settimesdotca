@@ -3,17 +3,13 @@ name: DAST - ZAP Baseline
 # ZAP scans require a deployed target to scan.
 # We only run on:
 # - Weekly schedule against production
-# - After successful deployment to dev branch
+# - Manual dispatch (any URL; defaults to production)
 # Note: PR scans are disabled because Cloudflare Pages doesn't deploy PR previews
 
 on:
   schedule:
     # Weekly scan on Monday at 7 AM UTC
     - cron: "0 7 * * 1"
-  workflow_run:
-    workflows: ["Deploy to Cloudflare Pages"]
-    types: [completed]
-    branches: [dev]
   # Manual trigger for ad-hoc scans
   workflow_dispatch:
     inputs:
@@ -38,8 +34,6 @@ jobs:
     concurrency:
       group: cloudflare-zone-smoke
       cancel-in-progress: false
-    # Only run if deployment succeeded (for workflow_run trigger)
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -55,17 +49,13 @@ jobs:
         run: |
           # workflow_dispatch: use provided URL or default to production
           # schedule: scan production
-          # workflow_run (after dev deploy): scan dev environment
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             URL="${INPUT_TARGET_URL}"
             echo "url=${URL:-https://settimes.ca}" >> $GITHUB_OUTPUT
             echo "Manual scan: ${URL:-https://settimes.ca}"
-          elif [ "$EVENT_NAME" = "schedule" ]; then
+          else
             echo "url=https://settimes.ca" >> $GITHUB_OUTPUT
             echo "Scheduled scan of production: https://settimes.ca"
-          else
-            echo "url=https://dev.settimes.ca" >> $GITHUB_OUTPUT
-            echo "Post-deployment scan of dev: https://dev.settimes.ca"
           fi
 
       - name: Bypass Cloudflare bot protection for runner IP

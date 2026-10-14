@@ -148,7 +148,7 @@ Your event is currently a draft (not visible to the public). To make it live:
 2. Find your newly created event
 3. Look for the gray **"Draft"** badge
 4. Click **"Edit"**
-5. Check the **"Published"** checkbox
+5. Set the **Status** dropdown to **Published**
 6. Click **"Save Changes"**
 
 **Success!** Your event is now **live** on the public timeline at **settimes.ca**!
@@ -215,7 +215,7 @@ Events tab → Create Event → Fill form → Next → Add venues → Next → A
 **Publish Event:**
 
 ```text
-Events tab → Find event → Edit → Check "Published" → Save
+Events tab → Find event → Edit → Set Status to "Published" → Save
 ```
 
 **Add Band:**
@@ -230,10 +230,10 @@ Performers tab → Add Performer → Fill form → Save
 Events tab → Find event → Edit → Make changes → Save
 ```
 
-**Unpublish Event:**
+**Cancel One Set:**
 
 ```text
-Events tab → Find event → Edit → Uncheck "Published" → Save
+Events tab → Find event → Lineup → Cancel the affected performance → Save
 ```
 
 ---
@@ -327,10 +327,10 @@ Events tab → Find event → Edit → Uncheck "Published" → Save
 
 1. Go to Events tab
 2. Click **"Edit"** on your event
-3. Uncheck **"Published"** (makes it a draft)
-4. Make your changes
-5. Re-check **"Published"** when ready
-6. Click **"Save"**
+3. Make the correction directly; published events remain editable
+4. Click **"Save"**
+
+For a mid-show problem with one set, use the per-set **Cancel** toggle in the Lineup tab. Do not unpublish the whole event; see [Show-Day Runbook](SHOW_DAY_RUNBOOK.md).
 
 ---
 

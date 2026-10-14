@@ -104,30 +104,17 @@ POST /api/admin/auth/signup
 
 ### P0-4: Content Security Policy (CSP)
 
-**Problem:** CSP disabled, leaving app vulnerable to XSS and injection attacks.
+**Current posture:** CSP is configured for both document and API responses, with separate policies for each response layer.
 
 **Solution:** Enabled strict CSP with minimal unsafe directives.
 
 **Files Changed:**
-- `backend/server.js` - Helmet CSP configuration
+- `frontend/public/_headers` - document CSP for static and HTML responses
+- `functions/_middleware.js` - API response CSP
 
-**CSP Directives:**
-```javascript
-{
-  defaultSrc: ["'self'"],
-  scriptSrc: ["'self'"],
-  styleSrc: ["'self'", "'unsafe-inline'"], // Tailwind needs inline
-  imgSrc: ["'self'", "data:", "https:"],
-  fontSrc: ["'self'", "data:"],
-  connectSrc: ["'self'"],
-  objectSrc: ["'none'"],
-  frameSrc: ["'none'"],
-  baseUri: ["'self'"],
-  formAction: ["'self'"],
-  frameAncestors: ["'none'"],
-  upgradeInsecureRequests: []
-}
-```
+The exact directives are maintained in those two files. The document policy
+includes Turnstile support and a hash allowlist for the theme-flash script;
+keep it strict and do not add `unsafe-inline` to script execution.
 
 ### P1-8: Fixed CORS Validation
 
@@ -140,7 +127,7 @@ POST /api/admin/auth/signup
 
 **Allowed Origins:**
 - Production: `https://settimes.ca`, `https://www.settimes.ca`
-- Preview: `https://dev.settimes.pages.dev`, `https://settimes.pages.dev`
+- Preview: `https://dev.settimesdotca.pages.dev`, `https://settimesdotca.pages.dev`, `https://dev.settimes.ca`
 - Local: `http://localhost:5173`, `http://localhost:3000`, `http://localhost:8788`
 
 ### P1-10: Service Worker Security
@@ -161,7 +148,7 @@ POST /api/admin/auth/signup
 | Role | Permissions |
 |------|------------|
 | **admin** | Full access: manage users, all CRUD operations, view audit logs |
-| **editor** | Create/edit events, bands, venues; cannot manage users |
+| **editor** | Create/edit events and bands, create venues, archive events; cannot edit or delete existing venues, delete events, or manage users |
 | **viewer** | Read-only access to admin panel |
 
 ### Role Hierarchy
@@ -177,7 +164,7 @@ Higher roles inherit lower role permissions.
 All admin endpoints use `checkPermission()` middleware:
 
 ```javascript
-const permCheck = await checkPermission(request, env, "editor");
+const permCheck = await checkPermission(context, "editor");
 if (permCheck.error) {
   return permCheck.response; // 401 or 403
 }
@@ -189,7 +176,7 @@ if (permCheck.error) {
 
 ### Session Cookies
 
-Sessions are managed by **Lucia auth v3** using a Cloudflare D1 (`lucia_sessions`) backend.
+Sessions use the direct D1 session manager in `functions/utils/auth.js`, backed by `lucia_sessions`.
 
 | Property | Value |
 |----------|-------|
@@ -198,7 +185,7 @@ Sessions are managed by **Lucia auth v3** using a Cloudflare D1 (`lucia_sessions
 | **HTTPOnly** | Yes (not accessible to JavaScript) |
 | **Secure** | Yes in production (enforced by `__Host-` prefix) |
 | **SameSite** | Strict (prevents CSRF) |
-| **Expiry** | 30 days (absolute); sliding on activity |
+| **Expiry** | Admins: 15 minutes idle / 8 hours absolute. Other users: 30 minutes idle / 30 days absolute. |
 
 The `__Host-` prefix also enforces `Path=/` and prohibits a `Domain` attribute, preventing subdomain injection attacks.
 
@@ -206,18 +193,18 @@ The `__Host-` prefix also enforces `Path=/` and prohibits a `Domain` attribute, 
 
 When TOTP MFA is enabled, login is a two-step flow:
 1. Password check → issues a short-lived `mfa_challenges` token (5 minutes)
-2. TOTP/backup-code verification → issues the full Lucia session
+2. TOTP/backup-code verification → issues the full D1 session
 
 Optionally, users can choose "Remember this device" to skip MFA for 30 days. Trusted device tokens are stored as `__Host-trusted_device` (SHA-256 hashed in DB) and validated against the stored SHA-256 hashes of the IP address and User-Agent string from when the device was registered.
 
 ### Session Lifecycle
 
-1. **Creation:** Successful MFA verification calls `lucia.createSession(userId, {})`
+1. **Creation:** Successful MFA verification calls the direct D1 session manager
 2. **Storage:** Session ID stored in `lucia_sessions` table with IP + UA metadata
-3. **Validation:** `_middleware.js` reads the session cookie with `lucia.readSessionCookie()` and validates the resulting ID with `lucia.validateSession(sessionId)` on every admin request
-4. **Activity:** `last_used_at` updated on successful validation; sessions slide on activity
-5. **Expiration:** Sessions expire after 30 days of inactivity
-6. **Logout:** `lucia.invalidateSession()` deletes the DB row; cookies cleared
+3. **Validation:** `_middleware.js` reads and validates the session ID on every admin request
+4. **Activity:** `last_activity_at` is updated on successful validation
+5. **Expiration:** Admin sessions expire after 15 minutes idle or 8 hours absolute; other sessions after 30 minutes idle or 30 days absolute
+6. **Logout:** The session row is deleted and cookies are cleared
 
 ---
 
@@ -273,7 +260,7 @@ File: `frontend/src/utils/validation.js`
 
 All endpoints validate:
 - Email format (`/^[^\s@]+@[^\s@]+\.[^\s@]+$/`)
-- Password length (8+ characters)
+- Password length (12+ characters)
 - Required fields
 - Data types
 - Length limits (future enhancement)
@@ -291,33 +278,14 @@ All endpoints validate:
 
 ### Configuration
 
-Location: `frontend/public/_headers` (Cloudflare Pages)
+The browser-enforced document policy is in `frontend/public/_headers`. API JSON responses receive the separate policy from `functions/_middleware.js`.
 
-```javascript
-helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"], // Tailwind CSS
-      imgSrc: ["'self'", "data:", "https:"],
-      fontSrc: ["'self'", "data:"],
-      connectSrc: ["'self'"],
-      objectSrc: ["'none'"],
-      frameSrc: ["'none'"],
-      baseUri: ["'self'"],
-      formAction: ["'self'"],
-      frameAncestors: ["'none'"]
-    }
-  }
-})
-```
+The document policy is maintained in `_headers`; do not describe it as a Helmet or Express configuration.
 
 ### Notes
 
-- `'unsafe-inline'` for styles: Required by Tailwind CSS
-- Consider using nonces for inline scripts if needed
-- Test thoroughly after any CSP changes
+- The document policy includes the Turnstile origins and a hash allowlist for the theme-flash script.
+- API responses use the policy assembled by `functions/_middleware.js`.
 
 ---
 
@@ -332,14 +300,19 @@ Configured in: `functions/_middleware.js`
 - `https://www.settimes.ca`
 
 **Preview/Staging:**
-- `https://dev.settimes.pages.dev`
-- `https://settimes.pages.dev`
+- `https://dev.settimesdotca.pages.dev`
+- `https://settimesdotca.pages.dev`
+- `https://dev.settimes.ca`
 
 **Local Development:**
 - `http://localhost:5173` (Vite)
 - `http://localhost:3000` (Express)
 - `http://localhost:8788` (Wrangler)
-- `http://127.0.0.1:*` (all above)
+- `http://127.0.0.1:5173`
+- `http://127.0.0.1:3000`
+- `http://127.0.0.1:8788`
+
+`CORS_ALLOWED_ORIGINS` adds comma-separated origins to this fixed list.
 
 ### Credentials
 
@@ -351,43 +324,28 @@ CORS requests with credentials (`credentials: 'include'`) only allowed from appr
 
 ### Environment Variables
 
-**Required secrets in Cloudflare Pages (set via dashboard, never commit):**
+**Production secrets in Cloudflare Pages (set in the dashboard, never commit):**
 
 ```bash
-CSRF_SECRET=<32+ byte random hex>          # HMAC key for CSRF tokens
-MFA_ENCRYPTION_KEY=<32 byte hex>           # AES-256 key for TOTP secrets at rest
-TURNSTILE_SECRET_KEY=<from Cloudflare>     # Bot protection for public forms
-CF_PAGES_API_TOKEN=<from Cloudflare>       # CI deployment token (GitHub secret)
-CF_ACCOUNT_ID=<from Cloudflare>            # CI deployment (GitHub secret)
+CSRF_SECRET=<secret>                       # Required; CSRF HMAC key
+MFA_TOTP_ENCRYPTION_KEY=<secret>            # Required for encrypted TOTP secrets; never rotate after use
+TURNSTILE_SECRET_KEY=<secret>              # Required; production bot protection fails closed when absent
+CRON_SECRET=<secret>                       # Required by the scheduled-job endpoint
+PUBLIC_URL=https://settimes.ca
+EMAIL_PROVIDER=postmark|mailchannels|resend
+EMAIL_FROM=<sender address>
+POSTMARK_API_TOKEN=<secret>                # If EMAIL_PROVIDER=postmark
+RESEND_API_KEY=<secret>                    # If EMAIL_PROVIDER=resend
+PUBLIC_DATA_PUBLISH_ENABLED=true
+CORS_ALLOWED_ORIGINS=<comma-separated extras> # Optional
+ENVIRONMENT=production
 ```
 
-**Optional:**
-```bash
-ENVIRONMENT=development   # Set in dev environment to relax __Host- cookie prefix
-RESEND_API_KEY=<key>      # Email delivery for subscription notifications
-```
+`CF_PAGES_API_TOKEN` and `CF_ACCOUNT_ID` are GitHub Actions secrets, not application runtime variables. Keep all production variables that are configured in Pages as secrets. A deploy using `wrangler.toml` can replace dashboard plain-text variables; the preview block documents this behavior.
 
 ### Database Setup
 
-1. Create D1 database:
-   ```bash
-   wrangler d1 create settimes-db
-   ```
-
-2. Run migrations:
-   ```bash
-   wrangler d1 execute settimes-db --file=database/schema.sql
-   wrangler d1 execute settimes-db --file=database/migration-rbac-sprint-1-1.sql
-   wrangler d1 execute settimes-db --file=database/migration-invite-codes.sql
-   ```
-
-3. Create first admin invite:
-   ```bash
-   node scripts/create-admin-invite.js --prod
-   wrangler d1 execute settimes-db --command="INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES ('UUID-HERE', 'admin', datetime('now', '+7 days'), 1);"
-   ```
-
-4. Sign up with invite code at your production URL
+Follow [the deployment guide](DEPLOYMENT.md) for database creation and migration operations. The schema source is the numbered files in `migrations/`; the production workflow applies them before deploying and verifies the live schema. `database/setup-complete.sql` is the consolidated local bootstrap reference. Do not apply ad-hoc legacy schema files to production.
 
 ### R2 Bucket (Band Photos)
 
@@ -481,31 +439,15 @@ Bind in Cloudflare Pages dashboard: Settings > Functions > R2 bucket bindings
 
 ## Future Security Enhancements
 
-### Priority 1 (Next Sprint)
-- [ ] Implement email verification
-- [ ] Sliding session expiration
-- [ ] Account lockout after failed logins
-- [ ] Password complexity requirements (12+ chars, mixed case, numbers, symbols)
-
-### Priority 2 (Next Month)
-- [ ] DOMPurify for HTML sanitization
-- [ ] Server-side input length limits
-- [ ] Generic error messages (prevent email enumeration)
-- [ ] Complete audit logging (all operations)
-- [ ] API rate limiting per endpoint
-
-### Priority 3 (Backlog)
-- [ ] WebAuthn/Passkey support
-- [ ] Security headers review
-- [ ] Automated security scanning in CI/CD
-- [ ] Penetration testing
-- [ ] Bug bounty program
+- WebAuthn/passkey support
+- Additional penetration testing
+- Further least-privilege and audit coverage as new features land
 
 ---
 
 ## Contact
 
-**Security Issues:** Report to [security@settimes.ca] or create a private security advisory on GitHub.
+**Security Issues:** Prefer GitHub's private vulnerability reporting. You can also report to `security@settimes.ca`.
 
 **General Questions:** Create an issue on GitHub with the `security` label.
 

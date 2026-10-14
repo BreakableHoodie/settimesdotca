@@ -8,13 +8,13 @@ This document outlines SQL safety practices implemented in the Long Weekend Band
 
 ```javascript
 // ✅ CORRECT - Parameterized query
-const result = await DB.prepare("SELECT * FROM bands WHERE id = ?")
-  .bind(bandId)
+const result = await DB.prepare("SELECT * FROM performances WHERE id = ?")
+  .bind(performanceId)
   .first();
 
 // ❌ WRONG - String concatenation (SQL injection risk)
 const result = await DB.prepare(
-  `SELECT * FROM bands WHERE id = ${bandId}`,
+  `SELECT * FROM performances WHERE id = ${performanceId}`,
 ).first();
 ```
 
@@ -25,7 +25,7 @@ Use multiple placeholders with `.bind()` in the same order:
 ```javascript
 const result = await DB.prepare(
   `
-  SELECT * FROM bands
+  SELECT * FROM performances
   WHERE event_id = ?
   AND venue_id = ?
   AND start_time > ?
@@ -44,14 +44,15 @@ Use transactions and parameterized queries for bulk inserts:
 ```javascript
 // ✅ CORRECT - Safe batch insert
 const insertStmt = DB.prepare(`
-  INSERT INTO bands (name, event_id, venue_id, start_time, end_time)
+  INSERT INTO performances (band_profile_id, event_id, venue_id, start_time, end_time)
   VALUES (?, ?, ?, ?, ?)
 `);
 
 await DB.batch([
-  insertStmt.bind("Band A", eventId, venue1, "20:00", "21:00"),
-  insertStmt.bind("Band B", eventId, venue2, "21:00", "22:00"),
-  insertStmt.bind("Band C", eventId, venue3, "22:00", "23:00"),
+  // band_profile_id takes a band_profiles.id, never a band name
+  insertStmt.bind(bandProfileIdA, eventId, venue1, "20:00", "21:00"),
+  insertStmt.bind(bandProfileIdB, eventId, venue2, "21:00", "22:00"),
+  insertStmt.bind(bandProfileIdC, eventId, venue3, "22:00", "23:00"),
 ]);
 ```
 
@@ -61,15 +62,15 @@ Never build dynamic WHERE clauses from user input:
 
 ```javascript
 // ✅ CORRECT - Individual parameterized updates
-for (const band of bands) {
-  await DB.prepare("UPDATE bands SET name = ? WHERE id = ?")
-    .bind(band.name, band.id)
+for (const set of sets) {
+  await DB.prepare("UPDATE performances SET start_time = ? WHERE id = ?")
+    .bind(set.start_time, set.id)
     .run();
 }
 
 // ❌ WRONG - Dynamic WHERE clause
-const ids = bands.map((b) => b.id).join(",");
-await DB.prepare(`UPDATE bands SET status = 1 WHERE id IN (${ids})`).run();
+const ids = sets.map((s) => s.id).join(",");
+await DB.prepare(`UPDATE performances SET is_cancelled = 1 WHERE id IN (${ids})`).run();
 ```
 
 ### Batch Deletes
@@ -78,9 +79,9 @@ Use prepared statements in loops or batch operations:
 
 ```javascript
 // ✅ CORRECT - Parameterized batch delete
-const deleteStmt = DB.prepare("DELETE FROM bands WHERE id = ?");
+const deleteStmt = DB.prepare("DELETE FROM performances WHERE id = ?");
 
-await DB.batch(bandIds.map((id) => deleteStmt.bind(id)));
+await DB.batch(performanceIds.map((id) => deleteStmt.bind(id)));
 ```
 
 ## Column Names and Table Names
@@ -89,10 +90,10 @@ Column and table names cannot be parameterized. When dynamic, use **whitelisting
 
 ```javascript
 // ✅ CORRECT - Whitelist validation
-const ALLOWED_SORT_COLUMNS = ["name", "start_time", "venue_id"];
+const ALLOWED_SORT_COLUMNS = ["start_time", "end_time", "venue_id"];
 const ALLOWED_SORT_ORDERS = ["ASC", "DESC"];
 
-function getSortedBands(sortBy, order) {
+function getSortedPerformances(sortBy, order) {
   if (!ALLOWED_SORT_COLUMNS.includes(sortBy)) {
     throw new Error("Invalid sort column");
   }
@@ -102,7 +103,7 @@ function getSortedBands(sortBy, order) {
 
   return DB.prepare(
     `
-    SELECT * FROM bands
+    SELECT * FROM performances
     ORDER BY ${sortBy} ${order}
   `,
   ).all();
@@ -111,7 +112,7 @@ function getSortedBands(sortBy, order) {
 // ❌ WRONG - No validation
 const result = await DB.prepare(
   `
-  SELECT * FROM bands ORDER BY ${req.query.sortBy}
+  SELECT * FROM performances ORDER BY ${req.query.sortBy}
 `,
 ).all();
 ```
@@ -123,14 +124,14 @@ Use LIKE with parameterized values:
 ```javascript
 // ✅ CORRECT - Parameterized LIKE search
 const searchTerm = `%${userInput}%`;
-const result = await DB.prepare("SELECT * FROM bands WHERE name LIKE ?")
+const result = await DB.prepare("SELECT * FROM band_profiles WHERE name LIKE ?")
   .bind(searchTerm)
   .all();
 
 // ❌ WRONG - String interpolation
 const result = await DB.prepare(
   `
-  SELECT * FROM bands WHERE name LIKE '%${userInput}%'
+  SELECT * FROM band_profiles WHERE name LIKE '%${userInput}%'
 `,
 ).all();
 ```
@@ -143,10 +144,10 @@ JOINs are safe when table/column names are hardcoded:
 // ✅ SAFE - Hardcoded table/column names, parameterized values
 const result = await DB.prepare(
   `
-  SELECT b.*, v.name as venue_name
-  FROM bands b
-  INNER JOIN venues v ON b.venue_id = v.id
-  WHERE b.event_id = ?
+  SELECT p.*, v.name as venue_name
+  FROM performances p
+  INNER JOIN venues v ON p.venue_id = v.id
+  WHERE p.event_id = ?
 `,
 )
   .bind(eventId)
@@ -158,26 +159,24 @@ const result = await DB.prepare(
 Always validate input before database operations:
 
 ```javascript
-function validateBandInput(data) {
-  if (!data.name || typeof data.name !== "string") {
-    throw new Error("Invalid band name");
-  }
-  if (data.start_time && !/^\d{2}:\d{2}$/.test(data.start_time)) {
-    throw new Error("Invalid time format");
+import { isValidTime } from "../utils/validation/datetime.js";
+
+function validateSetInput(data) {
+  // isValidTime checks the HH:MM shape AND the 0-23 / 0-59 ranges. It
+  // returns { valid, error }, never a boolean: test .valid.
+  // Never re-implement it with an inline regex (see CLAUDE.md, #1089).
+  if (data.start_time && !isValidTime(data.start_time).valid) {
+    throw new Error("Invalid time");
   }
   // ... more validation
   return true;
 }
 
-export async function createBand(data) {
-  validateBandInput(data); // Validate first
+export async function updateSetTime(DB, performanceId, data) {
+  validateSetInput(data); // Validate first
 
-  return DB.prepare(
-    `
-    INSERT INTO bands (name, start_time) VALUES (?, ?)
-  `,
-  )
-    .bind(data.name, data.start_time)
+  return DB.prepare("UPDATE performances SET start_time = ? WHERE id = ?")
+    .bind(data.start_time, performanceId)
     .run();
 }
 ```
@@ -188,8 +187,8 @@ Never expose SQL errors directly to users:
 
 ```javascript
 try {
-  const result = await DB.prepare("SELECT * FROM bands WHERE id = ?")
-    .bind(bandId)
+  const result = await DB.prepare("SELECT * FROM band_profiles WHERE id = ?")
+    .bind(bandProfileId)
     .first();
 } catch (error) {
   console.error("Database error:", error);

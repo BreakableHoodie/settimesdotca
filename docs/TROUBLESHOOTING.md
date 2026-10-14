@@ -83,31 +83,24 @@
 
 ### "Too many failed login attempts. Please try again later."
 
-**Problem:** Account temporarily locked due to failed login attempts.
+**Problem:** Login is rate-limited after repeated failed attempts.
 
-**Cause:** 5 failed login attempts within 10 minutes triggers 1-hour lockout.
+**Cause:** Failed attempts are counted in a sliding 10-minute window in `auth_attempts`. This is rate limiting, not a one-hour account lockout.
 
 **Solutions:**
 
-1. **Wait 1 hour:**
-   - Lockout automatically expires after 1 hour
-   - Timer shown in error message
+1. **Wait out the window:**
+   - Retry after the failed-attempt window has expired.
 
-2. **Contact administrator:**
-   - Admin can manually reset lockout
-   - Requires database access
+2. **Contact an administrator if it continues:**
+   - Check the login rate-limit response and the `auth_attempts` records.
 
 3. **Prevent in future:**
    - Use password manager to avoid typos
    - Ensure Caps Lock is off
    - Double-check email address
 
-**Administrator Reset:**
-
-```sql
--- Via wrangler CLI
-wrangler d1 execute settimes-db --command="DELETE FROM auth_audit WHERE ip_address = 'XX.XX.XX.XX'"
-```
+There is no supported SQL reset. Deleting from `auth_audit` does not affect the login limiter; wait for the sliding window to expire.
 
 ---
 
@@ -147,23 +140,22 @@ wrangler d1 execute settimes-db --command="DELETE FROM auth_audit WHERE ip_addre
 
 **Solutions:**
 
-1. **Delete all bands first:**
+1. **Delete all performances first:**
    - Go to Performers tab
    - Filter by event
-   - Delete all performers
+   - Delete all performances
    - Then delete event
 
 2. **Archive instead:**
    - Edit event
-   - Uncheck "Published"
-   - Mark as archived
+   - Use the archive action when the event is complete
    - Keeps historical data
 
 **Administrator Alternative:**
 
 ```sql
--- WARNING: Deletes event and all bands (irreversible!)
-DELETE FROM bands WHERE event_id = <event_id>;
+-- Prefer the admin UI. If SQL is unavoidable, delete performances, not bands.
+DELETE FROM performances WHERE event_id = <event_id>;
 DELETE FROM events WHERE id = <event_id>;
 ```
 
@@ -364,7 +356,7 @@ Band B: 8:30 PM - 9:30 PM (Analog Cafe) ✅ NO CONFLICT
 1. **Publish the event:**
    - Go to Events tab
    - Click "Edit" on event
-   - Check "Published" checkbox
+   - Set the Status dropdown to "Published"
    - Click "Save"
 
 2. **Wait for cache update:**
@@ -393,12 +385,11 @@ Band B: 8:30 PM - 9:30 PM (Analog Cafe) ✅ NO CONFLICT
 **Solutions:**
 
 1. **Check URL format:**
-   - Correct: `settimes.ca/bands/[event-slug]/[band-name-slug]`
-   - Example: `settimes.ca/bands/spring-fest-2025/the-sunset-trio`
+   - Correct: `settimes.ca/band/[id-or-slug]`
+   - Example: `settimes.ca/band/42` or `settimes.ca/band/the-sunset-trio`
 
 2. **Verify event is published:**
-   - Band profiles only work for published events
-   - Publish event first
+   - The route accepts the band ID or normalized band slug
 
 3. **Check event slug:**
    - Must match event's slug exactly
@@ -764,16 +755,17 @@ fetch('https://settimes.ca/api/admin/events');
 
 **Solutions (Administrator):**
 
-1. **Restore from backup:**
+1. **Use D1 Time Travel:**
 
    ```bash
-   wrangler d1 execute settimes-db --file=backups/settimes-20251119.sql
+   wrangler d1 time-travel info settimes-production-db
+   wrangler d1 time-travel restore settimes-production-db --timestamp=<ISO-8601-timestamp>
    ```
 
 2. **Check audit logs:**
 
    ```sql
-   SELECT * FROM audit_logs
+   SELECT * FROM audit_log
    WHERE action LIKE '%delete%'
    ORDER BY created_at DESC LIMIT 50;
    ```
@@ -781,15 +773,10 @@ fetch('https://settimes.ca/api/admin/events');
 3. **Verify data integrity:**
 
    ```sql
-   -- Check for orphaned bands
-   SELECT b.* FROM bands b
-   LEFT JOIN events e ON b.event_id = e.id
-   WHERE e.id IS NULL;
+    -- Review performances through the admin UI before using SQL.
 
-   -- Check for orphaned venues
-   SELECT v.* FROM venues v
-   LEFT JOIN bands b ON v.id = b.venue_id
-   WHERE b.id IS NULL AND v.created_at < datetime('now', '-30 days');
+    SELECT v.* FROM venues v
+    WHERE v.created_at < datetime('now', '-30 days');
    ```
 
 ---
@@ -819,13 +806,13 @@ fetch('https://settimes.ca/api/admin/events');
 
 ```sql
 -- View recent logins
-SELECT * FROM audit_logs
+SELECT * FROM audit_log
 WHERE action LIKE '%login%'
 AND user_id = <user_id>
 ORDER BY created_at DESC LIMIT 20;
 
 -- Force logout all sessions
-DELETE FROM sessions WHERE user_id = <user_id>;
+DELETE FROM lucia_sessions WHERE user_id = <user_id>;
 ```
 
 ---
@@ -839,18 +826,22 @@ DELETE FROM sessions WHERE user_id = <user_id>;
 **Solutions (Administrator):**
 
 1. **Add origin to allowed list:**
-   - Edit `functions/api/_middleware.js`
-   - Add origin to CORS headers
+    - Configure an extra origin through `CORS_ALLOWED_ORIGINS`; do not edit a generated or stale list in the docs.
 
 2. **Check request origin:**
 
    ```javascript
    // Allowed origins
-   const allowedOrigins = [
-     'https://settimes.ca',
-     'https://dev.settimes.ca',
-     'http://localhost:5173',
-   ];
+    const allowedOrigins = [
+      'https://settimes.ca',
+      'https://www.settimes.ca',
+      'https://dev.settimesdotca.pages.dev',
+      'https://settimesdotca.pages.dev',
+      'https://dev.settimes.ca',
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'http://localhost:8788',
+    ];
    ```
 
 **Note:** CORS is a security feature to prevent unauthorized API access.

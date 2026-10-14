@@ -87,6 +87,15 @@ export const REPO_ROOT = path.join(__dirname, "..");
 /** @type {Mutation[]} */
 export const MUTATIONS = [
   {
+    id: "api-keys-identity-management-read-only",
+    invariant:
+      "CLAUDE.md 'API keys' — identity-management resources are readable by keys but key mutations cannot create or change identities",
+    file: "functions/api/admin/_middleware.js",
+    find: '    if (\n      KEY_READ_ONLY_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)) &&\n      !["GET", "HEAD"].includes(request.method)\n    ) {',
+    replace: "    if (false) {",
+    tests: ["functions/api/admin/__tests__/api-key-auth.test.js"],
+  },
+  {
     id: "schedule-builds-hash-session",
     invariant:
       "CLAUDE.md 'Schedule builds are per-event pseudonyms, anonymised 30 days after the event (#1245)' — schedule builds never persist the raw schedule session id",

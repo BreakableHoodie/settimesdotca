@@ -48,6 +48,10 @@ const KEY_FORBIDDEN_PREFIXES = [
   "/api/admin/trusted-devices",
 ];
 
+// Keys may read identity-management resources, but may not create or change identities.
+// A leaked key must not be able to create a principal that outlives the key's revocation.
+const KEY_READ_ONLY_PREFIXES = ["/api/admin/users", "/api/admin/invite-codes", "/api/admin/api-keys"];
+
 function normalizeUser(user) {
   if (!user) return null;
   const displayName = user.name || [user.firstName, user.lastName].filter(Boolean).join(" ") || null;
@@ -347,6 +351,25 @@ export async function onRequest(context) {
           error: "Not available to API keys",
           code: "KEY_NOT_PERMITTED",
           message: "This endpoint acts on the account behind the key and is reachable only with a session.",
+        }),
+        { status: 403, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    if (
+      KEY_READ_ONLY_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)) &&
+      !["GET", "HEAD"].includes(request.method)
+    ) {
+      log.warn("API key blocked from identity-management mutation", {
+        keyPrefix: bearerValue.slice(0, DISPLAY_PREFIX_LENGTH),
+        path: pathname,
+        ipAddress,
+      });
+      return new Response(
+        JSON.stringify({
+          error: "Not available to API keys",
+          code: "KEY_NOT_PERMITTED",
+          message: "Identity-management mutations require a session.",
         }),
         { status: 403, headers: { "Content-Type": "application/json" } },
       );

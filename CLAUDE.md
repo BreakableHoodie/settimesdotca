@@ -720,6 +720,8 @@ Three traps here, each of which was live:
 
 `KEY_FORBIDDEN_PREFIXES` in `_middleware.js` now 403s these families (`KEY_NOT_PERMITTED`), **checked before the key is verified** — the refusal is a property of the credential type and the path, so a forged key and a valid one are refused identically at zero D1 cost. **The role hierarchy is the wrong axis here: no key role belongs on these routes, including one minted `admin`.** `/api/admin/me` is deliberately _not_ listed — a decision, not an omission.
 
+Keys are read-only for `/api/admin/users`, `/api/admin/invite-codes` and `/api/admin/api-keys`: GET/HEAD remain available, but every mutation is refused before key verification. Identity management is a human act; a leaked key must not create a principal that outlives its own revocation.
+
 `revoke-all.js` also got its own `checkPermission(context, "viewer")`. **`viewer`, not `admin`:** revoking your own sessions is legitimate self-service at every role, and raising the tier would break a viewer logging out everywhere. The point is that an endpoint which mints sessions must state its own requirement rather than inherit safety from middleware shape.
 
 `functions/api/admin/__tests__/apiKeySelfService.test.js` keeps it closed: any admin route exporting an `onRequest*` handler with **no `checkPermission` call** must be covered by the denylist or recorded in `REVIEWED_UNGATED_ROUTES` with a reason. **Its scope is honest and partial** — it catches the _ungated_ shape, not the MFA shape (viewer-gated, then acting on self), because nothing textual separates that from a viewer-gated route acting on `params.id`. The MFA family is covered by name instead. A sixth self-service family outside these prefixes still needs a human to notice.

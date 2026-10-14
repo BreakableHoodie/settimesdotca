@@ -16,13 +16,13 @@ export async function onRequest(context) {
 
   const log = createRequestLogger(context);
 
-  // Allowed origins for CORS (production and development)
+  // Allowed origins for CORS (production and local development). Only hosts
+  // we control: an allowlisted origin gets credentialed CORS, so a *.pages.dev
+  // name someone else could claim must never appear here (#1310). The preview
+  // alias edge E2E uses is added per environment via CORS_ALLOWED_ORIGINS.
   const baseAllowedOrigins = [
     "https://settimes.ca",
     "https://www.settimes.ca",
-    "https://dev.settimesdotca.pages.dev",
-    "https://settimesdotca.pages.dev",
-    "https://dev.settimes.ca",
     "http://localhost:5173",
     "http://localhost:3000",
     "http://localhost:8788",

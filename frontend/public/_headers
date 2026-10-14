@@ -32,7 +32,7 @@
   # it (sha256 of the exact built script body, base64) if that script changes.
   # worker-src 'self' permits /sw.js. NOTE: Cloudflare Rocket Loader must stay OFF
   # for the zone (it inline-executes scripts, which this no-'unsafe-inline' CSP blocks).
-  Content-Security-Policy: default-src 'self'; style-src 'self' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https: blob:; script-src 'self' https://static.cloudflareinsights.com https://challenges.cloudflare.com 'sha256-AthfpLUxHMTHKKJhjnay6WvKZb8lWKmb3ca+GM+ZrkI='; connect-src 'self' https://*.settimes.ca https://*.pages.dev https://cloudflareinsights.com https://static.cloudflareinsights.com https://challenges.cloudflare.com; object-src 'none'; frame-ancestors 'none'; frame-src 'self' https://challenges.cloudflare.com; child-src 'self' https://challenges.cloudflare.com; worker-src 'self'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; style-src 'self' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https: blob:; script-src 'self' https://static.cloudflareinsights.com https://challenges.cloudflare.com 'sha256-AthfpLUxHMTHKKJhjnay6WvKZb8lWKmb3ca+GM+ZrkI='; connect-src 'self' https://*.settimes.ca https://cloudflareinsights.com https://static.cloudflareinsights.com https://challenges.cloudflare.com; object-src 'none'; frame-ancestors 'none'; frame-src 'self' https://challenges.cloudflare.com; child-src 'self' https://challenges.cloudflare.com; worker-src 'self'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests
 
   # Permissions policy (disable unnecessary features)
   Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=(), usb=(), accelerometer=(), gyroscope=(), magnetometer=()
@@ -61,7 +61,7 @@
   ! Content-Security-Policy
   Cross-Origin-Embedder-Policy: unsafe-none
   Cross-Origin-Opener-Policy: unsafe-none
-  Content-Security-Policy: default-src 'self'; style-src 'self' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https: blob:; script-src 'self' https://static.cloudflareinsights.com; connect-src 'self' https://*.settimes.ca https://*.pages.dev https://cloudflareinsights.com https://static.cloudflareinsights.com; object-src 'none'; frame-ancestors *; frame-src 'none'; child-src 'none'; worker-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; style-src 'self' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https: blob:; script-src 'self' https://static.cloudflareinsights.com; connect-src 'self' https://*.settimes.ca https://cloudflareinsights.com https://static.cloudflareinsights.com; object-src 'none'; frame-ancestors *; frame-src 'none'; child-src 'none'; worker-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests
 
 # Cache control for static assets (versioned JS/CSS bundles)
 /assets/*

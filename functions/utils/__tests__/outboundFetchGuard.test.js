@@ -195,12 +195,25 @@ function findViolations(source) {
       visit(node.object);
       return;
     }
+    // A computed key destructured from the global object is a dynamic global
+    // lookup (`const { [k]: f } = globalThis`). Ordinary data is not.
+    const pattern =
+      node.type === "VariableDeclarator" ? node.id : node.type === "AssignmentExpression" ? node.left : undefined;
+    const destructuredFrom =
+      node.type === "VariableDeclarator" ? node.init : node.type === "AssignmentExpression" ? node.right : undefined;
+    if (
+      pattern?.type === "ObjectPattern" &&
+      destructuredFrom?.type === "Identifier" &&
+      GLOBAL_OBJECTS.has(destructuredFrom.name) &&
+      pattern.properties.some((p) => p.type === "Property" && p.computed && p.key.type !== "Literal")
+    ) {
+      violations.push(`dynamic ${destructuredFrom.name} destructuring`);
+    }
     // Destructuring renames are aliasing too: `const { fetch: f } = globalThis`.
     if (node.type === "ObjectPattern") {
       for (const p of node.properties) {
         if (p.type !== "Property") continue;
         if (isNamed(p.key, NETWORK_GLOBALS)) violations.push(`destructured ${source.slice(p.key.start, p.key.end)}`);
-        else if (p.computed && p.key.type !== "Literal") violations.push("destructuring with a computed key");
       }
     }
     if ((node.type === "Property" || node.type === "MethodDefinition") && !node.computed) {
@@ -265,6 +278,7 @@ describe("server requests go only to addresses fixed in code (SSRF guard)", () =
     expect(flagged("await import(body.module);")).toBe(true);
     // ...and accepts the shapes in use today.
     expect(flagged('await fetch("https://api.resend.com/emails", {});')).toBe(false);
+    expect(flagged("const { [field]: value } = record;")).toBe(false);
     expect(flagged('const URL_A = "https://x.example/a";\nawait fetch(URL_A, {});')).toBe(false);
     expect(flagged("export function h(request, env) { return env.ASSETS.fetch(request); }")).toBe(false);
     expect(flagged("// fetch(anything) in a comment")).toBe(false);

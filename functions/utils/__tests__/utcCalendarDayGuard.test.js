@@ -55,7 +55,6 @@ const functionsRoot = path.join(path.dirname(currentFile), "../../");
 // anywhere else. An entry must also keep matching: a fixed file left here
 // would silently exempt the next regression in it (see the last test).
 const SLICE = "toISOString().slice(0, 10)";
-const SIX_HOURS = "date('now', '-6 hours')";
 const ALLOWED = {
   // Calendar arithmetic on dates BUILT in UTC from a Y-M-D (nextCalendarDay /
   // previousCalendarDay). The UTC day is the intended answer there, by
@@ -68,12 +67,6 @@ const ALLOWED = {
   // admits today in every timezone. It can refuse nothing a Toronto admin
   // should be allowed and hides nothing from fans.
   "api/admin/events/wizard.js": { reason: "deliberately lenient admin cutoff", hits: [SLICE] },
-  // Known live instances, tracked. Remove each entry in the PR that fixes it.
-  "api/schedule.js": { reason: "#1270 — date('now', '-6 hours') flips at 2 AM EDT", hits: [SIX_HOURS] },
-  "api/events/public.js": {
-    reason: "#1270 — date('now', '-6 hours') flips at 2 AM EDT",
-    hits: [SIX_HOURS, SIX_HOURS],
-  },
 };
 
 // Comment lines are dropped before scanning: several files explain this very

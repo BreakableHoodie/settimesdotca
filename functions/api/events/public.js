@@ -6,6 +6,7 @@ import { getPublicDataGateResponse } from "../../utils/publicGate.js";
 import { CACHE_BROWSE } from "../../utils/cacheHeaders.js";
 import { normalizeHttpUrl } from "../../utils/validation.js";
 import { publicEventStatusSql } from "../../utils/eventVisibility.js";
+import { eventLocalFestivalToday } from "../../utils/eventDay.js";
 
 export async function onRequestGet(context) {
   const { request, env } = context;
@@ -23,6 +24,8 @@ export async function onRequestGet(context) {
   const upcoming = url.searchParams.get("upcoming") !== "false"; // Default true
 
   try {
+    const festivalDay = eventLocalFestivalToday();
+
     // Build query
     // V2 Schema: events -> performances -> band_profiles
     let query = `
@@ -35,7 +38,7 @@ export async function onRequestGet(context) {
         e.city,
         e.ticket_url,
         e.poster_url,
-        CASE WHEN COALESCE(e.end_date, e.date) >= date('now', '-6 hours') THEN 1 ELSE 0 END as is_upcoming,
+        CASE WHEN COALESCE(e.end_date, e.date) >= ? THEN 1 ELSE 0 END as is_upcoming,
         COUNT(DISTINCT p.band_profile_id) as band_count,
         COUNT(DISTINCT p.venue_id) as venue_count
       FROM events e
@@ -43,7 +46,8 @@ export async function onRequestGet(context) {
       WHERE ${publicEventStatusSql("e")}
     `;
 
-    const params = [];
+    // Bind order: CASE cutoff, optional city, optional genre, upcoming cutoff, limit.
+    const params = [festivalDay];
 
     // Filter by city
     if (city !== "all") {
@@ -67,12 +71,12 @@ export async function onRequestGet(context) {
     }
 
     // Filter by upcoming (future events only)
-    // Use -6 hours offset to account for ET timezone (UTC-5/UTC-4)
-    // This prevents events from disappearing while still ongoing.
+    // The Toronto festival day keeps an event visible through 06:00 local time.
     // COALESCE(end_date, date): a multi-day event stays "upcoming" through its
     // end_date instead of dropping off the morning after it starts (#539).
     if (upcoming) {
-      query += ` AND COALESCE(e.end_date, e.date) >= date('now', '-6 hours')`;
+      query += ` AND COALESCE(e.end_date, e.date) >= ?`;
+      params.push(festivalDay);
     }
 
     query += `

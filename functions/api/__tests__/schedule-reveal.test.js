@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { createTestEnv, insertEvent, insertVenue, insertBand } from "../test-utils";
 import * as scheduleHandler from "../schedule.js";
 
@@ -189,5 +189,44 @@ describe("GET /api/schedule - current-event window (#539)", () => {
     // No published event qualifies as current/upcoming — 404, same as before
     // the fix (single-day past-event exclusion is unchanged).
     expect(res.status).toBe(404);
+  });
+});
+
+describe("GET /api/schedule?event=current — Toronto festival-day cutoff (#1270)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function currentEventAt(instant) {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(instant));
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    insertEvent(rawDb, {
+      name: "Festival Day Event",
+      slug: "festival-day-event",
+      date: "2026-07-10",
+      status: "published",
+    });
+
+    return scheduleHandler.onRequestGet({
+      request: new Request("https://example.test/api/schedule?event=current"),
+      env,
+    });
+  }
+
+  it.each([
+    ["02:30 EDT", "2026-07-11T02:30:00-04:00"],
+    ["05:59 EDT", "2026-07-11T05:59:00-04:00"],
+  ])("resolves the current event at %s", async (_label, instant) => {
+    const response = await currentEventAt(instant);
+    expect(response.status).toBe(200);
+    expect((await response.json()).event.slug).toBe("festival-day-event");
+  });
+
+  it("does not resolve the event at 06:00 EDT when the Toronto festival day changes", async () => {
+    const response = await currentEventAt("2026-07-11T06:00:00-04:00");
+    expect(response.status).toBe(404);
+    expect((await response.json()).message).toBe("No published events available");
   });
 });

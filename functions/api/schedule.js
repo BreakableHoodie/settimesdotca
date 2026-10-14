@@ -6,6 +6,7 @@ import { getPublicDataGateResponse } from "../utils/publicGate.js";
 import { normalizeHttpUrl, safeReflectSocialLinks } from "../utils/validation.js";
 import { logger } from "../utils/logger.js";
 import { publicEventStatusSql, publishedEventStatusSql } from "../utils/eventVisibility.js";
+import { eventLocalFestivalToday } from "../utils/eventDay.js";
 
 export async function onRequestGet(context) {
   const { request, env } = context;
@@ -25,21 +26,23 @@ export async function onRequestGet(context) {
 
     if (eventParam === "current") {
       // Get the current or next upcoming published event.
-      // The -6 hour buffer keeps the event visible during late-night/overnight
-      // sets that span past midnight (e.g. 11:30pm-12:30am).
+      // The Toronto festival day keeps the event visible through 06:00 local time.
       // Deliberately published-only, unlike the slug branch below: that same
-      // -6h buffer means an event archived on its own final day still matches
-      // the date filter, and serving that as tonight's live schedule is wrong.
+      // festival-day cutoff means an event archived on its own final day still
+      // matches the date filter, and serving that as tonight's live schedule is wrong.
+      const festivalDay = eventLocalFestivalToday();
       event = await DB.prepare(
         `
         SELECT id, name, date, end_date, city, slug, status, ticket_url, poster_url, theme_colors, venue_info, social_links, doors_json, age_restriction, presented_by, reveal_mode
         FROM events
         WHERE ${publishedEventStatusSql()}
-          AND COALESCE(end_date, date) >= date('now', '-6 hours')
+          AND COALESCE(end_date, date) >= ?
         ORDER BY date ASC
         LIMIT 1
       `,
-      ).first();
+      )
+        .bind(festivalDay)
+        .first();
     } else {
       // Get event by slug — includes archived events for read-only history browsing
       event = await DB.prepare(

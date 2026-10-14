@@ -967,6 +967,10 @@ npx playwright test
 
 Requires a running wrangler dev server or uses it automatically via `playwright.config.js`. Run `npm run build --prefix frontend` first.
 
+### Post-deploy probes are read-only (#1292)
+
+Post-deploy probes check iCal, sitemap, and SSR identity metadata without writing; `/s/` is excluded because share links expire via cron and no fixed slug is safe to probe.
+
 ### Testing Safari/WebKit locally — `upgrade-insecure-requests` breaks it, silently
 
 Playwright WebKit against `http://localhost:8788` renders a **blank page** with no error: the `/*` document CSP in `frontend/public/_headers` carries `upgrade-insecure-requests`, so WebKit rewrites every subresource to `https://`, where the dev server has no TLS. Chromium treats `localhost` as trustworthy and skips the upgrade, which is why this only shows up in Safari. **It is not HSTS** (RFC 6797 §7.2 ignores STS over http — verified by experiment). **Production is unaffected; do not weaken the directive or HSTS.**

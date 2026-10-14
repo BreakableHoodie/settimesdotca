@@ -101,6 +101,61 @@ describe("subscription confirmation window, real SQLite (#1291)", () => {
     expect(body.verificationUrl).not.toContain("tok-stale");
   });
 
+  // The other two outcomes of the same race: the concurrent request has left
+  // the address VERIFIED, or has left no row at all. A wrong check on the
+  // re-read row would mis-answer one of them while the case above still passed.
+  const raceOnDelete = (env, swap) => {
+    const prepare = env.DB.prepare.bind(env.DB);
+    env.DB.prepare = (sql) => {
+      if (sql.includes("DELETE FROM email_subscriptions") && sql.includes("WHERE id = ?")) swap();
+      return prepare(sql);
+    };
+  };
+  const resubscribe = (email, env) =>
+    subscribe({
+      request: new Request("https://example.test/api/subscriptions/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "CF-Connecting-IP": "203.0.113.9" },
+        body: JSON.stringify({ email, city: "portland", genre: "punk", frequency: "weekly" }),
+      }),
+      env,
+    });
+
+  it("a row verified concurrently answers 'already subscribed' and is left verified", async () => {
+    const { env, rawDb } = createTestEnv();
+    seedPending(rawDb, { email: "verified-race@example.com", token: "tok-stale", ageDays: 8 });
+    raceOnDelete(env, () =>
+      rawDb
+        .prepare(
+          "UPDATE email_subscriptions SET verified = 1, verification_token = NULL, created_at = datetime('now') WHERE email = 'verified-race@example.com'",
+        )
+        .run(),
+    );
+
+    const res = await resubscribe("verified-race@example.com", env);
+
+    expect(res.status).toBe(400);
+    expect(row(rawDb, "verified-race@example.com")).toMatchObject({ verified: 1, verification_token: null });
+  });
+
+  it("a row deleted concurrently falls through to a fresh subscription", async () => {
+    const { env, rawDb } = createTestEnv();
+    seedPending(rawDb, { email: "gone-race@example.com", token: "tok-stale", ageDays: 8 });
+    raceOnDelete(env, () =>
+      rawDb.prepare("DELETE FROM email_subscriptions WHERE email = 'gone-race@example.com'").run(),
+    );
+
+    const res = await resubscribe("gone-race@example.com", env);
+
+    expect(res.status).toBe(201);
+    const rows = rawDb
+      .prepare("SELECT verified, verification_token FROM email_subscriptions WHERE email = 'gone-race@example.com'")
+      .all();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ verified: 0 });
+    expect(rows[0].verification_token).not.toBe("tok-stale");
+  });
+
   it("re-subscribing after expiry issues a fresh token; a verified row is never replaced", async () => {
     const { env, rawDb } = createTestEnv();
     seedPending(rawDb, { email: "again@example.com", token: "tok-stale", ageDays: 8 });

@@ -213,30 +213,30 @@ A third implementer on a separate subscription, via the `opencode-delegate` skil
 
 ## Mission & Scope
 
-settimes.ca is the multi-venue/multi-artist event platform for **Waterloo Region** (Kitchener-Waterloo, ON). The next edition is **Long Weekend Band Crawl Vol. 18** on **October 11, 2026** (event 37, `lwbc18`, single-day) — **`published` since 2026-08-28, with an empty lineup** (the supported "Lineup TBA" state; see the empty-lineup override under event visibility). It is live to the public now.
+settimes.ca is the multi-venue/multi-artist event platform for **Waterloo Region** (Kitchener-Waterloo, ON). The most recent edition, **Long Weekend Band Crawl Vol. 18** (event 37, `lwbc18`, single-day, October 11, 2026), ran and was **archived 2026-10-13**. No edition is published now; the next is expected in February 2027.
 
 - **Focus:** Waterloo Region. This governs **product language** — marketing copy, meta descriptions, SEO targeting, "where this is for" statements. It is not a censor on fact: the platform has hosted an event outside the region (Buddies Fest 2, Tillsonburg) and those records stay accurate wherever they appear. The specific drift this rule exists to prevent is describing the site as serving Ottawa, which it does not.
 - **Brand:** settimes.ca — no rebranding
-- **Target event:** Vol. 18, October 11, 2026
+- **Target event:** the next edition (expected February 2027); none is published yet
 - **Both fan-facing and admin tooling are equal priority**
 - **SEO is a priority** (band pages, event pages, local discovery, structured data)
 - **Colour themes:** 4 user-selectable (dark + light presets) via Tailwind v4 CSS custom properties + `data-theme` on `<html>`, persisted in localStorage
 - **Single photo per band** — extends existing `photo_url` / R2 upload flow; no video embeds
 
-**Shipped editions** (both `status = 'archived'`): Vol. 17 (event 21, 2026-08-02, 22 bands across 6 King St N venues — Blue Room, Princess Cafe, Prohibition Warehouse, Revive Karaoke, Room 47, Roost) and Buddies Fest 2 (event 36, 2026-08-07→09, Tillsonburg — the first multi-day production event). Their lineups and venue rosters are live data now, not spec; read them from D1 rather than from this file.
+**Shipped editions** (all `status = 'archived'`): Vol. 18 (event 37, 2026-10-11), Vol. 17 (event 21, 2026-08-02, 22 bands across 6 King St N venues — Blue Room, Princess Cafe, Prohibition Warehouse, Revive Karaoke, Room 47, Roost) and Buddies Fest 2 (event 36, 2026-08-07→09, Tillsonburg — the first multi-day production event). Their lineups and venue rosters are live data now, not spec; read them from D1 rather than from this file.
 
-**Between seasons is a supported state, not a bug** — and as of 2026-08-28 we are no longer in it. Vol. 18 is `published` with zero performances, so the surfaces split into two groups that a stale reading of this section would get wrong:
+**Between seasons is a supported state, not a bug**, and since Vol. 18 was archived on 2026-10-13 we are in it again. Measured against production on 2026-10-13:
 
-| Surface                                         | Now                                    | Why                                                        |
-| ----------------------------------------------- | -------------------------------------- | ---------------------------------------------------------- |
-| `/api/events/public` (defaults `upcoming=true`) | **1** (`lwbc18`)                       | event-driven; a published future event qualifies           |
-| `/api/events/timeline`                          | `now` 0, `upcoming` **1**, `past` 10   | same                                                       |
-| **iCal feed**                                   | **still 0**                            | `LEFT JOIN performances` — no announced sets, no `VEVENT`s |
-| `/api/stats/public`, `sitemap.xml`              | populated (283 performances, 277 URLs) | archived editions                                          |
+| Surface                                         | Now                                    | Why                                            |
+| ----------------------------------------------- | -------------------------------------- | ---------------------------------------------- |
+| `/api/events/public` (defaults `upcoming=true`) | **0**                                  | event-driven; no published future event        |
+| `/api/events/timeline`                          | `now` 0, `upcoming` 0, `past` 10       | same                                           |
+| **iCal feed**                                   | **0** `VEVENT`s                        | performance-driven; no upcoming published sets |
+| `/api/stats/public`, `sitemap.xml`              | populated (298 performances, 286 URLs) | archived editions                              |
 
-**The iCal zero is the trap.** It reads identically to the between-seasons zero and means something entirely different: _published event, lineup not yet announced_, not _no published event_. Diagnose the two apart by asking which layer the surface reads — an **event**-driven surface or a **performance**-driven one — rather than by the number.
+**The iCal zero is the trap once the next edition is published.** From 2026-08-28 until its lineup was announced, Vol. 18 was `published` with zero performances, and the feed's zero read identically to today's while meaning _published event, lineup not yet announced_, not _no published event_. Diagnose the two apart by asking which layer the surface reads — an **event**-driven surface or a **performance**-driven one — rather than by the number.
 
-`EventTimeline` still has its dedicated between-seasons empty state and auto-expands Past; that path is now dormant rather than gone, and will be live again after Vol. 18 is archived. Before treating any such zero as a bug, check both halves: is an event actually `published`, **and** does it have performances?
+`EventTimeline` still has its dedicated between-seasons empty state and auto-expands Past; that path is live again now that Vol. 18 is archived. Before treating any such zero as a bug, check both halves: is an event actually `published`, **and** does it have performances?
 
 Canonical active roadmap: `docs/ROADMAP.md`. Use it for handoffs between Claude, OpenCode, and humans.
 
@@ -253,7 +253,7 @@ Canonical active roadmap: `docs/ROADMAP.md`. Use it for handoffs between Claude,
 - **Storage**: Cloudflare R2 (band photos)
 - **Email**: Postmark/Resend/MailChannels
 - **Tests**: Vitest (unit, frontend), Playwright (E2E + a11y + visual regression)
-- **CI/CD**: GitHub Actions (13 workflows), Dependabot, Snyk, GitGuardian, CodeRabbit
+- **CI/CD**: GitHub Actions (16 workflows), Dependabot, Snyk, GitGuardian, CodeRabbit
   - **Runners are GitHub-hosted again** (2026-09-25, when the repo went public).
     Every job reads `runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}` except
     two that pin `ubuntu-latest` on purpose: `zap-baseline.yml` (needs Docker,
@@ -1408,6 +1408,19 @@ as "import from URL", and stored artist links are rendered, never visited.
 caller-supplied URL (link previews, URL import) must change that test on
 purpose, with an allowlist of hosts and a refusal of private and link-local
 addresses, never by loosening the scan. In the mutation gate.
+
+### Retention windows are a published promise
+
+The privacy policy's retention table (`frontend/src/pages/PrivacyPage.jsx`) states
+how long each kind of personal data is kept, and
+`functions/api/admin/maintenance/retention.js` is what makes it true. It runs daily
+from `scheduled-jobs.yml` through `/api/internal/run-scheduled`. Change a window in
+one and you must change the other in the same PR.
+
+Until the 2026-10 report card, the 30-day login-attempt window (emails and IPs) and
+the 90-day `api_key.request` window could be removed with every test green:
+the cross-table test seeded neither. `retentionWindows.test.js` now pins both on
+each side of the boundary, and both are in the mutation gate.
 
 ### Content-Security-Policy (strict, no `unsafe-inline`) — TWO sources
 

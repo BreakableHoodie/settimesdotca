@@ -320,6 +320,24 @@ export const MUTATIONS = [
     tests: ["functions/utils/__tests__/outboundFetchGuard.test.js"],
   },
   {
+    id: "retention-auth-attempts-30-days",
+    invariant:
+      "CLAUDE.md 'Retention windows are a published promise' — login attempts (emails, IPs) are deleted after 30 days, as the privacy policy states",
+    file: "functions/api/admin/maintenance/retention.js",
+    find: "DELETE FROM auth_attempts WHERE created_at < datetime('now', '-30 days')",
+    replace: "DELETE FROM auth_attempts WHERE created_at < datetime('now', '-3000 days')",
+    tests: ["functions/api/admin/maintenance/__tests__/retentionWindows.test.js"],
+  },
+  {
+    id: "retention-api-key-request-90-days",
+    invariant:
+      "CLAUDE.md 'Retention windows are a published promise' — api_key.request audit rows are pruned at 90 days, the rest of audit_log at 1 year",
+    file: "functions/api/admin/maintenance/retention.js",
+    find: "action = 'api_key.request' AND created_at < datetime('now', '-90 days')",
+    replace: "action = 'api_key.request' AND created_at < datetime('now', '-9000 days')",
+    tests: ["functions/api/admin/maintenance/__tests__/retentionWindows.test.js"],
+  },
+  {
     id: "time-validation-range-not-just-shape",
     invariant:
       "CLAUDE.md 'Time validation is shape AND range' — admin write paths bound hours/minutes via isValidTime, never an inline shape regex (#1089)",

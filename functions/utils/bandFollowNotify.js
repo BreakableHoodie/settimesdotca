@@ -6,7 +6,7 @@
 // notified for a performance — guaranteeing eventual delivery without ever
 // double-sending. Used by the announce flow (bands/[id].js) and the resend
 // endpoint (bands/[id]/resend-announcement.js).
-import { sendEmail } from "./email.js";
+import { listUnsubscribeHeaders, sendEmail } from "./email.js";
 import { logger } from "./logger.js";
 import { getPublicBaseUrl } from "./publicUrl.js";
 import { escapeHtml } from "./html.js";
@@ -75,6 +75,7 @@ export async function notifyBandFollowers(env, DB, { performanceId, bandProfileI
         to: follower.email,
         subject: `${bandName} just joined the lineup for ${eventName}!`,
         idempotencyKey: `band-follow:${performanceId}:${follower.id}`,
+        headers: listUnsubscribeHeaders(unsubUrl),
         text: `${bandName} is now on the lineup for ${eventName}.\n\nUnfollow: ${unsubUrl}`,
         html: `<p><strong>${escapeHtml(bandName)}</strong> is now on the lineup for <strong>${escapeHtml(eventName)}</strong>.</p><p><a href="${escapeHtml(unsubUrl)}">Unfollow this band</a></p>`,
       });

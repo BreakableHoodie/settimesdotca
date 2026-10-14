@@ -11,6 +11,55 @@ function getFrom(env) {
   return env?.EMAIL_FROM || env?.ADMIN_EMAIL || null;
 }
 
+function validateHeaders(headers) {
+  if (headers === undefined) return;
+  if (
+    headers === null ||
+    typeof headers !== "object" ||
+    Array.isArray(headers) ||
+    (Object.getPrototypeOf(headers) !== Object.prototype && Object.getPrototypeOf(headers) !== null)
+  ) {
+    throw new Error("headers must be a plain object");
+  }
+  for (const [name, value] of Object.entries(headers)) {
+    // Only the headers this module builds. A free-form name would let a future
+    // caller set From, Reply-To or Bcc, which some providers honour.
+    if (!ALLOWED_EXTRA_HEADERS.has(name)) {
+      throw new Error(`header not allowed: ${JSON.stringify(name)}`);
+    }
+    // Control characters (CR/LF above all) would let a value start a new header.
+    if (typeof value !== "string" || hasControlCharacter(value)) {
+      throw new Error("headers must contain string values without control characters");
+    }
+  }
+}
+
+// Tab (9) is legal folding whitespace; every other C0 control and DEL is not.
+function hasControlCharacter(value) {
+  for (const char of value) {
+    const code = char.charCodeAt(0);
+    if ((code < 32 && code !== 9) || code === 127) return true;
+  }
+  return false;
+}
+
+const ALLOWED_EXTRA_HEADERS = new Set(["List-Unsubscribe", "List-Unsubscribe-Post"]);
+
+export function listUnsubscribeHeaders(url) {
+  // RFC 2369 wraps each URI in <...> and separates URIs with commas, so a URL
+  // carrying either would split into extra targets.
+  if (typeof url !== "string" || !/^https?:\/\/[!-~]+$/.test(url) || /[<>,]/.test(url)) {
+    throw new Error("List-Unsubscribe URL must be a printable-ASCII http(s) URL without <, > or comma");
+  }
+  // RFC 8058 one-click requires HTTPS. A plain-HTTP base URL (local dev) sends
+  // the email with its body link and no one-click headers, rather than failing.
+  if (new URL(url).protocol !== "https:") return undefined;
+  return {
+    "List-Unsubscribe": `<${url}>`,
+    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+  };
+}
+
 export function isEmailConfigured(env) {
   const provider = getProvider(env);
   const from = getFrom(env);
@@ -33,7 +82,7 @@ export function isEmailConfigured(env) {
 /**
  * Send one email through the configured provider (EMAIL_PROVIDER).
  * @param {object} env
- * @param {{ to: string, subject: string, html: string, text?: string, idempotencyKey?: string }} message
+ * @param {{ to: string, subject: string, html: string, text?: string, idempotencyKey?: string, headers?: object }} message
  *   idempotencyKey (optional, 1-256 chars; throws if empty, longer, or not a string) is sent as
  *   `Idempotency-Key` on RESEND ONLY; Postmark and MailChannels have no equivalent and ignore it.
  *   Pass it only for claim-then-send mail, never for transactional mail a user may re-request.
@@ -42,13 +91,14 @@ export function isEmailConfigured(env) {
  *   `invalid_idempotent_request` -> reason "idempotency_payload_mismatch" (a reused key cannot prove
  *   a send, so it is never counted delivered -- see CLAUDE.md "A claim is not a delivery record").
  */
-export async function sendEmail(env, { to, subject, html, text, idempotencyKey }) {
+export async function sendEmail(env, { to, subject, html, text, idempotencyKey, headers }) {
   if (
     idempotencyKey !== undefined &&
     (typeof idempotencyKey !== "string" || idempotencyKey.length === 0 || idempotencyKey.length > 256)
   ) {
     throw new Error("idempotencyKey must be a string of 1 to 256 characters");
   }
+  validateHeaders(headers);
 
   const provider = getProvider(env);
   const from = getFrom(env);
@@ -91,6 +141,7 @@ export async function sendEmail(env, { to, subject, html, text, idempotencyKey }
       Subject: subject,
       HtmlBody: html || undefined,
       TextBody: text || undefined,
+      ...(headers !== undefined ? { Headers: Object.entries(headers).map(([Name, Value]) => ({ Name, Value })) } : {}),
     };
 
     let response;
@@ -145,6 +196,7 @@ export async function sendEmail(env, { to, subject, html, text, idempotencyKey }
         ...(html ? [{ type: "text/html", value: html }] : []),
         ...(text ? [{ type: "text/plain", value: text }] : []),
       ],
+      ...(headers !== undefined ? { headers } : {}),
     };
 
     let response;
@@ -199,6 +251,7 @@ export async function sendEmail(env, { to, subject, html, text, idempotencyKey }
       subject,
       html: html || undefined,
       text: text || undefined,
+      ...(headers !== undefined ? { headers } : {}),
     };
 
     let response;

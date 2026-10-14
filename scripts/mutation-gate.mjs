@@ -163,6 +163,15 @@ export const MUTATIONS = [
     tests: ["functions/utils/__tests__/email.test.js"],
   },
   {
+    id: "band-follow-unsubscribe-header-matches-body-link",
+    invariant:
+      "CLAUDE.md 'Band Announcements' — the RFC 8058 one-click URL is the same unsubscribe URL shown in the band-follow email body",
+    file: "functions/utils/bandFollowNotify.js",
+    find: "headers: listUnsubscribeHeaders(unsubUrl),",
+    replace: 'headers: listUnsubscribeHeaders("https://invalid.example/"),',
+    tests: ["functions/utils/__tests__/bandFollowNotify.test.js"],
+  },
+  {
     id: "announce-digest-idempotency-key-sorts-performance-ids",
     invariant:
       "CLAUDE.md 'A claim is not a delivery record (#1152)' — a digest key is stable for the same task regardless of queue order",

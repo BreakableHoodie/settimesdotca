@@ -4,7 +4,9 @@ import { buildAnnounceDigestIdempotencyKey, flushAnnounceDigest } from "../../..
 import { getPublicBaseUrl } from "../../../../utils/publicUrl.js";
 import { logger } from "../../../../utils/logger.js";
 
-vi.mock("../../../../utils/email.js", () => ({
+vi.mock("../../../../utils/email.js", async (importOriginal) => ({
+  // The real header builder, so these tests cannot drift from its format.
+  listUnsubscribeHeaders: (await importOriginal()).listUnsubscribeHeaders,
   sendEmail: vi.fn(() => Promise.resolve({ delivered: true })),
   isEmailConfigured: () => true,
 }));
@@ -69,6 +71,8 @@ describe("flushAnnounceDigest", () => {
     expect(html).toContain(correctEventUrl);
     expect(text).not.toContain(wrongEventUrl);
     expect(html).not.toContain(wrongEventUrl);
+    const bodyUrl = text.match(/Unfollow The Band: (\S+)/)[1];
+    expect(sendEmail.mock.calls[0][1].headers["List-Unsubscribe"]).toBe(`<${bodyUrl}>`);
 
     // Queue entry consumed
     const remaining = rawDb.prepare("SELECT * FROM band_announce_queue").all();
@@ -134,6 +138,7 @@ describe("flushAnnounceDigest", () => {
     expect(html).toContain(correctEventUrl);
     expect(text).not.toContain(wrongEventUrl);
     expect(html).not.toContain(wrongEventUrl);
+    expect(sendEmail.mock.calls[0][1].headers).toBeUndefined();
 
     // Both queue entries consumed, both notification rows written
     expect(rawDb.prepare("SELECT * FROM band_announce_queue").all()).toHaveLength(0);

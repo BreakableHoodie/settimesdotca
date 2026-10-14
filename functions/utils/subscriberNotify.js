@@ -11,7 +11,7 @@
 // tracking -- it silently drops fans whose first send failed"). The same
 // applies here, so the same shape applies: CLAIM before sending, release the
 // claim if delivery fails, and let a later resend pick up only the gaps.
-import { sendEmail } from "./email.js";
+import { listUnsubscribeHeaders, sendEmail } from "./email.js";
 import { logger } from "./logger.js";
 import { getPublicBaseUrl } from "./publicUrl.js";
 import { escapeHtml } from "./html.js";
@@ -169,6 +169,7 @@ export async function notifySubscribers(env, DB, { eventId, kind, eventName, eve
       to: sub.email,
       subject,
       idempotencyKey: `subscriber:${eventId}:${kind}:${sub.id}`,
+      headers: listUnsubscribeHeaders(unsubUrl),
       text: `${lead}\n\n${eventName}: ${eventUrl}\n\nUnsubscribe: ${unsubUrl}`,
       html:
         `<p>${escapeHtml(lead)}</p>` +

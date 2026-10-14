@@ -104,7 +104,7 @@ export default function PrivacyPage() {
                   </tr>
                   <tr>
                     <td className="py-2 pr-4">Rate-limit counters</td>
-                    <td className="py-2">Up to 1 day</td>
+                    <td className="py-2">Up to about 25 hours</td>
                   </tr>
                   <tr>
                     <td className="py-2 pr-4">Login attempt log (IPs, emails)</td>

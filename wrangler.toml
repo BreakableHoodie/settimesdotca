@@ -101,3 +101,21 @@ bucket_name = "settimes-band-photos"
 # [[routes]]
 # pattern = "/api/*"
 # custom_domain = false
+
+# ---------------------------------------------------------------------------
+# Preview deployments bind NOTHING. Do not add production bindings here.
+#
+# Cloudflare Pages applies top-level bindings to BOTH production and preview
+# when no [env.preview] block exists, and a deploy with this file overwrites
+# whatever the dashboard says. Until 2026-10-13 every preview deployment was
+# therefore bound to settimes-production-db and the production photo bucket:
+# 40 stale previews (Nov 2025 to Feb 2026, code from before the pen-test
+# remediation in #86 and the isDevRequest fix in #442, with no secrets or
+# ENVIRONMENT set) sat on *.longweekend-bandcrawl.pages.dev reading and
+# writing production data. They were deleted that day.
+#
+# Environment blocks do not inherit bindings, so this empty block gives a
+# preview no D1, R2 or Analytics Engine. Edge E2E (#1292) will bind a scratch
+# D1 here, never the production database_id. Guarded by
+# scripts/__tests__/previewBindings.test.js.
+[env.preview]

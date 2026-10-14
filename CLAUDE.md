@@ -1429,6 +1429,16 @@ you where to go:
 | **Account** resources    | Cloudflare account                                                                  | D1 databases                                                                                 |
 | **This repository**      | `frontend/public/_headers`                                                          | **HSTS** — listed only because the zone toggle reading "off" is correct and looks like a gap |
 
+- **Preview deployments bind nothing** (2026-10-13). `wrangler.toml` ends with
+  an empty `[env.preview]` block, because Pages otherwise applies the top-level
+  D1, R2 and Analytics Engine bindings to previews too, and every deploy
+  overwrites the dashboard. Until then every preview was bound to
+  `settimes-production-db` and the production photo bucket: 40 stale previews
+  from Nov 2025 to Feb 2026, running code from before the pen-test fixes (#86)
+  with no secrets set, sat on `*.longweekend-bandcrawl.pages.dev` against
+  production data. They were deleted the same day. Never bind a production
+  resource under `env.preview`; edge E2E (#1292) gets a scratch D1 there.
+  `scripts/__tests__/previewBindings.test.js` enforces both halves.
 - **Rocket Loader: disabled** — see the bullet above.
 - **`www` → apex 301 redirect rule** (#984, added 2026-08-29). A zone
   `http_request_dynamic_redirect` phase ruleset, `www to apex (301, preserves

@@ -1442,6 +1442,11 @@ the 90-day `api_key.request` window could be removed with every test green:
 the cross-table test seeded neither. `retentionWindows.test.js` now pins both on
 each side of the boundary, and both are in the mutation gate.
 
+A failed retention or anonymisation step must turn the daily run red. The workflow
+is the operational check that these published deletion promises actually ran; a
+log-only failure would leave personal data past its promised window while still
+reporting a successful run.
+
 ### Content-Security-Policy (strict, no `unsafe-inline`) — TWO sources
 
 There are **two** CSPs, and the one the browser enforces on a page is **not** the middleware:

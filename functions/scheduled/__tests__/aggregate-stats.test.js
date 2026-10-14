@@ -1,9 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createTestEnv } from "../../api/test-utils.js";
 import { scheduled } from "../aggregate-stats.js";
 
 async function runScheduled(env) {
-  await scheduled({}, env, {});
+  return scheduled({}, env, {});
 }
 
 function daysAgo(n) {
@@ -104,5 +104,13 @@ describe("aggregate-stats scheduled job (P1-P3)", () => {
       .prepare("SELECT COUNT(*) as count FROM artist_daily_stats WHERE band_profile_id = ?")
       .get(profileId);
     expect(remaining.count).toBe(2); // only -45 days and today survive
+  });
+
+  it("reports an aggregation throw as a failure", async () => {
+    const { env } = createTestEnv();
+    const batchSpy = vi.spyOn(env.DB, "batch").mockRejectedValue(new Error("aggregation unavailable"));
+
+    await expect(runScheduled(env)).resolves.toMatchObject({ failures: ["aggregate-stats"] });
+    expect(batchSpy).toHaveBeenCalled();
   });
 });

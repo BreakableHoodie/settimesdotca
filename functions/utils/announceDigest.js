@@ -73,7 +73,7 @@ export async function flushAnnounceDigest(env, DB) {
      ORDER BY q.event_id, bf.email, q.queued_at`,
   ).all();
 
-  if (!queue.length) return { sent: 0, failed: 0, skipped: 0 };
+  if (!queue.length) return { sent: 0, failed: 0, skipped: 0, unconfirmed: 0 };
 
   // Group by (email, event_id) — one digest per fan per event.
   const groups = new Map();
@@ -86,6 +86,7 @@ export async function flushAnnounceDigest(env, DB) {
   let skipped = 0;
   let sent = 0;
   let failed = 0;
+  let unconfirmed = 0;
 
   // ── Phase A (sequential) ─────────────────────────────────────────────────
   // For each group: claim slots, delete queue rows, build the email payload.
@@ -287,6 +288,7 @@ export async function flushAnnounceDigest(env, DB) {
           ),
         );
       } catch (confirmError) {
+        unconfirmed++;
         logStrandedClaims(
           task,
           "announce digest delivery confirmation failed; email WAS sent, claims may be retried",
@@ -345,7 +347,7 @@ export async function flushAnnounceDigest(env, DB) {
   }
 
   if (failed > 0) {
-    logger.warn("announce digest partially failed", { sent, failed, skipped });
+    logger.warn("announce digest partially failed", { sent, failed, skipped, unconfirmed });
   }
-  return { sent, failed, skipped };
+  return { sent, failed, skipped, unconfirmed };
 }

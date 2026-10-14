@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { expireShareLinks } from "../expire-share-links.js";
 import { createDBEnv, createTestDB, insertEvent } from "../../api/test-utils.js";
 
@@ -67,7 +67,16 @@ describe("expireShareLinks (#705 ledger cleanup)", () => {
     expect(link.n).toBe(1);
   });
 
-  it("is a no-op without a DB binding", async () => {
-    await expect(expireShareLinks({}, {}, {})).resolves.toBeUndefined();
+  it("reports failure without a DB binding", async () => {
+    await expect(expireShareLinks({}, {}, {})).resolves.toEqual({ failures: ["expire-share-links"] });
+  });
+
+  it("reports a cleanup throw as a failure", async () => {
+    const db = createTestDB();
+    const env = { DB: createDBEnv(db) };
+    const batchSpy = vi.spyOn(env.DB, "batch").mockRejectedValue(new Error("expiry unavailable"));
+
+    await expect(expireShareLinks({}, env, {})).resolves.toEqual({ failures: ["expire-share-links"] });
+    expect(batchSpy).toHaveBeenCalled();
   });
 });

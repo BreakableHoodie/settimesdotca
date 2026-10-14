@@ -78,12 +78,17 @@ Two things follow, and they are easy to conflate:
 3. **Set times, cancellations and venues cache for about a minute** (`Cache-Control: public, max-age=60` on show-critical endpoints; browse-only pages cache 5 minutes). A correct-looking database and a stale page is usually this: wait a minute rather than re-editing.
 4. **Times are Toronto-local everywhere.** If something classifies as the wrong day, suspect the after-midnight rule (above) before suspecting a timezone bug.
 
+If the daily run is red and names a `flush-announce-digest` step, act on the first red run: the next day's run can be green even if nobody acts. The two labels mean different things:
+
+- `flush-announce-digest`: some fans' announcement emails were **not sent**. In the Lineup tab, use **Resend** for the affected set (`POST /api/admin/bands/:id/resend-announcement`); it mails only followers with no live claim.
+- `flush-announce-digest(unconfirmed)`: the emails **were sent**, but recording the delivery failed. Do not resend blindly. Check the logs for `announce digest delivery confirmation failed` and the provider's dashboard first. A Resend after the 15-minute claim lease would mail those fans again, and only the Resend provider deduplicates it (within 24h).
+
 ## Telling fans about a change
 
 Nothing emails anyone automatically when a set moves or is cancelled.
 
 - **Calendar subscribers** see changes late: the feed is cached for **up to an hour** (`max-age=3600`), and each calendar app then refreshes on its own schedule (often every few hours). Times move and a cancelled set shows as cancelled, but not quickly.
-- **Band followers** are emailed when a set is first *announced*. There is no email for a later change. The Lineup tab's **Resend announcement** only reaches followers the *original* announcement missed (a partial send); it never re-mails anyone and never describes a change.
+- **Band followers** are emailed when a set is first *announced*. There is no email for a later change. The Lineup tab's **Resend announcement** only reaches followers the *original* announcement missed (a partial send). It does not re-mail followers whose delivery was recorded, and it never describes a change. The exception is a delivery that went out but was never recorded (see `flush-announce-digest(unconfirmed)` above): after 15 minutes Resend treats it as missed and can mail it again.
 - **Subscribers** get the admin **Notify** broadcast, and each kind of notice ("lineup is live", "set times are up") goes to a subscriber **at most once**. Pressing it again after a change sends nothing to people who already had it.
 
 So for a change on the day, **post it on Instagram** (@settimes.ca, and ask the organizers to share). The site itself shows the change within about a minute; calendars and email will not keep up.

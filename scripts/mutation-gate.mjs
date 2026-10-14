@@ -416,9 +416,27 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'Retention windows are a published promise' — never-confirmed follow and subscription requests are deleted after 7 days",
     file: "functions/api/admin/maintenance/retention.js",
-    find: "DB.prepare(`DELETE FROM band_follows WHERE verified = 0 AND NOT (${pendingConfirmationLiveSql()})`).run(),",
-    replace: "DB.prepare(`DELETE FROM band_follows WHERE verified = 0 AND 1 = 0`).run(),",
+    find: "() => DB.prepare(`DELETE FROM band_follows WHERE verified = 0 AND NOT (${pendingConfirmationLiveSql()})`).run(),",
+    replace: "() => DB.prepare(`DELETE FROM band_follows WHERE verified = 0 AND 1 = 0`).run(),",
     tests: ["functions/api/admin/maintenance/__tests__/retentionWindows.test.js"],
+  },
+  {
+    id: "scheduled-retention-failure-is-visible",
+    invariant:
+      "CLAUDE.md 'Retention windows are a published promise' — a failed retention step turns the daily scheduled run red",
+    file: "functions/scheduled/aggregate-stats.js",
+    find: 'failures.push("retention");',
+    replace: "void 0;",
+    tests: ["functions/api/internal/__tests__/run-scheduled.test.js"],
+  },
+  {
+    id: "announce-digest-unconfirmed-is-visible",
+    invariant:
+      "CLAUDE.md 'A claim is not a delivery record (#1152)' — a delivered email whose confirmation write fails remains sent but makes the scheduled run red",
+    file: "functions/utils/announceDigest.js",
+    find: "unconfirmed++;",
+    replace: "void 0;",
+    tests: ["functions/api/admin/bands/__tests__/announce-digest.test.js"],
   },
   {
     id: "time-validation-range-not-just-shape",

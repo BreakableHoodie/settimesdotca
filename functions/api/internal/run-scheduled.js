@@ -22,7 +22,8 @@ function secretsMatch(a, b) {
  * POST /api/internal/run-scheduled
  *
  * Secret-protected endpoint that invokes the scheduled handler (popularity
- * aggregation + PII retention cleanup + share-link expiry). Called by the
+ * aggregation + PII retention cleanup + share-link expiry + schedule-build
+ * anonymisation + announcement digest delivery). Called by the
  * .github/workflows/scheduled-jobs.yml GitHub Actions cron workflow because
  * Cloudflare Pages does not support native cron triggers.
  *
@@ -55,6 +56,17 @@ export async function onRequestPost(context) {
     await scheduled({ scheduledTime: start }, env, context);
   } catch (err) {
     console.error("[run-scheduled] scheduled() threw:", err);
+    if (err instanceof AggregateError && Array.isArray(err.failedSteps)) {
+      return Response.json(
+        {
+          ok: false,
+          failedSteps: err.failedSteps,
+          ranAt: new Date(start).toISOString(),
+          durationMs: Date.now() - start,
+        },
+        { status: 500 },
+      );
+    }
     return Response.json({ error: "Internal server error" }, { status: 500 });
   }
 

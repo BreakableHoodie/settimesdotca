@@ -850,12 +850,30 @@ WHERE sl.slug = ? AND sl.expires_at > datetime('now');
 concurrent resend requests:
 
 ```sql
+-- 1. Claim. changes === 0 means a row already exists for this follower.
 INSERT OR IGNORE INTO band_follow_notifications (performance_id, band_follow_id)
 VALUES (?, ?);
--- changes === 0 means another request already claimed this follower.
--- If the subsequent email send fails, the claim is released:
+
+-- 2. Only when step 1 claimed nothing: take over an ABANDONED claim
+--    (undelivered and older than the 15-minute lease). A delivered row or a
+--    live claim matches nothing, so at most one request wins.
+UPDATE band_follow_notifications
+   SET claimed_at = datetime('now')
+ WHERE performance_id = ? AND band_follow_id = ?
+   AND delivered_at IS NULL
+   AND claimed_at <= datetime('now', '-15 minutes');
+
+-- 3a. Send succeeded: record the delivery. Mandatory, because an unmarked
+--     claim becomes retryable once its lease expires.
+UPDATE band_follow_notifications SET delivered_at = datetime('now')
+ WHERE performance_id = ? AND band_follow_id = ?;
+
+-- 3b. Send failed: release the claim so a resend can retry at once.
 DELETE FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?;
 ```
+
+The lease is `CLAIM_LEASE_MINUTES`. Every reader that asks "has this follower
+been handled?" uses `claimIsLiveSql()` from the same file.
 
 **Compensating delete on a non-batchable mutation**
 (`functions/api/admin/events/[id]/duplicate.js`) — D1 has no transactions, so

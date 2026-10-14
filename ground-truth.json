@@ -50,7 +50,7 @@
   },
   "published_events": [],
   "draft_events": [],
-  "_archived_events_note": "Chronological ascending. Every past edition is archived — 19 events as of 2026-10-14, and they are what /api/stats/public and the recap pages are built from.",
+  "_archived_events_note": "Chronological ascending. Every past edition is archived — 20 events as of 2026-10-14, and they are what /api/stats/public and the recap pages are built from.",
   "archived_events": [
     { "db_id": 33, "slug": "lwbc01", "date": "2022-05-22" },
     { "db_id": 34, "slug": "lwbc02", "date": "2022-07-31" },

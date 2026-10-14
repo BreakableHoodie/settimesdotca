@@ -4,11 +4,9 @@ on:
   push:
     branches:
       - main
-      - dev
   pull_request:
     branches:
       - main
-      - dev
   workflow_dispatch:
 
 concurrency:
@@ -146,9 +144,7 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           CF_PROD_SMOKE_URL: ${{ vars.CF_PRODUCTION_SMOKE_URL }}
-          CF_DEV_SMOKE_URL: ${{ vars.CF_DEVELOPMENT_SMOKE_URL }}
           CF_D1_PROD_DB: ${{ vars.CF_D1_PRODUCTION_DATABASE_NAME }}
-          CF_D1_DEV_DB: ${{ vars.CF_D1_DEVELOPMENT_DATABASE_NAME }}
         run: |
           echo "should_deploy=false" >> "$GITHUB_OUTPUT"
 
@@ -161,19 +157,6 @@ jobs:
               echo "pages_branch=main" >> "$GITHUB_OUTPUT"
               echo "smoke_url=${CF_PROD_SMOKE_URL:-https://settimes.ca}" >> "$GITHUB_OUTPUT"
               echo "d1_database_name=${CF_D1_PROD_DB:-settimes-production-db}" >> "$GITHUB_OUTPUT"
-              ;;
-            dev)
-              if [ "$EVENT_NAME" != "pull_request" ]; then
-                echo "should_deploy=true" >> "$GITHUB_OUTPUT"
-              fi
-              echo "environment_name=development" >> "$GITHUB_OUTPUT"
-              echo "pages_branch=dev" >> "$GITHUB_OUTPUT"
-              echo "smoke_url=${CF_DEV_SMOKE_URL:-https://dev.settimes.ca}" >> "$GITHUB_OUTPUT"
-              if [ -z "$CF_D1_DEV_DB" ]; then
-                echo "::error::CF_D1_DEVELOPMENT_DATABASE_NAME is not set. Set this GitHub Actions variable to prevent dev migrations from running against the production database."
-                exit 1
-              fi
-              echo "d1_database_name=$CF_D1_DEV_DB" >> "$GITHUB_OUTPUT"
               ;;
             *)
               echo "environment_name=validation" >> "$GITHUB_OUTPUT"
@@ -276,8 +259,8 @@ jobs:
     name: Post-deploy smoke checks
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     timeout-minutes: 10
-    # Serialize across all branches: disable_bot_fight_mode operates at zone
-    # level, so concurrent smoke jobs from main+dev would race to restore it.
+    # Serialize across runs: disable_bot_fight_mode operates at zone level, so
+    # two overlapping smoke jobs would race to restore it.
     concurrency:
       group: cloudflare-zone-smoke
       cancel-in-progress: false

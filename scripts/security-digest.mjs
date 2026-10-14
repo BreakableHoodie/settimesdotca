@@ -33,6 +33,8 @@ const REPOSITORY = "BreakableHoodie/settimesdotca";
 export const ACCEPTED_NPM_AUDIT = {
   "frontend/package-lock.json|postcss-selector-parser|GHSA-rj75-hqrm-r3gf":
     "build-time only, pinned by @tailwindcss/typography; re-check on its next release (#1267)",
+  "frontend/package-lock.json|basic-ftp|GHSA-c475-qrg2-pj4r":
+    "dev-only, via @lhci/cli > proxy-agent > pac-proxy-agent > get-uri. Client.list() runs only if LHCI is given a proxy whose PAC file is fetched over ftp://; quality.yml and lighthouserc.json set no proxy, so it is unreachable in our use. Accepted by Dre 2026-10-14; re-check if a proxy is ever configured or on the next @lhci/cli release",
 };
 
 // The issue lists at most this many alerts. GitHub rejects an issue body over

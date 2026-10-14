@@ -87,6 +87,33 @@ export const REPO_ROOT = path.join(__dirname, "..");
 /** @type {Mutation[]} */
 export const MUTATIONS = [
   {
+    id: "case-insensitive-route-path-decisions",
+    invariant:
+      "CLAUDE.md 'Routes match case-insensitively; path checks must too' — path-based security decisions normalize Pages route paths before comparison",
+    file: "functions/utils/routePath.js",
+    find: "  const path = new URL(urlOrRequest?.url ?? urlOrRequest).pathname.toLowerCase();",
+    replace: "  const path = new URL(urlOrRequest?.url ?? urlOrRequest).pathname;",
+    tests: ["functions/api/admin/__tests__/api-key-auth.test.js", "functions/utils/__tests__/rateLimit.test.js"],
+  },
+  {
+    id: "route-path-strips-trailing-slash",
+    invariant:
+      "CLAUDE.md 'Routes match case-insensitively; path checks must too' — /foo/ routes like /foo, so a trailing slash must not escape a path-based limit",
+    file: "functions/utils/routePath.js",
+    find: '  return path.replace(/\\/+$/, "") || "/";',
+    replace: "  return path;",
+    tests: ["functions/utils/__tests__/rateLimit.test.js", "functions/utils/__tests__/csrf.test.js"],
+  },
+  {
+    id: "api-keys-identity-management-read-only",
+    invariant:
+      "CLAUDE.md 'API keys' — identity-management resources are readable by keys but key mutations cannot create or change identities",
+    file: "functions/api/admin/_middleware.js",
+    find: '    if (\n      KEY_READ_ONLY_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`)) &&\n      !["GET", "HEAD"].includes(request.method)\n    ) {',
+    replace: "    if (false) {",
+    tests: ["functions/api/admin/__tests__/api-key-auth.test.js"],
+  },
+  {
     id: "schedule-builds-hash-session",
     invariant:
       "CLAUDE.md 'Schedule builds are per-event pseudonyms, anonymised 30 days after the event (#1245)' — schedule builds never persist the raw schedule session id",

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { checkRateLimit, rateLimitHeaders, rateLimitResponse } from "../rateLimit.js";
+import { apiKeyRateLimitKey, checkRateLimit, rateLimitHeaders, rateLimitResponse } from "../rateLimit.js";
+import { createTestEnv } from "../../api/test-utils.js";
 
 // Mock the caches global (Cache API, used for non-sensitive endpoints)
 const mockCache = {
@@ -215,6 +216,29 @@ describe("Rate Limiting", () => {
       expect(mockCache.match).not.toHaveBeenCalled();
     });
 
+    it("case variants of admin auth login share its config and counter key", async () => {
+      const db = makeMockDB({ count: 5 });
+      const env = { DB: db };
+      const lower = await checkRateLimit(
+        new Request("https://example.com/api/admin/auth/login", {
+          headers: { "CF-Connecting-IP": "1.2.3.4" },
+        }),
+        env,
+      );
+      const mixed = await checkRateLimit(
+        new Request("https://example.com/api/admin/Auth/login", {
+          headers: { "CF-Connecting-IP": "1.2.3.4" },
+        }),
+        env,
+      );
+
+      expect(lower).toMatchObject({ allowed: true, remaining: 0, limit: 5 });
+      expect(mixed).toMatchObject({ allowed: true, remaining: 0, limit: 5 });
+      expect(db.prepare.mock.results[0].value.bind.mock.calls[0][0]).toBe(
+        db.prepare.mock.results[1].value.bind.mock.calls[0][0],
+      );
+    });
+
     it("admin auth login fails closed when D1 throws (P1-S1)", async () => {
       const db = {
         prepare: vi.fn().mockReturnValue({
@@ -361,6 +385,34 @@ describe("Rate Limiting", () => {
       expect(mockCache.match).not.toHaveBeenCalled();
     });
 
+    it("mixed-case band follow gets the same fail-closed config", async () => {
+      const db = makeMockDB({ count: 3 });
+      const result = await checkRateLimit(
+        new Request("https://example.com/api/bands/x/Follow", {
+          headers: { "CF-Connecting-IP": "1.2.3.4" },
+        }),
+        { DB: db },
+      );
+
+      expect(result).toMatchObject({ allowed: true, remaining: 2, limit: 5 });
+      expect(db.prepare).toHaveBeenCalled();
+    });
+
+    it("mixed-case auth requests share the existing counter", async () => {
+      const { env, rawDb } = createTestEnv({ role: "admin" });
+      const headers = { "CF-Connecting-IP": "1.2.3.4" };
+
+      await checkRateLimit(new Request("https://example.com/api/admin/auth/login", { headers }), env);
+      await checkRateLimit(new Request("https://example.com/api/admin/AUTH/login", { headers }), env);
+
+      expect(rawDb.prepare("SELECT COUNT(*) AS count FROM rate_limits").get().count).toBe(1);
+      expect(rawDb.prepare("SELECT count FROM rate_limits").get().count).toBe(2);
+    });
+
+    it("API-key rate-limit keys ignore path case", () => {
+      expect(apiKeyRateLimitKey(42, "/api/admin/API-KEYS")).toBe(apiKeyRateLimitKey(42, "/api/admin/api-keys"));
+    });
+
     it("/api/bands/<name>/follow fails closed when limit is exceeded", async () => {
       const db = makeMockDB({ count: 6 }); // over the 5-req/300s limit
       const env = { DB: db };
@@ -400,6 +452,53 @@ describe("Rate Limiting", () => {
       expect(result.allowed).toBe(true);
       expect(result.remaining).toBe(4);
       expect(db.prepare).toHaveBeenCalled();
+    });
+
+    it("normalizes trailing slashes for band actions and their counter keys", async () => {
+      const preparedCalls = [];
+      const db = {
+        prepare: vi.fn().mockImplementation(() => {
+          preparedCalls.push(true);
+          return {
+            bind: vi.fn().mockReturnValue({
+              first: vi.fn().mockResolvedValue({
+                count: 1,
+                window_start: Math.floor(Date.now() / 1000),
+              }),
+            }),
+          };
+        }),
+      };
+      const env = { DB: db };
+      const headers = { "CF-Connecting-IP": "1.2.3.4" };
+
+      const follow = await checkRateLimit(
+        new Request("https://example.com/api/bands/my-band/follow", { headers }),
+        env,
+      );
+      const followSlash = await checkRateLimit(
+        new Request("https://example.com/api/bands/my-band/follow/", { headers }),
+        env,
+      );
+
+      expect(follow.limit).toBe(5);
+      expect(followSlash.limit).toBe(5);
+      const keys = db.prepare.mock.results.map((result) => result.value.bind.mock.calls[0][0]);
+      expect(keys[0]).toBe(keys[1]);
+      expect(preparedCalls).toHaveLength(2);
+    });
+
+    it("normalizes trailing slashes for batch follow", async () => {
+      const db = makeMockDB({ count: 1 });
+      const result = await checkRateLimit(
+        new Request("https://example.com/api/bands/follow-batch/", {
+          headers: { "CF-Connecting-IP": "1.2.3.4" },
+        }),
+        { DB: db },
+      );
+
+      expect(result.limit).toBe(3);
+      expect(result.remaining).toBe(2);
     });
 
     it("/api/bands/<name>/follow fails closed when D1 throws", async () => {

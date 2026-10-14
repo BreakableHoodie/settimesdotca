@@ -720,6 +720,8 @@ Three traps here, each of which was live:
 
 `KEY_FORBIDDEN_PREFIXES` in `_middleware.js` now 403s these families (`KEY_NOT_PERMITTED`), **checked before the key is verified** — the refusal is a property of the credential type and the path, so a forged key and a valid one are refused identically at zero D1 cost. **The role hierarchy is the wrong axis here: no key role belongs on these routes, including one minted `admin`.** `/api/admin/me` is deliberately _not_ listed — a decision, not an omission.
 
+Keys are read-only for `/api/admin/users` and `/api/admin/api-keys`: GET/HEAD remain available, but every mutation is refused before key verification. Keys cannot touch `/api/admin/invite-codes` at all because GET exposes plaintext codes that can mint accounts. Identity management is a human act; a leaked key must not create a principal that outlives its own revocation.
+
 `revoke-all.js` also got its own `checkPermission(context, "viewer")`. **`viewer`, not `admin`:** revoking your own sessions is legitimate self-service at every role, and raising the tier would break a viewer logging out everywhere. The point is that an endpoint which mints sessions must state its own requirement rather than inherit safety from middleware shape.
 
 `functions/api/admin/__tests__/apiKeySelfService.test.js` keeps it closed: any admin route exporting an `onRequest*` handler with **no `checkPermission` call** must be covered by the denylist or recorded in `REVIEWED_UNGATED_ROUTES` with a reason. **Its scope is honest and partial** — it catches the _ungated_ shape, not the MFA shape (viewer-gated, then acting on self), because nothing textual separates that from a viewer-gated route acting on `params.id`. The MFA family is covered by name instead. A sixth self-service family outside these prefixes still needs a human to notice.
@@ -1340,6 +1342,10 @@ gh pr create --label "bug,priority:p1"   # example
 - CSRF cookie must be regenerated whenever a new session is created (see `functions/api/admin/sessions/revoke-all.js`).
 - `params.id` from Cloudflare Pages Functions URL params is a string; always run it through `validateId()` from `functions/utils/validation.js` before using it in a DB query.
 - **Every route that writes `events.slug` validates it against `VALIDATION_SCHEMAS.event.slug`** (create, wizard, `edit.js`, `duplicate.js`; PATCH refuses slug changes). Until #1276, `edit.js` and `duplicate.js` stored any string, and the slug reached `sitemap.xml`'s `<loc>` unescaped. Only the document CSP stopped a stored script from running there. Output is now escaped as well (sitemap, email `href`s), but the validation is the primary control. A new slug writer must reuse the schema field, not retype the regex. Both checks and the sitemap escaping are in the mutation gate.
+
+### Routes match case-insensitively; path checks must too
+
+Production evidence: `/api/admin/Users`, `/api/admin/MFA/setup` and `/api/Events/timeline` reach Functions regardless of case, while `/API/` does not. Use `routePath()` for every path-based security decision, never raw `url.pathname`; it also strips trailing slashes so `/path/` and `/path` take the same decision. `routePathGuard.test.js` scans for raw API path checks and is allowlisted only for `routePath.js`, the root `/api/` gate in `functions/_middleware.js` because `/API/` never reaches Functions, and the segment extraction in `functions/utils/request.js`, which fails closed on invalid casing.
 
 ### The security tooling this repo actually has
 

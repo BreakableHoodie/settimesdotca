@@ -4,9 +4,19 @@ import { onRequest, checkPermission } from "../_middleware.js";
 import { createTestEnv } from "../../test-utils.js";
 import { generateApiKey, verifyApiKey } from "../../../utils/apiKeys.js";
 import { toSqliteDateTime } from "../../../utils/authAttempts.js";
+import { generateCSRFToken } from "../../../utils/csrf.js";
+import * as usersHandler from "../users.js";
+import * as userHandler from "../users/[id].js";
+import * as toggleStatusHandler from "../users/[id]/toggle-status.js";
+import * as resetPasswordHandler from "../users/[id]/reset-password.js";
+import * as apiKeysHandler from "../api-keys.js";
+import * as apiKeyItemHandler from "../api-keys/[id].js";
+import * as inviteCodesHandler from "../invite-codes.js";
+import * as inviteCodeItemHandler from "../invite-codes/[code].js";
 
 const BASE_URL = "https://example.test/api/admin/me";
 const API_KEYS_URL = "https://example.test/api/admin/api-keys";
+const EVENTS_URL = "https://example.test/api/admin/events";
 
 async function seedKey(
   rawDb,
@@ -42,8 +52,8 @@ function keyRequest(plaintext, { method = "GET", url = BASE_URL, cookie = null, 
   return new Request(url, { method, headers, body });
 }
 
-async function runMiddleware(env, request, nextImpl) {
-  const context = { request, env, data: {} };
+async function runMiddleware(env, request, nextImpl, params = { id: "2" }) {
+  const context = { request, env, data: {}, params };
   context.next = nextImpl ? async () => nextImpl(context) : async () => new Response("ok", { status: 200 });
   const response = await onRequest(context);
   return { response, context };
@@ -122,7 +132,7 @@ describe("API key authentication path (#744 part 3)", () => {
 
     const { response: adminResponse, context: adminContext } = await runMiddleware(
       env,
-      keyRequest(adminKey.plaintext, { method: "POST", url: API_KEYS_URL }),
+      keyRequest(adminKey.plaintext, { method: "POST", url: EVENTS_URL }),
       adminGuardNext,
     );
     expect(adminResponse.status).toBe(403);
@@ -131,7 +141,7 @@ describe("API key authentication path (#744 part 3)", () => {
 
     const { response: editorResponse } = await runMiddleware(
       env,
-      keyRequest(adminKey.plaintext, { method: "POST", url: API_KEYS_URL }),
+      keyRequest(adminKey.plaintext, { method: "POST", url: EVENTS_URL }),
       editorGuardNext,
     );
     expect(editorResponse.status).toBe(200);
@@ -244,7 +254,7 @@ describe("API key authentication path (#744 part 3)", () => {
       env,
       keyRequest(key.plaintext, {
         method: "POST",
-        url: API_KEYS_URL,
+        url: EVENTS_URL,
         body: JSON.stringify({ name: "x" }),
       }),
       okNext,
@@ -329,7 +339,7 @@ describe("API key authentication path (#744 part 3)", () => {
       env,
       keyRequest(key.plaintext, {
         method: "POST",
-        url: API_KEYS_URL,
+        url: EVENTS_URL,
         body: JSON.stringify({}),
       }),
       okNext,
@@ -343,7 +353,7 @@ describe("API key authentication path (#744 part 3)", () => {
     expect(audit.api_key_id).toBe(key.id);
     const details = JSON.parse(audit.details);
     expect(details.method).toBe("POST");
-    expect(details.path).toBe("/api/admin/api-keys");
+    expect(details.path).toBe("/api/admin/events");
   });
 
   it("a failed authentication logs the key prefix and never the full key", async () => {
@@ -418,6 +428,179 @@ describe("API key authentication path (#744 part 3)", () => {
       const { response } = await runMiddleware(env, keyRequest(key.plaintext, { url: API_KEYS_URL }), okNext);
 
       expect(response.status).toBe(200);
+    });
+  });
+
+  describe("identity-management mutations are refused", () => {
+    const IDENTITY_MUTATIONS = [
+      [
+        "/api/admin/users",
+        "POST",
+        "invite_codes",
+        { email: "new-user@example.test", firstName: "New", lastName: "User", role: "viewer" },
+      ],
+      ["/api/admin/invite-codes", "POST", "invite_codes", { role: "editor" }],
+      ["/api/admin/api-keys", "POST", "api_keys", { name: "new key", role: "viewer" }],
+      ["/api/admin/users/2", "PATCH", "users", { role: "viewer" }],
+      ["/api/admin/users/2", "DELETE", "users", undefined],
+      ["/api/admin/users/2/toggle-status", "POST", "users", undefined],
+      ["/api/admin/users/2/reset-password", "POST", "password_reset_tokens", {}],
+      ["/api/admin/api-keys/1", "DELETE", "api_keys", undefined],
+      ["/api/admin/invite-codes/example", "DELETE", "invite_codes", undefined],
+    ];
+
+    it.each(IDENTITY_MUTATIONS)(
+      "%s (%s) returns 403 KEY_NOT_PERMITTED without writing %s",
+      async (path, method, _table, body) => {
+        const { env, rawDb } = createTestEnv({ role: "admin" });
+        const key = await seedKey(rawDb, { role: "admin" });
+        if (path === "/api/admin/invite-codes/example") {
+          rawDb
+            .prepare(
+              "INSERT INTO invite_codes (code, role, expires_at) VALUES ('example', 'editor', datetime('now', '+1 day'))",
+            )
+            .run();
+        }
+        const stateQuery =
+          path === "/api/admin/users"
+            ? "SELECT COUNT(*) AS value FROM invite_codes"
+            : path === "/api/admin/invite-codes"
+              ? "SELECT COUNT(*) AS value FROM invite_codes"
+              : path === "/api/admin/api-keys"
+                ? "SELECT COUNT(*) AS value FROM api_keys"
+                : path === "/api/admin/users/2"
+                  ? method === "DELETE"
+                    ? "SELECT COUNT(*) AS value FROM users WHERE id = 2"
+                    : "SELECT COUNT(*) AS value FROM users WHERE role = 'viewer'"
+                  : path === "/api/admin/users/2/toggle-status"
+                    ? "SELECT is_active AS value FROM users WHERE id = 2"
+                    : path === "/api/admin/users/2/reset-password"
+                      ? "SELECT COUNT(*) AS value FROM password_reset_tokens WHERE user_id = 2"
+                      : path === "/api/admin/api-keys/1"
+                        ? "SELECT revoked_at AS value FROM api_keys WHERE id = 1"
+                        : "SELECT is_active AS value FROM invite_codes WHERE code = 'example'";
+        const before = rawDb.prepare(stateQuery).get()?.value;
+
+        const next =
+          path === "/api/admin/users"
+            ? (ctx) => usersHandler.onRequestPost(ctx)
+            : path === "/api/admin/invite-codes"
+              ? (ctx) => inviteCodesHandler.onRequestPost(ctx)
+              : path === "/api/admin/api-keys"
+                ? (ctx) => apiKeysHandler.onRequestPost(ctx)
+                : path === "/api/admin/users/2" && method === "PATCH"
+                  ? (ctx) => userHandler.onRequestPatch(ctx)
+                  : path === "/api/admin/users/2" && method === "DELETE"
+                    ? (ctx) => userHandler.onRequestDelete(ctx)
+                    : path === "/api/admin/users/2/toggle-status"
+                      ? (ctx) => toggleStatusHandler.onRequestPost(ctx)
+                      : path === "/api/admin/users/2/reset-password"
+                        ? (ctx) => resetPasswordHandler.onRequestPost(ctx)
+                        : path === "/api/admin/api-keys/1"
+                          ? (ctx) => apiKeyItemHandler.onRequestDelete(ctx)
+                          : path === "/api/admin/invite-codes/example"
+                            ? (ctx) => inviteCodeItemHandler.onRequestDelete(ctx)
+                            : okNext;
+
+        const params = path === "/api/admin/api-keys/1" ? { id: "1" } : { id: "2", code: "example" };
+
+        const { response } = await runMiddleware(
+          env,
+          keyRequest(key.plaintext, {
+            method,
+            url: `https://example.test${path}`,
+            body: body === undefined ? undefined : JSON.stringify(body),
+          }),
+          next,
+          params,
+        );
+
+        expect(rawDb.prepare(stateQuery).get()?.value).toBe(before);
+        expect(response.status).toBe(403);
+        expect((await response.json()).code).toBe("KEY_NOT_PERMITTED");
+      },
+    );
+
+    it.each([
+      [
+        "/api/admin/Users",
+        "POST",
+        { email: "mixed-user@example.test", firstName: "Mixed", lastName: "User", role: "viewer" },
+      ],
+      ["/api/admin/API-KEYS", "POST", { name: "mixed key", role: "viewer" }],
+      ["/api/admin/Users/2", "PATCH", { role: "viewer" }],
+      ["/api/admin/MFA/setup", "POST", {}],
+      ["/api/admin/Sessions/revoke-all", "POST", {}],
+      ["/api/admin/Invite-Codes", "GET", undefined],
+      ["/api/admin/invite-codes", "GET", undefined],
+    ])("refuses mixed-case identity and self-service path %s (%s)", async (path, method, body) => {
+      const { env, rawDb } = createTestEnv({ role: "admin" });
+      const key = await seedKey(rawDb, { role: "admin" });
+      const next =
+        method === "GET"
+          ? (ctx) => inviteCodesHandler.onRequestGet(ctx)
+          : path.toLowerCase() === "/api/admin/users"
+            ? (ctx) => usersHandler.onRequestPost(ctx)
+            : path.toLowerCase() === "/api/admin/api-keys"
+              ? (ctx) => apiKeysHandler.onRequestPost(ctx)
+              : okNext;
+
+      const { response } = await runMiddleware(
+        env,
+        keyRequest(key.plaintext, {
+          method,
+          url: `https://example.test${path}`,
+          body: body === undefined ? undefined : JSON.stringify(body),
+        }),
+        next,
+      );
+
+      expect(response.status).toBe(403);
+      expect((await response.json()).code).toBe("KEY_NOT_PERMITTED");
+    });
+
+    it.each(["/api/admin/users", "/api/admin/api-keys"])("still allows an admin key to read %s", async (path) => {
+      const { env, rawDb } = createTestEnv({ role: "admin" });
+      const key = await seedKey(rawDb, { role: "admin" });
+
+      const { response } = await runMiddleware(
+        env,
+        keyRequest(key.plaintext, { url: `https://example.test${path}` }),
+        okNext,
+      );
+
+      expect(response.status).toBe(200);
+    });
+
+    it("allows a cookie-authenticated admin to create an invite code through middleware", async () => {
+      const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+      const before = rawDb.prepare("SELECT COUNT(*) AS count FROM invite_codes").get().count;
+      const sessionId = headers.Authorization.replace("Bearer ", "");
+      const cookie = `session_token=${sessionId}`;
+      const csrfRequest = new Request("https://example.test/api/admin/invite-codes", {
+        method: "POST",
+        headers: { Cookie: cookie },
+      });
+      const csrfToken = generateCSRFToken(csrfRequest, env);
+
+      const middlewareContext = {
+        env,
+        request: new Request("https://example.test/api/admin/invite-codes", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Cookie: `${cookie}; csrf_token=${csrfToken}`,
+            "X-CSRF-Token": csrfToken,
+          },
+          body: JSON.stringify({ role: "editor" }),
+        }),
+        data: {},
+      };
+      middlewareContext.next = async () => inviteCodesHandler.onRequestPost(middlewareContext);
+      const response = await onRequest(middlewareContext);
+
+      expect(response.status).toBe(201);
+      expect(rawDb.prepare("SELECT COUNT(*) AS count FROM invite_codes").get().count).toBe(before + 1);
     });
   });
 

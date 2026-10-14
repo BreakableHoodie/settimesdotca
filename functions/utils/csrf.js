@@ -8,6 +8,7 @@ import { API_KEY_PREFIX } from "./apiKeys.js";
 // the cookie name nor preserved "=" in a value -- so CSRF validation and session
 // validation could derive DIFFERENT session identifiers from one header.
 import { parseCookies } from "./cookies.js";
+import { routePath } from "./routePath.js";
 function getHeaderToken(request) {
   return request.headers.get("X-CSRF-Token") || "";
 }
@@ -171,13 +172,13 @@ export function validateCSRFMiddleware(request, env = null) {
     return null;
   }
 
-  const url = new URL(request.url);
+  const path = routePath(request);
 
   // Logout is an authenticated endpoint: the user always has both a session cookie
   // and a CSRF cookie set, so the full double-submit token check can be enforced.
   // The frontend sends X-CSRF-Token on every request via getHeaders(), so this
   // requires no frontend changes.
-  if (url.pathname === "/api/admin/auth/logout") {
+  if (path === "/api/admin/auth/logout") {
     if (!validateCSRFToken(request, env)) {
       const csrfToken = generateCSRFToken(request, env);
       const headers = new Headers({ "Content-Type": "application/json" });
@@ -195,7 +196,7 @@ export function validateCSRFMiddleware(request, env = null) {
 
   // Other auth-route mutations (login, signup, MFA verify) have no session yet,
   // so no CSRF cookie exists to validate against. Enforce same-origin only.
-  if (url.pathname.includes("/api/admin/auth/")) {
+  if (path.includes("/api/admin/auth/")) {
     if (!isSameOriginMutation(request)) {
       return new Response(
         JSON.stringify({

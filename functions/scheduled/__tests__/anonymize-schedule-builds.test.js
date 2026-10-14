@@ -109,13 +109,20 @@ describe("anonymizeScheduleBuilds", () => {
       return realBatch(statements);
     };
 
-    await anonymizeScheduleBuilds({}, env, {});
+    const result = await anonymizeScheduleBuilds({}, env, {});
 
     expect(rawDb.prepare("SELECT visitor_hash FROM schedule_builds WHERE event_id = ?").get(failing.id)).toEqual({
       visitor_hash: "raw-fail",
     });
     expect(rawDb.prepare("SELECT visitor_hash FROM schedule_builds WHERE event_id = ?").get(healthy.id)).toEqual({
       visitor_hash: "anon:1",
+    });
+    expect(result).toEqual({ failures: [`anonymize-schedule-builds(event ${failing.id})`] });
+  });
+
+  test("reports failure without a DB binding", async () => {
+    await expect(anonymizeScheduleBuilds({}, {}, {})).resolves.toEqual({
+      failures: ["anonymize-schedule-builds"],
     });
   });
 

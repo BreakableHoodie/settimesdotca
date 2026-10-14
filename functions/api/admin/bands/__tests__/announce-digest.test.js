@@ -180,7 +180,7 @@ describe("flushAnnounceDigest", () => {
   it("returns empty stats when the queue is empty", async () => {
     const { env } = createTestEnv();
     const stats = await flushAnnounceDigest(env, env.DB);
-    expect(stats).toEqual({ sent: 0, failed: 0, skipped: 0 });
+    expect(stats).toEqual({ sent: 0, failed: 0, skipped: 0, unconfirmed: 0 });
     expect(sendEmail).not.toHaveBeenCalled();
   });
 
@@ -763,6 +763,7 @@ describe("flushAnnounceDigest", () => {
     expect(sendEmail).toHaveBeenCalledOnce();
     expect(stats.sent).toBe(1);
     expect(stats.failed).toBe(0);
+    expect(stats.unconfirmed).toBe(1);
     expect(errorSpy).toHaveBeenCalled();
   });
 });

@@ -1,6 +1,9 @@
 export async function expireShareLinks(_event, env, _ctx) {
   const { DB } = env;
-  if (!DB) return;
+  if (!DB) {
+    console.error("[scheduled] Failed to clean up expired share links: DB binding is missing");
+    return { failures: ["expire-share-links"] };
+  }
 
   try {
     // The ledger rows are deleted EXPLICITLY, not left to the FK cascade.
@@ -24,5 +27,8 @@ export async function expireShareLinks(_event, env, _ctx) {
     ]);
   } catch (err) {
     console.error("[scheduled] Failed to clean up expired share links", err);
+    return { failures: ["expire-share-links"] };
   }
+
+  return { failures: [] };
 }

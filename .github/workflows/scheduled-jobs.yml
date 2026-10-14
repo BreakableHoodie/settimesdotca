@@ -29,7 +29,7 @@ jobs:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           echo "Triggering scheduled handler..."
-          curl -fsS -X POST "https://settimes.ca/api/internal/run-scheduled" \
+          curl -sS --fail-with-body -X POST "https://settimes.ca/api/internal/run-scheduled" \
             -H "Authorization: Bearer ${CRON_SECRET}" \
             -H "Content-Type: application/json"
           echo "Scheduled handler completed successfully."

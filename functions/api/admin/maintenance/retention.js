@@ -27,6 +27,69 @@ export async function runRetentionCleanup(env) {
   const { DB } = env;
   const nowUnix = Math.floor(Date.now() / 1000);
 
+  // Each delete is a thunk run inside its own promise, so a statement that
+  // fails while being PREPARED (synchronously) is settled like one that fails
+  // while running, instead of aborting the list before later tables start.
+  const deletes = [
+    ["lucia_sessions", () => DB.prepare("DELETE FROM lucia_sessions WHERE expires_at < ?").bind(nowUnix).run()],
+    [
+      "mfa_challenges",
+      () => DB.prepare("DELETE FROM mfa_challenges WHERE used = 1 OR expires_at < datetime('now')").run(),
+    ],
+    ["email_otp_codes", () => DB.prepare("DELETE FROM email_otp_codes WHERE expires_at < datetime('now')").run()],
+    [
+      "password_reset_tokens",
+      () =>
+        DB.prepare("DELETE FROM password_reset_tokens WHERE used = 1 OR datetime(expires_at) < datetime('now')").run(),
+    ],
+    ["trusted_devices", () => DB.prepare("DELETE FROM trusted_devices WHERE expires_at <= datetime('now')").run()],
+    [
+      "auth_attempts",
+      () => DB.prepare("DELETE FROM auth_attempts WHERE created_at < datetime('now', '-30 days')").run(),
+    ],
+    ["auth_audit", () => DB.prepare("DELETE FROM auth_audit WHERE timestamp < datetime('now', '-90 days')").run()],
+    [
+      "audit_log",
+      () =>
+        DB.prepare(
+          "DELETE FROM audit_log WHERE action != 'api_key.request' AND created_at < datetime('now', '-1 year')",
+        ).run(),
+    ],
+    [
+      "audit_log",
+      () =>
+        DB.prepare(
+          "DELETE FROM audit_log WHERE action = 'api_key.request' AND created_at < datetime('now', '-90 days')",
+        ).run(),
+    ],
+    ["rate_limits", () => DB.prepare("DELETE FROM rate_limits WHERE updated_at < unixepoch() - 1800").run()],
+    [
+      "band_follows",
+      () => DB.prepare(`DELETE FROM band_follows WHERE verified = 0 AND NOT (${pendingConfirmationLiveSql()})`).run(),
+    ],
+    [
+      "email_subscriptions",
+      () =>
+        DB.prepare(
+          `DELETE FROM email_subscriptions WHERE verified = 0 AND NOT (${pendingConfirmationLiveSql()})`,
+        ).run(),
+    ],
+  ];
+  const results = await Promise.allSettled(deletes.map(([, run]) => Promise.resolve().then(run)));
+  const failedTables = [
+    ...new Set(
+      results.flatMap((result, index) => {
+        if (result.status === "fulfilled") return [];
+        const table = deletes[index][0];
+        console.error("[Retention] Failed to delete %s", table, result.reason);
+        return [table];
+      }),
+    ),
+  ];
+  if (failedTables.length) {
+    throw new Error(`retention failed for: ${failedTables.join(", ")}`);
+  }
+
   const [
     sessions,
     mfaChallenges,
@@ -40,24 +103,7 @@ export async function runRetentionCleanup(env) {
     rateLimits,
     bandFollows,
     emailSubscriptions,
-  ] = await Promise.all([
-    DB.prepare("DELETE FROM lucia_sessions WHERE expires_at < ?").bind(nowUnix).run(),
-    DB.prepare("DELETE FROM mfa_challenges WHERE used = 1 OR expires_at < datetime('now')").run(),
-    DB.prepare("DELETE FROM email_otp_codes WHERE expires_at < datetime('now')").run(),
-    DB.prepare("DELETE FROM password_reset_tokens WHERE used = 1 OR datetime(expires_at) < datetime('now')").run(),
-    DB.prepare("DELETE FROM trusted_devices WHERE expires_at <= datetime('now')").run(),
-    DB.prepare("DELETE FROM auth_attempts WHERE created_at < datetime('now', '-30 days')").run(),
-    DB.prepare("DELETE FROM auth_audit WHERE timestamp < datetime('now', '-90 days')").run(),
-    DB.prepare(
-      "DELETE FROM audit_log WHERE action != 'api_key.request' AND created_at < datetime('now', '-1 year')",
-    ).run(),
-    DB.prepare(
-      "DELETE FROM audit_log WHERE action = 'api_key.request' AND created_at < datetime('now', '-90 days')",
-    ).run(),
-    DB.prepare("DELETE FROM rate_limits WHERE updated_at < unixepoch() - 1800").run(),
-    DB.prepare(`DELETE FROM band_follows WHERE verified = 0 AND NOT (${pendingConfirmationLiveSql()})`).run(),
-    DB.prepare(`DELETE FROM email_subscriptions WHERE verified = 0 AND NOT (${pendingConfirmationLiveSql()})`).run(),
-  ]);
+  ] = results.map((result) => result.value);
 
   return {
     sessions_deleted: sessions.meta.changes,

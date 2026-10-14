@@ -4,8 +4,10 @@ import { runRetentionCleanup } from "../api/admin/maintenance/retention.js";
 
 export async function scheduled(_event, env, _ctx) {
   const { DB } = env;
+  const failures = [];
   if (!DB) {
-    return;
+    console.error("[Metrics] Aggregation and retention require a DB binding");
+    return { failures: ["aggregate-stats", "retention"] };
   }
 
   try {
@@ -44,6 +46,7 @@ export async function scheduled(_event, env, _ctx) {
     ).run();
   } catch (error) {
     console.error("[Metrics] Aggregation error:", error);
+    failures.push("aggregate-stats");
   }
 
   try {
@@ -51,5 +54,8 @@ export async function scheduled(_event, env, _ctx) {
     console.log("[Retention] Cleanup complete.");
   } catch (error) {
     console.error("[Retention] Cleanup error:", error);
+    failures.push("retention");
   }
+
+  return { failures };
 }

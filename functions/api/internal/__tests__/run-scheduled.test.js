@@ -1,6 +1,24 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("../../../api/admin/maintenance/retention.js", () => ({
+  runRetentionCleanup: vi.fn(() => Promise.resolve()),
+}));
+vi.mock("../../../scheduled/expire-share-links.js", () => ({
+  expireShareLinks: vi.fn(() => Promise.resolve({ failures: [] })),
+}));
+vi.mock("../../../scheduled/anonymize-schedule-builds.js", () => ({
+  anonymizeScheduleBuilds: vi.fn(() => Promise.resolve({ failures: [] })),
+}));
+vi.mock("../../../utils/announceDigest.js", () => ({
+  flushAnnounceDigest: vi.fn(() => Promise.resolve()),
+}));
+
 import { createTestEnv } from "../../test-utils.js";
 import { onRequestPost } from "../run-scheduled.js";
+import { runRetentionCleanup } from "../../../api/admin/maintenance/retention.js";
+import { expireShareLinks } from "../../../scheduled/expire-share-links.js";
+import { anonymizeScheduleBuilds } from "../../../scheduled/anonymize-schedule-builds.js";
+import { flushAnnounceDigest } from "../../../utils/announceDigest.js";
 
 const SECRET = "test-cron-secret-for-unit-tests";
 
@@ -21,6 +39,10 @@ function makeContext(request, envOverrides = {}) {
 }
 
 describe("POST /api/internal/run-scheduled", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("returns 503 when CRON_SECRET is not configured", async () => {
     const ctx = makeContext(makeRequest(), { CRON_SECRET: undefined });
     const res = await onRequestPost(ctx);
@@ -75,5 +97,21 @@ describe("POST /api/internal/run-scheduled", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.ok).toBe(true);
+  });
+
+  it("returns 500 for retention failure after running later steps", async () => {
+    runRetentionCleanup.mockRejectedValueOnce(new Error("retention unavailable"));
+    const ctx = makeContext(makeRequest({ Authorization: `Bearer ${SECRET}` }), { CRON_SECRET: SECRET });
+
+    const res = await onRequestPost(ctx);
+
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body).toMatchObject({ ok: false, failedSteps: ["retention"] });
+    expect(typeof body.ranAt).toBe("string");
+    expect(typeof body.durationMs).toBe("number");
+    expect(expireShareLinks).toHaveBeenCalledOnce();
+    expect(anonymizeScheduleBuilds).toHaveBeenCalledOnce();
+    expect(flushAnnounceDigest).toHaveBeenCalledOnce();
   });
 });

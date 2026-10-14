@@ -45,7 +45,12 @@ async function anonymizeEvent(DB, eventId) {
 
 export async function anonymizeScheduleBuilds(_event, env, _ctx) {
   const { DB } = env;
-  if (!DB) return;
+  if (!DB) {
+    console.error("[scheduled] Failed to anonymise schedule builds: DB binding is missing");
+    return { failures: ["anonymize-schedule-builds"] };
+  }
+
+  const failures = [];
 
   let events;
   try {
@@ -64,7 +69,7 @@ export async function anonymizeScheduleBuilds(_event, env, _ctx) {
       .all();
   } catch (error) {
     console.error("[scheduled] Failed to list events for schedule-build anonymisation", error);
-    return;
+    return { failures: ["anonymize-schedule-builds"] };
   }
 
   // One event's failure must not skip the rest, every day, indefinitely.
@@ -73,6 +78,9 @@ export async function anonymizeScheduleBuilds(_event, env, _ctx) {
       await anonymizeEvent(DB, event.id);
     } catch (error) {
       console.error("[scheduled] Failed to anonymise schedule builds for event", event.id, error);
+      failures.push(`anonymize-schedule-builds(event ${event.id})`);
     }
   }
+
+  return { failures };
 }

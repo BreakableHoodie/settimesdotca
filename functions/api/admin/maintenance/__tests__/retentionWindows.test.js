@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { createTestEnv } from "../../../test-utils.js";
 import { runRetentionCleanup } from "../retention.js";
 
@@ -106,5 +106,51 @@ describe("retention windows published in the privacy policy", () => {
         .all()
         .map((r) => r.email),
     ).toEqual(["recent-subscription@example.test", "verified-subscription@example.test"]);
+  });
+
+  test("names every failed table while committing successful deletes", async () => {
+    const { env, rawDb } = createTestEnv({ role: "admin" });
+    rawDb
+      .prepare("INSERT INTO lucia_sessions (id, user_id, expires_at) VALUES (?, 1, ?)")
+      .run("expired-retention-session", 0);
+
+    const originalPrepare = env.DB.prepare.bind(env.DB);
+    const prepareSpy = vi.spyOn(env.DB, "prepare").mockImplementation((sql) => {
+      const statement = originalPrepare(sql);
+      if (sql.includes("DELETE FROM auth_attempts") || sql.includes("action != 'api_key.request'")) {
+        return {
+          ...statement,
+          bind: (...params) => ({
+            ...statement.bind(...params),
+            run: () => Promise.reject(new Error("delete failed")),
+          }),
+          run: () => Promise.reject(new Error("delete failed")),
+        };
+      }
+      return statement;
+    });
+
+    await expect(runRetentionCleanup(env)).rejects.toThrow("retention failed for: auth_attempts, audit_log");
+    expect(rawDb.prepare("SELECT COUNT(*) AS count FROM lucia_sessions").get().count).toBe(1);
+    prepareSpy.mockRestore();
+  });
+
+  // A statement can fail while being PREPARED, synchronously. Built eagerly,
+  // that throw aborted the list before later tables were even started.
+  test("a delete that throws while being prepared does not stop later tables", async () => {
+    const { env, rawDb } = createTestEnv({ role: "admin" });
+    rawDb.prepare("INSERT INTO lucia_sessions (id, user_id, expires_at) VALUES ('expired-prep', 1, 0)").run();
+
+    const originalPrepare = env.DB.prepare.bind(env.DB);
+    const prepareSpy = vi.spyOn(env.DB, "prepare").mockImplementation((sql) => {
+      if (sql.includes("DELETE FROM mfa_challenges")) throw new Error("prepare failed");
+      return originalPrepare(sql);
+    });
+
+    await expect(runRetentionCleanup(env)).rejects.toThrow("retention failed for: mfa_challenges");
+    // lucia_sessions comes first and rate_limits last: both still ran.
+    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM lucia_sessions WHERE id = 'expired-prep'").get().n).toBe(0);
+    expect(prepareSpy.mock.calls.some(([sql]) => sql.includes("DELETE FROM rate_limits"))).toBe(true);
+    prepareSpy.mockRestore();
   });
 });

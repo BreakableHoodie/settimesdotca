@@ -1394,6 +1394,21 @@ its gate is in git and its Pro ruleset is measured on this repo; Snyk Code would
 spend the Free plan's monthly Code-test allowance on every PR and keep its gate
 in Snyk's dashboard.
 
+### Outbound requests go only to fixed addresses (SSRF)
+
+The server never opens an address a caller can influence. Every `fetch` in
+`functions/` targets a hard-coded `https://` URL (Turnstile, Postmark,
+MailChannels, Resend) or `env.ASSETS`, which serves this site's own files and
+cannot reach the network. Band photos and posters arrive as file uploads, never
+as "import from URL", and stored artist links are rendered, never visited.
+
+`functions/utils/__tests__/outboundFetchGuard.test.js` enforces it: a
+`fetch(variable)`, a template-literal URL, another binding's `.fetch`, or a
+`cloudflare:sockets` import fails the build. A feature that genuinely needs a
+caller-supplied URL (link previews, URL import) must change that test on
+purpose, with an allowlist of hosts and a refusal of private and link-local
+addresses, never by loosening the scan. In the mutation gate.
+
 ### Content-Security-Policy (strict, no `unsafe-inline`) — TWO sources
 
 There are **two** CSPs, and the one the browser enforces on a page is **not** the middleware:

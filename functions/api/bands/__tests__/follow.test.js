@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createTestEnv, insertBand, insertEvent } from "../../test-utils";
 import * as followHandler from "../[name]/follow.js";
+import { CONSENT_VERSION } from "../../../utils/consent.js";
 
 const waitUntil = () => {};
 
@@ -37,6 +38,7 @@ describe("POST /api/bands/:name/follow", () => {
     expect(row.unsubscribe_token).toBeTruthy();
     // CASL/CAN-SPAM: consent fields are always recorded
     expect(row.consent_method).toBe("web_form");
+    expect(row.consent_version).toBe(CONSENT_VERSION);
     // CF-Connecting-IP is absent in test requests, so consent_ip is null
     expect(row.consent_ip).toBeNull();
   });
@@ -54,10 +56,11 @@ describe("POST /api/bands/:name/follow", () => {
     await followHandler.onRequestPost({ request: req, env, params: { name: String(band.band_profile_id) }, waitUntil });
 
     const row = rawDb
-      .prepare("SELECT consent_ip, consent_method FROM band_follows WHERE email=?")
+      .prepare("SELECT consent_ip, consent_method, consent_version FROM band_follows WHERE email=?")
       .get("fan2@example.com");
     expect(row.consent_ip).toBe("203.0.113.42");
     expect(row.consent_method).toBe("web_form");
+    expect(row.consent_version).toBe(CONSENT_VERSION);
   });
 
   it("returns 400 for an invalid email", async () => {

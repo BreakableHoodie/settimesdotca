@@ -28,6 +28,7 @@ import { escapeHtml } from "../../utils/html.js";
 import { getPublicBaseUrl } from "../../utils/publicUrl.js";
 import { parseJsonObjectBody } from "../../utils/request.js";
 import { publicEventStatusSql } from "../../utils/eventVisibility.js";
+import { CONSENT_VERSION } from "../../utils/consent.js";
 
 const MAX_EMAIL_LENGTH = 320;
 const MAX_BATCH_SIZE = 30;
@@ -136,9 +137,9 @@ export async function onRequestPost(context) {
       return DB.prepare(
         `INSERT OR IGNORE INTO band_follows
            (email, band_profile_id, verified, verification_token, unsubscribe_token,
-            consent_ip, consent_method, batch_token)
-         VALUES (?, ?, 0, ?, ?, ?, 'web_form', ?)`,
-      ).bind(email, band_profile_id, verificationToken, unsubscribeToken, consentIp, batchToken);
+             consent_ip, consent_method, consent_version, batch_token)
+          VALUES (?, ?, 0, ?, ?, ?, 'web_form', ?, ?)`,
+      ).bind(email, band_profile_id, verificationToken, unsubscribeToken, consentIp, CONSENT_VERSION, batchToken);
     });
 
     const results = await DB.batch(stmts);

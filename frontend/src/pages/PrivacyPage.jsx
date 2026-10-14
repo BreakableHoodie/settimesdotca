@@ -65,11 +65,11 @@ export default function PrivacyPage() {
             <p>
               We store your email address, your city/genre preferences (for subscribers), and a verification timestamp.
               As a record of your CASL express consent, we also store the IP address from which you subscribed or
-              confirmed your follow, and the consent method (<code className="text-accent-400 text-sm">web_form</code>).
-              This consent record is held for as long as your subscription or follow is active and deleted when you
-              unsubscribe. Limited request metadata may be processed transiently for abuse prevention and rate limiting.
-              Your email is only used to send the updates you subscribed to, and the one-click unsubscribe in every
-              email removes the active subscription immediately.
+              followed a band, the consent method (<code className="text-accent-400 text-sm">web_form</code>), and which
+              version of the consent wording you agreed to. This consent record is held for as long as your subscription
+              or follow is active and deleted when you unsubscribe. Limited request metadata may be processed
+              transiently for abuse prevention and rate limiting. Your email is only used to send the updates you
+              subscribed to, and the one-click unsubscribe in every email removes the active subscription immediately.
             </p>
 
             <h3 className="text-text-secondary font-medium mb-2 mt-4">If you are an organiser with admin access</h3>
@@ -104,7 +104,7 @@ export default function PrivacyPage() {
                   </tr>
                   <tr>
                     <td className="py-2 pr-4">Rate-limit counters</td>
-                    <td className="py-2">~30 minutes</td>
+                    <td className="py-2">Up to 1 day</td>
                   </tr>
                   <tr>
                     <td className="py-2 pr-4">Login attempt log (IPs, emails)</td>

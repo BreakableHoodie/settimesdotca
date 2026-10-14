@@ -40,6 +40,7 @@ describe("GET /api/subscriptions/verify", () => {
     expect(response.status).toBe(302);
     const subscription = mockDB.data.email_subscriptions.find((sub) => sub.id === 1);
     expect(subscription.verified).toBe(true);
+    expect(subscription.confirmed_at).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
     expect(mockDB.data.subscription_verifications).toHaveLength(1);
     expect(mockDB.data.subscription_verifications[0].subscription_id).toBe(1);
   });
@@ -78,6 +79,7 @@ describe("GET /api/subscriptions/verify", () => {
       verification_token: "valid-token-12345",
       unsubscribe_token: "unsub-token-67890",
       created_at: new Date().toISOString(),
+      confirmed_at: "2026-01-01 00:00:00",
     });
 
     const request = new Request("http://localhost/api/subscriptions/verify?token=valid-token-12345");
@@ -88,6 +90,7 @@ describe("GET /api/subscriptions/verify", () => {
     expect(response.status).toBe(200);
     const text = await response.text();
     expect(text).toContain("Email already verified");
+    expect(mockDB.data.email_subscriptions[0].confirmed_at).toBe("2026-01-01 00:00:00");
   });
 
   it("should log verification to subscription_verifications table", async () => {

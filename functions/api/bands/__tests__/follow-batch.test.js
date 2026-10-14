@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { createTestEnv, insertBand, insertEvent } from "../../test-utils";
 import * as followBatchHandler from "../follow-batch.js";
 import * as confirmBatchHandler from "../confirm-follow-batch.js";
+import { CONSENT_VERSION } from "../../../utils/consent.js";
 
 // waitUntil in tests: run the promise synchronously so email side-effects
 // execute before assertions (mirrors follow.test.js pattern).
@@ -56,6 +57,7 @@ describe("POST /api/bands/follow-batch", () => {
       expect(row.verification_token).toBeTruthy();
       expect(row.unsubscribe_token).toBeTruthy();
       expect(row.consent_method).toBe("web_form");
+      expect(row.consent_version).toBe(CONSENT_VERSION);
     }
 
     // All three rows share the same batch_token
@@ -288,13 +290,34 @@ describe("GET /api/bands/confirm-follow-batch", () => {
 
     // All rows now verified=1, batch_token cleared
     const confirmed = rawDb
-      .prepare("SELECT verified, batch_token FROM band_follows WHERE email = ?")
+      .prepare("SELECT verified, confirmed_at, batch_token FROM band_follows WHERE email = ?")
       .all("confirmbatch@example.com");
     expect(confirmed).toHaveLength(2);
     for (const row of confirmed) {
       expect(row.verified).toBe(1);
+      expect(row.confirmed_at).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
       expect(row.batch_token).toBeNull();
     }
+  });
+
+  it("does not overwrite a confirmed row when the batch token is reused", async () => {
+    const { env, rawDb } = createTestEnv();
+    const ev = insertEvent(rawDb, { name: "Vol17", slug: "vol17-confirm-batch-old", status: "published" });
+    const band = insertBand(rawDb, { name: "Already Confirmed", event_id: ev.id });
+    rawDb
+      .prepare(
+        "INSERT INTO band_follows (email, band_profile_id, verified, batch_token, confirmed_at, unsubscribe_token) VALUES (?, ?, 1, ?, ?, ?)",
+      )
+      .run("old@example.com", band.band_profile_id, "reused-batch-token", "2026-01-01 00:00:00", "old-unsub");
+
+    const res = await confirmBatchHandler.onRequestGet({
+      request: new Request("https://example.test/api/bands/confirm-follow-batch?token=reused-batch-token"),
+      env,
+    });
+
+    expect(res.status).toBe(200);
+    const row = rawDb.prepare("SELECT confirmed_at FROM band_follows WHERE email = ?").get("old@example.com");
+    expect(row.confirmed_at).toBe("2026-01-01 00:00:00");
   });
 
   it("is idempotent — a second click on a used token still returns 200", async () => {

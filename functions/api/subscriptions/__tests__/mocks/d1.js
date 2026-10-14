@@ -118,7 +118,7 @@ export class MockD1Database {
 
     // INSERT INTO email_subscriptions
     if (queryLower.includes("insert into email_subscriptions")) {
-      const [email, city, genre, frequency, verificationToken, unsubscribeToken, consentIp] = params;
+      const [email, city, genre, frequency, verificationToken, unsubscribeToken, consentIp, consentVersion] = params;
 
       const newSub = {
         id: this.idCounter++,
@@ -133,6 +133,7 @@ export class MockD1Database {
         last_email_sent: null,
         consent_ip: consentIp ?? null,
         consent_method: "web_form",
+        consent_version: consentVersion ?? null,
       };
 
       this.data.email_subscriptions.push(newSub);
@@ -150,6 +151,9 @@ export class MockD1Database {
 
         if (subscription) {
           subscription.verified = true;
+          if (queryLower.includes("confirmed_at")) {
+            subscription.confirmed_at = new Date().toISOString().replace("T", " ").slice(0, 19);
+          }
           return { success: true, meta: { changes: 1 } };
         }
 

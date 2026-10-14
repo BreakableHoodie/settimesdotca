@@ -25,7 +25,9 @@ describe("GET /api/bands/:name/confirm-follow", () => {
     });
 
     const pending = rawDb
-      .prepare("SELECT verified, verification_token FROM band_follows WHERE email=? AND band_profile_id=?")
+      .prepare(
+        "SELECT verified, confirmed_at, verification_token FROM band_follows WHERE email=? AND band_profile_id=?",
+      )
       .get("fan@example.com", band.band_profile_id);
     expect(pending.verified).toBe(0);
     expect(pending.verification_token).toBeTruthy();
@@ -42,9 +44,12 @@ describe("GET /api/bands/:name/confirm-follow", () => {
     expect(res.status).toBe(200);
 
     const confirmed = rawDb
-      .prepare("SELECT verified, verification_token FROM band_follows WHERE email=? AND band_profile_id=?")
+      .prepare(
+        "SELECT verified, confirmed_at, verification_token FROM band_follows WHERE email=? AND band_profile_id=?",
+      )
       .get("fan@example.com", band.band_profile_id);
     expect(confirmed.verified).toBe(1);
+    expect(confirmed.confirmed_at).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
     expect(confirmed.verification_token).toBeNull();
   });
 

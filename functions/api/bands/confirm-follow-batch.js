@@ -38,7 +38,7 @@ export async function onRequestGet(context) {
     // no rows match, changes=0, and the fan still sees the success page.
     await DB.prepare(
       `UPDATE band_follows
-       SET verified = 1, verification_token = NULL, batch_token = NULL
+       SET verified = 1, confirmed_at = datetime('now'), verification_token = NULL, batch_token = NULL
        WHERE batch_token = ? AND verified = 0`,
     )
       .bind(token)

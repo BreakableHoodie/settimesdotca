@@ -203,7 +203,7 @@ CREATE TABLE IF NOT EXISTS email_subscriptions (
   verification_token TEXT UNIQUE,        -- Token for email verification
   unsubscribe_token TEXT UNIQUE NOT NULL, -- Token for unsubscribe link
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  last_email_sent TEXT, consent_ip TEXT, consent_method TEXT NOT NULL DEFAULT 'web_form',                  -- When was last email sent
+  last_email_sent TEXT, consent_ip TEXT, consent_method TEXT NOT NULL DEFAULT 'web_form', confirmed_at TEXT, consent_version TEXT,                  -- When was last email sent
 
   UNIQUE(email, city, genre)             -- Prevent duplicate subscriptions
 );
@@ -398,7 +398,7 @@ CREATE TABLE IF NOT EXISTS band_follows (
   verified INTEGER NOT NULL DEFAULT 0,
   verification_token TEXT UNIQUE,
   unsubscribe_token TEXT UNIQUE NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (datetime('now')), consent_ip TEXT, consent_method TEXT NOT NULL DEFAULT 'web_form', batch_token TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')), consent_ip TEXT, consent_method TEXT NOT NULL DEFAULT 'web_form', batch_token TEXT, confirmed_at TEXT, consent_version TEXT,
   UNIQUE(email, band_profile_id)
 );
 

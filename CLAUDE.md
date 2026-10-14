@@ -931,6 +931,10 @@ When a performance is announced (`is_announced` 0→1), verified followers of th
 
 Bot protection on the public email-input endpoints (follow, subscribe) goes through `verifyTurnstile()` in `functions/utils/turnstile.js`, which **fails closed in production**: if `TURNSTILE_SECRET_KEY` is unset it allows only local-dev requests and rejects everything else (mirrors `CSRF_SECRET`). The secret **must** be configured in the production Pages project.
 
+### Proof of consent is recorded at confirmation (#1289)
+
+Band follows and email subscriptions store `confirmed_at` and the `consent_version` that identifies the wording shown when the request was made; legacy rows remain NULL because their wording and confirmation time were not recorded. Bump `CONSENT_VERSION` whenever the follow/subscribe form wording or confirmation email wording changes. Confirmation writes use SQLite's `datetime('now')` and must never overwrite an existing confirmed timestamp.
+
 ---
 
 ## Testing

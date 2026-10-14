@@ -199,6 +199,24 @@ export const MUTATIONS = [
     tests: ["functions/api/admin/bands/__tests__/announce-double-opt-in.test.js"],
   },
   {
+    id: "consent-confirmation-single-follow-timestamp",
+    invariant:
+      "CLAUDE.md 'Proof of consent is recorded at confirmation' — a single band follow confirmation records its SQLite timestamp",
+    file: "functions/api/bands/[name]/confirm-follow.js",
+    find: "confirmed_at = datetime('now'), ",
+    replace: "",
+    tests: ["functions/api/bands/__tests__/confirm-follow.test.js"],
+  },
+  {
+    id: "consent-confirmation-subscription-timestamp",
+    invariant:
+      "CLAUDE.md 'Proof of consent is recorded at confirmation' — a subscription confirmation records its SQLite timestamp",
+    file: "functions/api/subscriptions/verify.js",
+    find: "SET verified = 1, confirmed_at = datetime('now')",
+    replace: "SET verified = 1",
+    tests: ["functions/api/subscriptions/__tests__/verify.test.js"],
+  },
+  {
     id: "after-midnight-threshold-server",
     invariant:
       "CLAUDE.md 'After-midnight band sorting' — AFTER_MIDNIGHT_THRESHOLD_HOUR is 6 (server canonical home); sets before this hour belong to the previous festival day",

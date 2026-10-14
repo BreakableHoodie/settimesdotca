@@ -8,6 +8,7 @@ import { verifyTurnstile } from "../../utils/turnstile.js";
 import { escapeHtml } from "../../utils/html.js";
 import { getPublicBaseUrl } from "../../utils/publicUrl.js";
 import { parseJsonObjectBody } from "../../utils/request.js";
+import { CONSENT_VERSION } from "../../utils/consent.js";
 
 const FREQUENCY_OPTIONS = new Set(["daily", "weekly", "monthly"]);
 const MAX_EMAIL_LENGTH = 320;
@@ -132,11 +133,11 @@ export async function onRequestPost(context) {
     try {
       await env.DB.prepare(
         `
-        INSERT INTO email_subscriptions (email, city, genre, frequency, verification_token, unsubscribe_token, consent_ip, consent_method)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'web_form')
+        INSERT INTO email_subscriptions (email, city, genre, frequency, verification_token, unsubscribe_token, consent_ip, consent_method, consent_version)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'web_form', ?)
       `,
       )
-        .bind(email, city, genre, frequency, verificationToken, unsubscribeToken, consentIp)
+        .bind(email, city, genre, frequency, verificationToken, unsubscribeToken, consentIp, CONSENT_VERSION)
         .run();
     } catch (insertError) {
       if (insertError?.message?.includes("UNIQUE constraint failed")) {

@@ -38,7 +38,7 @@ export async function onRequestGet(context) {
     const verifyResult = await env.DB.prepare(
       `
       UPDATE email_subscriptions
-      SET verified = 1
+      SET verified = 1, confirmed_at = datetime('now')
       WHERE verification_token = ?
         AND verified = 0
     `,

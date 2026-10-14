@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { onRequestPost } from "../subscribe.js";
 import { MockD1Database } from "./mocks/d1.js";
 import { createMockRequest, createMockContext, VALID_SUBSCRIPTION, INVALID_PAYLOADS } from "./helpers.js";
+import { CONSENT_VERSION } from "../../../utils/consent.js";
 
 describe("POST /api/subscriptions/subscribe", () => {
   let mockDB;
@@ -45,6 +46,7 @@ describe("POST /api/subscriptions/subscribe", () => {
       frequency: "weekly",
       verified: false,
       consent_method: "web_form",
+      consent_version: CONSENT_VERSION,
     });
     // CF-Connecting-IP is not present in test requests, so consent_ip is null
     expect(mockDB.data.email_subscriptions[0].consent_ip).toBeNull();

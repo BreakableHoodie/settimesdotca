@@ -1412,10 +1412,12 @@ addresses, never by loosening the scan. In the mutation gate.
 ### Retention windows are a published promise
 
 The privacy policy's retention table (`frontend/src/pages/PrivacyPage.jsx`) states
-how long each kind of personal data is kept, and
-`functions/api/admin/maintenance/retention.js` is what makes it true. It runs daily
+how long each kind of personal data is kept. Two handlers make it true:
+`functions/api/admin/maintenance/retention.js` deletes expired rows, and
+`functions/scheduled/anonymize-schedule-builds.js` anonymises schedule-build
+visitor codes 30 days after an event. Both run daily
 from `scheduled-jobs.yml` through `/api/internal/run-scheduled`. Change a window in
-one and you must change the other in the same PR.
+one and you must change the policy in the same PR.
 
 Until the 2026-10 report card, the 30-day login-attempt window (emails and IPs) and
 the 90-day `api_key.request` window could be removed with every test green:

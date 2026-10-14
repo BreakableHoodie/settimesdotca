@@ -20,7 +20,7 @@ every grade in specific files/lines, not vibes.
 - **Dependency health** — outdated/abandoned packages, unnecessary bloat, version conflicts.
 - **Consistency with stated conventions** — does the code actually follow what AGENTS.md/CLAUDE.md says it should?
 - **Production reality** — for each critical flow (login, MFA, signup with invite, password reset completion, follow confirm, subscribe verify, schedule share, iCal feed, admin publish/archive), does anything verify it against the real edge runtime or production, rather than Node or local `wrangler`? Added 2026-10 because the 2026-09-09 card graded the repo A while PBKDF2 at 600,000 iterations had broken signup and password reset in production since June: the edge refuses more than 100,000 and nothing local could see it. Read-only probes only: public GETs and D1 `SELECT`s. Never create accounts, send email, or hit a route whose rate limiter writes D1.
-- **Privacy & compliance** — CASL and PIPEDA: consent records, retention versus what the privacy policy promises, what personal data is stored and where, unsubscribe paths, and every factual claim the policy makes checked against the code. Added 2026-10 because nothing had ever checked the email-consent records the policy describes, and the policy claimed a verification timestamp the schema does not have.
+- **Privacy & compliance** — CASL and PIPEDA: consent records, retention versus what the privacy policy promises, what personal data is stored and where, unsubscribe paths, and every factual claim the policy makes checked against the code. Added 2026-10 because nothing had ever checked the email-consent records the policy describes, and the policy claimed a verification timestamp the schema did not have until #1289.
 
 ## Step 1: Grade
 

@@ -770,19 +770,13 @@ paths:
             type: string
       responses:
         "200":
-          description: HTML confirmation page (valid, already-used, or expired)
+          description: HTML confirmation page with one button that POSTs the token back. Writes nothing and does not look the token up.
           content:
             text/html:
               schema:
                 type: string
         "400":
-          description: Missing or malformed token
-          content:
-            text/plain:
-              schema:
-                type: string
-        "500":
-          description: Server error
+          description: Missing token, or token longer than 256 characters
           content:
             text/plain:
               schema:
@@ -834,19 +828,13 @@ paths:
             type: string
       responses:
         "200":
-          description: HTML unsubscribe confirmation page
+          description: HTML unfollow page with one button that POSTs the token back. Writes nothing and does not look the token up.
           content:
             text/html:
               schema:
                 type: string
         "400":
-          description: Missing or malformed token
-          content:
-            text/plain:
-              schema:
-                type: string
-        "500":
-          description: Server error
+          description: Missing token, or token longer than 256 characters
           content:
             text/plain:
               schema:
@@ -932,13 +920,13 @@ paths:
             maxLength: 256
       responses:
         "200":
-          description: HTML confirmation page (success or already-confirmed)
+          description: HTML confirmation page with one button that POSTs the token back. Writes nothing and does not look the token up.
           content:
             text/html:
               schema:
                 type: string
         "400":
-          description: Missing or oversized token
+          description: Missing token, or token longer than 256 characters
           content:
             text/plain:
               schema:
@@ -1162,22 +1150,14 @@ paths:
           schema:
             type: string
       responses:
-        "302":
-          description: Verification succeeded and the client is redirected to the subscribe page
+        "200":
+          description: HTML verification page with one button that POSTs the token back. Writes nothing and does not look the token up.
+          content:
+            text/html:
+              schema:
+                type: string
         "400":
-          description: Invalid or expired token
-          content:
-            text/plain:
-              schema:
-                type: string
-        "404":
-          description: Token not found
-          content:
-            text/plain:
-              schema:
-                type: string
-        "500":
-          description: Verification failed
+          description: Missing token, or token longer than 256 characters
           content:
             text/plain:
               schema:
@@ -1216,25 +1196,13 @@ paths:
             type: string
       responses:
         "200":
-          description: HTML unsubscribe confirmation page
+          description: HTML unsubscribe page with one button that POSTs the token back. Writes nothing and does not look the token up.
           content:
             text/html:
               schema:
                 type: string
         "400":
-          description: Missing token
-          content:
-            text/plain:
-              schema:
-                type: string
-        "404":
-          description: Unknown token
-          content:
-            text/plain:
-              schema:
-                type: string
-        "500":
-          description: Unsubscribe failed
+          description: Missing token, or token longer than 256 characters
           content:
             text/plain:
               schema:

@@ -8,6 +8,7 @@ import { validatePassword, FIELD_LIMITS } from "../../utils/validation.js";
 import { getClientIP, parseJsonObjectBody } from "../../utils/request.js";
 import { revokeAllTrustedDevices } from "../../utils/trustedDevice.js";
 import { fromSqliteDateTime } from "../../utils/authAttempts.js";
+import { isDevRequest } from "../../utils/auth.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -15,7 +16,9 @@ export async function onRequestPost(context) {
   const debugId = crypto.randomUUID();
 
   const withDebug = (payload) => {
-    if (env?.ENVIRONMENT !== "production") {
+    // Only a known dev environment echoes debugId; unset or a variant fails
+    // closed (#1273).
+    if (isDevRequest(request, env)) {
       return { ...payload, debugId };
     }
     return payload;

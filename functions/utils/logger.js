@@ -1,6 +1,8 @@
 // Structured logging utility for Cloudflare Workers
 // Provides consistent log formatting with metadata for production debugging
 
+import { isDevRequest } from "./auth.js";
+
 /**
  * Log levels with numeric priority
  */
@@ -77,13 +79,14 @@ const SENSITIVE_KEYS = new Set([
 
 /**
  * Get current log level from environment
- * Defaults to 'info' in production, 'debug' in development
+ * Defaults to 'debug' only in a known dev environment, 'info' everywhere else
+ * (#1273: production ran with ENVIRONMENT unset, which read as non-production)
  */
 function getLogLevel(env) {
   if (env?.LOG_LEVEL && LOG_LEVELS[env.LOG_LEVEL] !== undefined) {
     return env.LOG_LEVEL;
   }
-  return env?.ENVIRONMENT === "production" ? "info" : "debug";
+  return isDevRequest(null, env) ? "debug" : "info";
 }
 
 /**
@@ -184,7 +187,9 @@ function formatLogEntry(level, message, meta = {}) {
 export function createLogger(options = {}) {
   const { env = {}, requestId = generateRequestId(), module = null } = options;
 
-  const minLevel = LOG_LEVELS[getLogLevel(env)] || LOG_LEVELS.info;
+  // `??`, not `||`: debug is level 0, and `0 || info` silently made debug
+  // logging unreachable everywhere.
+  const minLevel = LOG_LEVELS[getLogLevel(env)] ?? LOG_LEVELS.info;
 
   const log = (level, message, meta = {}) => {
     if (LOG_LEVELS[level] < minLevel) return;

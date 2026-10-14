@@ -6,6 +6,9 @@ describe("routePath", () => {
     [new Request("https://example.test/API/Admin/Users?x=1"), "/api/admin/users"],
     [new URL("https://example.test/API/Admin/Users?x=1"), "/api/admin/users"],
     ["https://example.test/API/Admin/Users?x=1", "/api/admin/users"],
+    ["https://example.test/a/", "/a"],
+    ["https://example.test/a//", "/a"],
+    ["https://example.test/", "/"],
   ])("accepts a URL-like input and lowercases its pathname", (input, expected) => {
     expect(routePath(input)).toBe(expected);
   });

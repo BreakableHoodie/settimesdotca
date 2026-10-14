@@ -454,6 +454,53 @@ describe("Rate Limiting", () => {
       expect(db.prepare).toHaveBeenCalled();
     });
 
+    it("normalizes trailing slashes for band actions and their counter keys", async () => {
+      const preparedCalls = [];
+      const db = {
+        prepare: vi.fn().mockImplementation(() => {
+          preparedCalls.push(true);
+          return {
+            bind: vi.fn().mockReturnValue({
+              first: vi.fn().mockResolvedValue({
+                count: 1,
+                window_start: Math.floor(Date.now() / 1000),
+              }),
+            }),
+          };
+        }),
+      };
+      const env = { DB: db };
+      const headers = { "CF-Connecting-IP": "1.2.3.4" };
+
+      const follow = await checkRateLimit(
+        new Request("https://example.com/api/bands/my-band/follow", { headers }),
+        env,
+      );
+      const followSlash = await checkRateLimit(
+        new Request("https://example.com/api/bands/my-band/follow/", { headers }),
+        env,
+      );
+
+      expect(follow.limit).toBe(5);
+      expect(followSlash.limit).toBe(5);
+      const keys = db.prepare.mock.results.map((result) => result.value.bind.mock.calls[0][0]);
+      expect(keys[0]).toBe(keys[1]);
+      expect(preparedCalls).toHaveLength(2);
+    });
+
+    it("normalizes trailing slashes for batch follow", async () => {
+      const db = makeMockDB({ count: 1 });
+      const result = await checkRateLimit(
+        new Request("https://example.com/api/bands/follow-batch/", {
+          headers: { "CF-Connecting-IP": "1.2.3.4" },
+        }),
+        { DB: db },
+      );
+
+      expect(result.limit).toBe(3);
+      expect(result.remaining).toBe(2);
+    });
+
     it("/api/bands/<name>/follow fails closed when D1 throws", async () => {
       const db = {
         prepare: vi.fn().mockReturnValue({

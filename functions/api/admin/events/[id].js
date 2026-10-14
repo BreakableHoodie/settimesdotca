@@ -17,6 +17,7 @@ import {
   validateDoorsJson,
 } from "../../../utils/validation.js";
 import { getClientIP, getUrlId, parseJsonObjectBody, parseOptionalJsonObjectBody } from "../../../utils/request.js";
+import { routePath } from "../../../utils/routePath.js";
 
 function parseJsonField(value, label) {
   if (value === undefined) {
@@ -666,7 +667,6 @@ export async function onRequestPatch(context) {
 export async function onRequestPut(context) {
   const { request, env } = context;
   const { DB } = env;
-  const url = new URL(request.url);
   const ipAddress = getClientIP(request);
 
   try {
@@ -693,7 +693,7 @@ export async function onRequestPut(context) {
     }
 
     // Check if this is a publish request
-    if (url.pathname.endsWith("/publish")) {
+    if (routePath(request).endsWith("/publish")) {
       // Get current event
       const event = await DB.prepare(
         `

@@ -1337,15 +1337,15 @@ gh pr create --label "bug,priority:p1"   # example
 
 ## Security Notes
 
-### Routes match case-insensitively; path checks must too
-
-Production evidence: `/api/admin/Users`, `/api/admin/MFA/setup` and `/api/Events/timeline` reach Functions regardless of case, while `/API/` does not. Use `routePath()` for every path-based security decision, never raw `url.pathname`. `routePathGuard.test.js` scans for raw API path checks and is allowlisted only for `routePath.js` and the root `/api/` gate in `functions/_middleware.js`, because `/API/` never reaches Functions.
-
 - All admin state-changing endpoints require both a valid session cookie AND a CSRF token (`X-CSRF-Token` header, read from the `csrf_token` cookie).
 - Session invalidation: `lucia.invalidateUserSessions(userId)` must be called before `lucia.createSession(user.id, {})` on re-authentication (login, MFA verify). This kills stale sessions from prior compromised contexts. Both methods live on the object returned by `initializeLucia()` in `functions/utils/auth.js`.
 - CSRF cookie must be regenerated whenever a new session is created (see `functions/api/admin/sessions/revoke-all.js`).
 - `params.id` from Cloudflare Pages Functions URL params is a string; always run it through `validateId()` from `functions/utils/validation.js` before using it in a DB query.
 - **Every route that writes `events.slug` validates it against `VALIDATION_SCHEMAS.event.slug`** (create, wizard, `edit.js`, `duplicate.js`; PATCH refuses slug changes). Until #1276, `edit.js` and `duplicate.js` stored any string, and the slug reached `sitemap.xml`'s `<loc>` unescaped. Only the document CSP stopped a stored script from running there. Output is now escaped as well (sitemap, email `href`s), but the validation is the primary control. A new slug writer must reuse the schema field, not retype the regex. Both checks and the sitemap escaping are in the mutation gate.
+
+### Routes match case-insensitively; path checks must too
+
+Production evidence: `/api/admin/Users`, `/api/admin/MFA/setup` and `/api/Events/timeline` reach Functions regardless of case, while `/API/` does not. Use `routePath()` for every path-based security decision, never raw `url.pathname`; it also strips trailing slashes so `/path/` and `/path` take the same decision. `routePathGuard.test.js` scans for raw API path checks and is allowlisted only for `routePath.js`, the root `/api/` gate in `functions/_middleware.js` because `/API/` never reaches Functions, and the segment extraction in `functions/utils/request.js`, which fails closed on invalid casing.
 
 ### The security tooling this repo actually has
 

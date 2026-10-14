@@ -35,6 +35,15 @@ describe("CSRF middleware — rejection paths (T5)", () => {
     expect(result).toBeNull();
   });
 
+  it("treats a trailing-slash logout as the authenticated logout route", () => {
+    const req = makeRequest("https://settimes.ca/api/admin/auth/logout/", "POST", {
+      Origin: "https://settimes.ca",
+    });
+    const result = validateCSRFMiddleware(req, devEnv);
+    expect(result).not.toBeNull();
+    expect(result.status).toBe(403);
+  });
+
   it("allows GET requests through without CSRF check", () => {
     const req = makeRequest("https://settimes.ca/api/admin/auth/login", "GET");
     const result = validateCSRFMiddleware(req, devEnv);

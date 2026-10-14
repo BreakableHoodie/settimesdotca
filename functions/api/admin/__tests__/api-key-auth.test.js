@@ -7,8 +7,12 @@ import { toSqliteDateTime } from "../../../utils/authAttempts.js";
 import { generateCSRFToken } from "../../../utils/csrf.js";
 import * as usersHandler from "../users.js";
 import * as userHandler from "../users/[id].js";
+import * as toggleStatusHandler from "../users/[id]/toggle-status.js";
+import * as resetPasswordHandler from "../users/[id]/reset-password.js";
 import * as apiKeysHandler from "../api-keys.js";
+import * as apiKeyItemHandler from "../api-keys/[id].js";
 import * as inviteCodesHandler from "../invite-codes.js";
+import * as inviteCodeItemHandler from "../invite-codes/[code].js";
 
 const BASE_URL = "https://example.test/api/admin/me";
 const API_KEYS_URL = "https://example.test/api/admin/api-keys";
@@ -48,8 +52,8 @@ function keyRequest(plaintext, { method = "GET", url = BASE_URL, cookie = null, 
   return new Request(url, { method, headers, body });
 }
 
-async function runMiddleware(env, request, nextImpl) {
-  const context = { request, env, data: {}, params: { id: "2" } };
+async function runMiddleware(env, request, nextImpl, params = { id: "2" }) {
+  const context = { request, env, data: {}, params };
   context.next = nextImpl ? async () => nextImpl(context) : async () => new Response("ok", { status: 200 });
   const response = await onRequest(context);
   return { response, context };
@@ -432,7 +436,7 @@ describe("API key authentication path (#744 part 3)", () => {
       [
         "/api/admin/users",
         "POST",
-        "users",
+        "invite_codes",
         { email: "new-user@example.test", firstName: "New", lastName: "User", role: "viewer" },
       ],
       ["/api/admin/invite-codes", "POST", "invite_codes", { role: "editor" }],
@@ -440,21 +444,42 @@ describe("API key authentication path (#744 part 3)", () => {
       ["/api/admin/users/2", "PATCH", "users", { role: "viewer" }],
       ["/api/admin/users/2", "DELETE", "users", undefined],
       ["/api/admin/users/2/toggle-status", "POST", "users", undefined],
-      ["/api/admin/users/2/reset-password", "POST", "users", undefined],
+      ["/api/admin/users/2/reset-password", "POST", "password_reset_tokens", {}],
       ["/api/admin/api-keys/1", "DELETE", "api_keys", undefined],
       ["/api/admin/invite-codes/example", "DELETE", "invite_codes", undefined],
     ];
 
     it.each(IDENTITY_MUTATIONS)(
       "%s (%s) returns 403 KEY_NOT_PERMITTED without writing %s",
-      async (path, method, table, body) => {
+      async (path, method, _table, body) => {
         const { env, rawDb } = createTestEnv({ role: "admin" });
         const key = await seedKey(rawDb, { role: "admin" });
-        const countQuery =
-          path === "/api/admin/users/2"
-            ? "SELECT COUNT(*) AS count FROM users WHERE role = 'viewer'"
-            : `SELECT COUNT(*) AS count FROM ${table}`;
-        const before = rawDb.prepare(countQuery).get().count;
+        if (path === "/api/admin/invite-codes/example") {
+          rawDb
+            .prepare(
+              "INSERT INTO invite_codes (code, role, expires_at) VALUES ('example', 'editor', datetime('now', '+1 day'))",
+            )
+            .run();
+        }
+        const stateQuery =
+          path === "/api/admin/users"
+            ? "SELECT COUNT(*) AS value FROM invite_codes"
+            : path === "/api/admin/invite-codes"
+              ? "SELECT COUNT(*) AS value FROM invite_codes"
+              : path === "/api/admin/api-keys"
+                ? "SELECT COUNT(*) AS value FROM api_keys"
+                : path === "/api/admin/users/2"
+                  ? method === "DELETE"
+                    ? "SELECT COUNT(*) AS value FROM users WHERE id = 2"
+                    : "SELECT COUNT(*) AS value FROM users WHERE role = 'viewer'"
+                  : path === "/api/admin/users/2/toggle-status"
+                    ? "SELECT is_active AS value FROM users WHERE id = 2"
+                    : path === "/api/admin/users/2/reset-password"
+                      ? "SELECT COUNT(*) AS value FROM password_reset_tokens WHERE user_id = 2"
+                      : path === "/api/admin/api-keys/1"
+                        ? "SELECT revoked_at AS value FROM api_keys WHERE id = 1"
+                        : "SELECT is_active AS value FROM invite_codes WHERE code = 'example'";
+        const before = rawDb.prepare(stateQuery).get()?.value;
 
         const next =
           path === "/api/admin/users"
@@ -465,7 +490,19 @@ describe("API key authentication path (#744 part 3)", () => {
                 ? (ctx) => apiKeysHandler.onRequestPost(ctx)
                 : path === "/api/admin/users/2" && method === "PATCH"
                   ? (ctx) => userHandler.onRequestPatch(ctx)
-                  : okNext;
+                  : path === "/api/admin/users/2" && method === "DELETE"
+                    ? (ctx) => userHandler.onRequestDelete(ctx)
+                    : path === "/api/admin/users/2/toggle-status"
+                      ? (ctx) => toggleStatusHandler.onRequestPost(ctx)
+                      : path === "/api/admin/users/2/reset-password"
+                        ? (ctx) => resetPasswordHandler.onRequestPost(ctx)
+                        : path === "/api/admin/api-keys/1"
+                          ? (ctx) => apiKeyItemHandler.onRequestDelete(ctx)
+                          : path === "/api/admin/invite-codes/example"
+                            ? (ctx) => inviteCodeItemHandler.onRequestDelete(ctx)
+                            : okNext;
+
+        const params = path === "/api/admin/api-keys/1" ? { id: "1" } : { id: "2", code: "example" };
 
         const { response } = await runMiddleware(
           env,
@@ -475,9 +512,10 @@ describe("API key authentication path (#744 part 3)", () => {
             body: body === undefined ? undefined : JSON.stringify(body),
           }),
           next,
+          params,
         );
 
-        expect(rawDb.prepare(countQuery).get().count).toBe(before);
+        expect(rawDb.prepare(stateQuery).get()?.value).toBe(before);
         expect(response.status).toBe(403);
         expect((await response.json()).code).toBe("KEY_NOT_PERMITTED");
       },

@@ -91,9 +91,18 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'Routes match case-insensitively; path checks must too' — path-based security decisions normalize Pages route paths before comparison",
     file: "functions/utils/routePath.js",
-    find: "  return new URL(urlOrRequest?.url ?? urlOrRequest).pathname.toLowerCase();",
-    replace: "  return new URL(urlOrRequest?.url ?? urlOrRequest).pathname;",
+    find: "  const path = new URL(urlOrRequest?.url ?? urlOrRequest).pathname.toLowerCase();",
+    replace: "  const path = new URL(urlOrRequest?.url ?? urlOrRequest).pathname;",
     tests: ["functions/api/admin/__tests__/api-key-auth.test.js", "functions/utils/__tests__/rateLimit.test.js"],
+  },
+  {
+    id: "route-path-strips-trailing-slash",
+    invariant:
+      "CLAUDE.md 'Routes match case-insensitively; path checks must too' — /foo/ routes like /foo, so a trailing slash must not escape a path-based limit",
+    file: "functions/utils/routePath.js",
+    find: '  return path.replace(/\\/+$/, "") || "/";',
+    replace: "  return path;",
+    tests: ["functions/utils/__tests__/rateLimit.test.js", "functions/utils/__tests__/csrf.test.js"],
   },
   {
     id: "api-keys-identity-management-read-only",

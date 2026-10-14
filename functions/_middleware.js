@@ -3,6 +3,7 @@
 
 import { checkRateLimit, rateLimitHeaders, rateLimitResponse } from "./utils/rateLimit.js";
 import { createRequestLogger } from "./utils/logger.js";
+import { routePath } from "./utils/routePath.js";
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -94,7 +95,7 @@ export async function onRequest(context) {
     // Functions match routes exactly, so this can't be satisfied by a
     // sub-path or a different handler.
     const RAISED_LIMIT_UPLOAD_ROUTES = new Set(["/api/admin/bands/photos", "/api/admin/events/posters"]);
-    const isPhotoUpload = isMultipart && RAISED_LIMIT_UPLOAD_ROUTES.has(url.pathname);
+    const isPhotoUpload = isMultipart && RAISED_LIMIT_UPLOAD_ROUTES.has(routePath(request));
 
     const MAX_BODY_BYTES = 1_000_000;
     // Coarse DoS ceiling, not the business rule: 5MB file + multipart

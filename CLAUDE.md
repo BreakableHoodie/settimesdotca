@@ -1430,9 +1430,12 @@ MailChannels, Resend) or `env.ASSETS`, which serves this site's own files and
 cannot reach the network. Band photos and posters arrive as file uploads, never
 as "import from URL", and stored artist links are rendered, never visited.
 
-`functions/utils/__tests__/outboundFetchGuard.test.js` enforces it: a
-`fetch(variable)`, a template-literal URL, another binding's `.fetch`, or a
-`cloudflare:sockets` import fails the build. A feature that genuinely needs a
+`functions/utils/__tests__/outboundFetchGuard.test.js` enforces it by parsing
+every file: `fetch`, `WebSocket` and `EventSource` may take only a secure
+(HTTPS or WSS) string literal, or a module-level `const` bound to one and not
+shadowed. Any other argument (a variable, an interpolated template, a property read),
+another binding's `.fetch`, or a `cloudflare:sockets` import fails the build.
+A feature that genuinely needs a
 caller-supplied URL (link previews, URL import) must change that test on
 purpose, with an allowlist of hosts and a refusal of private and link-local
 addresses, never by loosening the scan. In the mutation gate.

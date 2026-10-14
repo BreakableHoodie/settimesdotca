@@ -39,11 +39,21 @@ function emptyLineupError() {
   return err
 }
 
+// Always in the future, relative to whenever the suite runs. A past date makes
+// EventsTab treat the draft as archived (isEventLockedAsArchived), so Edit asks
+// for an archived-edit confirmation first. These tests decline confirms, so a
+// fixed date silently turned them red the day after it passed (2026-10-12).
+const FUTURE_DATE = (() => {
+  const d = new Date()
+  d.setDate(d.getDate() + 30)
+  return d.toLocaleDateString('en-CA')
+})()
+
 const DRAFT_EVENT_NO_BANDS = {
   id: 37,
   name: 'Long Weekend Band Crawl Vol. 18',
   slug: 'lwbc18',
-  date: '2026-10-11',
+  date: FUTURE_DATE,
   status: 'draft',
   band_count: 0,
 }

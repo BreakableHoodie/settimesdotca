@@ -662,6 +662,15 @@ export const MUTATIONS = [
     tests: ["functions/utils/__tests__/crypto.test.js"],
   },
   {
+    id: "users-role-trigger-refuses-unknown-role",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — users.role outside viewer/editor/admin is refused at the database, so an inherited-key role like 'constructor' can never be stored (#1287)",
+    file: "database/setup-complete.sql",
+    find: "BEFORE INSERT ON users\nWHEN NEW.role NOT IN ('viewer', 'editor', 'admin')",
+    replace: "BEFORE INSERT ON users\nWHEN 0",
+    tests: ["functions/utils/__tests__/roleCheckTriggers.test.js"],
+  },
+  {
     id: "signup-invite-single-redeem",
     invariant:
       "CLAUDE.md 'RBAC Roles' — an invite code creates at most one account: the user INSERT fires only while the invite is still unclaimed, in the same batch as the claim (#1255)",

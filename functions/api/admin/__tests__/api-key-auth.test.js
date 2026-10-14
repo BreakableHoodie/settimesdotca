@@ -162,6 +162,10 @@ describe("API key authentication path (#744 part 3)", () => {
   it("fails closed when the creator's role is an inherited object property name", async () => {
     const { env, rawDb } = createTestEnv({ role: "admin" });
     const key = await seedKey(rawDb, { role: "admin", created_by: 1 });
+    // Migration 0069 refuses this write at the database (#1287). Drop that
+    // trigger here so this test keeps proving the middleware's own
+    // fail-closed lookup, independent of the schema layer.
+    rawDb.exec("DROP TRIGGER users_role_valid_update");
     rawDb.prepare("UPDATE users SET role = 'constructor' WHERE id = ?").run(1);
 
     const { response } = await runMiddleware(env, keyRequest(key.plaintext), okNext);

@@ -60,11 +60,20 @@ describe("preview deployments never bind production data", () => {
       { table: "env.preview.d1_databases", line: `database_name = "${SCRATCH_D1_NAME}"` },
       { table: "env.preview.d1_databases", line: `database_id = "${SCRATCH_D1_ID}"` },
     ]);
-    expect(lines.filter(({ table }) => table.startsWith("env.preview.")).map(({ table }) => table)).toEqual([
-      "env.preview.d1_databases",
-      "env.preview.d1_databases",
-      "env.preview.d1_databases",
-      "env.preview.d1_databases",
+    // The only other preview table is [env.preview.vars]; no R2, no Analytics Engine.
+    expect(
+      [...new Set(lines.filter(({ table }) => table.startsWith("env.preview.")).map(({ table }) => table))].sort(),
+    ).toEqual(["env.preview.d1_databases", "env.preview.vars"]);
+  });
+
+  // isDevRequest allowlists development/dev/test; any of those on a public
+  // preview would switch off secure cookies, CSRF and Turnstile there.
+  it("previews declare a non-dev ENVIRONMENT and allow only the edge-e2e origin", () => {
+    const vars = lines.filter(({ table, line }) => table === "env.preview.vars" && line !== "[env.preview.vars]");
+    expect(vars.map(({ line }) => line)).toEqual([
+      'ENVIRONMENT = "preview"',
+      'PUBLIC_DATA_PUBLISH_ENABLED = "true"',
+      'CORS_ALLOWED_ORIGINS = "https://edge-e2e.longweekend-bandcrawl.pages.dev"',
     ]);
   });
 

@@ -977,6 +977,7 @@ Node and local `wrangler` do not enforce the Workers runtime's limits, which is 
 
 - **Data:** previews bind only the scratch D1 `settimes-e2e-db`. `scripts/reset-e2e-db.mjs` rebuilds it from `database/setup-complete.sql` each run. It refuses any target other than that exact name and id, deletes the schema file's local test accounts, and seeds the E2E admin plus a `viewer@settimes.ca` whose password is random and discarded.
 - **Drop order:** children are dropped before their parents. D1 ignores `foreign_keys = OFF`, and a child's implicit DELETE fails once its parent is gone.
+- **Plain-text vars live in `wrangler.toml` (`[env.preview.vars]`), never the dashboard.** A deploy with that file replaces the dashboard's plain-text vars and keeps only secrets; the first run lost all three that way. Secrets stay in the dashboard. Production is unaffected only because every production var is a secret.
 - **Production code paths:** previews set `ENVIRONMENT=preview`, which `isDevRequest` treats as production (secure cookies, real CSRF). They use Cloudflare's always-pass Turnstile test keys and no email provider.
 - **Origin:** tests hit the branch alias `edge-e2e.longweekend-bandcrawl.pages.dev`, because the middleware's Origin allowlist needs a stable origin. The preview env's `CORS_ALLOWED_ORIGINS` names exactly that alias.
 - **Queueing and teardown:** one shared database, so runs queue (`cancel-in-progress: false`). Every run deletes its deployment, and a failed delete fails the job, so stale previews (#1295) cannot pile up.

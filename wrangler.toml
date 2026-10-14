@@ -123,3 +123,14 @@ bucket_name = "settimes-band-photos"
 binding = "DB"
 database_name = "settimes-e2e-db"
 database_id = "c06cc3e7-92e3-4044-a705-608330c1f4ba"
+
+# Plain-text vars MUST live here, not in the dashboard: a deploy with this file
+# replaces the dashboard's plain-text vars (measured 2026-10-14 -- the first
+# edge-e2e deploy wiped all three) and keeps only secrets. Secrets
+# (CSRF_SECRET, MFA_TOTP_ENCRYPTION_KEY, TURNSTILE_SECRET_KEY) stay in the
+# dashboard. ENVIRONMENT=preview is deliberately NOT a dev value: isDevRequest
+# fails closed on it, so previews run production code paths.
+[env.preview.vars]
+ENVIRONMENT = "preview"
+PUBLIC_DATA_PUBLISH_ENABLED = "true"
+CORS_ALLOWED_ORIGINS = "https://edge-e2e.longweekend-bandcrawl.pages.dev"

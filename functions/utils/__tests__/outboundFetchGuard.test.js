@@ -39,7 +39,7 @@ const functionsRoot = path.join(path.dirname(currentFile), "../../");
 // site's own built files and cannot reach the network.
 const ALLOWED_RECEIVERS = new Set(["env.ASSETS", "context.env.ASSETS"]);
 
-const FIXED_HTTPS = /^https:\/\/[^\s]+$/;
+const FIXED_HTTPS = /^(?:https|wss):\/\/[^\s]+$/;
 
 // Parsed, not regex-matched: whitespace, line breaks and comments cannot hide
 // a call, and identifiers are resolved by binding rather than by name search.
@@ -63,7 +63,7 @@ function memberPath(node) {
     const left = memberPath(node.object);
     return left && `${left}.${node.property.name}`;
   }
-  return null;
+  return undefined;
 }
 
 function bindingNames(pattern, out) {
@@ -118,61 +118,91 @@ function isFixedArg(arg, fixed) {
   return arg.type === "Identifier" && fixed.has(arg.name);
 }
 
+// Names that open a network connection on Workers. Every reference to one is a
+// violation unless it is one of the approved shapes below.
+const NETWORK_GLOBALS = new Set(["fetch", "WebSocket", "EventSource"]);
+const GLOBAL_OBJECTS = new Set(["globalThis", "self", "global"]);
+
+function isNamed(node, names) {
+  if (node.type === "Identifier") return names.has(node.name);
+  if (node.type === "Literal") return names.has(node.value);
+  if (node.type === "TemplateLiteral") return node.expressions.length === 0 && names.has(node.quasis[0].value.cooked);
+  return false;
+}
+
+// Allowlist, not blocklist: the approved shapes are `fetch(<fixed https>)`,
+// `new WebSocket(<fixed wss/https>)` and `env.ASSETS.fetch(...)`. Any other
+// reference to a network global or a `.fetch` property is a violation, which
+// covers aliasing (`const f = fetch`, `const f = globalThis.fetch`) without
+// enumerating each form. Dynamic global lookups (`globalThis[key]`) and
+// non-literal dynamic imports are refused because no scan can see through them.
+//
+// Scope: this catches a network call introduced by mistake. It is not a
+// defence against code written to evade it; review is.
 function findViolations(source) {
   const ast = parse(source);
   const fixed = fixedConstants(ast);
   const violations = [];
   let globalCount = 0;
   let assetsCount = 0;
-  const callees = new Set();
+  const approved = new Set();
+
   (function visit(node) {
-    if (node.type === "CallExpression") {
+    if (node.type === "CallExpression" || node.type === "NewExpression") {
       const callee = node.callee;
-      if (callee.type === "Identifier" && callee.name === "fetch") {
-        callees.add(callee);
-        globalCount += 1;
-        if (!isFixedArg(node.arguments[0], fixed))
-          violations.push(
-            `fetch(${source.slice(node.arguments[0]?.start ?? node.start, node.arguments[0]?.end ?? node.end)})`,
-          );
-      } else if (callee.type === "MemberExpression" && !callee.computed && callee.property.name === "fetch") {
-        const receiver = memberPath(callee.object);
-        if (ALLOWED_RECEIVERS.has(receiver)) assetsCount += 1;
-        else violations.push(`${receiver ?? "<expression>"}.fetch(`);
+      if (callee.type === "Identifier" && NETWORK_GLOBALS.has(callee.name)) {
+        approved.add(callee);
+        if (callee.name === "fetch") globalCount += 1;
+        if (!isFixedArg(node.arguments[0], fixed)) {
+          const arg = node.arguments[0];
+          violations.push(`${callee.name}(${arg ? source.slice(arg.start, arg.end) : ""})`);
+        }
+      } else if (
+        node.type === "CallExpression" &&
+        callee.type === "MemberExpression" &&
+        !callee.computed &&
+        callee.property.name === "fetch" &&
+        ALLOWED_RECEIVERS.has(memberPath(callee.object))
+      ) {
+        approved.add(callee);
+        assetsCount += 1;
       }
     }
-    // A bare reference that is not the callee (`const f = fetch`, passing it
-    // along) would let a call escape the argument check.
-    if (node.type === "Identifier" && node.name === "fetch" && !callees.has(node)) {
-      violations.push("fetch referenced outside a direct call");
+
+    if (node.type === "Identifier" && NETWORK_GLOBALS.has(node.name) && !approved.has(node)) {
+      violations.push(`${node.name} referenced outside an approved call`);
     }
-    // obj["fetch"] / obj[`fetch`]: a computed key naming fetch dodges both
-    // checks above, so it is refused outright.
-    if (
-      node.type === "MemberExpression" &&
-      node.computed &&
-      ((node.property.type === "Literal" && node.property.value === "fetch") ||
-        (node.property.type === "TemplateLiteral" &&
-          node.property.expressions.length === 0 &&
-          node.property.quasis[0].value.cooked === "fetch"))
-    ) {
-      violations.push('computed ["fetch"] access');
+    if (node.type === "MemberExpression" && !approved.has(node)) {
+      if (!node.computed && NETWORK_GLOBALS.has(node.property.name)) {
+        violations.push(`${memberPath(node.object) ?? "<expression>"}.${node.property.name}`);
+      } else if (node.computed && isNamed(node.property, NETWORK_GLOBALS)) {
+        violations.push(`computed [${source.slice(node.property.start, node.property.end)}] access`);
+      } else if (node.computed && node.object.type === "Identifier" && GLOBAL_OBJECTS.has(node.object.name)) {
+        violations.push(`dynamic ${node.object.name}[...] lookup`);
+      }
     }
     if (node.type === "ImportDeclaration" && node.source.value === "cloudflare:sockets") {
       violations.push("cloudflare:sockets import");
     }
-    if (node.type === "CallExpression") {
-      // Visit the callee last so the direct-call identifier is registered first.
-      node.arguments.forEach(visit);
-      visit(node.callee);
-      return;
+    if (node.type === "ImportExpression") {
+      if (node.source.type !== "Literal") violations.push("dynamic import() of a computed module");
+      else if (node.source.value === "cloudflare:sockets") violations.push("cloudflare:sockets import");
     }
+
+    // Do not descend into names that are labels, not references: non-computed
+    // property keys and member property names.
     if (node.type === "MemberExpression" && !node.computed) {
       visit(node.object);
       return;
     }
-    if (node.type === "Property" && !node.computed && node.key.type === "Identifier") {
+    if ((node.type === "Property" || node.type === "MethodDefinition") && !node.computed) {
       visit(node.value);
+      return;
+    }
+    if (node.type === "CallExpression" || node.type === "NewExpression") {
+      // Callee after arguments is irrelevant now; approval is recorded above.
+      visit(node.callee);
+      node.arguments.forEach(visit);
       return;
     }
     children(node).forEach(visit);
@@ -217,6 +247,11 @@ describe("server requests go only to addresses fixed in code (SSRF guard)", () =
     expect(flagged("await globalThis.fetch(body.url);")).toBe(true);
     expect(flagged('await globalThis["fetch"](body.url);')).toBe(true);
     expect(flagged("await env.OTHER[`fetch`](req);")).toBe(true);
+    expect(flagged("const outbound = globalThis.fetch;\nawait outbound(body.url);")).toBe(true);
+    expect(flagged("await globalThis[body.method](body.url);")).toBe(true);
+    expect(flagged("const ws = new WebSocket(body.url);")).toBe(true);
+    expect(flagged('await import("cloudflare:sockets");')).toBe(true);
+    expect(flagged("await import(body.module);")).toBe(true);
     // ...and accepts the shapes in use today.
     expect(flagged('await fetch("https://api.resend.com/emails", {});')).toBe(false);
     expect(flagged('const URL_A = "https://x.example/a";\nawait fetch(URL_A, {});')).toBe(false);

@@ -310,6 +310,16 @@ export const MUTATIONS = [
     tests: ["functions/api/feeds/__tests__/ical.test.js"],
   },
   {
+    id: "outbound-fetch-fixed-address-only",
+    invariant:
+      "CLAUDE.md 'Outbound requests go only to fixed addresses (SSRF)' — every server fetch targets a hard-coded https URL or env.ASSETS",
+    file: "functions/utils/turnstile.js",
+    find: 'const SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";',
+    replace:
+      'const SITEVERIFY_URL = globalThis.SITEVERIFY_OVERRIDE || "https://challenges.cloudflare.com/turnstile/v0/siteverify";',
+    tests: ["functions/utils/__tests__/outboundFetchGuard.test.js"],
+  },
+  {
     id: "time-validation-range-not-just-shape",
     invariant:
       "CLAUDE.md 'Time validation is shape AND range' — admin write paths bound hours/minutes via isValidTime, never an inline shape regex (#1089)",

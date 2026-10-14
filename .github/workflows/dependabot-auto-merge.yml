@@ -10,7 +10,10 @@ jobs:
     auto-merge:
         name: auto-merge
         runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
-        if: github.actor == 'dependabot[bot]'
+        # The PR's AUTHOR, never github.actor: the actor is whoever triggered
+        # this event, and this job holds write permissions on pull_request_target.
+        # Same class as edge-e2e.yml's check (zizmor bot-conditions, #1307).
+        if: github.event.pull_request.user.login == 'dependabot[bot]'
 
         steps:
             - name: Fetch Dependabot metadata

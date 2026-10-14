@@ -61,6 +61,11 @@ const quoteSql = (value) => `'${value.replaceAll("'", "''")}'`;
 
 const resetDatabase = async () => {
   assertScratchD1Target(SCRATCH_D1_NAME, SCRATCH_D1_ID);
+  // Before anything destructive: a missing secret must not leave the scratch
+  // D1 rebuilt with no accounts.
+  if (!process.env.E2E_ADMIN_EMAIL || !process.env.E2E_ADMIN_PASSWORD) {
+    throw new Error("E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required to seed the scratch database");
+  }
 
   // Table names plus each table's foreign-key parents, in one query.
   const graphOutput = runWrangler([
@@ -75,10 +80,6 @@ const resetDatabase = async () => {
 
   runWrangler(["--file", schema]);
   runWrangler(["--command", "DELETE FROM users"]);
-
-  if (!process.env.E2E_ADMIN_EMAIL || !process.env.E2E_ADMIN_PASSWORD) {
-    throw new Error("E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required to seed the scratch database");
-  }
 
   const tempDirectory = mkdtempSync(join(tmpdir(), "settimes-e2e-seed-"));
   const seedFile = join(tempDirectory, "admin.sql");

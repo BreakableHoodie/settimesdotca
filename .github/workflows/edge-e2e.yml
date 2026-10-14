@@ -40,7 +40,9 @@ env:
 jobs:
   not-run:
     name: Preview edge E2E (not run)
-    if: github.actor == 'dependabot[bot]' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork)
+    # Keyed on the PR's AUTHOR, not github.actor: a human re-running a
+    # Dependabot PR is the actor, which would flip which job runs (zizmor bot-conditions).
+    if: github.event_name == 'pull_request' && (github.event.pull_request.user.login == 'dependabot[bot]' || github.event.pull_request.head.repo.fork)
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     steps:
       - name: Report skipped run
@@ -50,7 +52,7 @@ jobs:
 
   edge-e2e:
     name: Preview edge E2E
-    if: github.actor != 'dependabot[bot]' && !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork)
+    if: github.event_name != 'pull_request' || (github.event.pull_request.user.login != 'dependabot[bot]' && !github.event.pull_request.head.repo.fork)
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     timeout-minutes: 25
     steps:

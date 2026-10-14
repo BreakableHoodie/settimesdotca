@@ -120,17 +120,28 @@ jobs:
           echo "deployment_id=$id" >> "$GITHUB_OUTPUT"
           echo "Deployed $url ($id)"
 
-      - name: Wait for preview
+      # Ready means FUNCTIONS answer, not that "/" does: "/" is a static file
+      # that returned 200 while the alias still pointed at the previous run's
+      # (deleted) deployment, and login then got an HTML error page (run
+      # 38582049702). Require JSON from a Functions route three times running.
+      - name: Wait for preview Functions
         run: |
-          for attempt in $(seq 1 30); do
-            if curl --fail --silent --show-error --location --max-time 10 "$PREVIEW_URL/" > /dev/null; then
-              echo "Preview is ready: $PREVIEW_URL"
+          ok=0
+          for attempt in $(seq 1 40); do
+            type=$(curl --silent --show-error --max-time 10 --output /dev/null \
+              --write-out '%{http_code} %{content_type}' "$PREVIEW_URL/api/events/timeline" || true)
+            case "$type" in
+              "200 application/json"*) ok=$((ok + 1)) ;;
+              *) ok=0 ;;
+            esac
+            if [ "$ok" -ge 3 ]; then
+              echo "Preview Functions are serving JSON: $PREVIEW_URL"
               exit 0
             fi
-            echo "Waiting for preview ($attempt/30)..."
+            echo "Waiting for preview Functions ($attempt/40): ${type:-no response}"
             sleep 5
           done
-          echo "::error::Preview did not return HTTP 200 within 150 seconds: $PREVIEW_URL"
+          echo "::error::Preview Functions did not serve JSON three times running within 200 seconds: $PREVIEW_URL"
           exit 1
 
       # Previews run PRODUCTION rate limits: 5 logins per minute per IP

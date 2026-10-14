@@ -52,6 +52,27 @@ describe("POST /api/subscriptions/subscribe", () => {
     expect(mockDB.data.email_subscriptions[0].consent_ip).toBeNull();
   });
 
+  it("does not echo a verification URL when email is unconfigured in production", async () => {
+    mockContext.env.ENVIRONMENT = "production";
+    mockContext.env.TURNSTILE_SECRET_KEY = "test-secret";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true }))));
+    const response = await onRequestPost({
+      ...mockContext,
+      request: createMockRequest("POST", "/api/subscriptions/subscribe", {
+        email: "production@example.com",
+        city: "portland",
+        genre: "punk",
+        frequency: "weekly",
+        turnstileToken: "test-token",
+      }),
+    });
+
+    const data = await response.json();
+    expect(response.status).toBe(201);
+    expect(data.verificationUrl).toBeUndefined();
+    vi.unstubAllGlobals();
+  });
+
   it("should reject request with missing email", async () => {
     const request = createMockRequest("POST", "/api/subscriptions/subscribe", INVALID_PAYLOADS.missingEmail);
     mockContext.request = request;

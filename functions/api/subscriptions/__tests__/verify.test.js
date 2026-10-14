@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { onRequestGet } from "../verify.js";
+import { onRequestGet, onRequestPost } from "../verify.js";
 import { MockD1Database } from "./mocks/d1.js";
 import { createMockContext } from "./helpers.js";
 
-describe("GET /api/subscriptions/verify", () => {
+describe("/api/subscriptions/verify", () => {
   let mockDB;
   let mockContext;
 
@@ -18,7 +18,7 @@ describe("GET /api/subscriptions/verify", () => {
     vi.restoreAllMocks();
   });
 
-  it("should verify subscription with valid token", async () => {
+  it("GET renders a confirmation form without verifying, then POST verifies the subscription", async () => {
     // Pre-populate with unverified subscription
     mockDB.data.email_subscriptions.push({
       id: 1,
@@ -35,9 +35,20 @@ describe("GET /api/subscriptions/verify", () => {
     const request = new Request("http://localhost/api/subscriptions/verify?token=valid-token-12345");
     mockContext.request = request;
 
-    const response = await onRequestGet(mockContext);
+    const getResponse = await onRequestGet(mockContext);
 
-    expect(response.status).toBe(302);
+    expect(getResponse.status).toBe(200);
+    expect(await getResponse.text()).toContain('method="post"');
+    expect(mockDB.data.email_subscriptions[0].verified).toBe(false);
+
+    mockContext.request = new Request("http://localhost/api/subscriptions/verify?token=valid-token-12345", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ token: "valid-token-12345" }),
+    });
+    const response = await onRequestPost(mockContext);
+
+    expect(response.status).toBe(303);
     const subscription = mockDB.data.email_subscriptions.find((sub) => sub.id === 1);
     expect(subscription.verified).toBe(true);
     expect(subscription.confirmed_at).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
@@ -49,7 +60,7 @@ describe("GET /api/subscriptions/verify", () => {
     const request = new Request("http://localhost/api/subscriptions/verify");
     mockContext.request = request;
 
-    const response = await onRequestGet(mockContext);
+    const response = await onRequestPost(mockContext);
 
     expect(response.status).toBe(400);
     const text = await response.text();
@@ -60,7 +71,7 @@ describe("GET /api/subscriptions/verify", () => {
     const request = new Request("http://localhost/api/subscriptions/verify?token=invalid-token");
     mockContext.request = request;
 
-    const response = await onRequestGet(mockContext);
+    const response = await onRequestPost(mockContext);
 
     expect(response.status).toBe(404);
     const text = await response.text();
@@ -85,7 +96,7 @@ describe("GET /api/subscriptions/verify", () => {
     const request = new Request("http://localhost/api/subscriptions/verify?token=valid-token-12345");
     mockContext.request = request;
 
-    const response = await onRequestGet(mockContext);
+    const response = await onRequestPost(mockContext);
 
     expect(response.status).toBe(200);
     const text = await response.text();
@@ -109,7 +120,7 @@ describe("GET /api/subscriptions/verify", () => {
     const request = new Request("http://localhost/api/subscriptions/verify?token=valid-token-12345");
     mockContext.request = request;
 
-    await onRequestGet(mockContext);
+    await onRequestPost(mockContext);
 
     expect(mockDB.data.subscription_verifications).toHaveLength(1);
     expect(mockDB.data.subscription_verifications[0]).toMatchObject({
@@ -134,9 +145,9 @@ describe("GET /api/subscriptions/verify", () => {
     const request = new Request("http://localhost/api/subscriptions/verify?token=valid-token-12345");
     mockContext.request = request;
 
-    const response = await onRequestGet(mockContext);
+    const response = await onRequestPost(mockContext);
 
-    expect(response.status).toBe(302);
+    expect(response.status).toBe(303);
     const location = response.headers.get("location");
     expect(location).toBe("https://example.com/subscribe?verified=true");
   });

@@ -1,5 +1,5 @@
-// GET /api/bands/confirm-follow-batch?token=<batch_token>
-// Confirms all pending (verified=0) band follows that share the given batch_token.
+// GET /api/bands/confirm-follow-batch?token=<batch_token> renders the page.
+// POST confirms all pending (verified=0) band follows that share the token.
 //
 // The batch_token is shared across every band_follows row created by a single
 // POST /api/bands/follow-batch request. One click here verifies all of them.
@@ -9,22 +9,29 @@
 // page without any error. Messaging is generic to avoid revealing whether a given
 // token was valid (no enumeration).
 
-const htmlPage = (heading, body) =>
-  new Response(
-    `<html><head><meta charset="utf-8"></head><body style="font-family:sans-serif;padding:2rem"><h2>${heading}</h2><p>${body}</p></body></html>`,
-    {
-      status: 200,
-      headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
-    },
-  );
+import { emailActionPage, emailResultPage, readEmailActionToken } from "../../utils/emailActionPage.js";
 
 export async function onRequestGet(context) {
+  const { request } = context;
+  const token = await readEmailActionToken(request);
+  if (!token) {
+    return new Response("Invalid token.", { status: 400, headers: { "Content-Type": "text/plain" } });
+  }
+  return emailActionPage({
+    action: new URL(request.url).pathname,
+    token,
+    heading: "Confirm your lineup",
+    message: "Click the button below to confirm your follows.",
+    buttonLabel: "Confirm my follow",
+  });
+}
+
+export async function onRequestPost(context) {
   const { request, env } = context;
   const { DB } = env;
 
   try {
-    const url = new URL(request.url);
-    const token = url.searchParams.get("token");
+    const token = await readEmailActionToken(request);
 
     if (!token || token.length > 256) {
       return new Response("Invalid token.", {
@@ -44,9 +51,9 @@ export async function onRequestGet(context) {
       .bind(token)
       .run();
 
-    return htmlPage(
-      "You're all set!",
-      "We'll email you when your bands join a lineup. You can unsubscribe anytime from those emails.",
+    return emailResultPage(
+      `You&apos;re all set!`,
+      `We'll email you when your bands join a lineup. You can unsubscribe anytime from those emails.`,
     );
   } catch (err) {
     console.error("[band-confirm-follow-batch] Error:", err);

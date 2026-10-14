@@ -3,14 +3,29 @@
 // Returns 200 regardless of whether the token exists (avoid enumeration).
 
 import { escapeHtml } from "../../../utils/html.js";
+import { emailActionPage, readEmailActionToken } from "../../../utils/emailActionPage.js";
 
 export async function onRequestGet(context) {
+  const { request } = context;
+  const token = await readEmailActionToken(request);
+  if (!token) {
+    return new Response("Invalid token.", { status: 400, headers: { "Content-Type": "text/plain" } });
+  }
+  return emailActionPage({
+    action: new URL(request.url).pathname,
+    token,
+    heading: "Unfollow this band",
+    message: "Click the button below to stop receiving emails about this band.",
+    buttonLabel: "Unfollow",
+  });
+}
+
+export async function onRequestPost(context) {
   const { request, env } = context;
   const { DB } = env;
 
   try {
-    const url = new URL(request.url);
-    const token = url.searchParams.get("token");
+    const token = await readEmailActionToken(request);
 
     if (!token || token.length > 256) {
       return new Response("Invalid token.", {
@@ -43,7 +58,11 @@ export async function onRequestGet(context) {
       `<html><head><meta charset="utf-8"></head><body style="font-family:sans-serif;padding:2rem"><h2>${heading}</h2><p>${message}</p></body></html>`,
       {
         status: 200,
-        headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-store",
+          "X-Robots-Tag": "noindex",
+        },
       },
     );
   } catch (err) {

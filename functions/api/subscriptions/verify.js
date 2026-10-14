@@ -1,12 +1,25 @@
-// Email verification endpoint
-// GET /api/subscriptions/verify?token=xxx
+// GET /api/subscriptions/verify?token=xxx renders the verification page.
+// POST verifies the subscription.
 
 import { getPublicBaseUrl } from "../../utils/publicUrl.js";
+import { emailActionPage, readEmailActionToken } from "../../utils/emailActionPage.js";
 
 export async function onRequestGet(context) {
+  const { request } = context;
+  const token = await readEmailActionToken(request);
+  if (!token) return new Response("Missing verification token", { status: 400 });
+  return emailActionPage({
+    action: new URL(request.url).pathname,
+    token,
+    heading: "Confirm your subscription",
+    message: "Click the button below to confirm your SetTimes subscription.",
+    buttonLabel: "Confirm my subscription",
+  });
+}
+
+export async function onRequestPost(context) {
   const { request, env } = context;
-  const url = new URL(request.url);
-  const token = url.searchParams.get("token");
+  const token = await readEmailActionToken(request);
 
   if (!token) {
     return new Response("Missing verification token", { status: 400 });
@@ -66,7 +79,7 @@ export async function onRequestGet(context) {
 
     // Redirect to success page
     const baseUrl = getPublicBaseUrl(env);
-    return Response.redirect(`${baseUrl}/subscribe?verified=true`, 302);
+    return Response.redirect(`${baseUrl}/subscribe?verified=true`, 303);
   } catch (error) {
     console.error("Verification error:", error);
     return new Response("Verification failed", { status: 500 });

@@ -29,6 +29,7 @@ import { getPublicBaseUrl } from "../../utils/publicUrl.js";
 import { parseJsonObjectBody } from "../../utils/request.js";
 import { publicEventStatusSql } from "../../utils/eventVisibility.js";
 import { CONSENT_VERSION } from "../../utils/consent.js";
+import { isDevRequest } from "../../utils/auth.js";
 
 const MAX_EMAIL_LENGTH = 320;
 const MAX_BATCH_SIZE = 30;
@@ -185,7 +186,7 @@ export async function onRequestPost(context) {
     const responseBody = { success: true };
     // In local/dev (email unconfigured), surface the confirmUrl inline so the
     // follow can still be completed — mirrors follow.js behaviour.
-    if (isNewBatch && !isEmailConfigured(env)) {
+    if (isNewBatch && !isEmailConfigured(env) && isDevRequest(request, env)) {
       responseBody.confirmUrl = confirmUrl;
     }
 

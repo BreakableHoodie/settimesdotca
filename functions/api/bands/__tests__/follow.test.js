@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createTestEnv, insertBand, insertEvent } from "../../test-utils";
 import * as followHandler from "../[name]/follow.js";
 import { CONSENT_VERSION } from "../../../utils/consent.js";
@@ -41,6 +41,32 @@ describe("POST /api/bands/:name/follow", () => {
     expect(row.consent_version).toBe(CONSENT_VERSION);
     // CF-Connecting-IP is absent in test requests, so consent_ip is null
     expect(row.consent_ip).toBeNull();
+  });
+
+  it("does not echo a confirm URL when email is unconfigured in production", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.ENVIRONMENT = "production";
+    env.TURNSTILE_SECRET_KEY = "test-secret";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true }))));
+    const ev = insertEvent(rawDb, { name: "Vol6", slug: "vol6-confirmurl-prod" });
+    const band = insertBand(rawDb, { name: "Production Band", event_id: ev.id });
+    const req = new Request(`https://example.test/api/bands/${band.band_profile_id}/follow`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "prod@example.com", turnstileToken: "test-token" }),
+    });
+
+    const data = await (
+      await followHandler.onRequestPost({
+        request: req,
+        env,
+        params: { name: String(band.band_profile_id) },
+        waitUntil,
+      })
+    ).json();
+
+    expect(data.confirmUrl).toBeUndefined();
+    vi.unstubAllGlobals();
   });
 
   it("records CF-Connecting-IP as consent_ip when the header is present", async () => {

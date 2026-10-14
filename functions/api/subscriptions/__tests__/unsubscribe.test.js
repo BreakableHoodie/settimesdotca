@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { onRequestGet } from "../unsubscribe.js";
+import { onRequestGet, onRequestPost } from "../unsubscribe.js";
 import { MockD1Database } from "./mocks/d1.js";
 import { createMockContext } from "./helpers.js";
 
-describe("GET /api/subscriptions/unsubscribe", () => {
+describe("/api/subscriptions/unsubscribe", () => {
   let mockDB;
   let mockContext;
 
@@ -18,7 +18,7 @@ describe("GET /api/subscriptions/unsubscribe", () => {
     vi.restoreAllMocks();
   });
 
-  it("should unsubscribe with valid token", async () => {
+  it("GET renders a form without unsubscribing, then POST unsubscribes", async () => {
     // Pre-populate with subscription
     mockDB.data.email_subscriptions.push({
       id: 1,
@@ -35,7 +35,18 @@ describe("GET /api/subscriptions/unsubscribe", () => {
     const request = new Request("http://localhost/api/subscriptions/unsubscribe?token=valid-token-67890");
     mockContext.request = request;
 
-    const response = await onRequestGet(mockContext);
+    const getResponse = await onRequestGet(mockContext);
+
+    expect(getResponse.status).toBe(200);
+    expect(await getResponse.text()).toContain('method="post"');
+    expect(mockDB.data.email_subscriptions).toHaveLength(1);
+
+    mockContext.request = new Request("http://localhost/api/subscriptions/unsubscribe?token=valid-token-67890", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ token: "valid-token-67890" }),
+    });
+    const response = await onRequestPost(mockContext);
 
     expect(response.status).toBe(200);
     expect(mockDB.data.email_subscriptions).toHaveLength(0);
@@ -43,11 +54,35 @@ describe("GET /api/subscriptions/unsubscribe", () => {
     expect(mockDB.data.subscription_unsubscribes[0].subscription_id).toBe(1);
   });
 
+  it("POST supports RFC 8058 query-string token fallback", async () => {
+    mockDB.data.email_subscriptions.push({
+      id: 1,
+      email: "test@example.com",
+      city: "portland",
+      genre: "punk",
+      frequency: "weekly",
+      verified: true,
+      verification_token: "verify-token-12345",
+      unsubscribe_token: "one-click-token",
+      created_at: new Date().toISOString(),
+    });
+
+    mockContext.request = new Request("http://localhost/api/subscriptions/unsubscribe?token=one-click-token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "List-Unsubscribe=One-Click",
+    });
+    const response = await onRequestPost(mockContext);
+
+    expect(response.status).toBe(200);
+    expect(mockDB.data.email_subscriptions).toHaveLength(0);
+  });
+
   it("should reject request without token", async () => {
     const request = new Request("http://localhost/api/subscriptions/unsubscribe");
     mockContext.request = request;
 
-    const response = await onRequestGet(mockContext);
+    const response = await onRequestPost(mockContext);
 
     expect(response.status).toBe(400);
     const text = await response.text();
@@ -58,7 +93,7 @@ describe("GET /api/subscriptions/unsubscribe", () => {
     const request = new Request("http://localhost/api/subscriptions/unsubscribe?token=invalid-token");
     mockContext.request = request;
 
-    const response = await onRequestGet(mockContext);
+    const response = await onRequestPost(mockContext);
 
     expect(response.status).toBe(404);
     const text = await response.text();
@@ -81,7 +116,7 @@ describe("GET /api/subscriptions/unsubscribe", () => {
     const request = new Request("http://localhost/api/subscriptions/unsubscribe?token=valid-token-67890");
     mockContext.request = request;
 
-    await onRequestGet(mockContext);
+    await onRequestPost(mockContext);
 
     expect(mockDB.data.subscription_unsubscribes).toHaveLength(1);
     expect(mockDB.data.subscription_unsubscribes[0]).toMatchObject({
@@ -106,7 +141,7 @@ describe("GET /api/subscriptions/unsubscribe", () => {
     const request = new Request("http://localhost/api/subscriptions/unsubscribe?token=valid-token-67890");
     mockContext.request = request;
 
-    const response = await onRequestGet(mockContext);
+    const response = await onRequestPost(mockContext);
 
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Type")).toBe("text/html; charset=utf-8");

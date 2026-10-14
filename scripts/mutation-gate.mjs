@@ -217,6 +217,35 @@ export const MUTATIONS = [
     tests: ["functions/api/subscriptions/__tests__/verify.test.js"],
   },
   {
+    id: "email-link-get-does-not-confirm-follow",
+    invariant:
+      "CLAUDE.md 'Emailed links never act on a GET (#1291)' — GET renders a confirmation page and does not confirm a band follow",
+    file: "functions/api/bands/[name]/confirm-follow.js",
+    find: "  const { request } = context;\n  const token = await readEmailActionToken(request);",
+    replace:
+      "  const { request } = context;\n  const token = await readEmailActionToken(request);\n  return onRequestPost(context);",
+    tests: ["functions/api/bands/__tests__/confirm-follow.test.js"],
+  },
+  {
+    id: "email-link-get-does-not-verify-subscription",
+    invariant:
+      "CLAUDE.md 'Emailed links never act on a GET (#1291)' — GET renders a verification page and does not verify a subscription",
+    file: "functions/api/subscriptions/verify.js",
+    find: "  const { request } = context;\n  const token = await readEmailActionToken(request);",
+    replace:
+      "  const { request } = context;\n  const token = await readEmailActionToken(request);\n  return onRequestPost(context);",
+    tests: ["functions/api/subscriptions/__tests__/verify.test.js"],
+  },
+  {
+    id: "confirm-url-echo-dev-only",
+    invariant:
+      "CLAUDE.md 'Emailed links never act on a GET (#1291)' — confirmation URLs are echoed only for explicitly allowed development requests",
+    file: "functions/api/bands/[name]/follow.js",
+    find: "if (isNewFollow && !isEmailConfigured(env) && isDevRequest(request, env))",
+    replace: "if (isNewFollow && !isEmailConfigured(env))",
+    tests: ["functions/api/bands/__tests__/follow.test.js"],
+  },
+  {
     id: "after-midnight-threshold-server",
     invariant:
       "CLAUDE.md 'After-midnight band sorting' — AFTER_MIDNIGHT_THRESHOLD_HOUR is 6 (server canonical home); sets before this hour belong to the previous festival day",

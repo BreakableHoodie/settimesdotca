@@ -26,6 +26,7 @@ import { listUnsubscribeHeaders, sendEmail } from "./email.js";
 import { logger } from "./logger.js";
 import { escapeHtml } from "./html.js";
 import { getPublicBaseUrl } from "./publicUrl.js";
+import { toSqliteDateTime } from "./authAttempts.js";
 
 const SEND_CONCURRENCY = 8;
 
@@ -96,6 +97,7 @@ export async function flushAnnounceDigest(env, DB) {
   for (const items of groups.values()) {
     const { email, event_name, event_slug } = items[0];
     const eventUrl = `${publicUrl}/event/${event_slug}`;
+    const claimedAt = toSqliteDateTime(new Date());
 
     // A performance cancelled between queuing and this flush (#732 MAJOR 1)
     // must never be claimed or sent — excluded up front, before the claim
@@ -135,11 +137,11 @@ export async function flushAnnounceDigest(env, DB) {
     // between for sendEmail() to observe a state that has already changed.
     const claimStatements = liveItems.map((item) =>
       DB.prepare(
-        `INSERT OR IGNORE INTO band_follow_notifications (performance_id, band_follow_id)
-         SELECT ?, ? WHERE NOT EXISTS (
+        `INSERT OR IGNORE INTO band_follow_notifications (performance_id, band_follow_id, claimed_at)
+         SELECT ?, ?, ? WHERE NOT EXISTS (
            SELECT 1 FROM performances WHERE id = ? AND is_cancelled = 1
          )`,
-      ).bind(item.performance_id, item.band_follow_id, item.performance_id),
+      ).bind(item.performance_id, item.band_follow_id, claimedAt, item.performance_id),
     );
     // Delete every queue entry for this group — whether claimed now,
     // cancelled, or already handled by a concurrent path. A cancelled entry
@@ -219,6 +221,7 @@ export async function flushAnnounceDigest(env, DB) {
       text,
       html,
       claimed,
+      claimedAt,
       // A one-click digest must not silently unsubscribe only one of several bands.
       headers: unsubLinks.length === 1 ? listUnsubscribeHeaders(unsubLinks[0].url) : undefined,
       idempotencyKey: await buildAnnounceDigestIdempotencyKey(
@@ -318,10 +321,9 @@ export async function flushAnnounceDigest(env, DB) {
       try {
         await DB.batch(
           task.claimed.map((item) =>
-            DB.prepare("DELETE FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?").bind(
-              item.performance_id,
-              item.band_follow_id,
-            ),
+            DB.prepare(
+              "DELETE FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ? AND claimed_at = ? AND delivered_at IS NULL",
+            ).bind(item.performance_id, item.band_follow_id, task.claimedAt),
           ),
         );
       } catch (releaseError) {

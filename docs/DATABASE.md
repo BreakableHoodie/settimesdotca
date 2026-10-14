@@ -850,15 +850,17 @@ WHERE sl.slug = ? AND sl.expires_at > datetime('now');
 concurrent resend requests:
 
 ```sql
+-- `?claimed` below is ONE toSqliteDateTime() value per send attempt.
+
 -- 1. Claim. changes === 0 means a row already exists for this follower.
-INSERT OR IGNORE INTO band_follow_notifications (performance_id, band_follow_id)
-VALUES (?, ?);
+INSERT OR IGNORE INTO band_follow_notifications (performance_id, band_follow_id, claimed_at)
+VALUES (?, ?, ?claimed);
 
 -- 2. Only when step 1 claimed nothing: take over an ABANDONED claim
 --    (undelivered and older than the 15-minute lease). A delivered row or a
 --    live claim matches nothing, so at most one request wins.
 UPDATE band_follow_notifications
-   SET claimed_at = datetime('now')
+   SET claimed_at = ?claimed
  WHERE performance_id = ? AND band_follow_id = ?
    AND delivered_at IS NULL
    AND claimed_at <= datetime('now', '-15 minutes');
@@ -868,8 +870,11 @@ UPDATE band_follow_notifications
 UPDATE band_follow_notifications SET delivered_at = datetime('now')
  WHERE performance_id = ? AND band_follow_id = ?;
 
--- 3b. Send failed: release the claim so a resend can retry at once.
-DELETE FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?;
+-- 3b. Send failed: release ONLY this attempt's undelivered claim, so a
+--     later takeover or a delivery made meanwhile is never removed (#1311).
+DELETE FROM band_follow_notifications
+ WHERE performance_id = ? AND band_follow_id = ?
+   AND claimed_at = ?claimed AND delivered_at IS NULL;
 ```
 
 The lease is `CLAIM_LEASE_MINUTES`. Every reader that asks "has this follower

@@ -15,6 +15,7 @@ import { listUnsubscribeHeaders, sendEmail } from "./email.js";
 import { logger } from "./logger.js";
 import { getPublicBaseUrl } from "./publicUrl.js";
 import { escapeHtml } from "./html.js";
+import { toSqliteDateTime } from "./authAttempts.js";
 
 // Mirrors announceDigest.js, which bounds its sends for the same reason.
 //
@@ -128,12 +129,13 @@ export async function notifySubscribers(env, DB, { eventId, kind, eventName, eve
   // every send simultaneously, which is how a Worker exhausts its subrequest
   // budget. Same reason announceDigest.js chunks.
   const sendOne = async (sub) => {
+    const claimedAt = toSqliteDateTime(new Date());
     // Claim BEFORE delivery, so two concurrent runs cannot mail one person
     // twice. A claim is NOT a delivery record, though -- see delivered_at.
     const claim = await DB.prepare(
-      "INSERT OR IGNORE INTO subscription_notifications (subscription_id, event_id, kind) VALUES (?, ?, ?)",
+      "INSERT OR IGNORE INTO subscription_notifications (subscription_id, event_id, kind, claimed_at) VALUES (?, ?, ?, ?)",
     )
-      .bind(sub.id, eventId, kind)
+      .bind(sub.id, eventId, kind, claimedAt)
       .run();
 
     let owned = claim.meta.changes === 1;
@@ -145,12 +147,12 @@ export async function notifySubscribers(env, DB, { eventId, kind, eventName, eve
       // so a live sender's claim is never stolen.
       const retake = await DB.prepare(
         `UPDATE subscription_notifications
-         SET claimed_at = datetime('now')
+         SET claimed_at = ?
          WHERE subscription_id = ? AND event_id = ? AND kind = ?
            AND delivered_at IS NULL
            AND claimed_at <= datetime('now', ?)`,
       )
-        .bind(sub.id, eventId, kind, `-${CLAIM_LEASE_MINUTES} minutes`)
+        .bind(claimedAt, sub.id, eventId, kind, `-${CLAIM_LEASE_MINUTES} minutes`)
         .run();
       owned = retake.meta.changes === 1;
     }
@@ -180,8 +182,10 @@ export async function notifySubscribers(env, DB, { eventId, kind, eventName, eve
     if (result?.delivered !== true) {
       // Release immediately rather than waiting for the lease to lapse, so a
       // resend can retry this recipient now.
-      await DB.prepare("DELETE FROM subscription_notifications WHERE subscription_id = ? AND event_id = ? AND kind = ?")
-        .bind(sub.id, eventId, kind)
+      await DB.prepare(
+        "DELETE FROM subscription_notifications WHERE subscription_id = ? AND event_id = ? AND kind = ? AND claimed_at = ? AND delivered_at IS NULL",
+      )
+        .bind(sub.id, eventId, kind, claimedAt)
         .run();
       return "failed";
     }

@@ -10,6 +10,7 @@ import { listUnsubscribeHeaders, sendEmail } from "./email.js";
 import { logger } from "./logger.js";
 import { getPublicBaseUrl } from "./publicUrl.js";
 import { escapeHtml } from "./html.js";
+import { toSqliteDateTime } from "./authAttempts.js";
 
 // A claim is not a delivery record (#1152).
 //
@@ -38,13 +39,14 @@ export async function notifyBandFollowers(env, DB, { performanceId, bandProfileI
 
   const results = await Promise.allSettled(
     followers.map(async (follower) => {
+      const claimedAt = toSqliteDateTime(new Date());
       // Claim the follower atomically before delivery. INSERT OR IGNORE
       // returns changes=0 if a row already exists for this follower, which
       // prevents concurrent resends from double-sending to the same person.
       const claim = await DB.prepare(
-        "INSERT OR IGNORE INTO band_follow_notifications (performance_id, band_follow_id) VALUES (?, ?)",
+        "INSERT OR IGNORE INTO band_follow_notifications (performance_id, band_follow_id, claimed_at) VALUES (?, ?, ?)",
       )
-        .bind(performanceId, follower.id)
+        .bind(performanceId, follower.id, claimedAt)
         .run();
 
       if (claim.meta.changes === 0) {
@@ -56,12 +58,12 @@ export async function notifyBandFollowers(env, DB, { performanceId, bandProfileI
         // exactly one UPDATE reports changes=1.
         const takeover = await DB.prepare(
           `UPDATE band_follow_notifications
-              SET claimed_at = datetime('now')
+              SET claimed_at = ?
             WHERE performance_id = ? AND band_follow_id = ?
               AND delivered_at IS NULL
               AND claimed_at <= datetime('now', '-${CLAIM_LEASE_MINUTES} minutes')`,
         )
-          .bind(performanceId, follower.id)
+          .bind(claimedAt, performanceId, follower.id)
           .run();
 
         // Live claim or a real delivery -- either way, not ours to send.
@@ -117,8 +119,10 @@ export async function notifyBandFollowers(env, DB, { performanceId, bandProfileI
         // rather than waiting out the lease. If this DELETE itself fails the
         // row survives, but that is no longer permanent: the lease expires and
         // the follower becomes retryable on their own. Prompt, not load-bearing.
-        await DB.prepare("DELETE FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?")
-          .bind(performanceId, follower.id)
+        await DB.prepare(
+          "DELETE FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ? AND claimed_at = ? AND delivered_at IS NULL",
+        )
+          .bind(performanceId, follower.id, claimedAt)
           .run();
       }
       return delivered;

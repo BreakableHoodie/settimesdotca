@@ -208,12 +208,30 @@ export const MUTATIONS = [
     tests: ["functions/api/bands/__tests__/confirm-follow.test.js"],
   },
   {
+    id: "confirmation-link-expires-follow",
+    invariant:
+      "CLAUDE.md 'Emailed links never act on a GET (#1291)' — pending band follow confirmation links expire after 7 days",
+    file: "functions/api/bands/[name]/confirm-follow.js",
+    find: "WHERE id = ? AND verified = 0 AND ${pendingConfirmationLiveSql()}`",
+    replace: "WHERE id = ? AND verified = 0`",
+    tests: ["functions/api/bands/__tests__/confirm-follow.test.js"],
+  },
+  {
     id: "consent-confirmation-subscription-timestamp",
     invariant:
       "CLAUDE.md 'Proof of consent is recorded at confirmation' — a subscription confirmation records its SQLite timestamp",
     file: "functions/api/subscriptions/verify.js",
     find: "SET verified = 1, confirmed_at = datetime('now')",
     replace: "SET verified = 1",
+    tests: ["functions/api/subscriptions/__tests__/verify.test.js"],
+  },
+  {
+    id: "confirmation-link-expires-subscription",
+    invariant:
+      "CLAUDE.md 'Emailed links never act on a GET (#1291)' — pending subscription confirmation links expire after 7 days",
+    file: "functions/api/subscriptions/verify.js",
+    find: "AND verified = 0\n        AND ${pendingConfirmationLiveSql()}",
+    replace: "AND verified = 0\n        AND 1 = 0",
     tests: ["functions/api/subscriptions/__tests__/verify.test.js"],
   },
   {
@@ -391,6 +409,15 @@ export const MUTATIONS = [
     file: "functions/api/admin/maintenance/retention.js",
     find: "action = 'api_key.request' AND created_at < datetime('now', '-90 days')",
     replace: "action = 'api_key.request' AND created_at < datetime('now', '-9000 days')",
+    tests: ["functions/api/admin/maintenance/__tests__/retentionWindows.test.js"],
+  },
+  {
+    id: "retention-unconfirmed-signups",
+    invariant:
+      "CLAUDE.md 'Retention windows are a published promise' — never-confirmed follow and subscription requests are deleted after 7 days",
+    file: "functions/api/admin/maintenance/retention.js",
+    find: "DB.prepare(`DELETE FROM band_follows WHERE verified = 0 AND NOT (${pendingConfirmationLiveSql()})`).run(),",
+    replace: "DB.prepare(`DELETE FROM band_follows WHERE verified = 0 AND 1 = 0`).run(),",
     tests: ["functions/api/admin/maintenance/__tests__/retentionWindows.test.js"],
   },
   {

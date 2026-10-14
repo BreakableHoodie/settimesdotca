@@ -3,6 +3,7 @@
 
 import { escapeHtml } from "../../../utils/html.js";
 import { emailActionPage, emailResultPage, readEmailActionToken } from "../../../utils/emailActionPage.js";
+import { pendingConfirmationLiveSql } from "../../../utils/consent.js";
 
 export async function onRequestGet(context) {
   const { request } = context;
@@ -42,7 +43,8 @@ export async function onRequestPost(context) {
       `SELECT bf.id, bp.name AS band_name
        FROM band_follows bf
        JOIN band_profiles bp ON bp.id = bf.band_profile_id
-       WHERE bf.verification_token = ?`,
+       WHERE bf.verification_token = ?
+         AND (bf.verified = 1 OR (bf.verified = 0 AND ${pendingConfirmationLiveSql("bf")}))`,
     )
       .bind(token)
       .first();
@@ -57,11 +59,26 @@ export async function onRequestPost(context) {
 
     // Verify and clear the one-time token in one statement. This is idempotent:
     // a second click finds no matching token (already NULL) and changes nothing.
-    await DB.prepare(
-      "UPDATE band_follows SET verified = 1, confirmed_at = datetime('now'), verification_token = NULL WHERE id = ? AND verified = 0",
+    const update = await DB.prepare(
+      `UPDATE band_follows
+       SET verified = 1, confirmed_at = datetime('now'), verification_token = NULL
+       WHERE id = ? AND verified = 0 AND ${pendingConfirmationLiveSql()}`,
     )
       .bind(row.id)
       .run();
+
+    // No change means either a concurrent click already confirmed it (true
+    // success) or the link reached the end of its window between the lookup
+    // and this write. Re-read rather than claim a follow that was not recorded.
+    if (!update?.meta?.changes) {
+      const current = await DB.prepare("SELECT verified FROM band_follows WHERE id = ?").bind(row.id).first();
+      if (!current?.verified) {
+        return emailResultPage(
+          `Link expired`,
+          `This confirmation link is invalid or has already been used. If you already confirmed, you're all set.`,
+        );
+      }
+    }
 
     return emailResultPage(
       `You&apos;re following ${escapeHtml(row.band_name)}`,

@@ -140,6 +140,45 @@ describe("POST /api/bands/follow-batch", () => {
     expect(rows).toHaveLength(1);
   });
 
+  it("replaces expired pending batch follows with fresh tokens without deleting verified rows", async () => {
+    const { env, rawDb } = createTestEnv();
+    const ev = insertEvent(rawDb, { name: "Vol17", slug: "vol17-batch-expiry", status: "published" });
+    const band = insertBand(rawDb, { name: "Batch Expiry Band", event_id: ev.id });
+    rawDb
+      .prepare(
+        "INSERT INTO band_follows (email, band_profile_id, verified, verification_token, unsubscribe_token, batch_token, created_at) VALUES (?, ?, 0, ?, ?, ?, datetime('now', '-8 days'))",
+      )
+      .run("pending-batch@example.com", band.band_profile_id, "old-batch-token", "old-batch-unsub", "old-batch");
+    rawDb
+      .prepare(
+        "INSERT INTO band_follows (email, band_profile_id, verified, verification_token, unsubscribe_token) VALUES (?, ?, 1, ?, ?)",
+      )
+      .run("verified-batch@example.com", band.band_profile_id, "verified-batch-token", "verified-batch-unsub");
+
+    const post = (email) =>
+      followBatchHandler.onRequestPost({
+        request: new Request("https://example.test/api/bands/follow-batch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, performance_ids: [band.id] }),
+        }),
+        env,
+        waitUntil,
+      });
+    await post("pending-batch@example.com");
+    await post("verified-batch@example.com");
+
+    const rows = rawDb.prepare("SELECT email, verified, verification_token FROM band_follows ORDER BY email").all();
+    expect(rows).toHaveLength(2);
+    expect(rows[0].verification_token).not.toBe("old-batch-token");
+    expect(rows[0].verified).toBe(0);
+    expect(rows[1]).toMatchObject({
+      email: "verified-batch@example.com",
+      verified: 1,
+      verification_token: "verified-batch-token",
+    });
+  });
+
   it("no-enumeration: existing follows return 200 without leaking state", async () => {
     const { env, rawDb } = createTestEnv();
     const ev = insertEvent(rawDb, { name: "Vol17", slug: "vol17-noenum", status: "published" });
@@ -443,6 +482,40 @@ describe("/api/bands/confirm-follow-batch", () => {
     const html = await res.text();
     expect(html).not.toMatch(/all set!/i);
     expect(html).toMatch(/invalid or has already been used/i);
+  });
+
+  it("does not confirm an expired batch but confirms a recent batch", async () => {
+    const { env, rawDb } = createTestEnv();
+    const ev = insertEvent(rawDb, { name: "Vol17", slug: "vol17-confirm-batch-expiry", status: "published" });
+    const oldBand = insertBand(rawDb, { name: "Old Batch", event_id: ev.id });
+    const newBand = insertBand(rawDb, { name: "New Batch", event_id: ev.id });
+    rawDb
+      .prepare(
+        "INSERT INTO band_follows (email, band_profile_id, verified, batch_token, unsubscribe_token, created_at) VALUES (?, ?, 0, ?, ?, datetime('now', ?))",
+      )
+      .run("old-batch-confirm@example.com", oldBand.band_profile_id, "old-confirm-batch", "old-unsub", "-8 days");
+    rawDb
+      .prepare(
+        "INSERT INTO band_follows (email, band_profile_id, verified, batch_token, unsubscribe_token, created_at) VALUES (?, ?, 0, ?, ?, datetime('now', ?))",
+      )
+      .run("new-batch-confirm@example.com", newBand.band_profile_id, "new-confirm-batch", "new-unsub", "-6 days");
+
+    const post = (token) =>
+      confirmBatchHandler.onRequestPost({
+        request: new Request("https://example.test/api/bands/confirm-follow-batch", {
+          method: "POST",
+          body: new URLSearchParams({ token }),
+        }),
+        env,
+      });
+    await post("old-confirm-batch");
+    await post("new-confirm-batch");
+
+    const rows = rawDb.prepare("SELECT email, verified FROM band_follows ORDER BY email").all();
+    expect(rows).toEqual([
+      { email: "new-batch-confirm@example.com", verified: 1 },
+      { email: "old-batch-confirm@example.com", verified: 0 },
+    ]);
   });
 });
 

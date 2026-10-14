@@ -151,4 +151,70 @@ describe("/api/subscriptions/verify", () => {
     const location = response.headers.get("location");
     expect(location).toBe("https://example.com/subscribe?verified=true");
   });
+
+  it("rejects an expired pending subscription but verifies one within the window", async () => {
+    mockDB.data.email_subscriptions.push(
+      {
+        id: 1,
+        email: "old@example.com",
+        city: "all",
+        genre: "all",
+        frequency: "weekly",
+        verified: false,
+        verification_token: "old-token",
+        unsubscribe_token: "old-unsub",
+        created_at: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      {
+        id: 2,
+        email: "new@example.com",
+        city: "all",
+        genre: "all",
+        frequency: "weekly",
+        verified: false,
+        verification_token: "new-token",
+        unsubscribe_token: "new-unsub",
+        created_at: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+    );
+
+    for (const token of ["old-token", "new-token"]) {
+      mockContext.request = new Request(`http://localhost/api/subscriptions/verify?token=${token}`, {
+        method: "POST",
+        body: new URLSearchParams({ token }),
+      });
+      await onRequestPost(mockContext);
+    }
+
+    expect(mockDB.data.email_subscriptions.map(({ verified }) => verified)).toEqual([false, true]);
+  });
+
+  it("keeps the update expiry guard when a stale lookup slips through", async () => {
+    mockDB.data.email_subscriptions.push({
+      id: 1,
+      email: "race@example.com",
+      city: "all",
+      genre: "all",
+      frequency: "weekly",
+      verified: false,
+      verification_token: "race-token",
+      unsubscribe_token: "race-unsub",
+      created_at: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+    const prepare = mockDB.prepare.bind(mockDB);
+    mockDB.prepare = (query) =>
+      prepare(
+        query.includes("SELECT id, email")
+          ? query.replace("AND (verified = 1 OR (verified = 0 AND created_at >= datetime('now', '-7 days')))", "")
+          : query,
+      );
+
+    mockContext.request = new Request("http://localhost/api/subscriptions/verify?token=race-token", {
+      method: "POST",
+      body: new URLSearchParams({ token: "race-token" }),
+    });
+    await onRequestPost(mockContext);
+
+    expect(mockDB.data.email_subscriptions[0].verified).toBe(false);
+  });
 });

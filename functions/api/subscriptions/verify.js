@@ -3,6 +3,7 @@
 
 import { getPublicBaseUrl } from "../../utils/publicUrl.js";
 import { emailActionPage, readEmailActionToken } from "../../utils/emailActionPage.js";
+import { pendingConfirmationLiveSql } from "../../utils/consent.js";
 
 export async function onRequestGet(context) {
   const { request } = context;
@@ -32,6 +33,7 @@ export async function onRequestPost(context) {
       SELECT id, email, city, genre, verified
       FROM email_subscriptions
       WHERE verification_token = ?
+        AND (verified = 1 OR (verified = 0 AND ${pendingConfirmationLiveSql()}))
     `,
     )
       .bind(token)
@@ -54,12 +56,21 @@ export async function onRequestPost(context) {
       SET verified = 1, confirmed_at = datetime('now')
       WHERE verification_token = ?
         AND verified = 0
+        AND ${pendingConfirmationLiveSql()}
     `,
     )
       .bind(token)
       .run();
 
     if (!verifyResult?.meta?.changes) {
+      // Either a concurrent click verified it, or the link expired between the
+      // lookup and this write. Only the first is "already verified".
+      const current = await env.DB.prepare("SELECT verified FROM email_subscriptions WHERE verification_token = ?")
+        .bind(token)
+        .first();
+      if (!current?.verified) {
+        return new Response("This verification link has expired. Please subscribe again.", { status: 410 });
+      }
       return new Response("Email already verified", { status: 200 });
     }
 

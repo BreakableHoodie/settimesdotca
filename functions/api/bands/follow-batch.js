@@ -28,7 +28,7 @@ import { escapeHtml } from "../../utils/html.js";
 import { getPublicBaseUrl } from "../../utils/publicUrl.js";
 import { parseJsonObjectBody } from "../../utils/request.js";
 import { publicEventStatusSql } from "../../utils/eventVisibility.js";
-import { CONSENT_VERSION } from "../../utils/consent.js";
+import { CONSENT_VERSION, pendingConfirmationLiveSql } from "../../utils/consent.js";
 import { isDevRequest } from "../../utils/auth.js";
 
 const MAX_EMAIL_LENGTH = 320;
@@ -132,20 +132,26 @@ export async function onRequestPost(context) {
     // by INSERT OR IGNORE, so it is NOT adopted into this batch_token — it stays
     // confirmable via its own earlier email. This errs toward not-verifying, never
     // toward over-verifying, so it carries no email-amplification or consent risk.
-    const stmts = bands.results.map(({ band_profile_id }) => {
+    const stmts = bands.results.flatMap(({ band_profile_id }) => {
       const verificationToken = generateToken();
       const unsubscribeToken = generateToken();
-      return DB.prepare(
-        `INSERT OR IGNORE INTO band_follows
-           (email, band_profile_id, verified, verification_token, unsubscribe_token,
-             consent_ip, consent_method, consent_version, batch_token)
-          VALUES (?, ?, 0, ?, ?, ?, 'web_form', ?, ?)`,
-      ).bind(email, band_profile_id, verificationToken, unsubscribeToken, consentIp, CONSENT_VERSION, batchToken);
+      return [
+        DB.prepare(
+          `DELETE FROM band_follows
+           WHERE email = ? AND band_profile_id = ? AND verified = 0 AND NOT (${pendingConfirmationLiveSql()})`,
+        ).bind(email, band_profile_id),
+        DB.prepare(
+          `INSERT OR IGNORE INTO band_follows
+             (email, band_profile_id, verified, verification_token, unsubscribe_token,
+               consent_ip, consent_method, consent_version, batch_token)
+            VALUES (?, ?, 0, ?, ?, ?, 'web_form', ?, ?)`,
+        ).bind(email, band_profile_id, verificationToken, unsubscribeToken, consentIp, CONSENT_VERSION, batchToken),
+      ];
     });
 
     const results = await DB.batch(stmts);
-    // True when at least one new follow row was inserted (not an existing duplicate).
-    const isNewBatch = results.some((r) => r.meta.changes > 0);
+    // Every pair is delete-then-insert; only insert results count as new follows.
+    const isNewBatch = results.some((r, index) => index % 2 === 1 && r.meta.changes > 0);
 
     if (isNewBatch && isEmailConfigured(env)) {
       const bandListText = bands.results.map((b) => `• ${b.band_name}`).join("\n");

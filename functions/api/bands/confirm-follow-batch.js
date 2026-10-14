@@ -10,6 +10,7 @@
 // token was valid (no enumeration).
 
 import { emailActionPage, emailResultPage, readEmailActionToken } from "../../utils/emailActionPage.js";
+import { pendingConfirmationLiveSql } from "../../utils/consent.js";
 
 export async function onRequestGet(context) {
   const { request } = context;
@@ -48,7 +49,7 @@ export async function onRequestPost(context) {
     const result = await DB.prepare(
       `UPDATE band_follows
        SET verified = 1, confirmed_at = datetime('now'), verification_token = NULL, batch_token = NULL
-       WHERE batch_token = ? AND verified = 0`,
+       WHERE batch_token = ? AND verified = 0 AND ${pendingConfirmationLiveSql()}`,
     )
       .bind(token)
       .run();

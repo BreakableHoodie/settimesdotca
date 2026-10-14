@@ -927,7 +927,7 @@ Band follows are **double opt-in**: `POST /api/bands/:name/follow` creates the r
 
 ### Emailed links never act on a GET (#1291)
 
-Corporate mail scanners fetch email links with GET, so confirmation and unsubscribe links must not mutate state when scanned. GET renders a no-store, noindex page with a button and writes nothing; POST performs the action. Confirmation and unsubscribe POSTs accept the token from the form or the query string, so the unsubscribe routes are ready for RFC 8058 one-click; outgoing mail does not yet send the `List-Unsubscribe` / `List-Unsubscribe-Post` headers that would let a mail client use it. Confirmation URLs are echoed in API responses only for explicitly allowed development requests when email delivery is unconfigured.
+Corporate mail scanners fetch email links with GET, so confirmation and unsubscribe links must not mutate state when scanned. GET renders a no-store, noindex page with a button and writes nothing; POST performs the action. Confirmation and unsubscribe POSTs accept the token from the form or the query string, so the unsubscribe routes are ready for RFC 8058 one-click; outgoing mail does not yet send the `List-Unsubscribe` / `List-Unsubscribe-Post` headers that would let a mail client use it. Confirmation URLs are echoed in API responses only for explicitly allowed development requests when email delivery is unconfigured. Confirmation links expire after 7 days; an expired pending request is deleted on re-request and receives a fresh token and consent timestamp.
 
 **The page's `<meta name="referrer" content="same-origin">` is load-bearing.** `functions/_middleware.js` sends `Referrer-Policy: no-referrer` on every Function response, and under that policy a browser submits the form with `Origin: null`, which the origin allowlist rejects with 403. Every button failed in Chromium; `curl` (no `Origin` at all) passed, and so did every unit test. Verify a change to these pages by clicking the button in a real browser against `wrangler pages dev`, not with `curl`. Do not allowlist `"null"` instead: sandboxed iframes send it too.
 
@@ -1422,7 +1422,11 @@ addresses, never by loosening the scan. In the mutation gate.
 ### Retention windows are a published promise
 
 The privacy policy's retention table (`frontend/src/pages/PrivacyPage.jsx`) states
-how long each kind of personal data is kept. Two handlers make it true:
+how long each kind of personal data is kept. Unconfirmed follow and subscription
+requests, including their email and consent IP, expire after 7 days; confirmation
+and re-request paths use the same window, while
+`functions/api/admin/maintenance/retention.js` deletes any remaining pending rows.
+Two handlers make the other published windows true:
 `functions/api/admin/maintenance/retention.js` deletes expired rows, and
 `functions/scheduled/anonymize-schedule-builds.js` anonymises schedule-build
 visitor codes 30 days after an event. Both run daily

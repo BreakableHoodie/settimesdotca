@@ -1183,6 +1183,12 @@ paths:
           description: Verification succeeded and the client is redirected to the subscribe page
         "400":
           description: Missing or malformed token
+        "410":
+          description: The link expired before the verification was recorded; subscribe again
+          content:
+            text/plain:
+              schema:
+                type: string
         "404":
           description: Token not found
         "500":

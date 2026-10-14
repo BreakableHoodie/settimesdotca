@@ -14,6 +14,7 @@
 //    enforcement, and fail-open behaviour avoids availability impact.
 
 import { logger } from "./logger.js";
+import { routePath } from "./routePath.js";
 
 const RATE_LIMIT_PREFIX = "rate-limit:";
 
@@ -64,41 +65,43 @@ const SKIP_PATTERNS = [
 // protection — see file header and #482.
 const FAIL_CLOSED_PATTERNS = ["/api/admin/auth/", "/api/auth/", "/api/subscriptions", "/api/metrics"];
 
-function shouldFailClosed(pathname) {
+function shouldFailClosed(path) {
+  path = routePath(new URL(path, "https://route-path.invalid"));
   return (
-    BAND_ACTION_RE.test(pathname) ||
-    BATCH_FOLLOW_RE.test(pathname) ||
-    FAIL_CLOSED_PATTERNS.some((pattern) => pathname.startsWith(pattern))
+    BAND_ACTION_RE.test(path) ||
+    BATCH_FOLLOW_RE.test(path) ||
+    FAIL_CLOSED_PATTERNS.some((pattern) => path.startsWith(pattern))
   );
 }
 
 /**
  * Get rate limit config for a path
  */
-function getRateLimitConfig(pathname) {
+function getRateLimitConfig(path) {
+  path = routePath(new URL(path, "https://route-path.invalid"));
   // Check skip patterns
   for (const pattern of SKIP_PATTERNS) {
-    if (pathname.startsWith(pattern)) {
+    if (path.startsWith(pattern)) {
       return null;
     }
   }
 
   // Only rate limit /api/ routes
-  if (!pathname.startsWith("/api/")) {
+  if (!path.startsWith("/api/")) {
     return null;
   }
 
   // Band action endpoints (follow/unfollow/confirm-follow) — checked before the
   // prefix loop so that the tight fail-closed limit takes precedence over 'default'.
-  if (BAND_ACTION_RE.test(pathname)) return { requests: 5, window: 300 };
+  if (BAND_ACTION_RE.test(path)) return { requests: 5, window: 300 };
 
   // Batch follow endpoints — tighter than single-band follow (3/5min) because a
   // single request can cover up to 30 bands and triggers an email send.
-  if (BATCH_FOLLOW_RE.test(pathname)) return { requests: 3, window: 300 };
+  if (BATCH_FOLLOW_RE.test(path)) return { requests: 3, window: 300 };
 
   // Find matching config
   for (const [pattern, config] of Object.entries(RATE_LIMITS)) {
-    if (pattern !== "default" && pathname.startsWith(pattern)) {
+    if (pattern !== "default" && path.startsWith(pattern)) {
       return config;
     }
   }
@@ -111,12 +114,11 @@ function getRateLimitConfig(pathname) {
  * Auth sub-routes and band action endpoints use 5 segments so each action
  * (login, signup, follow, confirm-follow, etc.) gets a distinct D1 key.
  */
-function getRateLimitKey(ip, pathname) {
+function getRateLimitKey(ip, path) {
+  path = routePath(new URL(path, "https://route-path.invalid"));
   const depth =
-    pathname.startsWith("/api/admin/auth/") || pathname.startsWith("/api/auth/") || BAND_ACTION_RE.test(pathname)
-      ? 5
-      : 4;
-  const basePath = pathname.split("/").slice(0, depth).join("/");
+    path.startsWith("/api/admin/auth/") || path.startsWith("/api/auth/") || BAND_ACTION_RE.test(path) ? 5 : 4;
+  const basePath = path.split("/").slice(0, depth).join("/");
   return `${ip}:${basePath}`;
 }
 
@@ -129,8 +131,9 @@ function getRateLimitKey(ip, pathname) {
  * endpoint cannot starve the others. Keyed on the key id rather than the IP: a bearer
  * credential is the thing being limited, and it can move between addresses.
  */
-export function apiKeyRateLimitKey(keyId, pathname) {
-  const basePath = pathname.split("/").slice(0, 4).join("/");
+export function apiKeyRateLimitKey(keyId, path) {
+  path = routePath(new URL(path, "https://route-path.invalid"));
+  const basePath = path.split("/").slice(0, 4).join("/");
   return `apikey:${keyId}:${basePath}`;
 }
 
@@ -199,16 +202,17 @@ export async function checkRateLimitByKey(DB, key, config, logContext = {}) {
   }
 }
 
-function checkRateLimitD1(DB, ip, pathname, config) {
-  return checkRateLimitByKey(DB, getRateLimitKey(ip, pathname), config, { ip, pathname });
+function checkRateLimitD1(DB, ip, path, config, rawPath) {
+  return checkRateLimitByKey(DB, getRateLimitKey(ip, path), config, { ip, pathname: rawPath });
 }
 
 /**
  * Generate cache key for Cache API rate limiting
  */
-function getCacheKey(ip, pathname) {
+function getCacheKey(ip, path) {
+  path = routePath(new URL(path, "https://route-path.invalid"));
   // Normalize path to endpoint base
-  const basePath = pathname.split("/").slice(0, 4).join("/");
+  const basePath = path.split("/").slice(0, 4).join("/");
   return `https://rate-limit.internal/${RATE_LIMIT_PREFIX}${ip}:${basePath}`;
 }
 
@@ -221,10 +225,10 @@ function getCacheKey(ip, pathname) {
  * @returns {{ allowed: boolean, remaining: number, resetAt: number, limit?: number }}
  */
 export async function checkRateLimit(request, env = null) {
-  const url = new URL(request.url);
-  const pathname = url.pathname;
+  const rawPath = new URL(request.url).pathname;
+  const path = routePath(request);
 
-  const config = getRateLimitConfig(pathname);
+  const config = getRateLimitConfig(path);
   if (!config) {
     return { allowed: true, remaining: -1, resetAt: 0 };
   }
@@ -244,7 +248,7 @@ export async function checkRateLimit(request, env = null) {
   // In production, CF-Connecting-IP is always present. If both IP headers are absent,
   // fail closed on auth endpoints (misconfiguration safety) and fail open elsewhere.
   if (ip === "unknown") {
-    if (shouldFailClosed(pathname)) {
+    if (shouldFailClosed(path)) {
       return {
         allowed: false,
         remaining: 0,
@@ -256,12 +260,12 @@ export async function checkRateLimit(request, env = null) {
   }
 
   // Security-sensitive endpoints use D1 for globally-consistent counters.
-  if (shouldFailClosed(pathname) && env?.DB) {
-    return await checkRateLimitD1(env.DB, ip, pathname, config);
+  if (shouldFailClosed(path) && env?.DB) {
+    return await checkRateLimitD1(env.DB, ip, path, config, rawPath);
   }
 
   // Non-sensitive endpoints (or D1 unavailable in local dev): use Cache API.
-  const cacheKey = getCacheKey(ip, pathname);
+  const cacheKey = getCacheKey(ip, path);
   const cache = caches.default;
   const now = Math.floor(Date.now() / 1000);
 

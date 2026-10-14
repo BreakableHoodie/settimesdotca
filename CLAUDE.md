@@ -720,7 +720,7 @@ Three traps here, each of which was live:
 
 `KEY_FORBIDDEN_PREFIXES` in `_middleware.js` now 403s these families (`KEY_NOT_PERMITTED`), **checked before the key is verified** — the refusal is a property of the credential type and the path, so a forged key and a valid one are refused identically at zero D1 cost. **The role hierarchy is the wrong axis here: no key role belongs on these routes, including one minted `admin`.** `/api/admin/me` is deliberately _not_ listed — a decision, not an omission.
 
-Keys are read-only for `/api/admin/users`, `/api/admin/invite-codes` and `/api/admin/api-keys`: GET/HEAD remain available, but every mutation is refused before key verification. Identity management is a human act; a leaked key must not create a principal that outlives its own revocation.
+Keys are read-only for `/api/admin/users` and `/api/admin/api-keys`: GET/HEAD remain available, but every mutation is refused before key verification. Keys cannot touch `/api/admin/invite-codes` at all because GET exposes plaintext codes that can mint accounts. Identity management is a human act; a leaked key must not create a principal that outlives its own revocation.
 
 `revoke-all.js` also got its own `checkPermission(context, "viewer")`. **`viewer`, not `admin`:** revoking your own sessions is legitimate self-service at every role, and raising the tier would break a viewer logging out everywhere. The point is that an endpoint which mints sessions must state its own requirement rather than inherit safety from middleware shape.
 
@@ -1336,6 +1336,10 @@ gh pr create --label "bug,priority:p1"   # example
 ---
 
 ## Security Notes
+
+### Routes match case-insensitively; path checks must too
+
+Production evidence: `/api/admin/Users`, `/api/admin/MFA/setup` and `/api/Events/timeline` reach Functions regardless of case, while `/API/` does not. Use `routePath()` for every path-based security decision, never raw `url.pathname`. `routePathGuard.test.js` scans for raw API path checks and is allowlisted only for `routePath.js` and the root `/api/` gate in `functions/_middleware.js`, because `/API/` never reaches Functions.
 
 - All admin state-changing endpoints require both a valid session cookie AND a CSRF token (`X-CSRF-Token` header, read from the `csrf_token` cookie).
 - Session invalidation: `lucia.invalidateUserSessions(userId)` must be called before `lucia.createSession(user.id, {})` on re-authentication (login, MFA verify). This kills stale sessions from prior compromised contexts. Both methods live on the object returned by `initializeLucia()` in `functions/utils/auth.js`.

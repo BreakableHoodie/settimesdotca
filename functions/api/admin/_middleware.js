@@ -10,6 +10,7 @@ import { createRequestLogger, logger } from "../../utils/logger.js";
 import { auditLogStatement } from "../../utils/auditLogStatement.js";
 import { API_KEY_PREFIX, DISPLAY_PREFIX_LENGTH, verifyApiKey } from "../../utils/apiKeys.js";
 import { apiKeyRateLimitKey, checkRateLimitByKey, rateLimitResponse } from "../../utils/rateLimit.js";
+import { routePath } from "../../utils/routePath.js";
 
 export { auditLogStatement } from "../../utils/auditLogStatement.js";
 
@@ -46,11 +47,12 @@ const KEY_FORBIDDEN_PREFIXES = [
   "/api/admin/mfa/",
   "/api/admin/sessions",
   "/api/admin/trusted-devices",
+  "/api/admin/invite-codes",
 ];
 
-// Keys may read identity-management resources, but may not create or change identities.
-// A leaked key must not be able to create a principal that outlives the key's revocation.
-const KEY_READ_ONLY_PREFIXES = ["/api/admin/users", "/api/admin/invite-codes", "/api/admin/api-keys"];
+// Keys may read users and API keys, but may not create or change identities.
+// Invite codes are forbidden entirely: GET exposes plaintext codes that can mint accounts.
+const KEY_READ_ONLY_PREFIXES = ["/api/admin/users", "/api/admin/api-keys"];
 
 function normalizeUser(user) {
   if (!user) return null;
@@ -291,7 +293,8 @@ export async function auditLog(env, userId, action, resourceType, resourceId, de
 
 export async function onRequest(context) {
   const { request, env, next } = context;
-  const { pathname } = new URL(request.url);
+  const rawPathname = new URL(request.url).pathname;
+  const path = routePath(request);
   const log = createRequestLogger(context);
 
   const authHeader = request.headers.get("Authorization");
@@ -340,10 +343,10 @@ export async function onRequest(context) {
     // the path, not of any particular key, so a valid key and a forged one are refused
     // identically. It also costs zero D1 round-trips, which is the right posture for a
     // path an attacker can hammer for free.
-    if (KEY_FORBIDDEN_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+    if (KEY_FORBIDDEN_PREFIXES.some((prefix) => path.startsWith(prefix))) {
       log.warn("API key blocked from account self-service route", {
         keyPrefix: bearerValue.slice(0, DISPLAY_PREFIX_LENGTH),
-        path: pathname,
+        path: rawPathname,
         ipAddress,
       });
       return new Response(
@@ -357,12 +360,12 @@ export async function onRequest(context) {
     }
 
     if (
-      KEY_READ_ONLY_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)) &&
+      KEY_READ_ONLY_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`)) &&
       !["GET", "HEAD"].includes(request.method)
     ) {
       log.warn("API key blocked from identity-management mutation", {
         keyPrefix: bearerValue.slice(0, DISPLAY_PREFIX_LENGTH),
-        path: pathname,
+        path: rawPathname,
         ipAddress,
       });
       return new Response(
@@ -389,7 +392,7 @@ export async function onRequest(context) {
       });
     }
 
-    const rateResult = await checkRateLimitByKey(env.DB, apiKeyRateLimitKey(key.id, pathname), API_KEY_RATE_LIMIT, {
+    const rateResult = await checkRateLimitByKey(env.DB, apiKeyRateLimitKey(key.id, path), API_KEY_RATE_LIMIT, {
       apiKeyId: key.id,
     });
     if (!rateResult.allowed) {
@@ -438,7 +441,7 @@ export async function onRequest(context) {
           "api_key.request",
           "api_key",
           key.id,
-          { method, path: pathname },
+          { method, path: rawPathname },
           ipAddress,
           key.id,
         ).run();
@@ -450,7 +453,7 @@ export async function onRequest(context) {
     return next();
   }
 
-  if (pathname.startsWith("/api/admin/auth/")) {
+  if (path.startsWith("/api/admin/auth/")) {
     const csrfError = validateCSRFMiddleware(request, env);
     if (csrfError) {
       return csrfError;

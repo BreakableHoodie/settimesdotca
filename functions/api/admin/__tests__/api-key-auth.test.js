@@ -4,6 +4,10 @@ import { onRequest, checkPermission } from "../_middleware.js";
 import { createTestEnv } from "../../test-utils.js";
 import { generateApiKey, verifyApiKey } from "../../../utils/apiKeys.js";
 import { toSqliteDateTime } from "../../../utils/authAttempts.js";
+import { generateCSRFToken } from "../../../utils/csrf.js";
+import * as usersHandler from "../users.js";
+import * as userHandler from "../users/[id].js";
+import * as apiKeysHandler from "../api-keys.js";
 import * as inviteCodesHandler from "../invite-codes.js";
 
 const BASE_URL = "https://example.test/api/admin/me";
@@ -45,7 +49,7 @@ function keyRequest(plaintext, { method = "GET", url = BASE_URL, cookie = null, 
 }
 
 async function runMiddleware(env, request, nextImpl) {
-  const context = { request, env, data: {} };
+  const context = { request, env, data: {}, params: { id: "2" } };
   context.next = nextImpl ? async () => nextImpl(context) : async () => new Response("ok", { status: 200 });
   const response = await onRequest(context);
   return { response, context };
@@ -425,9 +429,14 @@ describe("API key authentication path (#744 part 3)", () => {
 
   describe("identity-management mutations are refused", () => {
     const IDENTITY_MUTATIONS = [
-      ["/api/admin/users", "POST", "users", undefined],
-      ["/api/admin/invite-codes", "POST", "invite_codes", undefined],
-      ["/api/admin/api-keys", "POST", "api_keys", undefined],
+      [
+        "/api/admin/users",
+        "POST",
+        "users",
+        { email: "new-user@example.test", firstName: "New", lastName: "User", role: "viewer" },
+      ],
+      ["/api/admin/invite-codes", "POST", "invite_codes", { role: "editor" }],
+      ["/api/admin/api-keys", "POST", "api_keys", { name: "new key", role: "viewer" }],
       ["/api/admin/users/2", "PATCH", "users", { role: "viewer" }],
       ["/api/admin/users/2", "DELETE", "users", undefined],
       ["/api/admin/users/2/toggle-status", "POST", "users", undefined],
@@ -441,7 +450,22 @@ describe("API key authentication path (#744 part 3)", () => {
       async (path, method, table, body) => {
         const { env, rawDb } = createTestEnv({ role: "admin" });
         const key = await seedKey(rawDb, { role: "admin" });
-        const before = rawDb.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get().count;
+        const countQuery =
+          path === "/api/admin/users/2"
+            ? "SELECT COUNT(*) AS count FROM users WHERE role = 'viewer'"
+            : `SELECT COUNT(*) AS count FROM ${table}`;
+        const before = rawDb.prepare(countQuery).get().count;
+
+        const next =
+          path === "/api/admin/users"
+            ? (ctx) => usersHandler.onRequestPost(ctx)
+            : path === "/api/admin/invite-codes"
+              ? (ctx) => inviteCodesHandler.onRequestPost(ctx)
+              : path === "/api/admin/api-keys"
+                ? (ctx) => apiKeysHandler.onRequestPost(ctx)
+                : path === "/api/admin/users/2" && method === "PATCH"
+                  ? (ctx) => userHandler.onRequestPatch(ctx)
+                  : okNext;
 
         const { response } = await runMiddleware(
           env,
@@ -450,14 +474,52 @@ describe("API key authentication path (#744 part 3)", () => {
             url: `https://example.test${path}`,
             body: body === undefined ? undefined : JSON.stringify(body),
           }),
-          okNext,
+          next,
         );
 
+        expect(rawDb.prepare(countQuery).get().count).toBe(before);
         expect(response.status).toBe(403);
         expect((await response.json()).code).toBe("KEY_NOT_PERMITTED");
-        expect(rawDb.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get().count).toBe(before);
       },
     );
+
+    it.each([
+      [
+        "/api/admin/Users",
+        "POST",
+        { email: "mixed-user@example.test", firstName: "Mixed", lastName: "User", role: "viewer" },
+      ],
+      ["/api/admin/API-KEYS", "POST", { name: "mixed key", role: "viewer" }],
+      ["/api/admin/Users/2", "PATCH", { role: "viewer" }],
+      ["/api/admin/MFA/setup", "POST", {}],
+      ["/api/admin/Sessions/revoke-all", "POST", {}],
+      ["/api/admin/Invite-Codes", "GET", undefined],
+      ["/api/admin/invite-codes", "GET", undefined],
+    ])("refuses mixed-case identity and self-service path %s (%s)", async (path, method, body) => {
+      const { env, rawDb } = createTestEnv({ role: "admin" });
+      const key = await seedKey(rawDb, { role: "admin" });
+      const next =
+        method === "GET"
+          ? (ctx) => inviteCodesHandler.onRequestGet(ctx)
+          : path.toLowerCase() === "/api/admin/users"
+            ? (ctx) => usersHandler.onRequestPost(ctx)
+            : path.toLowerCase() === "/api/admin/api-keys"
+              ? (ctx) => apiKeysHandler.onRequestPost(ctx)
+              : okNext;
+
+      const { response } = await runMiddleware(
+        env,
+        keyRequest(key.plaintext, {
+          method,
+          url: `https://example.test${path}`,
+          body: body === undefined ? undefined : JSON.stringify(body),
+        }),
+        next,
+      );
+
+      expect(response.status).toBe(403);
+      expect((await response.json()).code).toBe("KEY_NOT_PERMITTED");
+    });
 
     it.each(["/api/admin/users", "/api/admin/api-keys"])("still allows an admin key to read %s", async (path) => {
       const { env, rawDb } = createTestEnv({ role: "admin" });
@@ -472,22 +534,32 @@ describe("API key authentication path (#744 part 3)", () => {
       expect(response.status).toBe(200);
     });
 
-    it("still allows a cookie-authenticated admin to create an invite code", async () => {
+    it("allows a cookie-authenticated admin to create an invite code through middleware", async () => {
       const { env, rawDb, headers } = createTestEnv({ role: "admin" });
       const before = rawDb.prepare("SELECT COUNT(*) AS count FROM invite_codes").get().count;
       const sessionId = headers.Authorization.replace("Bearer ", "");
+      const cookie = `session_token=${sessionId}`;
+      const csrfRequest = new Request("https://example.test/api/admin/invite-codes", {
+        method: "POST",
+        headers: { Cookie: cookie },
+      });
+      const csrfToken = generateCSRFToken(csrfRequest, env);
 
-      const response = await inviteCodesHandler.onRequestPost({
+      const middlewareContext = {
         env,
         request: new Request("https://example.test/api/admin/invite-codes", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Cookie: `session_token=${sessionId}`,
+            Cookie: `${cookie}; csrf_token=${csrfToken}`,
+            "X-CSRF-Token": csrfToken,
           },
           body: JSON.stringify({ role: "editor" }),
         }),
-      });
+        data: {},
+      };
+      middlewareContext.next = async () => inviteCodesHandler.onRequestPost(middlewareContext);
+      const response = await onRequest(middlewareContext);
 
       expect(response.status).toBe(201);
       expect(rawDb.prepare("SELECT COUNT(*) AS count FROM invite_codes").get().count).toBe(before + 1);

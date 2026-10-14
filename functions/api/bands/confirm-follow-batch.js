@@ -33,7 +33,7 @@ export async function onRequestPost(context) {
   try {
     const token = await readEmailActionToken(request);
 
-    if (!token || token.length > 256) {
+    if (!token) {
       return new Response("Invalid token.", {
         status: 400,
         headers: { "Content-Type": "text/plain" },
@@ -41,15 +41,24 @@ export async function onRequestPost(context) {
     }
 
     // Verify all pending follows in this batch and clear the shared token in one
-    // statement. Idempotent: on a second click the batch_token is already NULL so
-    // no rows match, changes=0, and the fan still sees the success page.
-    await DB.prepare(
+    // statement. A second click finds batch_token already NULL, so no rows match.
+    // changes=0 gets the same generic page as an unknown token: now that this
+    // runs on a deliberate button press, "You're all set" for a token that
+    // confirmed nothing would be a false success.
+    const result = await DB.prepare(
       `UPDATE band_follows
        SET verified = 1, confirmed_at = datetime('now'), verification_token = NULL, batch_token = NULL
        WHERE batch_token = ? AND verified = 0`,
     )
       .bind(token)
       .run();
+
+    if (!result?.meta?.changes) {
+      return emailResultPage(
+        "Link expired",
+        "This confirmation link is invalid or has already been used. If you already confirmed, you&apos;re all set.",
+      );
+    }
 
     return emailResultPage(
       `You&apos;re all set!`,

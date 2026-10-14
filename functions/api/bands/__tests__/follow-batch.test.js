@@ -426,6 +426,24 @@ describe("/api/bands/confirm-follow-batch", () => {
     const html = await res.text();
     expect(html).toMatch(/confirm your lineup/i);
   });
+
+  // The button is a deliberate press now (#1291), so a POST that confirmed
+  // nothing must not claim success. Same generic wording as the single route.
+  it("POST with an unknown token does not claim the follows were confirmed", async () => {
+    const { env } = createTestEnv();
+    const res = await confirmBatchHandler.onRequestPost({
+      request: new Request("https://example.test/api/bands/confirm-follow-batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ token: "nonexistent-batch-token" }),
+      }),
+      env,
+    });
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).not.toMatch(/all set!/i);
+    expect(html).toMatch(/invalid or has already been used/i);
+  });
 });
 
 /**

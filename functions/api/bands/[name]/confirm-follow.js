@@ -30,7 +30,7 @@ export async function onRequestPost(context) {
   try {
     const token = await readEmailActionToken(request);
 
-    if (!token || token.length > 256) {
+    if (!token) {
       return new Response("Invalid token.", {
         status: 400,
         headers: { "Content-Type": "text/plain" },

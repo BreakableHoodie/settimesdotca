@@ -237,6 +237,15 @@ export const MUTATIONS = [
     tests: ["functions/api/subscriptions/__tests__/verify.test.js"],
   },
   {
+    id: "email-action-page-real-origin",
+    invariant:
+      "CLAUDE.md 'Emailed links never act on a GET (#1291)' — the action page overrides no-referrer so browsers send a real Origin, not null (403)",
+    file: "functions/utils/emailActionPage.js",
+    find: '<meta name="referrer" content="same-origin">',
+    replace: "",
+    tests: ["functions/utils/__tests__/emailActionPage.test.js"],
+  },
+  {
     id: "confirm-url-echo-dev-only",
     invariant:
       "CLAUDE.md 'Emailed links never act on a GET (#1291)' — confirmation URLs are echoed only for explicitly allowed development requests",

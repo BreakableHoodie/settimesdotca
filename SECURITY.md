@@ -127,7 +127,7 @@ keep it strict and do not add `unsafe-inline` to script execution.
 
 **Allowed Origins:**
 - Production: `https://settimes.ca`, `https://www.settimes.ca`
-- Preview: `https://dev.settimesdotca.pages.dev`, `https://settimesdotca.pages.dev`, `https://dev.settimes.ca`
+- Preview: none built in. A preview's own alias is added through `CORS_ALLOWED_ORIGINS` (edge E2E uses `https://edge-e2e.longweekend-bandcrawl.pages.dev`).
 - Local: `http://localhost:5173`, `http://localhost:3000`, `http://localhost:8788`
 
 ### P1-10: Service Worker Security
@@ -299,10 +299,7 @@ Configured in: `functions/_middleware.js`
 - `https://settimes.ca`
 - `https://www.settimes.ca`
 
-**Preview/Staging:**
-- `https://dev.settimesdotca.pages.dev`
-- `https://settimesdotca.pages.dev`
-- `https://dev.settimes.ca`
+**Preview:** none built in. Each preview environment adds its own alias through `CORS_ALLOWED_ORIGINS`. Never list a `*.pages.dev` name we do not own: anyone can claim an unused one and would get credentialed CORS (#1310).
 
 **Local Development:**
 - `http://localhost:5173` (Vite)

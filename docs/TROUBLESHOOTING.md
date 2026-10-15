@@ -835,9 +835,6 @@ DELETE FROM lucia_sessions WHERE user_id = <user_id>;
     const allowedOrigins = [
       'https://settimes.ca',
       'https://www.settimes.ca',
-      'https://dev.settimesdotca.pages.dev',
-      'https://settimesdotca.pages.dev',
-      'https://dev.settimes.ca',
       'http://localhost:5173',
       'http://localhost:3000',
       'http://localhost:8788',

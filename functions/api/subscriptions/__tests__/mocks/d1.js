@@ -294,7 +294,9 @@ export class MockD1Database {
         };
       });
 
-    let paramIndex = 0;
+    // The public endpoint's CASE expression binds the festival-day cutoff
+    // before its optional filters, matching the real SQL bind order.
+    let paramIndex = queryLower.includes("case when coalesce(e.end_date, e.date) >= ?") ? 1 : 0;
     if (queryLower.includes("where city = ?") || queryLower.includes("lower(e.city) = lower(?)")) {
       const city = params[paramIndex++];
       results = results.filter((e) => e.city?.toLowerCase() === city.toLowerCase());
@@ -316,7 +318,10 @@ export class MockD1Database {
     // a multi-day event stays "upcoming"/current through its end_date rather
     // than dropping off the day after it starts. NULL end_date falls back to
     // date, so single-day behavior is unchanged.
-    if (
+    if (queryLower.includes("and coalesce(e.end_date, e.date) >= ?")) {
+      const festivalDay = params[paramIndex];
+      results = results.filter((e) => (e.end_date || e.date) >= festivalDay);
+    } else if (
       queryLower.includes("where date >= date('now')") ||
       queryLower.includes("e.date >= date('now'") ||
       queryLower.includes("coalesce(e.end_date, e.date) >= date('now'")

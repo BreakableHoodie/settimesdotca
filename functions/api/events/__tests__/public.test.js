@@ -493,3 +493,94 @@ describe("GET /api/events/public — genre filter matches within free-text genre
     expect(await slugsFor(env, "?genre=%25")).toEqual([]);
   });
 });
+
+describe("GET /api/events/public — Toronto festival-day cutoff (#1270)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function eventsAt(instant, eventDate = "2026-07-10") {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(instant));
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    insertEvent(rawDb, {
+      name: "Festival Day Event",
+      slug: "festival-day-event",
+      date: eventDate,
+      status: "published",
+    });
+
+    const response = await onRequestGet({
+      request: new Request("https://example.test/api/events/public"),
+      env,
+    });
+    expect(response.status).toBe(200);
+    return (await response.json()).events;
+  }
+
+  it.each([
+    ["01:59 EDT", "2026-07-11T01:59:00-04:00"],
+    ["02:30 EDT", "2026-07-11T02:30:00-04:00"],
+    ["05:59 EDT", "2026-07-11T05:59:00-04:00"],
+  ])("lists the event at %s while the festival day is still active", async (_label, instant) => {
+    const events = await eventsAt(instant);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ slug: "festival-day-event", is_upcoming: 1 });
+  });
+
+  it("keeps the cutoff bind ahead of city, genre, upcoming, and limit binds", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-11T02:30:00-04:00"));
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, {
+      name: "Filtered Festival Day Event",
+      slug: "filtered-festival-day-event",
+      date: "2026-07-10",
+      status: "published",
+    });
+    rawDb.prepare("UPDATE events SET city = ? WHERE id = ?").run("waterloo", event.id);
+    const venue = insertVenue(rawDb, { name: "Blue Room", city: "waterloo" });
+    insertBand(rawDb, { event_id: event.id, venue_id: venue.id, genre: "Punk Rock" });
+
+    const response = await onRequestGet({
+      request: new Request("https://example.test/api/events/public?city=waterloo&genre=punk&limit=1"),
+      env,
+    });
+    expect(response.status).toBe(200);
+    const events = (await response.json()).events;
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ slug: "filtered-festival-day-event", is_upcoming: 1 });
+  });
+
+  it("stops listing the event at 06:00 EDT when the Toronto festival day changes", async () => {
+    expect(await eventsAt("2026-07-11T06:00:00-04:00")).toHaveLength(0);
+  });
+
+  it("keeps the event listed until 05:59 EST on the winter festival day", async () => {
+    const events = await eventsAt("2026-01-11T05:59:00-05:00", "2026-01-10");
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ slug: "festival-day-event", is_upcoming: 1 });
+  });
+
+  it("stops listing the event at 06:00 EST when the Toronto festival day changes", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-11T06:00:00-05:00"));
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    insertEvent(rawDb, {
+      name: "Winter Festival Day Event",
+      slug: "winter-festival-day-event",
+      date: "2026-01-10",
+      status: "published",
+    });
+
+    const response = await onRequestGet({
+      request: new Request("https://example.test/api/events/public"),
+      env,
+    });
+    expect(response.status).toBe(200);
+    expect((await response.json()).events).toHaveLength(0);
+  });
+});

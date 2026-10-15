@@ -79,7 +79,7 @@ export function archivedEventStatusSql(alias = "") {
  * Use this only where serving a concluded event would be wrong, not merely
  * unusual. The live case is `/api/schedule?event=current`: an event archived
  * on its own final day still satisfies
- * `COALESCE(end_date, date) >= date('now','-6 hours')`, so the broader
+ * `COALESCE(end_date, date) >= ?` bound to eventLocalFestivalToday(), so the broader
  * publicEventStatusSql() would hand a fan the archived edition as tonight's
  * running schedule. Browse and history surfaces want publicEventStatusSql()
  * instead — archived editions are the site's back catalogue, not an error.

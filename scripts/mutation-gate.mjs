@@ -393,6 +393,25 @@ export const MUTATIONS = [
     tests: ["functions/api/events/__tests__/public.test.js"],
   },
   {
+    id: "schedule-current-cutoff-is-toronto-festival-day",
+    invariant:
+      "CLAUDE.md 'Server-side' (today/now is Toronto-local) — /api/schedule?event=current stays eligible through 06:00 Toronto festival day, not a UTC hour offset",
+    file: "functions/api/schedule.js",
+    find: "AND COALESCE(end_date, date) >= ?\n        ORDER BY date ASC\n        LIMIT 1\n      `,\n      )\n        .bind(festivalDay)",
+    replace:
+      "AND COALESCE(end_date, date) >= date('now', '-6 hours')\n        ORDER BY date ASC\n        LIMIT 1\n      `,\n      )",
+    tests: ["functions/api/__tests__/schedule-reveal.test.js"],
+  },
+  {
+    id: "public-event-cutoff-is-toronto-festival-day",
+    invariant:
+      "CLAUDE.md 'Server-side' (today/now is Toronto-local) — /api/events/public uses the Toronto festival day cutoff rather than a UTC hour offset",
+    file: "functions/api/events/public.js",
+    find: "if (upcoming) {\n      query += ` AND COALESCE(e.end_date, e.date) >= ?`;\n      params.push(festivalDay);\n    }",
+    replace: "if (upcoming) {\n      query += ` AND COALESCE(e.end_date, e.date) >= date('now', '-6 hours')`;\n    }",
+    tests: ["functions/api/events/__tests__/public.test.js"],
+  },
+  {
     id: "reveal-mode-is-announced-gate",
     invariant:
       "CLAUDE.md 'Pulling a band from a live lineup' — public reads must guard with (reveal_mode = 0 OR is_announced = 1); this is one of 8 files carrying the gate, picked as the representative for v1",

@@ -541,7 +541,9 @@ export default function AdminPanel({ currentUser, onLogout }) {
           // A full reload re-reads the session user and refetches the data
           // every gated request was refused.
           onEnabled={() => window.location.reload()}
-          onLogout={onLogout}
+          // Same path as the header's Logout: the next person to sign in on
+          // this browser must not inherit this user's tab, event or draft.
+          onLogout={confirmLogout}
         />
       ) : (
         <MfaSettingsModal

@@ -26,8 +26,17 @@ vi.mock('../components/BottomNav', () => ({
 vi.mock('../components/ContextBanner', () => ({ default: () => null }))
 vi.mock('../components/Breadcrumbs', () => ({ default: () => null }))
 vi.mock('../components/MfaSettingsModal', () => ({
-  default: ({ isOpen, required }) =>
-    isOpen ? <div>{required ? 'MFA enrolment required' : 'MFA settings'}</div> : null,
+  default: ({ isOpen, required, onLogout }) =>
+    isOpen ? (
+      <div>
+        {required ? 'MFA enrolment required' : 'MFA settings'}
+        {required && onLogout && (
+          <button type="button" onClick={onLogout}>
+            Log out of enrolment
+          </button>
+        )}
+      </div>
+    ) : null,
 }))
 vi.mock('../../components/ui', () => ({
   Alert: ({ children }) => <div>{children}</div>,
@@ -174,6 +183,23 @@ describe('AdminPanel', () => {
 
 // #1253: admins and editors must enrol in 2FA before using the admin area.
 describe('AdminPanel 2FA enrolment', () => {
+  it('logging out from required enrolment clears persisted admin context', async () => {
+    const onLogout = vi.fn()
+    sessionStorage.setItem('adminActiveTab', 'roster')
+    sessionStorage.setItem('adminSelectedEventId', '7')
+    sessionStorage.setItem('adminEventWizardDraft', JSON.stringify({ currentStep: 2, eventData: { name: 'Draft' } }))
+    render(
+      <AdminPanel currentUser={{ role: 'editor', mfaEnrolmentRequired: true, mfaEnabled: false }} onLogout={onLogout} />
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Log out of enrolment' }))
+
+    expect(onLogout).toHaveBeenCalledOnce()
+    expect(sessionStorage.getItem('adminActiveTab')).toBeNull()
+    expect(sessionStorage.getItem('adminSelectedEventId')).toBeNull()
+    expect(sessionStorage.getItem('adminEventWizardDraft')).toBeNull()
+  })
+
   it('opens the required enrolment modal for an admin without 2FA', async () => {
     render(
       <AdminPanel currentUser={{ role: 'admin', mfaEnrolmentRequired: true, mfaEnabled: false }} onLogout={vi.fn()} />

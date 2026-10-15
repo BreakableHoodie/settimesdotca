@@ -8,6 +8,7 @@ vi.mock("../email.js", async (importOriginal) => ({
 
 import { sendEmail } from "../email.js";
 import { notifyBandFollowers } from "../bandFollowNotify.js";
+import { toSqliteDateTime } from "../authAttempts.js";
 import * as loggerModule from "../logger.js";
 import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../api/test-utils.js";
 
@@ -177,6 +178,74 @@ describe("notifyBandFollowers", () => {
       .prepare("SELECT id FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?")
       .all(perf.id, fId);
     expect(rows).toHaveLength(0);
+  });
+
+  test("failed send does not release a claim taken over during delivery", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { name: "Test", slug: "test" });
+    const venue = insertVenue(rawDb, { name: "Venue" });
+    const perf = insertBand(rawDb, { name: "Band", event_id: event.id, venue_id: venue.id });
+    const followId = rawDb
+      .prepare("INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)")
+      .run("takeover@example.com", perf.band_profile_id, "tok-takeover").lastInsertRowid;
+    const takeoverClaimedAt = toSqliteDateTime(new Date(Date.now() - 60_000));
+
+    sendEmail.mockImplementationOnce(async () => {
+      rawDb
+        .prepare("UPDATE band_follow_notifications SET claimed_at = ? WHERE performance_id = ? AND band_follow_id = ?")
+        .run(takeoverClaimedAt, perf.id, followId);
+      return { delivered: false };
+    });
+
+    await notifyBandFollowers(env, env.DB, {
+      performanceId: perf.id,
+      bandProfileId: perf.band_profile_id,
+      bandName: "Band",
+      eventName: "Test",
+      followers: [{ id: followId, email: "takeover@example.com", unsubscribe_token: "tok-takeover" }],
+    });
+
+    expect(
+      rawDb
+        .prepare(
+          "SELECT claimed_at, delivered_at FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?",
+        )
+        .get(perf.id, followId),
+    ).toEqual({ claimed_at: takeoverClaimedAt, delivered_at: null });
+  });
+
+  test("failed send does not release a row delivered during delivery", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { name: "Test", slug: "test" });
+    const venue = insertVenue(rawDb, { name: "Venue" });
+    const perf = insertBand(rawDb, { name: "Band", event_id: event.id, venue_id: venue.id });
+    const followId = rawDb
+      .prepare("INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)")
+      .run("delivered@example.com", perf.band_profile_id, "tok-delivered").lastInsertRowid;
+    const deliveredAt = toSqliteDateTime(new Date(Date.now() - 30_000));
+
+    sendEmail.mockImplementationOnce(async () => {
+      rawDb
+        .prepare(
+          "UPDATE band_follow_notifications SET delivered_at = ? WHERE performance_id = ? AND band_follow_id = ?",
+        )
+        .run(deliveredAt, perf.id, followId);
+      return { delivered: false };
+    });
+
+    await notifyBandFollowers(env, env.DB, {
+      performanceId: perf.id,
+      bandProfileId: perf.band_profile_id,
+      bandName: "Band",
+      eventName: "Test",
+      followers: [{ id: followId, email: "delivered@example.com", unsubscribe_token: "tok-delivered" }],
+    });
+
+    expect(
+      rawDb
+        .prepare("SELECT delivered_at FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?")
+        .get(perf.id, followId),
+    ).toEqual({ delivered_at: deliveredAt });
   });
   // Sender-level companions to the handler tests in
   // api/admin/bands/__tests__/resend-announcement.test.js.

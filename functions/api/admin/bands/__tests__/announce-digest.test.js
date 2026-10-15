@@ -3,6 +3,7 @@ import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../../te
 import { buildAnnounceDigestIdempotencyKey, flushAnnounceDigest } from "../../../../utils/announceDigest.js";
 import { getPublicBaseUrl } from "../../../../utils/publicUrl.js";
 import { logger } from "../../../../utils/logger.js";
+import { toSqliteDateTime } from "../../../../utils/authAttempts.js";
 
 vi.mock("../../../../utils/email.js", async (importOriginal) => ({
   // The real header builder, so these tests cannot drift from its format.
@@ -223,6 +224,76 @@ describe("flushAnnounceDigest", () => {
     expect(rawDb.prepare("SELECT * FROM band_announce_queue").all()).toHaveLength(0);
     // Claim released so resend-announcement can recover
     expect(rawDb.prepare("SELECT * FROM band_follow_notifications").all()).toHaveLength(0);
+  });
+
+  it("does not release a digest claim taken over during delivery", async () => {
+    const { env, rawDb } = createTestEnv();
+    const ev = insertEvent(rawDb, { name: "Fest", slug: "fest-takeover" });
+    const venue = insertVenue(rawDb, { name: "Room" });
+    const perf = insertBand(rawDb, { name: "Band", event_id: ev.id, venue_id: venue.id });
+    const followId = rawDb
+      .prepare("INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)")
+      .run("takeover@example.com", perf.band_profile_id, "tok-takeover").lastInsertRowid;
+    rawDb
+      .prepare(
+        `INSERT INTO band_announce_queue
+       (band_follow_id, performance_id, event_id, band_name, event_name, event_slug, band_profile_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(followId, perf.id, ev.id, "Band", "Fest", "fest-takeover", perf.band_profile_id);
+    const takeoverClaimedAt = toSqliteDateTime(new Date(Date.now() - 60_000));
+
+    sendEmail.mockImplementationOnce(async () => {
+      rawDb
+        .prepare("UPDATE band_follow_notifications SET claimed_at = ? WHERE performance_id = ? AND band_follow_id = ?")
+        .run(takeoverClaimedAt, perf.id, followId);
+      return { delivered: false };
+    });
+
+    await flushAnnounceDigest(env, env.DB);
+
+    expect(
+      rawDb
+        .prepare(
+          "SELECT claimed_at, delivered_at FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?",
+        )
+        .get(perf.id, followId),
+    ).toEqual({ claimed_at: takeoverClaimedAt, delivered_at: null });
+  });
+
+  it("does not release a digest row delivered during delivery", async () => {
+    const { env, rawDb } = createTestEnv();
+    const ev = insertEvent(rawDb, { name: "Fest", slug: "fest-delivered" });
+    const venue = insertVenue(rawDb, { name: "Room" });
+    const perf = insertBand(rawDb, { name: "Band", event_id: ev.id, venue_id: venue.id });
+    const followId = rawDb
+      .prepare("INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)")
+      .run("delivered@example.com", perf.band_profile_id, "tok-delivered").lastInsertRowid;
+    rawDb
+      .prepare(
+        `INSERT INTO band_announce_queue
+       (band_follow_id, performance_id, event_id, band_name, event_name, event_slug, band_profile_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(followId, perf.id, ev.id, "Band", "Fest", "fest-delivered", perf.band_profile_id);
+    const deliveredAt = toSqliteDateTime(new Date(Date.now() - 30_000));
+
+    sendEmail.mockImplementationOnce(async () => {
+      rawDb
+        .prepare(
+          "UPDATE band_follow_notifications SET delivered_at = ? WHERE performance_id = ? AND band_follow_id = ?",
+        )
+        .run(deliveredAt, perf.id, followId);
+      return { delivered: false };
+    });
+
+    await flushAnnounceDigest(env, env.DB);
+
+    expect(
+      rawDb
+        .prepare("SELECT delivered_at FROM band_follow_notifications WHERE performance_id = ? AND band_follow_id = ?")
+        .get(perf.id, followId),
+    ).toEqual({ delivered_at: deliveredAt });
   });
 
   it("skips entries already claimed by a concurrent flush or resend", async () => {

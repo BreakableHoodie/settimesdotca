@@ -862,6 +862,9 @@ Rule 1 alone is satisfied by making _everything_ retryable -- which would
 re-mail the entire history on the first resend. That is why every test here
 comes in twos.
 
+Failed-send release is attempt-specific: it matches that attempt's `claimed_at`
+and `delivered_at IS NULL`, so a later takeover or delivery can never be removed.
+
 `CLAIM_LEASE_MINUTES` (15) and `claimIsLiveSql(alias)` live in
 `functions/utils/bandFollowNotify.js` and are the single home for "does this row
 still speak for the follower?". The sender and **every reader** must agree

@@ -212,9 +212,36 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'A claim is not a delivery record (#1152)' — a DELIVERED row is never retried, however old the claim",
     file: "functions/utils/bandFollowNotify.js",
-    find: "AND delivered_at IS NULL",
-    replace: "",
+    find: "WHERE performance_id = ? AND band_follow_id = ?\n              AND delivered_at IS NULL",
+    replace: "WHERE performance_id = ? AND band_follow_id = ?",
     tests: ["functions/utils/__tests__/bandFollowNotify.test.js"],
+  },
+  {
+    id: "band-follow-release-only-own-claim",
+    invariant:
+      "CLAUDE.md 'A claim is not a delivery record (#1152)' — a failed band-follow send releases only its own undelivered claim",
+    file: "functions/utils/bandFollowNotify.js",
+    find: ' AND claimed_at = ? AND delivered_at IS NULL",\n        )\n          .bind(performanceId, follower.id, claimedAt)',
+    replace: '"\n        )\n          .bind(performanceId, follower.id)',
+    tests: ["functions/utils/__tests__/bandFollowNotify.test.js"],
+  },
+  {
+    id: "announce-digest-release-only-own-claim",
+    invariant:
+      "CLAUDE.md 'A claim is not a delivery record (#1152)' — a failed digest send releases only its own undelivered claims",
+    file: "functions/utils/announceDigest.js",
+    find: ' AND claimed_at = ? AND delivered_at IS NULL",\n            ).bind(item.performance_id, item.band_follow_id, task.claimedAt)',
+    replace: '"\n            ).bind(item.performance_id, item.band_follow_id)',
+    tests: ["functions/api/admin/bands/__tests__/announce-digest.test.js"],
+  },
+  {
+    id: "subscriber-release-only-own-claim",
+    invariant:
+      "CLAUDE.md 'A claim is not a delivery record (#1152)' — a failed subscriber send releases only its own undelivered claim",
+    file: "functions/utils/subscriberNotify.js",
+    find: ' AND claimed_at = ? AND delivered_at IS NULL",\n      )\n        .bind(sub.id, eventId, kind, claimedAt)',
+    replace: '"\n      )\n        .bind(sub.id, eventId, kind)',
+    tests: ["functions/api/admin/events/__tests__/notify-subscribers.test.js"],
   },
   {
     id: "announce-double-opt-in-primary",

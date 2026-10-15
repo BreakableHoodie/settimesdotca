@@ -3,6 +3,7 @@ import { createTestEnv, insertEvent } from "../../../test-utils.js";
 import * as handler from "../[id]/notify-subscribers.js";
 import { MAX_PER_INVOCATION, notifySubscribers, pendingSubscribers } from "../../../../utils/subscriberNotify.js";
 import { logger } from "../../../../utils/logger.js";
+import { toSqliteDateTime } from "../../../../utils/authAttempts.js";
 
 vi.mock("../../../../utils/email.js", async (importOriginal) => ({
   // The real header builder, so these tests cannot drift from its format.
@@ -105,6 +106,74 @@ describe("POST /api/admin/events/[id]/notify-subscribers", () => {
 
     expect(sendEmail.mock.calls.map((c) => c[1].to)).toEqual(["bounces@example.com"]);
     expect(await second.json()).toMatchObject({ sent: 1, failed: 0 });
+  });
+
+  it("does not release a subscriber claim taken over during delivery", async () => {
+    const { env, rawDb } = createTestEnv({ role: "admin" });
+    const ev = insertEvent(rawDb, { name: "Vol. 18", slug: "subscriber-takeover" });
+    publish(rawDb, ev.id);
+    const subscriber = sub(rawDb, { email: "takeover@example.com", verified: 1 });
+    const takeoverClaimedAt = toSqliteDateTime(new Date(Date.now() - 60_000));
+    sendEmail.mockImplementationOnce(async () => {
+      rawDb
+        .prepare(
+          "UPDATE subscription_notifications SET claimed_at = ? WHERE subscription_id = ? AND event_id = ? AND kind = ?",
+        )
+        .run(takeoverClaimedAt, subscriber.id, ev.id, "schedule_announced");
+      return { delivered: false };
+    });
+
+    await notifySubscribers(env, env.DB, {
+      eventId: ev.id,
+      kind: "schedule_announced",
+      eventName: "Vol. 18",
+      eventSlug: "subscriber-takeover",
+      subject: "s",
+      lead: "l",
+      subscribers: [subscriber],
+    });
+
+    expect(
+      rawDb
+        .prepare(
+          "SELECT claimed_at, delivered_at FROM subscription_notifications WHERE subscription_id = ? AND event_id = ? AND kind = ?",
+        )
+        .get(subscriber.id, ev.id, "schedule_announced"),
+    ).toEqual({ claimed_at: takeoverClaimedAt, delivered_at: null });
+  });
+
+  it("does not release a subscriber row delivered during delivery", async () => {
+    const { env, rawDb } = createTestEnv({ role: "admin" });
+    const ev = insertEvent(rawDb, { name: "Vol. 18", slug: "subscriber-delivered" });
+    publish(rawDb, ev.id);
+    const subscriber = sub(rawDb, { email: "delivered@example.com", verified: 1 });
+    const deliveredAt = toSqliteDateTime(new Date(Date.now() - 30_000));
+    sendEmail.mockImplementationOnce(async () => {
+      rawDb
+        .prepare(
+          "UPDATE subscription_notifications SET delivered_at = ? WHERE subscription_id = ? AND event_id = ? AND kind = ?",
+        )
+        .run(deliveredAt, subscriber.id, ev.id, "schedule_announced");
+      return { delivered: false };
+    });
+
+    await notifySubscribers(env, env.DB, {
+      eventId: ev.id,
+      kind: "schedule_announced",
+      eventName: "Vol. 18",
+      eventSlug: "subscriber-delivered",
+      subject: "s",
+      lead: "l",
+      subscribers: [subscriber],
+    });
+
+    expect(
+      rawDb
+        .prepare(
+          "SELECT delivered_at FROM subscription_notifications WHERE subscription_id = ? AND event_id = ? AND kind = ?",
+        )
+        .get(subscriber.id, ev.id, "schedule_announced"),
+    ).toEqual({ delivered_at: deliveredAt });
   });
 
   it("treats each kind separately for the same event", async () => {

@@ -132,13 +132,29 @@ export async function onRequestPost(context) {
   const backupCodes = generateBackupCodes();
   const hashedCodes = await Promise.all(backupCodes.map((codeValue) => hashBackupCode(codeValue)));
 
-  await DB.prepare("UPDATE users SET backup_codes = ?, totp_secret = ? WHERE id = ?")
+  // Only over the factor this request verified: a reset that commits after the
+  // read must not get the old secret written back as a pending setup (#1253).
+  const written = await DB.prepare(
+    "UPDATE users SET backup_codes = ?, totp_secret = ? WHERE id = ? AND totp_enabled = 1 AND totp_secret = ?",
+  )
     .bind(
       JSON.stringify(hashedCodes),
       totpSecretState?.shouldPersist ? totpSecretState.encryptedSecret : user.totp_secret,
       userId,
+      user.totp_secret,
     )
     .run();
+
+  if (written?.meta?.changes === 0) {
+    return new Response(
+      JSON.stringify({
+        error: "Conflict",
+        code: "MFA_SETUP_CHANGED",
+        message: "Two-factor settings changed while this request was running. Reload and try again.",
+      }),
+      { status: 409, headers: { "Content-Type": "application/json" } },
+    );
+  }
 
   await writeAuthAttempt(DB, {
     attemptType: AUTH_ATTEMPT_TYPES.mfaBackupCodes,

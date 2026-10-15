@@ -293,13 +293,34 @@ export async function onRequestPost(context) {
         bindValues.push(nextCodes);
       }
 
-      await DB.prepare(
+      // Write only over the factor this request verified. Without the
+      // predicate, a login that read the row before an admin reset writes the
+      // old secret back, and two logins spending different backup codes each
+      // restore the other's (#1253 review). `IS ?` because either may be NULL.
+      const written = await DB.prepare(
         `UPDATE users
          SET ${setClauses.join(", ")}
-         WHERE id = ?`,
+         WHERE id = ? AND totp_enabled = ? AND totp_secret IS ? AND backup_codes IS ?`,
       )
-        .bind(...bindValues, challenge.user_id)
+        .bind(
+          ...bindValues,
+          challenge.user_id,
+          challenge.totp_enabled,
+          challenge.totp_secret ?? null,
+          challenge.backup_codes ?? null,
+        )
         .run();
+
+      if (written?.meta?.changes === 0) {
+        return new Response(
+          JSON.stringify({
+            error: "Authentication failed",
+            code: "MFA_CHANGED",
+            message: "Two-factor settings changed during sign-in. Sign in again.",
+          }),
+          { status: 401, headers: { "Content-Type": "application/json" } },
+        );
+      }
     }
 
     const lucia = initializeLucia(DB, request, env);

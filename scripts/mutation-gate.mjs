@@ -851,6 +851,24 @@ export const MUTATIONS = [
     replace: "  if (false) {",
     tests: ["functions/api/admin/mfa/__tests__/mfa-settings.test.js"],
   },
+  {
+    id: "mfa-login-backup-code-spend-not-restored",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — a login writes backup codes only over the list it verified, so a concurrent login cannot restore a spent code (#1253 review)",
+    file: "functions/api/admin/auth/mfa/verify.js",
+    find: "AND backup_codes IS ?`,",
+    replace: "AND (? IS NULL OR 1)`,",
+    tests: ["functions/api/admin/auth/__tests__/mfa.test.js"],
+  },
+  {
+    id: "mfa-backup-codes-regen-bound-to-enrolled-secret",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — regenerating backup codes never writes an old secret back over an admin reset (#1253 review)",
+    file: "functions/api/admin/mfa/backup-codes.js",
+    find: 'WHERE id = ? AND totp_enabled = 1 AND totp_secret = ?",',
+    replace: 'WHERE id = ? AND ? IS NOT NULL",',
+    tests: ["functions/api/admin/mfa/__tests__/mfa-settings.test.js"],
+  },
 ];
 
 // ============================================================================

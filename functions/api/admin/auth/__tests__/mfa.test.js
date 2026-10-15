@@ -236,4 +236,50 @@ describe("admin mfa", () => {
     const response = await mfaVerifyHandler.onRequestPost({ request, env });
     expect(response.status).toBe(429);
   });
+
+  // Two logins spending different backup codes both read the full list; the
+  // later write must not restore the code the earlier one spent (#1253 review).
+  it("refuses a backup-code login whose list another login changed mid-request", async () => {
+    const { env, rawDb } = createTestEnv({ role: "admin" });
+    const encryptedSecret = await encryptTotpSecret(generateTotpSecret(), env);
+    const codes = ["ABCD-12", "EFGH-34"];
+    const hashed = await Promise.all(codes.map((c) => hashBackupCode(c)));
+    rawDb
+      .prepare("UPDATE users SET totp_secret = ?, totp_enabled = 1, backup_codes = ? WHERE id = 1")
+      .run(encryptedSecret, JSON.stringify(hashed));
+    rawDb.prepare("DELETE FROM lucia_sessions WHERE user_id = 1").run();
+    const mfaToken = crypto.randomUUID();
+    rawDb
+      .prepare(
+        `INSERT INTO mfa_challenges (token, user_id, ip_address, user_agent, expires_at)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(mfaToken, 1, "127.0.0.1", "test-agent", new Date(Date.now() + 300000).toISOString());
+
+    // The other login spent EFGH-34 and committed first.
+    const prepare = env.DB.prepare.bind(env.DB);
+    let interleaved = false;
+    env.DB.prepare = (sql) => {
+      if (!interleaved && sql.includes("AND backup_codes IS ?")) {
+        interleaved = true;
+        rawDb.prepare("UPDATE users SET backup_codes = ? WHERE id = 1").run(JSON.stringify([hashed[0]]));
+      }
+      return prepare(sql);
+    };
+
+    const response = await mfaVerifyHandler.onRequestPost({
+      request: new Request("https://example.test/api/admin/auth/mfa/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "CF-Connecting-IP": "127.0.0.1", "User-Agent": "test-agent" },
+        body: JSON.stringify({ mfaToken, code: codes[0] }),
+      }),
+      env,
+    });
+    expect(interleaved).toBe(true);
+    expect(response.status).toBe(401);
+    expect((await response.json()).code).toBe("MFA_CHANGED");
+    const user = rawDb.prepare("SELECT backup_codes FROM users WHERE id = 1").get();
+    expect(JSON.parse(user.backup_codes)).toEqual([hashed[0]]);
+    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM lucia_sessions WHERE user_id = 1").get().n).toBe(0);
+  });
 });

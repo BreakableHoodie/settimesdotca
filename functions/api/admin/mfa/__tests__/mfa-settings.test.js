@@ -268,4 +268,49 @@ describe("admin mfa settings", () => {
     const sessions = rawDb.prepare("SELECT COUNT(*) AS n FROM lucia_sessions WHERE user_id = 1").get();
     expect(sessions.n).toBe(0);
   });
+
+  it("regenerating backup codes does not write an old secret back after a reset", async () => {
+    const { env, headers, rawDb } = createTestEnv({ role: "admin", mfaEnrolled: false });
+    const setupRes = await mfaSetupHandler.onRequestPost({
+      request: new Request("https://example.test/api/admin/mfa/setup", {
+        method: "POST",
+        headers: buildAuthHeaders(headers),
+        body: JSON.stringify({}),
+      }),
+      env,
+    });
+    const { secret } = await setupRes.json();
+    const enableRes = await mfaEnableHandler.onRequestPost({
+      request: new Request("https://example.test/api/admin/mfa/enable", {
+        method: "POST",
+        headers: buildAuthHeaders(headers),
+        body: JSON.stringify({ code: await generateTotpCode(secret) }),
+      }),
+      env,
+    });
+    expect(enableRes.status).toBe(200);
+    adoptSessionFrom(enableRes, headers);
+
+    const prepare = env.DB.prepare.bind(env.DB);
+    let interleaved = false;
+    env.DB.prepare = (sql) => {
+      if (!interleaved && sql.startsWith("UPDATE users SET backup_codes = ?, totp_secret = ?")) {
+        interleaved = true;
+        rawDb.prepare("UPDATE users SET totp_enabled = 0, totp_secret = NULL, backup_codes = NULL WHERE id = 1").run();
+      }
+      return prepare(sql);
+    };
+    const res = await mfaBackupHandler.onRequestPost({
+      request: new Request("https://example.test/api/admin/mfa/backup-codes", {
+        method: "POST",
+        headers: buildAuthHeaders(headers),
+        body: JSON.stringify({ code: await generateTotpCode(secret) }),
+      }),
+      env,
+    });
+    expect(interleaved).toBe(true);
+    expect(res.status).toBe(409);
+    const user = rawDb.prepare("SELECT totp_enabled, totp_secret, backup_codes FROM users WHERE id = 1").get();
+    expect(user).toEqual({ totp_enabled: 0, totp_secret: null, backup_codes: null });
+  });
 });

@@ -561,6 +561,34 @@ CREATE INDEX IF NOT EXISTS idx_band_follow_notifications_lookup
 CREATE UNIQUE INDEX IF NOT EXISTS idx_schedule_builds_unique
   ON schedule_builds(event_id, performance_id, visitor_hash);
 
+CREATE TRIGGER IF NOT EXISTS users_role_valid_insert
+BEFORE INSERT ON users
+WHEN NEW.role NOT IN ('viewer', 'editor', 'admin')
+BEGIN
+  SELECT RAISE(ABORT, 'users.role must be viewer, editor or admin');
+END;
+
+CREATE TRIGGER IF NOT EXISTS users_role_valid_update
+BEFORE UPDATE OF role ON users
+WHEN NEW.role NOT IN ('viewer', 'editor', 'admin')
+BEGIN
+  SELECT RAISE(ABORT, 'users.role must be viewer, editor or admin');
+END;
+
+CREATE TRIGGER IF NOT EXISTS invite_codes_role_valid_insert
+BEFORE INSERT ON invite_codes
+WHEN NEW.role NOT IN ('viewer', 'editor', 'admin')
+BEGIN
+  SELECT RAISE(ABORT, 'invite_codes.role must be viewer, editor or admin');
+END;
+
+CREATE TRIGGER IF NOT EXISTS invite_codes_role_valid_update
+BEFORE UPDATE OF role ON invite_codes
+WHEN NEW.role NOT IN ('viewer', 'editor', 'admin')
+BEGIN
+  SELECT RAISE(ABORT, 'invite_codes.role must be viewer, editor or admin');
+END;
+
 -- ============================================
 -- TEST ACCOUNTS (passwords set by scripts/setup-local-db.sh)
 -- ============================================

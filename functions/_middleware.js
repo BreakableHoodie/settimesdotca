@@ -4,6 +4,7 @@
 import { checkRateLimit, rateLimitHeaders, rateLimitResponse } from "./utils/rateLimit.js";
 import { createRequestLogger } from "./utils/logger.js";
 import { routePath } from "./utils/routePath.js";
+import { isDevRequest } from "./utils/auth.js";
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -191,7 +192,10 @@ export async function onRequest(context) {
   const cspEnforce =
     env?.CSP_ENFORCE !== undefined && env?.CSP_ENFORCE !== null
       ? env?.CSP_ENFORCE === "true"
-      : env?.ENVIRONMENT === "production";
+      : // Enforce unless this is a known dev environment (#1273). Production
+        // shipped with ENVIRONMENT unset, so `=== "production"` left the API
+        // CSP report-only; isDevRequest fails closed for unset and variants.
+        !isDevRequest(request, env);
 
   // Single source of truth for the Content-Security-Policy (reused on both the
   // success and error responses below).

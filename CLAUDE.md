@@ -1480,7 +1480,8 @@ reporting a successful run.
 There are **two** CSPs, and the one the browser enforces on a page is **not** the middleware:
 
 - **`frontend/public/_headers`** sets the CSP (and COOP/COEP/CORP) on **static/document responses** — i.e. the HTML the browser loads. **This is the browser-enforced CSP for pages and the one that governs Turnstile, the service worker, and inline scripts.** Edit this for anything affecting what the page can load.
-- **`functions/_middleware.js`** sets a CSP on **Pages Functions / API responses** (JSON), enforced when `ENVIRONMENT=production` unless `CSP_ENFORCE` overrides. It does not govern the document.
+- **`functions/_middleware.js`** sets a CSP on **Pages Functions / API responses** (JSON), enforced unless `isDevRequest` says this is a known dev environment, and `CSP_ENFORCE` overrides either way. It does not govern the document.
+- **Never compare `env.ENVIRONMENT` directly; call `isDevRequest`.** Production runs with `ENVIRONMENT` unset (a deploy with `wrangler.toml` wiped the plain-text var), and three `=== "production"` checks read that as non-production: the API CSP was report-only and password-reset completion echoed a `debugId` (#1273). `functions/__tests__/environmentFailsClosed.test.js` fails the build if any other file reads `ENVIRONMENT`.
 
 For the `_headers` document CSP:
 

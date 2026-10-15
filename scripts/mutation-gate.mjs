@@ -771,6 +771,15 @@ export const MUTATIONS = [
     replace: "roleHierarchy[role] || 0",
     tests: ["functions/api/admin/__tests__/checkPermissionCallerRole.test.js"],
   },
+  {
+    id: "api-csp-enforced-unless-dev",
+    invariant:
+      "CLAUDE.md 'Content-Security-Policy (strict, no unsafe-inline) — TWO sources' — the API CSP is enforced unless isDevRequest says dev; production runs with ENVIRONMENT unset, so an `=== \"production\"` check left it report-only (#1273)",
+    file: "functions/_middleware.js",
+    find: "        !isDevRequest(request, env);",
+    replace: '        env?.ENVIRONMENT === "production";',
+    tests: ["functions/__tests__/environmentFailsClosed.test.js"],
+  },
 ];
 
 // ============================================================================

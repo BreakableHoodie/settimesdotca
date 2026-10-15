@@ -833,6 +833,24 @@ export const MUTATIONS = [
     replace: "  // sessions kept",
     tests: ["functions/api/admin/__tests__/mfaRequired.test.js"],
   },
+  {
+    id: "mfa-enable-bound-to-verified-secret",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — enabling 2FA writes only if the pending secret is still the one the code was verified against, so a second setup or an admin reset mid-request wins (#1253 review)",
+    file: "functions/api/admin/mfa/enable.js",
+    find: "     WHERE id = ? AND totp_enabled = 0 AND totp_secret = ?`,",
+    replace: "     WHERE id = ? AND totp_enabled = 0 AND ? IS NOT NULL`,",
+    tests: ["functions/api/admin/mfa/__tests__/mfa-settings.test.js"],
+  },
+  {
+    id: "mfa-enable-session-dropped-after-concurrent-reset",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — a reset committing between enrolment and session issue must not leave the freshly issued session alive (#1253 review)",
+    file: "functions/api/admin/mfa/enable.js",
+    find: "  if (!stillEnrolled) {",
+    replace: "  if (false) {",
+    tests: ["functions/api/admin/mfa/__tests__/mfa-settings.test.js"],
+  },
 ];
 
 // ============================================================================

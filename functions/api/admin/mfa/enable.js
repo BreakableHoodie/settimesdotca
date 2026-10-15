@@ -150,26 +150,20 @@ export async function onRequestPost(context) {
 
   // `AND totp_enabled = 0`: two concurrent enables with the same code must not
   // both succeed, or the second overwrites the backup codes the first showed.
+  // `AND totp_secret = ?` binds enrolment to the secret the code was checked
+  // against: a second setup that replaced it, or an admin reset that cleared
+  // it, must not be overwritten by this request's stale read.
+  const enrolledSecret = totpSecretState?.shouldPersist ? totpSecretState.encryptedSecret : user.totp_secret;
   const written = await DB.prepare(
     `UPDATE users
      SET totp_enabled = 1, backup_codes = ?, totp_secret = ?
-     WHERE id = ? AND totp_enabled = 0`,
+     WHERE id = ? AND totp_enabled = 0 AND totp_secret = ?`,
   )
-    .bind(
-      JSON.stringify(hashedCodes),
-      totpSecretState?.shouldPersist ? totpSecretState.encryptedSecret : user.totp_secret,
-      userId,
-    )
+    .bind(JSON.stringify(hashedCodes), enrolledSecret, userId, user.totp_secret)
     .run();
 
   if (written?.meta?.changes === 0) {
-    return new Response(
-      JSON.stringify({
-        error: "Conflict",
-        message: "MFA is already enabled for this account",
-      }),
-      { status: 409, headers: { "Content-Type": "application/json" } },
-    );
+    return mfaSetupChangedResponse();
   }
 
   await revokeAllTrustedDevices(DB, userId);
@@ -185,6 +179,18 @@ export async function onRequestPost(context) {
   await DB.prepare("UPDATE lucia_sessions SET ip_address = ?, user_agent = ?, remember_me = 0 WHERE id = ?")
     .bind(ipAddress, request.headers.get("User-Agent"), newSession.id)
     .run();
+
+  // An admin reset that commits between the enrolment UPDATE and createSession
+  // has already deleted every session, so the one just created would outlive
+  // it. Re-check the factor now the session exists: a reset that commits
+  // later deletes this session in its own batch.
+  const stillEnrolled = await DB.prepare("SELECT 1 FROM users WHERE id = ? AND totp_enabled = 1 AND totp_secret = ?")
+    .bind(userId, enrolledSecret)
+    .first();
+  if (!stillEnrolled) {
+    await lucia.invalidateSession(newSession.id);
+    return mfaSetupChangedResponse();
+  }
   const sessionHeaders = new Headers({ "Content-Type": "application/json" });
   sessionHeaders.append("Set-Cookie", lucia.createSessionCookie(newSession.id).serialize());
   sessionHeaders.append("Set-Cookie", setCSRFCookie(generateCSRFToken(request, env, newSession.id), request, env));
@@ -209,5 +215,16 @@ export async function onRequestPost(context) {
       status: 200,
       headers: sessionHeaders,
     },
+  );
+}
+
+function mfaSetupChangedResponse() {
+  return new Response(
+    JSON.stringify({
+      error: "Conflict",
+      code: "MFA_SETUP_CHANGED",
+      message: "Two-factor setup changed while this request was running. Reload and try again.",
+    }),
+    { status: 409, headers: { "Content-Type": "application/json" } },
   );
 }

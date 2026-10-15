@@ -200,4 +200,72 @@ describe("admin mfa settings", () => {
     expect(user.totp_enabled).toBe(1);
     expect(user.totp_secret).toBeTruthy();
   });
+
+  // Enable reads the pending secret, verifies the code, then writes. A
+  // competing write that commits in between must win (#1253 review). Each
+  // test commits it immediately before the named statement executes.
+  async function enableWithInterleavedWrite(matchSql, interleave) {
+    const { env, headers, rawDb } = createTestEnv({ role: "admin", mfaEnrolled: false });
+    const setupRes = await mfaSetupHandler.onRequestPost({
+      request: new Request("https://example.test/api/admin/mfa/setup", {
+        method: "POST",
+        headers: buildAuthHeaders(headers),
+        body: JSON.stringify({}),
+      }),
+      env,
+    });
+    const { secret } = await setupRes.json();
+    const code = await generateTotpCode(secret);
+
+    const prepare = env.DB.prepare.bind(env.DB);
+    let interleaved = false;
+    env.DB.prepare = (sql) => {
+      if (!interleaved && sql.includes(matchSql)) {
+        interleaved = true;
+        interleave(rawDb);
+      }
+      return prepare(sql);
+    };
+    const res = await mfaEnableHandler.onRequestPost({
+      request: new Request("https://example.test/api/admin/mfa/enable", {
+        method: "POST",
+        headers: buildAuthHeaders(headers),
+        body: JSON.stringify({ code }),
+      }),
+      env,
+    });
+    expect(interleaved).toBe(true);
+    return { res, rawDb };
+  }
+
+  it("refuses to enrol a secret that a second setup replaced mid-request", async () => {
+    const { res, rawDb } = await enableWithInterleavedWrite("SET totp_enabled = 1", (db) =>
+      db.prepare("UPDATE users SET totp_secret = 'replaced-by-second-setup' WHERE id = 1").run(),
+    );
+    expect(res.status).toBe(409);
+    expect((await res.json()).code).toBe("MFA_SETUP_CHANGED");
+    const user = rawDb.prepare("SELECT totp_enabled, totp_secret FROM users WHERE id = 1").get();
+    expect(user.totp_enabled).toBe(0);
+    expect(user.totp_secret).toBe("replaced-by-second-setup");
+  });
+
+  it("does not restore a factor an admin reset cleared mid-request", async () => {
+    const { res, rawDb } = await enableWithInterleavedWrite("SET totp_enabled = 1", (db) =>
+      db.prepare("UPDATE users SET totp_enabled = 0, totp_secret = NULL WHERE id = 1").run(),
+    );
+    expect(res.status).toBe(409);
+    const user = rawDb.prepare("SELECT totp_enabled, totp_secret FROM users WHERE id = 1").get();
+    expect(user.totp_enabled).toBe(0);
+    expect(user.totp_secret).toBeNull();
+  });
+
+  it("drops the new session when a reset lands between enrolment and session issue", async () => {
+    const { res, rawDb } = await enableWithInterleavedWrite("UPDATE lucia_sessions SET ip_address", (db) => {
+      db.prepare("UPDATE users SET totp_enabled = 0, totp_secret = NULL, backup_codes = NULL WHERE id = 1").run();
+    });
+    expect(res.status).toBe(409);
+    expect(res.headers.getSetCookie().some((v) => /session_token=[^;]/.test(v) && !/Max-Age=0/.test(v))).toBe(false);
+    const sessions = rawDb.prepare("SELECT COUNT(*) AS n FROM lucia_sessions WHERE user_id = 1").get();
+    expect(sessions.n).toBe(0);
+  });
 });

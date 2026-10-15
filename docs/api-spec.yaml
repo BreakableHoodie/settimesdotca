@@ -1648,6 +1648,11 @@ paths:
       tags:
         - Admin - MFA
       summary: Enable MFA with a TOTP code
+      description: >-
+        Revokes every existing session and issues a fresh session and CSRF
+        cookie. Answers 409 when MFA is already enabled, or with code
+        MFA_SETUP_CHANGED when a second setup or an admin reset changed the
+        pending secret while this request was running.
       security:
         - AdminSessionCookie: []
           CsrfToken: []
@@ -1714,6 +1719,9 @@ paths:
       tags:
         - Admin - MFA
       summary: Disable MFA using a TOTP or backup code
+      description: >-
+        Refused with 403 MFA_REQUIRED_FOR_ROLE for admins and editors, who must
+        keep 2FA enabled.
       security:
         - AdminSessionCookie: []
           CsrfToken: []
@@ -1734,6 +1742,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "429":
@@ -2933,6 +2943,36 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/admin/users/{id}/reset-mfa:
+    post:
+      tags:
+        - Admin - Users
+      summary: Reset another user's 2FA (lost authenticator)
+      description: >-
+        Admin only. Clears the factor and backup codes and ends the target's
+        sessions, trusted devices and API keys in one batch. Refuses the
+        caller's own account (400 CANNOT_RESET_OWN_MFA).
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/NumericId"
+      responses:
+        "200":
+          description: Two-factor authentication reset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/ServerError"
 

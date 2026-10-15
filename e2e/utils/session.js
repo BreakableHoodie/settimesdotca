@@ -1,4 +1,5 @@
 import { ADMIN_EMAIL, ADMIN_PASSWORD } from "../credentials";
+import { e2eTotpCode } from "../../scripts/e2e-totp.mjs";
 
 // The storageState saved by auth.setup.js cannot be trusted to still be valid.
 // `lucia.invalidateUserSessions()` runs on every re-authentication (see
@@ -17,9 +18,21 @@ export const loginAsAdmin = async (page) => {
   // Wait for either admin tab buttons (valid session) or login form (session expired/invalidated)
   await page.waitForSelector('button[role="tab"], input[type="email"]', { state: "visible", timeout: 15000 });
   if (await page.locator('input[type="email"]').isVisible()) {
-    await page.fill('input[type="email"]', ADMIN_EMAIL);
-    await page.fill('input[type="password"]', ADMIN_PASSWORD);
-    await page.click('button[type="submit"]');
+    await submitAdminLogin(page);
     await page.waitForSelector('button[role="tab"]', { state: "visible", timeout: 15000 });
   }
+};
+
+// Password, then the 2FA code: the E2E admin is enrolled like every real admin
+// (#1253; see scripts/e2e-totp.mjs). The code is generated at the moment it is
+// typed, so it cannot go stale between the two steps. Every spec that logs in
+// through the form goes through here -- do not add a password-only copy.
+export const submitAdminLogin = async (page) => {
+  await page.fill('input[type="email"]', ADMIN_EMAIL);
+  await page.fill('input[type="password"]', ADMIN_PASSWORD);
+  await page.click('button[type="submit"]');
+  const codeInput = page.locator("#mfa-code");
+  await codeInput.waitFor({ state: "visible", timeout: 15000 });
+  await codeInput.fill(await e2eTotpCode(ADMIN_PASSWORD));
+  await page.getByRole("button", { name: "Verify Code" }).click();
 };

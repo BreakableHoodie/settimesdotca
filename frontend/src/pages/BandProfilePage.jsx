@@ -234,12 +234,13 @@ export default function BandProfilePage() {
     }
   }, [id, isNumericId, location.search, location.state, navigate])
 
-  useEffect(() => {
-    trackPageView(`/band/${id || ''}`)
-  }, [id])
-
+  // One page view per artist visit, keyed on the canonical numeric id (#1265).
+  // Keying on the route param counted an in-app slug visit twice: once for
+  // /band/<slug>, again after the client redirect to /band/<id>. An
+  // unresolvable slug renders an error and is not counted.
   useEffect(() => {
     if (profile?.id) {
+      trackPageView(`/band/${profile.id}`)
       trackArtistView(profile.id)
     }
   }, [profile?.id])

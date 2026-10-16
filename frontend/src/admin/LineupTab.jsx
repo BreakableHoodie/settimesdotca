@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Eye, EyeOff, Ban, RotateCcw } from 'lucide-react'
 import { bandsApi, eventsApi, venuesApi } from '../utils/adminApi'
 import AnnouncementPlanningPanel from './components/AnnouncementPlanningPanel'
@@ -113,16 +113,23 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
   const [bulkApplying, setBulkApplying] = useState(false)
   const [confirmDialog, setConfirmDialog] = useState({ open: false, message: '', onConfirm: () => {} })
 
+  // Latest-wins guard: a slow response for a previous event (or an earlier
+  // reload) must not overwrite newer state.
+  const loadReqRef = useRef(0)
+
   const loadData = useCallback(async () => {
+    const reqId = ++loadReqRef.current
     try {
       setLoading(true)
       const [venuesRes, bandsRes] = await Promise.all([venuesApi.getAll(), bandsApi.getByEvent(selectedEventId)])
 
+      if (reqId !== loadReqRef.current) return true
       setVenues(venuesRes.venues || [])
       setBands(bandsRes.bands || [])
       setLoadError(false)
       return true
     } catch (err) {
+      if (reqId !== loadReqRef.current) return false
       setLoadError(true)
       showToast('Failed to load schedule: ' + err.message, 'error')
       // Returns a boolean rather than rethrowing: every existing caller
@@ -132,7 +139,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
       // did not take" when in fact it did.
       return false
     } finally {
-      setLoading(false)
+      if (reqId === loadReqRef.current) setLoading(false)
     }
   }, [selectedEventId, showToast])
 
@@ -205,6 +212,11 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
     // Day filter values are event-specific dates — a stale one from the
     // previous event would match no rows in the new one (#588).
     setDayFilter('all')
+    // The previous event's rows must not render under the new one if its load
+    // fails (edits are keyed by performance id and would hit the wrong sets).
+    setBands([])
+    setVenues([])
+    setLoadError(false)
   }, [selectedEventId])
 
   const handleInputChange = e => {

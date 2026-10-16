@@ -2,6 +2,7 @@ import React from 'react'
 import { render, screen, within, fireEvent, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import LineupTab from '../LineupTab'
+import LoadError from '../components/LoadError'
 import { bandsApi, eventsApi, venuesApi } from '../../utils/adminApi'
 
 // LineupTab owns the show-day controls (cancel, announce, resend, conflict
@@ -88,8 +89,12 @@ vi.mock('../components/ScheduleGrid', () => {
 })
 
 vi.mock('../components/ArtistPicker', () => ({
-  default: ({ onSelect, onCancel }) => (
+  default: ({ onSelect, onCancel, artists, loadError, onRetry }) => (
     <div data-testid="artist-picker">
+      {loadError && <LoadError what="the roster" onRetry={onRetry} />}
+      {artists.map(a => (
+        <span key={a.id}>{a.name}</span>
+      ))}
       <button onClick={() => onSelect(null, 'New Band')}>Pick new band</button>
       <button onClick={onCancel}>Cancel picker</button>
     </div>
@@ -274,6 +279,70 @@ describe('LineupTab — loading failure', () => {
     await renderLineup({ bands: [] })
     expect(await screen.findByText('No performances scheduled yet.')).toBeInTheDocument()
     expect(screen.queryByText("Couldn't load the lineup.")).toBeNull()
+  })
+})
+
+describe('LineupTab — load failure across events and races (#1323)', () => {
+  const renderFor = event => (
+    <LineupTab selectedEventId={event.id} selectedEvent={event} events={[event]} showToast={showToast} />
+  )
+
+  it("does not render the previous event's lineup when the new event's load fails", async () => {
+    const eventA = makeEvent({ id: 37 })
+    const eventB = makeEvent({ id: 38 })
+    bandsApi.getByEvent.mockReset()
+    bandsApi.getByEvent.mockResolvedValueOnce({ bands: [makeBand({ name: 'Event37 Act' })] })
+    const { rerender } = render(renderFor(eventA))
+    const table = await screen.findByRole('table')
+    expect(within(table).getByText('Event37 Act')).toBeInTheDocument()
+
+    bandsApi.getByEvent.mockRejectedValueOnce(new Error('network down'))
+    rerender(renderFor(eventB))
+
+    const alert = await screen.findByRole('alert')
+    expect(within(alert).getByText("Couldn't load the lineup.")).toBeInTheDocument()
+    expect(screen.queryByText('Event37 Act')).toBeNull()
+  })
+
+  it("a slow response for the previous event cannot overwrite the new event's lineup", async () => {
+    const eventA = makeEvent({ id: 37 })
+    const eventB = makeEvent({ id: 38 })
+    let resolveA
+    bandsApi.getByEvent.mockReset()
+    bandsApi.getByEvent.mockImplementationOnce(() => new Promise(res => (resolveA = res)))
+    bandsApi.getByEvent.mockResolvedValueOnce({ bands: [makeBand({ id: 2, name: 'Event38 Act' })] })
+    const { rerender } = render(renderFor(eventA))
+    await waitFor(() => expect(bandsApi.getByEvent).toHaveBeenCalledTimes(1))
+    rerender(renderFor(eventB))
+    const table = await screen.findByRole('table')
+    expect(within(table).getByText('Event38 Act')).toBeInTheDocument()
+
+    resolveA({ bands: [makeBand({ id: 1, name: 'Event37 Act' })] })
+    await new Promise(res => setTimeout(res, 20))
+
+    expect(screen.queryByText('Event37 Act')).toBeNull()
+    expect(within(screen.getByRole('table')).getByText('Event38 Act')).toBeInTheDocument()
+  })
+})
+
+describe('LineupTab — roster load failure reaches the picker (#1323)', () => {
+  it('shows the roster error in the picker; Retry refetches and the roster renders', async () => {
+    bandsApi.getAll.mockReset()
+    bandsApi.getAll.mockRejectedValueOnce(new Error('network down'))
+    bandsApi.getAll.mockResolvedValueOnce({ bands: [{ id: 9, name: 'Roster Act', is_active: 1 }] })
+    await renderLineup({ bands: [] })
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add to Lineup' }))
+    const picker = await screen.findByTestId('artist-picker')
+    const alert = await within(picker).findByRole('alert')
+    expect(within(alert).getByText("Couldn't load the roster.")).toBeInTheDocument()
+    expect(bandsApi.getAll).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(within(alert).getByRole('button', { name: 'Retry' }))
+
+    await waitFor(() => expect(bandsApi.getAll).toHaveBeenCalledTimes(2))
+    expect(await within(picker).findByText('Roster Act')).toBeInTheDocument()
+    expect(within(picker).queryByRole('alert')).toBeNull()
   })
 })
 

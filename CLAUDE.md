@@ -992,6 +992,12 @@ Node and local `wrangler` do not enforce the Workers runtime's limits, which is 
 - **Queueing and teardown:** one shared database, so runs queue (`cancel-in-progress: false`). Every run deletes its deployment, and a failed delete fails the job, so stale previews (#1295) cannot pile up.
 - **Not run** for fork or Dependabot PRs, which get no secrets. The job says so; it never passes silently.
 
+### Playwright artifacts carry typed secrets — upload only scrubbed ones
+
+Playwright has no masking: a `fill()` writes the value into the failure page snapshot (Playwright's error-context file), the trace and the HTML report's step titles. This repo is public, so any signed-in GitHub user can download an artifact. On 2026-10-15, 12 artifacts were found holding the E2E admin password; they were deleted and the secret was rotated.
+
+Every Playwright upload now runs `scripts/scrub-e2e-artifacts.mjs` first, which drops traces and the HTML report, redacts the secret, then reads every remaining file back and exits 1 if anything survives. The upload is gated on `failure() && steps.scrub.outcome == 'success'`. `failure()` alone is still true after a failed scrub step, so a broken scrub would upload the raw files. `scripts/__tests__/scrubE2eArtifacts.test.js` fails the build on any workflow that uploads `playwright-report/`, or uploads `test-results/` without that gate. Need a trace? Reproduce locally.
+
 ### Testing Safari/WebKit locally — `upgrade-insecure-requests` breaks it, silently
 
 Playwright WebKit against `http://localhost:8788` renders a **blank page** with no error: the `/*` document CSP in `frontend/public/_headers` carries `upgrade-insecure-requests`, so WebKit rewrites every subresource to `https://`, where the dev server has no TLS. Chromium treats `localhost` as trustworthy and skips the upgrade, which is why this only shows up in Safari. **It is not HSTS** (RFC 6797 §7.2 ignores STS over http — verified by experiment). **Production is unaffected; do not weaken the directive or HSTS.**

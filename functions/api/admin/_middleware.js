@@ -68,29 +68,38 @@ const KEY_READ_ONLY_PREFIXES = ["/api/admin/users", "/api/admin/api-keys"];
 // forbidden route.
 const MAX_DECODE_ROUNDS = 4;
 
-function segmentForms(path) {
-  // NFKC folds compatibility characters a case-insensitive matcher could treat as
-  // ASCII ("\u017f" long s -> "s") before lowercasing.
-  const segments = path
-    .normalize("NFKC")
-    .toLowerCase()
-    .split(/[/\\]/)
-    .filter((segment) => segment !== "" && segment !== ".");
+// Both splitting rules, because a router may treat a decoded backslash as a separator or
+// as an ordinary character, and ".." pops a different number of segments under each.
+const SEGMENT_SPLITTERS = [/\//, /[/\\]/];
+
+function resolveDots(segments) {
   const resolved = [];
   for (const segment of segments) {
     if (segment === "..") resolved.pop();
     else resolved.push(segment);
   }
-  return [`/${segments.join("/")}`, `/${resolved.join("/")}`];
+  return `/${resolved.join("/")}`;
+}
+
+function segmentForms(path) {
+  // NFKC folds compatibility characters a case-insensitive matcher could treat as
+  // ASCII ("\u017f" long s -> "s") before lowercasing.
+  const folded = path.normalize("NFKC").toLowerCase();
+  return SEGMENT_SPLITTERS.flatMap((splitter) => {
+    const segments = folded.split(splitter).filter((segment) => segment !== "" && segment !== ".");
+    return [`/${segments.join("/")}`, resolveDots(segments)];
+  });
 }
 
 function keyPathForms(rawPathname) {
   // Forms are built at EVERY decode depth, not only the last: a router that decodes
   // fewer times than we do resolves ".." over different segments (Cass, #1327 review:
   // x%252f..%2f..%2finvite-codes resolves to /api/invite-codes fully decoded, but to
-  // /api/admin/invite-codes after one decode).
+  // /api/admin/invite-codes after one decode). `chained` models a router that resolves
+  // ".." between decodes.
   const forms = [trimTrailingSlashes(rawPathname.toLowerCase()), ...segmentForms(rawPathname)];
   let decoded = rawPathname;
+  let chained = rawPathname;
   for (let round = 0; ; round++) {
     let next;
     try {
@@ -105,6 +114,17 @@ function keyPathForms(rawPathname) {
     if (round === MAX_DECODE_ROUNDS - 1) return null;
     decoded = next;
     forms.push(...segmentForms(decoded));
+    try {
+      chained = resolveDots(
+        decodeURIComponent(chained)
+          .toLowerCase()
+          .split("/")
+          .filter((segment) => segment !== "" && segment !== "."),
+      );
+      forms.push(chained);
+    } catch {
+      // The chain hit a literal "%"; the full-decode forms above still cover this depth.
+    }
   }
   return forms;
 }

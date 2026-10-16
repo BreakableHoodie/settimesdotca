@@ -10,7 +10,7 @@ import { createRequestLogger, logger } from "../../utils/logger.js";
 import { auditLogStatement } from "../../utils/auditLogStatement.js";
 import { API_KEY_PREFIX, DISPLAY_PREFIX_LENGTH, verifyApiKey } from "../../utils/apiKeys.js";
 import { apiKeyRateLimitKey, checkRateLimitByKey, rateLimitResponse } from "../../utils/rateLimit.js";
-import { routePath } from "../../utils/routePath.js";
+import { routePath, trimTrailingSlashes } from "../../utils/routePath.js";
 
 export { auditLogStatement } from "../../utils/auditLogStatement.js";
 
@@ -57,29 +57,43 @@ const KEY_READ_ONLY_PREFIXES = ["/api/admin/users", "/api/admin/api-keys"];
 // Every spelling of the request path the two lists above are checked against (#1327).
 // routePath() alone missed `%69nvite-codes`, `//invite-codes` and `bands%2f..%2finvite-codes`
 // in production; only the router kept them from a handler. So a key is refused if ANY
-// form matches: lowercased, then decoded until stable, then with slashes collapsed and
-// dot segments resolved. Encoded band names (`AC%2FDC`, `100%25`) stay allowed because no
-// form of them matches a listed prefix. Returns null when the path is malformed on the first
-// decode, which the caller refuses: it cannot be proven not to name a forbidden route.
+// form matches: the raw path lowercased, and the path decoded until stable, then
+// lowercased, split on "/" and backslash, with empty and "." segments dropped, both before
+// and after resolving "..". Resolution is done by hand, not by new URL(), whose parser
+// would truncate at a decoded "?" or "#". Lowercasing comes AFTER decoding because routes
+// match case-insensitively, so `%49nvite-codes` is `Invite-codes`. Encoded band names
+// (`AC%2FDC`, `100%25`, `Who%3F`) stay allowed because no form of them matches a listed
+// prefix. Returns null, which the caller refuses, when the path is malformed on the first
+// decode or still decoding after MAX_DECODE_ROUNDS: neither can be proven not to name a
+// forbidden route.
+const MAX_DECODE_ROUNDS = 4;
+
 function keyPathForms(rawPathname) {
-  const forms = [rawPathname.toLowerCase()];
-  let decoded = forms[0];
-  for (let i = 0; i < 3; i++) {
+  let decoded = rawPathname;
+  for (let round = 0; ; round++) {
     let next;
     try {
       next = decodeURIComponent(decoded);
     } catch {
       // Only the FIRST decode proves the request malformed. A later failure is a
       // literal "%" the first pass produced ("100%25" -> "100%"), so stop there.
-      if (i === 0) return null;
+      if (round === 0) return null;
       break;
     }
     if (next === decoded) break;
+    if (round === MAX_DECODE_ROUNDS - 1) return null;
     decoded = next;
   }
-  const collapsed = decoded.replace(/\/{2,}/g, "/");
-  forms.push(collapsed, new URL(collapsed, "https://key-path.invalid").pathname);
-  return forms.map((form) => form.replace(/\/+$/, "") || "/");
+  const segments = decoded
+    .toLowerCase()
+    .split(/[/\\]/)
+    .filter((segment) => segment !== "" && segment !== ".");
+  const resolved = [];
+  for (const segment of segments) {
+    if (segment === "..") resolved.pop();
+    else resolved.push(segment);
+  }
+  return [trimTrailingSlashes(rawPathname.toLowerCase()), `/${segments.join("/")}`, `/${resolved.join("/")}`];
 }
 
 const matchesPrefix = (forms, prefixes, exact = false) =>
@@ -391,10 +405,7 @@ export async function onRequest(context) {
       );
     }
 
-    if (
-      matchesPrefix([path, ...keyPaths], KEY_READ_ONLY_PREFIXES, true) &&
-      !["GET", "HEAD"].includes(request.method)
-    ) {
+    if (matchesPrefix([path, ...keyPaths], KEY_READ_ONLY_PREFIXES, true) && !["GET", "HEAD"].includes(request.method)) {
       log.warn("API key blocked from identity-management mutation", {
         keyPrefix: bearerValue.slice(0, DISPLAY_PREFIX_LENGTH),
         path: rawPathname,

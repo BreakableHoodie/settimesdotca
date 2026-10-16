@@ -447,6 +447,16 @@ describe("API key authentication path (#744 part 3)", () => {
       ["/api/admin//users/5", "PATCH"],
       ["/api/admin/bands%2f..%2fapi-keys", "POST"],
       ["/api/admin/%zz/users", "GET"],
+      // Cass review: an escape decoding to UPPERCASE, since routes match case-insensitively.
+      ["/api/admin/%49nvite-codes", "GET"],
+      ["/api/admin/%55sers", "POST"],
+      ["/api/admin/%4dFA/setup", "POST"],
+      // A decoded backslash is a separator; a decoded ? or # must not truncate the path.
+      ["/api/admin/%5cinvite-codes", "GET"],
+      ["/api/admin/%3f%2f..%2finvite-codes", "GET"],
+      ["/api/admin/%23%2f..%2fusers", "POST"],
+      // Still decoding after the round cap: refused rather than trusted.
+      ["/api/admin/%25252569nvite-codes", "GET"],
     ];
 
     it.each(NON_CANONICAL)("refuses the non-canonical spelling %s (%s)", async (path, method) => {
@@ -469,7 +479,7 @@ describe("API key authentication path (#744 part 3)", () => {
       const { env, rawDb } = createTestEnv({ role: "admin" });
       const key = await seedKey(rawDb, { role: "admin" });
 
-      for (const name of ["AC%2FDC", "Kepi%20Ghoulie", "100%25%20Real"]) {
+      for (const name of ["AC%2FDC", "Kepi%20Ghoulie", "100%25%20Real", "Who%3F", "Users%20Of%20Sound"]) {
         const reached = vi.fn(async () => new Response("ok", { status: 200 }));
         const { response } = await runMiddleware(
           env,

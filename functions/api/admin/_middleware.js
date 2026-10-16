@@ -95,11 +95,11 @@ function keyPathForms(rawPathname) {
   // Forms are built at EVERY decode depth, not only the last: a router that decodes
   // fewer times than we do resolves ".." over different segments (Cass, #1327 review:
   // x%252f..%2f..%2finvite-codes resolves to /api/invite-codes fully decoded, but to
-  // /api/admin/invite-codes after one decode). `chained` models a router that resolves
-  // ".." between decodes.
+  // /api/admin/invite-codes after one decode). `chains` model a router that resolves
+  // ".." between decodes, one per splitting rule.
   const forms = [trimTrailingSlashes(rawPathname.toLowerCase()), ...segmentForms(rawPathname)];
   let decoded = rawPathname;
-  let chained = rawPathname;
+  const chains = SEGMENT_SPLITTERS.map(() => rawPathname);
   for (let round = 0; ; round++) {
     let next;
     try {
@@ -114,17 +114,20 @@ function keyPathForms(rawPathname) {
     if (round === MAX_DECODE_ROUNDS - 1) return null;
     decoded = next;
     forms.push(...segmentForms(decoded));
-    try {
-      chained = resolveDots(
-        decodeURIComponent(chained)
-          .toLowerCase()
-          .split("/")
-          .filter((segment) => segment !== "" && segment !== "."),
-      );
-      forms.push(chained);
-    } catch {
-      // The chain hit a literal "%"; the full-decode forms above still cover this depth.
-    }
+    SEGMENT_SPLITTERS.forEach((splitter, i) => {
+      try {
+        chains[i] = resolveDots(
+          decodeURIComponent(chains[i])
+            .normalize("NFKC")
+            .toLowerCase()
+            .split(splitter)
+            .filter((segment) => segment !== "" && segment !== "."),
+        );
+        forms.push(chains[i]);
+      } catch {
+        // The chain hit a literal "%"; the full-decode forms above still cover this depth.
+      }
+    });
   }
   return forms;
 }

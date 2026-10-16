@@ -469,6 +469,9 @@ describe("API key authentication path (#744 part 3)", () => {
       ["/api/admin/%5c%2f../invite-codes", "GET"],
       // A router that resolves ".." between decodes.
       ["/api/admin/%252f/..%2f%252f/invite-codes", "GET"],
+      // Resolving between decodes AND splitting on a decoded backslash.
+      ["/api/admin/%252f/..%2f%255c/invite-codes", "GET"],
+      ["/api/admin/%252f/..%2f%255c/users", "POST"],
     ];
 
     it.each(NON_CANONICAL)("refuses the non-canonical spelling %s (%s)", async (path, method) => {

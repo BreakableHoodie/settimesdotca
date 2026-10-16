@@ -125,6 +125,28 @@ jobs:
       - name: Lint backend
         run: npm run lint
 
+  # `make gate` runs this, but a local tree hides failures: a cited path that is
+  # gitignored output (test-results/) exists wherever tests have run, so the gate
+  # passed locally and failed on a fresh clone. A CI checkout is that fresh clone.
+  claude-md-citations:
+    name: CLAUDE.md citations
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Check cited paths exist
+        run: node scripts/check-claude-md-citations.mjs
+
   mutation-gate:
     name: Mutation Gate
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}

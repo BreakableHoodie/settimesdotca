@@ -3,9 +3,13 @@ import { loginAsAdmin } from "./utils/session";
 
 // A date N days from now, as YYYY-MM-DD. Fixed dates here expired: "2026-10-15" became
 // a past date on 2026-10-16, and past dates are rejected by the form, so the create
-// test failed on main with no code change. Days ahead, not hours, so the UTC runner
-// and the Toronto-local validation agree on which day it is.
-const futureDate = (daysAhead) => new Date(Date.now() + daysAhead * 86_400_000).toISOString().slice(0, 10);
+// test failed on main with no code change. Local date on the pinned Toronto clock
+// (playwright.config.js, #1256), the same idiom as the other specs.
+const futureDate = (daysAhead) => {
+  const d = new Date();
+  d.setDate(d.getDate() + daysAhead);
+  return d.toLocaleDateString("en-CA");
+};
 
 const openEventsTab = async (page) => {
   await page.click('button:has-text("Events")');

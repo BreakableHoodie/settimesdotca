@@ -100,7 +100,7 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'Routes match case-insensitively; path checks must too' — /foo/ routes like /foo, so a trailing slash must not escape a path-based limit",
     file: "functions/utils/routePath.js",
-    find: '  return path.replace(/\\/+$/, "") || "/";',
+    find: "  return trimTrailingSlashes(path);",
     replace: "  return path;",
     tests: ["functions/utils/__tests__/rateLimit.test.js", "functions/utils/__tests__/csrf.test.js"],
   },
@@ -109,7 +109,7 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'API keys' — identity-management resources are readable by keys but key mutations cannot create or change identities",
     file: "functions/api/admin/_middleware.js",
-    find: '    if (\n      matchesPrefix([path, ...keyPaths], KEY_READ_ONLY_PREFIXES, true) &&\n      !["GET", "HEAD"].includes(request.method)\n    ) {',
+    find: '    if (matchesPrefix([path, ...keyPaths], KEY_READ_ONLY_PREFIXES, true) && !["GET", "HEAD"].includes(request.method)) {',
     replace: "    if (false) {",
     tests: ["functions/api/admin/__tests__/api-key-auth.test.js"],
   },

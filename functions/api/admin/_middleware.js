@@ -57,7 +57,7 @@ const KEY_READ_ONLY_PREFIXES = ["/api/admin/users", "/api/admin/api-keys"];
 // Every spelling of the request path the two lists above are checked against (#1327).
 // routePath() alone missed `%69nvite-codes`, `//invite-codes` and `bands%2f..%2finvite-codes`
 // in production; only the router kept them from a handler. So a key is refused if ANY
-// form matches: the raw path lowercased, and the path decoded until stable, then
+// form matches: the raw path lowercased, and at every decode depth the path NFKC-folded,
 // lowercased, split on "/" and backslash, with empty and "." segments dropped, both before
 // and after resolving "..". Resolution is done by hand, not by new URL(), whose parser
 // would truncate at a decoded "?" or "#". Lowercasing comes AFTER decoding because routes
@@ -68,7 +68,28 @@ const KEY_READ_ONLY_PREFIXES = ["/api/admin/users", "/api/admin/api-keys"];
 // forbidden route.
 const MAX_DECODE_ROUNDS = 4;
 
+function segmentForms(path) {
+  // NFKC folds compatibility characters a case-insensitive matcher could treat as
+  // ASCII ("\u017f" long s -> "s") before lowercasing.
+  const segments = path
+    .normalize("NFKC")
+    .toLowerCase()
+    .split(/[/\\]/)
+    .filter((segment) => segment !== "" && segment !== ".");
+  const resolved = [];
+  for (const segment of segments) {
+    if (segment === "..") resolved.pop();
+    else resolved.push(segment);
+  }
+  return [`/${segments.join("/")}`, `/${resolved.join("/")}`];
+}
+
 function keyPathForms(rawPathname) {
+  // Forms are built at EVERY decode depth, not only the last: a router that decodes
+  // fewer times than we do resolves ".." over different segments (Cass, #1327 review:
+  // x%252f..%2f..%2finvite-codes resolves to /api/invite-codes fully decoded, but to
+  // /api/admin/invite-codes after one decode).
+  const forms = [trimTrailingSlashes(rawPathname.toLowerCase()), ...segmentForms(rawPathname)];
   let decoded = rawPathname;
   for (let round = 0; ; round++) {
     let next;
@@ -83,17 +104,9 @@ function keyPathForms(rawPathname) {
     if (next === decoded) break;
     if (round === MAX_DECODE_ROUNDS - 1) return null;
     decoded = next;
+    forms.push(...segmentForms(decoded));
   }
-  const segments = decoded
-    .toLowerCase()
-    .split(/[/\\]/)
-    .filter((segment) => segment !== "" && segment !== ".");
-  const resolved = [];
-  for (const segment of segments) {
-    if (segment === "..") resolved.pop();
-    else resolved.push(segment);
-  }
-  return [trimTrailingSlashes(rawPathname.toLowerCase()), `/${segments.join("/")}`, `/${resolved.join("/")}`];
+  return forms;
 }
 
 const matchesPrefix = (forms, prefixes, exact = false) =>

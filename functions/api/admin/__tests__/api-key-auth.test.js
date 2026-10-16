@@ -457,6 +457,12 @@ describe("API key authentication path (#744 part 3)", () => {
       ["/api/admin/%23%2f..%2fusers", "POST"],
       // Still decoding after the round cap: refused rather than trusted.
       ["/api/admin/%25252569nvite-codes", "GET"],
+      // ".." resolved at every decode depth: a router decoding once sees /api/admin/invite-codes.
+      ["/api/admin/x%252f..%2f..%2finvite-codes", "GET"],
+      ["/api/admin/x%252f..%2f..%2fusers", "POST"],
+      // Unicode compatibility forms that case-fold to ASCII (U+017F long s, U+212A Kelvin sign).
+      ["/api/admin/u%C5%BFers", "POST"],
+      ["/api/admin/api-%E2%84%AAeys", "POST"],
     ];
 
     it.each(NON_CANONICAL)("refuses the non-canonical spelling %s (%s)", async (path, method) => {

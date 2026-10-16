@@ -90,62 +90,19 @@ Prefer a durable guard over a repeat audit: a source-scanning test (as `bandFiel
 
 ### Verify guards against the failure they guard, not the success
 
-**Code whose only job runs when something breaks must be tested broken.** A
-guard, a diagnostic, a timeout, a retry, an error handler — none of it is
-exercised by the happy path, so a green run says nothing about whether it works.
-
-Five instances in one day (2026-08-19), all shipped after reading the code and
-all caught only by _running_ the failure:
-
-| Guard                                             | What it did on the failure path                                                                                                                                                                                           |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `curl` probe in the Lighthouse diagnostics (#879) | Unbounded — would hang to the 15-minute job timeout in the _wedged_ case it existed to detect, costing the artifact upload                                                                                                |
-| `ss` listener check (#879)                        | Printed nothing when nothing was listening — "no listener" is the crashed-vs-wedged signal, and silence reads as command failure                                                                                          |
-| Exit-status capture in the apt bound (#882)       | `code=$?` after `if cmd; then return 0; fi` read the **if-statement's** status, not the command's — an `if` whose condition fails with no `else` returns 0, so **every failure was captured as 0 and treated as success** |
-| `timeout` without `-k` (#882)                     | Sends SIGTERM, which apt-get can ignore — process survives, step still hangs                                                                                                                                              |
-| Retry around the apt bound (#883)                 | Attempt 1's SIGKILLed apt-get orphan kept `/var/lib/apt/lists/lock`, so attempt 2 could never succeed                                                                                                                     |
-
-The pattern is identical every time: the happy path was written and verified;
-the failure path was written and _assumed_.
-
-**What actually catches these** is cheap — substitute the failing thing and run
-it:
+**Code whose only job runs when something breaks must be tested broken.** A guard, diagnostic, timeout, retry or error handler is never exercised by the happy path. Five shipped in one day (2026-08-19, #879–#883) after the code was read, and each was caught only by running the failure. Substitute the failing thing and run it:
 
 ```bash
-# Prove the listener check reports "none" when ss returns an empty header
-ss() { return 0; }; run_listener_check          # -> "  none", not silence
-
-# Prove the bound kills a process that IGNORES SIGTERM
-run_bounded "stubborn" bash -c 'trap "" TERM; sleep 60'   # -> 137 in ~3s, not 60s
-
-# Prove the exit status you capture is the COMMAND's, not a compound's
+ss() { return 0; }; run_listener_check                     # -> "  none", not silence
+run_bounded "stubborn" bash -c 'trap "" TERM; sleep 60'    # -> 137 in ~3s, not 60s
 f() { if false; then return 0; fi; code=$?; echo "$code"; }   # -> 0  WRONG
 g() { code=0; false || code=$?; echo "$code"; }               # -> 1  right
-
-# Prove the bounded probe cannot outlive its own budget
-time run_bounded "hang" sleep 600                # -> ~300s, not 600s
-
-# Prove a retry survives a KILLED predecessor, not just a cleanly-failed one
+time run_bounded "hang" sleep 600                          # -> ~300s, not 600s
 ```
 
-That last line is the one that cost the most: the retry was tested against a
-command that failed _cleanly_, never against one that had been _killed_ — the
-only case the step actually produces. It has no one-liner because proving it
-needs the predecessor's orphaned children still holding a lock, which is the
-whole reason a naive retry fails (#883).
+An `if` whose condition fails with no `else` returns 0, so `$?` after it is the compound's status, not the command's. `timeout` needs `-k`, because SIGTERM can be ignored. A retry must be proven against a **killed** predecessor whose orphans still hold locks, not a cleanly-failed one (#883).
 
-**The status-capture probe earns its place twice over.** The original diagnosis
-of that bug was itself wrong — it blamed `local` for resetting `$?`, which
-`false; local code=$?` disproves in one line (it yields 1). The real culprit is
-that an `if` whose condition fails and has no `else` returns 0. A wrong
-explanation shipped into a code comment and this file before a probe caught it;
-running the two-line comparison above would have caught it immediately.
-
-**Ask before shipping any guard: what does this print, and what does it return,
-when the thing it guards is actually broken?** If you cannot answer from a run
-rather than from reading, it is not verified. This is the same discipline as
-mutation-testing an assertion (see the vacuous-test class), applied to
-operational code instead of tests.
+Ask before shipping any guard: **what does this print, and what does it return, when the thing it guards is actually broken?** Answer from a run, not from reading. The incident table: `docs/field-notes/testing-gates.md`.
 
 ### The efficiency ladder — before you write
 
@@ -333,37 +290,17 @@ Three things are load-bearing:
 
 ### Public event visibility is `status`, never `is_published` (#800) — history, guards still live
 
-`events.is_published INTEGER` was deprecated by migration 0005 and, for years, never dropped (0036 even added a fresh index on it). Until #799, **`functions/api/admin/events/[id]/archive.js` wrote `status = 'archived', is_published = 0`** — archiving unpublished under the old column. On 2026-08-10 archiving the last un-archived event dropped 13 public read paths to zero rows simultaneously and took the public site dark.
+`events.is_published` was dropped by migration 0059 (#799). Before #799, archiving wrote `is_published = 0`, and on 2026-08-10 archiving the last live event took 13 public read paths dark at once. `functions/utils/eventVisibility.js` is the single home:
 
-**The column itself is gone as of migration 0059** (#799 part 2) — dropped from production, from `database/setup-complete.sql`, and from every test schema, along with its two indexes (`idx_events_published`, `idx_events_published_date`; replaced by `idx_events_status_date` on `(status, date)`, since every public query that used to filter+order on the old pair now does the same on `status`). This section stays in CLAUDE.md as **history, not a live warning**: the two source-scanning guards described below remain in the test suite even though there is no column left to accidentally read, because the postmortem they encode — one dead column silently zeroing 13 public read paths at the same instant — is worth more than the guards cost to keep. A future PR that reintroduces `is_published` (a copy-pasted old query, a reverted migration without reverted callers) fails CI on these guards instead of shipping.
+- `publicEventStatusSql(alias?)` → `status IN ('published','archived')`, the default for browse and history surfaces: **archived means concluded, not hidden.** `archivedEventStatusSql` serves recap-only surfaces. `publishedEventStatusSql` is for where serving a concluded event is wrong, such as `/api/schedule?event=current`.
+- **Timeline buckets are a lifecycle question before a date question.** `now`/`upcoming` are published-only; `past` is `archived OR (published AND concluded)`. Drop either half and an archived event matches no bucket.
+- **Two source-scanning guards.** One forbids any `is_published` outside `__tests__/**` and `eventVisibility.js`, on both sides of the build boundary. The other fails any non-admin file that queries `events` without importing a visibility helper by name; an inline `status = 'published'` deliberately does not satisfy it. Exempt by name: `api/metrics.js`, `utils/timeConflicts.js`. The guards are `functions/utils/__tests__/eventVisibility.test.js` and `frontend/src/__tests__/isPublishedGuard.test.js`; public queries filter and order on the `idx_events_status_date` index. The second guard is file-level, so it cannot see one missed query in a file that imports the helper.
 
-`functions/utils/eventVisibility.js` is the single canonical home, mirroring `eventDay.js`'s role for the after-midnight threshold:
+**Archiving is one-way.** Exactly four routes write `status`: `POST .../publish`, the PUT publish toggle, `POST .../archive`, and PATCH's dynamic `UPDATE events SET ${updates.join(", ")}`. Each rejects a status change on an archived event, and each `UPDATE` carries `AND status IN ('draft','published')` with a mandatory null check, so a concurrent archive yields 409, never a 500 or a silent resurrection. Grep `UPDATE events`, not `SET status`, to find all four; `edit.js`, `posters.js`, `reveal-mode.js` and `users/[id].js` also match and provably never write `status`. PATCH's predicate stays conditional: editing an archived event's description, poster or venue info is allowed.
 
-- `publicEventStatusSql(alias?)` → `status IN ('published','archived')`. The default for browse/history surfaces — **archived means concluded, not hidden.**
-- `archivedEventStatusSql(alias?)` → recap-only surfaces.
-- `publishedEventStatusSql(alias?)` → the narrower gate, for where serving a concluded event is _wrong_ rather than merely unusual. Live case: `/api/schedule?event=current`, whose `-6 hours` buffer means an event archived on its own final day still passes the date filter.
+**Only `POST .../publish` checks the lineup.** Zero performances gets 400 `EMPTY_LINEUP`, overridable with `allowEmptyLineup: true`, because "Lineup TBA" is a supported state. PATCH and the toggle stay unchecked on purpose. The client closes the UX gap (#821): `EventFormModal` sends a draft → published transition through `POST .../publish`, sharing `frontend/src/admin/utils/publishWithLineupConfirm.js` with the list toggle. Only the transition is rerouted, and the rejection is detected by `code`, never by message. **Creating an event as `published` is refused** (400 `CREATE_AS_PUBLISHED`, #804); `draft` and `archived` (historical back-fill) stay allowed. That create `INSERT` is a fifth status writer, which the `UPDATE events` grep misses.
 
-**Bucket membership is a lifecycle question before a date question.** `/api/events/timeline` splits: `now`/`upcoming` = published-only; `past` = `archived OR (published AND concluded by date)`. Both halves are load-bearing — narrowing the live buckets without `archived OR` in past makes an archived event with a live or future date match no bucket and vanish entirely.
-
-**Two** source-scanning guards enforce this, and they catch different things:
-
-1. **No `is_published` read or write anywhere**, outside `__tests__/**` (the guard tests necessarily name the retired column) and `functions/utils/eventVisibility.js` (its own header narrates this incident by name) — scanned on both sides of the build boundary (`functions/utils/__tests__/eventVisibility.test.js`, `frontend/src/__tests__/isPublishedGuard.test.js`). The `functions/api/admin/**`, `frontend/src/admin/**` and `utils/adminApi.js` exemptions were **removed** by #799 part 1; the `functions/api/test-utils.js` exemption (the shared test schema, kept only while it mirrored production's still-live column) came out with #799 part 2 once migration 0059 dropped the column from the test schema too. Nothing in `functions/` may name it any more, outside those two allowlisted paths.
-2. **No non-admin file queries `events` without importing the shared visibility helper.** The scan matches the helper _names_ (`…EventStatusSql`, `concludedEventSql`), not SQL semantics — so an inline `status = 'published'` written by hand does **not** satisfy it, deliberately: the point is one canonical home, not merely "some gate exists". The first guard only catches the _old column_; this one catches a route with no gate at all. That gap was real: `functions/s/[slug].js` (the OG card crawlers fetch for a shared schedule link) joined `events` ungated while both siblings for the same slug gated correctly, so an event unpublished _after_ a link was shared still produced a crawler-facing card naming it. Exempt by design, named in the guard: `api/metrics.js` (write-path existence check, projects only `id`) and `utils/timeConflicts.js` (admin-only, must see drafts).
-
-Guard 2 is a file-level scan: it catches "never imported the helper" (the class that has occurred), not "imported it and missed one query". Don't mistake it for proof of the latter.
-
-**Archiving is one-way, and every route that can write `status` enforces it — there are exactly four.** There is no unarchive endpoint. `POST .../publish`, the PUT publish-toggle, `POST .../archive` and `PATCH` all reject a status change on an archived event, and **each of those four `UPDATE`s carries `AND status IN ('draft','published')`** so a concurrent archive committing between the read and the write cannot be overwritten. A no-match returns 409, never a silent resurrection — and the null check is mandatory, not defensive: all four dereference `result` immediately, so the predicate without it converts a lost race into a 500.
-
-Two traps, both of which bit during #803's review:
-
-- **The four sites do not look alike.** Three are dedicated status endpoints with literal SQL; the fourth is PATCH's _dynamic_ `UPDATE events SET ${updates.join(", ")}`, which writes status only when the body carries it. Grepping for the literal `SET status` finds three of four. Grep `UPDATE events` instead — `edit.js`, `posters.js`, `reveal-mode.js` and `users/[id].js` also match but provably never write `status`.
-- **PATCH's predicate must stay conditional.** Editing an archived event's description, poster or venue info is legitimate and deliberately still allowed; only a _status_ change is one-way. Applying the predicate unconditionally would silently break archived-event editing.
-
-**Only one of those four routes checks the lineup, and that asymmetry is deliberate.** `POST .../publish` rejects publishing an event with zero performances (`400`, `code: "EMPTY_LINEUP"`) — but the rejection is _overridable_ with an explicit `allowEmptyLineup: true`, because "Lineup TBA" is a supported published state (announcing before booking completes, e.g. for SEO runway). PATCH and the PUT toggle carry **no** lineup check at all, and both now say so in a comment. Do not "fix" that by tightening them: it would make them stricter than the guarded route and block the very workflow the override exists to allow.
-
-The gap this leaves is a _UX_ one, and #821 closed it on the **client**, not the API: `EventFormModal` strips `status` from the PATCH payload for a draft → published transition and calls `POST .../publish` instead, so the confirmation appears whichever control the admin used. The shared confirm lives in `frontend/src/admin/utils/publishWithLineupConfirm.js` and is used by both that form and the Events-list toggle — previously the toggle asked and the form did not. Two traps: only the _transition_ is rerouted (re-saving an already-published event still PATCHes `status`, a no-op write that must stay allowed), and the empty-lineup rejection is detected by its `code`, never by matching `err.message`.
-
-**Creating an event as `published` is refused outright** (`400`, `code: "CREATE_AS_PUBLISHED"`, #804) — a row is born with zero performances, so create-as-published is _always_ a silent empty-lineup publish. `draft` and `archived` stay allowed on create; archived is historical back-fill (`HistoricalImportModal`) and carries no lineup requirement. Note the create path is an `INSERT`, so it does **not** appear in the `UPDATE events` grep above — that grep finds four writers, but there are five.
+Incident history and the #803 review traps: `docs/field-notes/event-visibility.md`.
 
 ### Server-side "today"/"now" is Toronto-local — never UTC-sliced
 
@@ -474,107 +411,38 @@ Example: `frontend/src/pages/EventRecapPage.jsx` — uses both `<Helmet>` (for o
 
 ### SSR owns identity meta and JSON-LD where it emits either; the client `<Helmet>` owns only what SSR does not emit — never canonical/`og:*`/`twitter:*`/description, and never JSON-LD on a route whose SSR handler already emits it
 
-`<Helmet>` only manages tags it created itself, marked internally with `data-rh`. Neither `index.html`'s baked-in defaults nor a Pages Function's server-injected `<meta>`/`<link>` carry that marker, so Helmet can't tell it already owns the slot — it **appends** a second copy on mount instead of replacing the first. `/artists` first showed this as `index.html`'s homepage `og:url="https://settimes.ca/"` sitting ahead of the page's own client-declared canonical: Google reads `og:url` as a canonicalization hint, prefers the first tag, and overrode our canonical — surfacing in Search Console as **"Duplicate, Google chose different canonical than user."**
+`<Helmet>` manages only tags it created (`data-rh`), so it **appends** a second copy of any tag that `index.html` or a Pages Function put there. A duplicate `og:url` once overrode our canonical ("Duplicate, Google chose different canonical than user"). Ownership is therefore split by who emits:
 
-The fix has two parts:
+- **`serveWithInjectedMeta()`** (`functions/utils/ssrMeta.js`) strips `index.html`'s defaults via `DEFAULT_META_RE` before injecting. Every `og:*`/`twitter:*`/`description` property `index.html` declares must be listed there, or its default becomes a live second copy (`og:site_name`, #784).
+- **On SSR-injected routes the client `<Helmet>` declares no `canonical`, `og:*`, `twitter:*` or `description`**, and no JSON-LD where the SSR handler passes `jsonLd` (`/band/*`, `/venue/*`, #790). It may set `<title>`, but only with the SSR formula verbatim and only once data has loaded (#785); `functions/api/venues/[id].js` exposes `city` so the venue title can reproduce its formula. `ssrIdentityMeta.test.jsx` asserts this, including the fetch-in-flight case; keep that case. It mounts with `createRoot`, not `hydrateRoot`, because the app is client-rendered.
+- **SSR owns what SSR emits; everything else stays client-owned.** Before deleting a tag from a `<Helmet>`, confirm SSR emits an equivalent, or the sweep drops the tag instead of de-duplicating it. `functions/band/[id].js`'s JSON-LD `description` is a separate, untruncated value: do not merge it with the 200-char meta description (most bios exceed it). Where the two disagreed, the complete, spec-valid value won (`og:type="website"`, `twitter:card="summary_large_image"`).
+- Do not mark SSR tags `data-rh` so Helmet adopts them: that relies on the replace behaviour React 19 makes unreliable. Accepted tradeoff: identity meta freezes across in-app navigation; crawlers always fetch fresh.
+- **Every indexable route has a Pages Function injecting its own meta:** `/event/*`, `/band/*`, `/venue/*`, `/events/*/recap` (D1-backed, `functions/events/[slug]/recap.js`) and the static pages through `STATIC_PAGES` (`functions/utils/staticPageMeta.js`, one 2-line route file each). `/` has `functions/index.js`, which injects event links into the `<noscript>` nav and leaves `<head>` byte-for-byte: `index.html`'s defaults are the homepage's correct meta, and `EventsPage` owns it client-side. Every shell-rewriting handler uses `headersForRewrittenShell()`: policy headers kept, `Content-Type` set, `ETag`/`Last-Modified`/`Content-Length`/`Content-Encoding` dropped.
+- **The handler must server-render the URL people actually link to.** Artist links are slug-built, so `functions/band/[id].js` resolves a slug via `normalizeBandName` and **301**s to `/band/<id>`, query preserved (#983). The `Location` is relative on purpose (canonicals pin the host; redirects preserve it), the public-data gate runs before the lookup (else an existence oracle), and an unresolvable slug renders the shell, not a 404. `functions/venue/[id].js` is safe only because venue links are id-built; a `/venue/<slug>` link builder needs the same redirect.
+- **`/event/:slug` (live) and `/events/:slug/recap` (archive) are different resources.** Anything building an event URL picks the right prefix (#562). Do not unify them (declined, #910).
+- Build every URL from `CANONICAL_HOST`, never `request.url`.
+- **`frontend/public/_routes.json` is the only routes file**, and `exclude` beats `include`. `functions/__tests__/staticPageMeta.test.js` fails if an included path lacks a route file or registry entry. Never recreate a root `/_routes.json`.
 
-1. **`serveWithInjectedMeta()`** (`functions/utils/ssrMeta.js`) strips `index.html`'s baked-in defaults via `DEFAULT_META_RE` _before_ injecting page-specific tags, so a crawler that never executes JS sees exactly one of each. **Every `og:*`/`twitter:*`/`description` property `index.html` declares must be listed in `DEFAULT_META_RE`** — the moment a Pages Function starts emitting a property `index.html` already has (`og:site_name` was the case that caught this, #784), an unstripped default turns into a second, live copy instead of a silent gap.
-2. **The client `<Helmet>` on every SSR-injected route must not declare `canonical`, `og:*`, `twitter:*`, or `description`** — SSR is the single owner of identity meta, full stop, not merely "must agree with the client." `<Helmet>` may still set `<title>` (backed by the direct `document.title = ...` assignment above — same React 19 unreliability), but **when it does, the string must replicate the SSR `<title>` formula verbatim, and the assignment must be gated on the data having loaded** (#785): before the fix, the client's loading-state title replaced the server-sent title mid-render, so crawlers that execute JS (Googlebot's rendering queue) could register a title different from the raw-HTML one. `BandProfilePage.jsx` and `App.jsx`/`EventRecapPage.jsx` (which gate on `loading`) are the enforced pattern; `functions/api/venues/[id].js` exposes `city` precisely so the venue client title can reproduce `functions/venue/[id].js`'s formula. `ssrIdentityMeta.test.jsx` seeds the SSR `<title>` and asserts it survives mount (including with the fetch still in flight) — do not drop that deferred-fetch case when touching title effects. **The same rule applies to JSON-LD on any route whose SSR handler passes a `jsonLd` block** — `/band/*` and `/venue/*` duplicated their `MusicGroup`/`MusicVenue` schema client-side the same way until #790; the client copy is deleted, not merely trimmed, once SSR emits an equivalent (`functions/band/[id].js`'s JSON-LD `description` was truncated to the 200-char SERP length shared with `<meta name="description">` — fixed to a separate, untruncated value before the client copy was removed, since 44 of 62 artist bios in production exceed 200 chars). A route whose SSR handler passes no `jsonLd` (the `STATIC_PAGES` registry pages, the recap page) keeps its JSON-LD, if any, client-owned.
+Mocked unit tests cannot prove Cloudflare dispatches to a handler. Verify routing changes against `npx wrangler pages dev --port 8788` and diff per-path tag counts.
 
-   **The rule is "SSR owns what SSR emits," not "the client may only own `<title>`."** A tag no SSR handler emits stays client-owned and must not be deleted in an ownership sweep — deleting it drops the tag rather than de-duplicating it. `BandProfilePage.jsx`'s `<meta name="keywords">` was the worked example: it had no SSR equivalent, so it correctly survived #790's ownership sweep — and was then removed by **#797** on the unrelated grounds that search engines have ignored `keywords` since 2009. Deleting it _for the ownership reason_ would have been the error; deleting it because the tag is dead everywhere is not. That page's `<Helmet>` (and its `react-helmet-async` import) went with it, since the tag was its only child. This is the same trap as `og:site_name` in #784.
-
-The rejected alternative was marking SSR-injected tags `data-rh="true"` so Helmet would adopt and replace them instead of appending. Rejected because it makes canonical correctness depend on Helmet _reliably adopting and replacing_ tags it didn't create — the exact behavior already documented above as unreliable for `document.title` in React 19. Inverting ownership removes the duplicate class entirely without depending on Helmet's replace behavior working.
-
-**Tradeoff, accepted:** since SSR only injects meta into the initial HTML response, identity meta now freezes at whatever that response's values were across client-side (in-app) navigation between SSR-injected routes — refreshed only by a full-page load. This doesn't affect crawlers or link-unfurl bots, which always fetch the specific URL fresh; it only affects a live DOM read after in-app navigation, which nothing in this codebase does.
-
-- **Every indexable route needs a Pages Function that injects its own meta.** `/event/*`, `/band/*`, `/venue/*` have always had one; the eight static pages go through the `STATIC_PAGES` registry in `functions/utils/staticPageMeta.js`, one 2-line route file each; `/events/*/recap` (the archive recap page, distinct from singular `/event/*`) is D1-backed like `/event/*`/`/band/*`/`/venue/*` rather than registry-driven — `functions/events/[slug]/recap.js` — because its title/description embed per-event stats (`total_sets`, `venue_count`) a static registry entry can't express.
-
-  **"Has a Function" is not the same as "the Function server-renders the URL people actually link to."** `/band/*` had a handler from the start, but it bailed to the un-injected shell for any non-numeric id — and _every_ public link to an artist is slug-built (`buildBandProfileHref`, used by ArtistsPage, StatsPage, EventRecapPage, EventTimeline, BandCard), while only the sitemap used the id form. So Googlebot crawled `/band/<slug>`, got 200 with the **homepage** title and no canonical, and 14 of them entered the index as duplicates of their own `/band/<id>` page — one ranking at position 49, two drawing clicks. `BandProfilePage` corrected the URL client-side, so the fix existed only after JS ran. Fixed in #983: `functions/band/[id].js` now resolves the slug through `normalizeBandName` (which agrees with `slugifyBandName` by construction — both reduce to `/[a-z0-9]/`) and **301**s to `/band/<id>`, query string preserved.
-
-  Three things about that fix are load-bearing and easy to undo:
-  - **The `Location` is relative**, deliberately breaking the `CANONICAL_HOST` rule two bullets down. That rule stops a preview deploy self-_canonicalising_; an absolute `Location` would _bounce_ preview and `www` traffic to production mid-request. Canonicals pin the host; redirects preserve it.
-  - **The public-data gate runs before the lookup.** A redirect that fires only for real slugs is an existence oracle even when it leaks no field values.
-  - **An unresolvable slug still renders the shell**, not a 404 — it may be a renamed artist whose old URL is still linked.
-
-  `functions/venue/[id].js` carries the identical numeric guard and is safe only because every venue link is id-built. Adding a `/venue/<slug>` link builder without also adding the redirect reintroduces the whole class — there is a comment in that file saying so.
-
-- **Before deleting a tag from a page's `<Helmet>`, confirm SSR emits an equivalent** — the ownership sweep isn't just "delete the client copy." `og:site_name` existed only in two pages' old client Helmet (`SubscribePage.jsx`, `App.jsx`'s `/event/:slug`) and had no SSR equivalent anywhere; deleting it outright would have silently dropped the tag rather than de-duplicating it. Two other disagreements surfaced the same way on `/event/:slug`: the old client `og:type="event"` (invalid without Facebook's required `event:start_time`/`event:end_time` properties, which this route never emitted) and `twitter:card="summary"` (no image) lost to SSR's already-established, spec-valid `og:type="website"` / `twitter:card="summary_large_image"` — the more complete value wins once there's only one.
-- **`/` has a dedicated Function for body links only.** `index.html`'s baked-in defaults _are_ the homepage's correct meta, and `EventsPage` keeps full client-side ownership of its identity meta there. `functions/index.js` injects current-event links into the existing `<noscript>` nav. It preserves the shell's `<head>` byte-for-byte and its **policy** headers (CSP, HSTS, COOP/CORP, frame options, `Cache-Control`), sets `Content-Type`, and **drops the representation headers** that describe only the original bytes: `ETag`, `Last-Modified`, `Content-Length`, `Content-Encoding`. Every handler that rewrites the shell uses `headersForRewrittenShell()` (`functions/utils/ssrMeta.js`) for this. Copying the shell's `ETag` onto a rewritten body labels new content with old validators, and production hides that only because the edge strips the header (#1163 review).
-- **The singular/plural prefix split is deliberate — do not "unify" it.** `/event/:slug` is the live event page; `/events/:slug/recap` is the archive recap, a _different resource_. Both are SSR-injected, listed in `_routes.json`, and emitted into `sitemap.xml`, so both are indexed. Anything that constructs an event URL — digest emails, share links, structured data — must pick the right prefix; building the wrong one is how #562 shipped broken links in digest emails, and it reads as an oversight precisely because nothing said otherwise. It is not one: an indexed URL is an external contract in the same way the public API paths and the `band_profiles` table name are, and migrating it would cost permanent 301s, a sitemap change, an SSR handler move and `_routes.json` surgery to buy guessability on the least-trafficked public surface we have. Declined deliberately in #910.
-
-- **Build every URL from `CANONICAL_HOST`, never `request.url`** — preview deploys must not self-canonicalise.
-- **`_routes.json` `exclude` beats `include`.** A path listed in both never reaches its Function, and the page silently regresses to the shared shell. The guard test in `functions/__tests__/staticPageMeta.test.js` scans `_routes.json` and fails if an included path lacks either a route file or a registry entry. **The file is `frontend/public/_routes.json`, and it is the only one** — `wrangler.toml` sets `pages_build_output_dir = "frontend/dist"`, so Cloudflare reads the copy Vite emits from `frontend/public/`. A second, stale `/_routes.json` sat at the repo root until #786; it listed only `/api/*` and `/s/*`, so anyone reading it would have concluded the SSR routes were never wired up. Do not recreate one — a root copy is dead on arrival and actively misleading.
-
-Mocked unit tests prove the handler _builds_ correct HTML; they cannot prove Cloudflare _dispatches_ to it, and a pure string assertion on the SSR response can't prove Helmet doesn't duplicate it after mount. Verify routing changes against a real `npx wrangler pages dev --port 8788` and diff the tag counts per path; `frontend/src/pages/__tests__/ssrIdentityMeta.test.jsx` covers the mount side — it seeds `document.head` with the tags SSR would have injected, mounts the real page component the same way `main.jsx` does (`createRoot`, not `hydrateRoot` — this app is client-rendered, not server-rendered; see that file's header comment), and asserts exactly one `canonical`/`og:url` survives (plus, on `/band/*` and `/venue/*`, exactly one JSON-LD `script` per `@type`).
+Search Console evidence, the `/band/<slug>` incident and the rejected alternatives: `docs/field-notes/ssr-identity-meta.md`.
 
 ---
 
 ### The sitemap is the event-discovery signal — spend it (#1158)
 
-**Until #1159, no page on this site emitted a single crawlable `<a>`.** Verified
-2026-09-10 against production: `/`, `/events`, `/artists`, `/event/*` and
-`/band/*` all returned **zero** anchors in raw HTML, because
-`serveWithInjectedMeta()` injects into `<head>` only and the `<body>` stays an
-empty `#root`. Googlebot renders JS, so pages _did_ get indexed — but every
-link-derived signal was absent, and Search Console confirmed it: an indexed
-page's sole `referring_urls` entry was `https://settimes.ca/sitemap.xml`.
+Until #1159 no page emitted a crawlable `<a>` in raw HTML (`serveWithInjectedMeta()` touches `<head>` only and `<body>` is an empty `#root`), and Search Console listed the sitemap as an indexed page's only referrer.
 
-`frontend/index.html` now ships a `<noscript>` nav covering the static,
-parameterless routes, so every page carries a link graph in raw HTML. Three
-things about it are load-bearing:
-
-- **`<noscript>`, not a plain element.** React only replaces `#root`, so markup
-  placed beside it renders _alongside_ the app's own nav for every JS visitor.
-  The links are still parsed in the raw-HTML pass, and a scripting-off visitor
-  gets real navigation instead of a blank page.
-- **Every href must be a real `<Route path>` in `main.jsx`.** `/events` is the
-  trap — it reads like the event list but is **not** a route; the list lives at
-  `/`. `frontend/src/__tests__/crawlableLinks.test.js` enforces this, because
-  linking a 404 spends a discovery signal on a dead end.
-- **Only parameterless routes.** A static shell cannot know a slug.
-
-**The event-specific link is now injected by the homepage Function.** It links
-current public events in the existing raw-HTML `<noscript>` nav and changes
-body links only: the shell's `<head>` and response headers remain the static
-asset's values. The sitemap remains the primary event-discovery signal; the
-homepage link is the strongest internal signal for which edition matters now.
-
-So `functions/sitemap.xml.js` is still the primary signal, and the only one that
-speaks about events.
-
-Which is why events are no longer emitted at a flat `weekly` / `0.8`. That rate
-made the live edition indistinguishable from four archived ones — twenty URLs
-sharing a priority — and `/event/lwbc18` sat `Discovered - currently not
-indexed`, `last_crawled: null`, **31 days before the event**, while an older
-recap page was indexed fine.
+- `frontend/index.html` ships a `<noscript>` nav of parameterless routes: `<noscript>`, so JS visitors do not get a second nav. Every href must be a real `<Route path>` in `main.jsx`. `/events` is **not** one (the list is `/`). `frontend/src/__tests__/crawlableLinks.test.js` enforces this.
+- `functions/index.js` adds current public event links to that nav at request time (#1163).
+- `functions/sitemap.xml.js` is the primary event-discovery signal, in two states:
 
 | event state          | priority | changefreq |
 | -------------------- | -------- | ---------- |
 | published, upcoming  | `1.0`    | `daily`    |
 | concluded / archived | `0.5`    | `monthly`  |
 
-Three things not to undo:
-
-- **`changefreq` matters as much as `priority`.** An upcoming event's lineup and
-  set times change daily; `weekly` told Google to check back less often than
-  reality warrants.
-- **A concluded event's `0.5` sits just under its own recap page's `0.6`, on
-  purpose.** Once an edition is over, the recap — with its per-event stats — is
-  the better answer than the schedule page.
-- **`is_concluded` comes from the shared SQL predicate** (`concludedEventSql()`),
-  not a local date compare, so this cannot drift from the recap API or the recap
-  SSR route. That drift is exactly what #787 fixed.
-
-The tests assert the two states **differ**, not that each has some value — a
-test that only checked "the URL is present" passed with the priorities
-identical, which is how the flat rate survived this long. Both halves are in the
-mutation gate.
-
-**#1159 narrowed this, and #1163 closes the missing event link.** The shell now
-carries a crawlable link _spine_, and `functions/index.js` adds current public
-event links at request time without disturbing homepage meta ownership. The
-sitemap remains the event-specific discovery signal and its priorities are still
-worth this much attention.
+`changefreq` matters as much as priority. A concluded event's `0.5` sits just under its recap's `0.6` on purpose. `is_concluded` comes from `concludedEventSql()`, never a local date compare (#787). Under the old flat `weekly`/`0.8`, `/event/lwbc18` sat unindexed 31 days before the event. The tests assert the two states **differ**, because a presence-only test let that flat rate survive. Both halves are in the mutation gate.
 
 ## Theming
 
@@ -699,38 +567,27 @@ Three traps here, each of which was live:
 
 ### The request path — a key borrows a person's identity, and that is the whole risk
 
-`functions/api/admin/_middleware.js`'s `onRequest` gained an API-key branch. Its order is not stylistic:
+`functions/api/admin/_middleware.js`'s `onRequest` orders this deliberately:
 
-1. A request is key-authenticated **iff** `Authorization: Bearer <v>` and `v` starts with `API_KEY_PREFIX` (`st_`). That prefix test is the discriminator because `resolveSession` **already** reads `Authorization: Bearer …` as a _Lucia session id_ under `ALLOW_HEADER_AUTH` (non-production only). Both meanings coexist; the prefix separates them. Import `API_KEY_PREFIX` from `utils/apiKeys.js` — never retype `"st_"`.
-2. **Key + any session cookie → 400 `AMBIGUOUS_AUTH`, before either credential is validated.**
-3. The key branch `return next()`s early, which **structurally skips `validateCSRFMiddleware`**.
+1. A request is key-authenticated **iff** it has `Authorization: Bearer <v>` and `v` starts with `API_KEY_PREFIX` (import it; never retype `"st_"`). Under `ALLOW_HEADER_AUTH` (non-production) the same header carries a session id; the prefix separates the two, and session ids (`crypto.randomUUID()`) can never start with `st_`.
+2. A key plus any session cookie gets 400 `AMBIGUOUS_AUTH`, before either is validated. This is defence in depth against privilege confusion.
+3. The key branch returns early and skips CSRF. **That is safe because `Authorization` is not an ambient header**: a browser never attaches it cross-origin without a preflight, which `functions/_middleware.js` grants only to allowlisted origins.
 
-**What makes step 3 safe is that `Authorization` is not an ambient header** — a browser never attaches it cross-origin without a successful preflight, and `functions/_middleware.js` emits `Access-Control-Allow-Headers: …Authorization` only for an origin already on the allowlist, which an attacker does not control. That is a property of the platform, not of code anyone can edit here. **Step 2 is defence-in-depth against privilege confusion, not the load-bearing control** — an earlier draft of this section said it was, which was wrong twice over: it made the skip look one edit from a CSRF bypass, and it demanded an exactness the check did not have. `parseCookies` split on `=` without trimming the resulting _name_, so `__Host-session_token =abc` keyed the map on `"__Host-session_token "` and `getCookie` returned undefined while `lucia.readSessionCookie` (which compares `k.trim()`) read it fine. Fixed in `cookies.js` — which also stopped it truncating any value containing `=`.
+`context.data.user.role` is **the key's role, never its creator's**, and `context.data.apiKey` carries `{ id, keyPrefix, role }`; endpoints need no changes because `checkPermission` reads `context.data.user`. `context.data.user.userId` is **the creator's**, and that is the sharp edge: an endpoint that reads `userId` as "the human in this browser" acts on the creator's own account. A security review found five such endpoints live (MFA setup and enable, the sessions list, revoke-all, trusted devices). So:
 
-`context.data.user.role` is **the key's role, never its creator's**. A `viewer` key minted by an admin authorises as `viewer`; getting this backwards makes every key an admin key. `context.data.apiKey` carries `{ id, keyPrefix, role }`. Endpoints need no changes — `checkPermission` already short-circuits on `context.data.user`.
+- `KEY_FORBIDDEN_PREFIXES` 403s self-service families (`KEY_NOT_PERMITTED`) **before** the key is verified, for every key role including `admin`. `/api/admin/me` is deliberately not listed.
+- Keys are read-only on `/api/admin/users` and `/api/admin/api-keys` (mutations refused before key verification), and barred from `/api/admin/invite-codes` entirely, because its GET exposes plaintext codes. Identity management is a human act.
+- `revoke-all.js` calls `checkPermission(context, "viewer")` itself. Viewer, so self-service logout works at every role.
+- `apiKeySelfService.test.js` fails on any admin handler with no `checkPermission` that is neither denylisted nor in `REVIEWED_UNGATED_ROUTES`. It catches only the ungated shape: the MFA shape (viewer-gated, acting on self) is covered by name, and a new self-service family outside these prefixes needs a human to notice.
 
-**But `context.data.user.userId` is the creator's, and that is the sharp edge.** It has to be — audit attribution and every ownership check need a real user id. The consequence is that any endpoint reading `data.user.userId` as _"the human holding this browser session"_ will act on the **creator's own account** when a key calls it. A security review of this branch found five such endpoints live:
+Related rules:
 
-| Route                            | Gate it had | What a `viewer` key got                                                                                          |
-| -------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------- |
-| `mfa/setup.js` + `mfa/enable.js` | `viewer`    | planted an attacker-controlled TOTP secret **and backup codes on its admin creator**                             |
-| `sessions.js` (GET)              | **none**    | the admin's live sessions, with IPs and user agents                                                              |
-| `sessions/revoke-all.js` (POST)  | **none**    | invalidates every session and **mints a new one**; only failed because `data.lucia` is undefined on the key path |
-| `trusted-devices.js`             | **none**    | device inventory with IPs; revokes them                                                                          |
+- `ALLOW_HEADER_AUTH`'s production guard uses `isDevRequest`, never `!== "production"`, in both copies (`_middleware.js`, `auth/logout.js`).
+- `csrf.js`'s `getSessionIdentifier` ignores any bearer value starting with `API_KEY_PREFIX`.
+- Failure logs record only `bearerValue.slice(0, DISPLAY_PREFIX_LENGTH)`.
+- `parseCookies` (`cookies.js`) trims cookie names and keeps values that contain `=`.
 
-`KEY_FORBIDDEN_PREFIXES` in `_middleware.js` now 403s these families (`KEY_NOT_PERMITTED`), **checked before the key is verified** — the refusal is a property of the credential type and the path, so a forged key and a valid one are refused identically at zero D1 cost. **The role hierarchy is the wrong axis here: no key role belongs on these routes, including one minted `admin`.** `/api/admin/me` is deliberately _not_ listed — a decision, not an omission.
-
-Keys are read-only for `/api/admin/users` and `/api/admin/api-keys`: GET/HEAD remain available, but every mutation is refused before key verification. Keys cannot touch `/api/admin/invite-codes` at all because GET exposes plaintext codes that can mint accounts. Identity management is a human act; a leaked key must not create a principal that outlives its own revocation.
-
-`revoke-all.js` also got its own `checkPermission(context, "viewer")`. **`viewer`, not `admin`:** revoking your own sessions is legitimate self-service at every role, and raising the tier would break a viewer logging out everywhere. The point is that an endpoint which mints sessions must state its own requirement rather than inherit safety from middleware shape.
-
-`functions/api/admin/__tests__/apiKeySelfService.test.js` keeps it closed: any admin route exporting an `onRequest*` handler with **no `checkPermission` call** must be covered by the denylist or recorded in `REVIEWED_UNGATED_ROUTES` with a reason. **Its scope is honest and partial** — it catches the _ungated_ shape, not the MFA shape (viewer-gated, then acting on self), because nothing textual separates that from a viewer-gated route acting on `params.id`. The MFA family is covered by name instead. A sixth self-service family outside these prefixes still needs a human to notice.
-
-**`ALLOW_HEADER_AUTH`'s production guard must use `isDevRequest`, not `!== "production"`.** The raw comparison passes for `"Production"`, `" production"` and `"PRODUCTION"` — and it is the switch deciding whether `Authorization: Bearer <session-id>` is a credential at all, which is now the _other_ meaning of the header the `st_` prefix discriminates against. There were **two** copies (`_middleware.js` and `auth/logout.js`); both now use `isDevRequest`, which allowlists known dev values and fails closed (#425). Session ids are `crypto.randomUUID()` and can never begin with `st_`, so no single value satisfies both discriminators.
-
-**An API key must never become CSRF HMAC input.** `csrf.js`'s `getSessionIdentifier` falls back to the `Authorization` bearer value for the `ALLOW_HEADER_AUTH` dev path; it now ignores anything starting with `API_KEY_PREFIX`. Not a leak — the identifier is only ever hashed — but a live 256-bit secret has no business flowing into a second subsystem.
-
-Failure logging records `bearerValue.slice(0, DISPLAY_PREFIX_LENGTH)` — the non-secret display prefix — so brute force is visible without the presented secret reaching a log sink.
+The review's findings table and the corrected reasoning: `docs/field-notes/api-keys.md`.
 
 ### Time validation is shape AND range — `isValidTime()` is the only home (#1089)
 
@@ -762,17 +619,13 @@ drifted passes while checking nothing.
 
 ### Never use numbered `?N` SQL placeholders anywhere in `functions/`
 
-D1 accepts them; **better-sqlite3, which backs the entire unit-test harness, does not** — it treats `?1`/`?2` as _named_ parameters and refuses positional binding outright (`RangeError: Too many parameter values were provided`).
+D1 accepts `?1`/`?2`; **better-sqlite3, which backs the unit-test harness, refuses positional binding for them** (`RangeError: Too many parameter values were provided`). While `rateLimit.js` used them, `checkRateLimitByKey` failed closed in every test, so its success path never ran under test. Repeat the value positionally instead. `functions/utils/__tests__/rateLimitPlaceholders.test.js` scans `functions/` for `?N` and asserts the limiter actually counts (`remaining` decrements).
 
-The failure is silent where it matters. `checkRateLimitByKey` catches its own errors and **fails closed**, so while `rateLimit.js` used numbered placeholders its success path had _never once executed under test_ — every test reaching it got a 429 from the catch. The module sits on the auth, subscriptions, band-follow and `/api/metrics` paths. It was found only because a new caller's tests all came back 429 for no visible reason.
+### Audit attribution for API keys — `audit_log.api_key_id` and `api_key.request`
 
-Repeat the value positionally instead. `functions/utils/__tests__/rateLimitPlaceholders.test.js` scans `functions/` for `?N` and separately asserts the limiter actually counts (`remaining` decrements) rather than returning the fail-closed shape — that second assertion is the one that catches a regression the scan cannot see.
+`audit_log.api_key_id` (migration 0061) records which credential acted; NULL means cookie-authenticated. Both builders in `auditLogStatement.js` take it as a trailing optional argument. Threading `api_key_id` through the ~15 per-action call sites was considered and deliberately not done. Instead the middleware writes one `api_key.request` row per key-authenticated **mutating** request, before `next()`, so it captures requests that then 403 or 404; correlate it with the per-action rows that share its `user_id`. It is the one audit row written outside a batch, because there is nothing to batch it with; it is not precedent for standalone audit rows. `retention.js` prunes it at **90 days** (`action = 'api_key.request'`) while the rest of `audit_log` keeps 1 year (`!=`); the predicates are disjoint on purpose.
 
-`audit_log.api_key_id` (migration 0061) records which credential acted; NULL means cookie-authenticated. Both builders in `auditLogStatement.js` take it as a trailing optional argument, so existing call sites are unchanged and write NULL. The middleware also writes one `api_key.request` row per key-authenticated **mutating** request — that, correlated with the per-action rows sharing its `user_id`, is how "which credential did this" gets answered. Threading `api_key_id` through all ~15 per-action call sites was considered and deliberately not done.
-
-**`api_key.request` is the one audit row not written in a batch, and it has its own retention tier.** It records a _request_, not a change, and is written before `next()` runs — so there is nothing to batch it with, and it captures requests that then 403 or 404. Do not read it as precedent for writing audit rows standalone. Because it is one row per mutating key request against a 60/min ceiling (~31.5M rows/year from a single saturated key), `retention.js` prunes `action = 'api_key.request'` at **90 days** while the rest of `audit_log` stays at 1 year; the two predicates are deliberately disjoint (`=` vs `!=`) so they cannot double-count.
-
-Audit rows for the API-key routes otherwise go in the **same `DB.batch`** as the change. **That is a statement about this feature, not a repo-wide rule** — measured 2026-08-31, only 5 of the 26 admin handlers calling `auditLog` batch it with their write (`bands/[id].js`, `bands/bulk.js`, `events/[id].js`, `events/wizard.js`, `venues/[id].js`); the other 21 issue the change and the audit row as separate statements, so a failed audit write leaves an unattributed change. Whether that should be tightened repo-wide is an open question, not a settled invariant — read this sentence as scoped before citing it. It was previously unqualified and was read as universal while briefing work on `events/[id]/edit.js`, which does not batch. Creation is the awkward case — the key's id does not exist until the INSERT runs — so `auditLogStatementForInsertedRow()` (`functions/utils/auditLogStatement.js`) resolves `resource_id` with an `INSERT … SELECT … FROM <table> WHERE <col> = ?`. It takes a table and column **identifier**, not a SQL string, and validates both with an explicit `typeof value === "string"` check: `RegExp.prototype.test` coerces its argument, so a bare `/^[A-Za-z_]\w*$/.test(undefined)` tests the string `"undefined"` and **passes**. Note also that `INSERT … SELECT` over zero rows inserts nothing and does not error — so pass either a value the preceding INSERT just wrote, or **exactly the same predicate** the conditional UPDATE in the batch uses (an array value renders `IN (…)` for that). A _narrower_ predicate than the UPDATE's commits the change with no audit row: `schedule.js` first pinned `status = <status read at request start>`, so a concurrent publish toggle left a schedule change unattributed (#1161 review).
+The API-key routes batch their audit row with the change. **That is not a repo-wide rule:** measured 2026-08-31, 5 of 26 admin handlers batch (`bands/[id].js`, `bands/bulk.js`, `events/[id].js`, `events/wizard.js`, `venues/[id].js`), and whether to tighten the rest is open. For creation, `auditLogStatementForInsertedRow()` resolves `resource_id` with `INSERT … SELECT … FROM <table> WHERE <col> = ?`, and validates the identifiers with an explicit `typeof value === "string"` (a bare `RegExp.test(undefined)` passes). `INSERT … SELECT` over zero rows inserts nothing without an error, so pass either a value the preceding INSERT wrote or **exactly** the conditional UPDATE's predicate (an array value renders `IN (…)`). A narrower predicate commits the change with no audit row (#1161 review).
 
 ---
 
@@ -780,151 +633,37 @@ Audit rows for the API-key routes otherwise go in the **same `DB.batch`** as the
 
 **Use the cancel toggle (`is_cancelled = 1`). Do not un-announce, and do not delete the row.**
 
-`is_announced = 0` is **not** a way to hide a set. Every public read path **that returns per-performance rows** guards with `AND (e.reveal_mode = 0 OR p.is_announced = 1)` — **10 files**, and three of them bind `reveal_mode` as a parameter (`AND (? = 0 OR p.is_announced = 1)`): `api/events/[id]/details.js`, `api/schedule.js`, and `event/[slug].js`, which uses both forms. Grep for `is_announced = 1` rather than the literal `e.reveal_mode` form or you will undercount:
+- **`is_announced = 0` hides nothing on a `reveal_mode = 0` event**, which is the normal published state. Per-performance public read paths gate with `(e.reveal_mode = 0 OR p.is_announced = 1)` (some bind it as `? = 0`), which short-circuits true. There are ten: `api/bands/[name].js`, `api/bands/[name]/stage-mates.js`, `api/bands/stats/[name].js`, `api/events/[id]/details.js`, `api/events/timeline.js`, `api/feeds/ical.js`, `api/schedule.js`, `api/schedule/share/[slug].js`, `api/venues/[id].js`, `event/[slug].js`. To sweep, grep `is_announced = 1` and then check the projection, because `follow-batch.js`, `schedule/build.js` and `s/[slug].js` match but return no per-performance rows. The `0 → 1` transition still sends follower email, so un- and re-announcing can mail people while changing nothing publicly.
+- **Deleting the row** hides the set, but fans get no cancellation signal, and it vanishes silently from shared routes (#733).
+- **Cancelling** (the LineupTab toggle: `PATCH /api/admin/bands/:id` with `is_cancelled: true`, editor or above, #732) keeps the set visible and struck through on every fan surface, drops it from "up next" and live time math, makes it unselectable, emits `STATUS:CANCELLED`, and blocks the announcement email. It applies to one performance: a band with two sets needs two cancels.
+- **Un-cancelling resends nothing**, since the announce path needs an `is_announced` `0 → 1` transition. **It is also the one transition that can double-book**, because a cancelled set frees its slot: the PATCH runs `checkConflicts` on `1 → 0` and 409s naming the holder, never auto-resolving.
 
-`api/bands/[name].js`, `api/bands/[name]/stage-mates.js`, `api/bands/stats/[name].js`, `api/events/[id]/details.js`, `api/events/timeline.js`, `api/feeds/ical.js`, `api/schedule.js`, `api/schedule/share/[slug].js`, `api/venues/[id].js`, `event/[slug].js`
+**Calendar surfaces never invent times.** Three surfaces share these rules: `functions/api/feeds/ical.js`, `prepareBands` (`DEFAULT_SET_DURATION_MS` in `frontend/src/utils/bandUtils.js`) and the My Route export (`frontend/src/utils/routeIcs.js`, #1251). Change one, change all.
 
-**The grep over-reports, so check the projection before adding a file here.** `is_announced = 1` also appears in `api/bands/follow-batch.js` (`SELECT DISTINCT p.band_profile_id` — band-level, not per-performance), `api/schedule/build.js` (`SELECT p.id` only) and `s/[slug].js` (id + name for the OG card). None returns per-performance rows, so none belongs in the list above. `api/schedule/share/[slug].js` does — it projects `start_time`, `end_time`, `performance_date`, `is_cancelled` and `venue` — and was missing from this list until 2026-09-20, even though that file's own comment already described itself as joining "the nine other public read paths."
+- A set with no `start_time` is omitted (#1079: a `"20:00"` fallback once stacked a whole lineup at 8 PM).
+- A missing end is one hour after the start, written in `.ics` as `DURATION:PT1H`. A constant `DTEND` can precede the start, and a computed one doubles across the DST repeat hour.
+- After-midnight sets are dated on the next calendar day, cancelled sets are `STATUS:CANCELLED`, and UIDs share one scheme.
+- Every time is `DTSTART;TZID=America/Toronto` with an identical `VTIMEZONE` in both `.ics` builders. A floating time shows the right hour in the wrong zone (#1261), and `X-WR-TIMEZONE` does not prevent that.
+- `DESCRIPTION` lines are joined with a real newline and escaped once.
 
-On a `reveal_mode = 0` event the left side short-circuits **true**, so `is_announced` is never consulted for visibility. The set stays on the schedule, the artist page, the venue page and the iCal feed. Nothing errors; the failure is invisible until fans arrive at a dark venue.
+The server feed's two fallbacks are in the mutation gate (`ical-no-fabricated-start-time`, `ical-end-time-derived-not-constant`). The My Route export is guarded only by `frontend/src/utils/__tests__/routeIcs.test.js`. Keep `docs/SHOW_DAY_RUNBOOK.md` in step with this section, in the same commit.
 
-`is_announced` is not meaningless on such an event, though — the **`0 → 1` transition still drives the follower announcement email** (see "Band Announcements" below). Un-announcing and re-announcing a set on a `reveal_mode = 0` event changes nothing publicly while still being capable of sending mail.
-
-`reveal_mode = 0` is the normal state for a published lineup — Buddies Fest 2 (event 36) is `reveal_mode = 0`. So this trap applies to exactly the events you are most likely to be editing during a show.
-
-Deleting the performance row does hide it, but it is lossy: a fan who already saw the lineup gets no signal the set was cancelled, and since #733 the set is **dropped entirely** from already-shared routes — `schedule/share/[slug].js` resolves live performances and filters out ids that no longer exist, so a fan reopening their shared link finds the stop silently gone rather than marked off. (Before #733 it left an orphaned name with no time or venue, which read as a rendering bug; dropping it is better, but neither tells the fan the set was cancelled.)
-
-Since #732 the correct action is the reversible cancel toggle in LineupTab (`PATCH /api/admin/bands/:id` with `is_cancelled: true`, `editor` role or above). It keeps the set visible and struck through with a "Cancelled" label on every fan surface, suppresses it from "up next" routing and live/starting-soon time math, makes it unselectable, emits `STATUS:CANCELLED` to calendar subscribers, and **blocks the announcement email** — a cancelled performance can neither queue nor send a follower notification.
-
-**Un-cancelling does not resend anything.** The announce path fires only on an `is_announced` `0 → 1` transition (`hasAnnounced && newValue === 1 && isCancelled === 0 && performance.is_announced === 0 && !performance.band_follow_notified`). Restoring a set leaves `is_announced` untouched, so a performance that was already announced before being cancelled produces no new transition, no `band_announce_queue` rows, and no follower email. Un-cancel restores visibility and selectability only. **It is also the one transition that can double-book**, because a cancelled set frees its slot (decided 2026-09-22): the PATCH runs `checkConflicts` on a `1 → 0` `is_cancelled` change and answers 409 naming whoever now holds the slot, never auto-resolving which act keeps it. Keep `docs/SHOW_DAY_RUNBOOK.md` in step.
-
-Operational detail: cancelling is scoped to _one performance_. A band playing two sets (ALL and Kepi Ghoulie each play twice at BF2) needs each set cancelled separately.
-
-**The iCal feed omits a set with no `start_time` rather than inventing one (#1079).** It
-used to substitute `"20:00"`, which on 2026-09-02 put all 15 of Vol 18's announced
-sets in subscribers' calendars stacked at 8:00 PM -- the entire content of the feed,
-fabricated -- while `/event/lwbc18` correctly said "Time To Be Announced". Two public
-surfaces stating different things about the same rows.
-
-Omitting is both the honest shape and the consistent one: the feed is
-_performance_-driven, so it already reports an event with no lineup as no `VEVENT`s,
-and an unscheduled set is that same case one row down. An absent entry is
-recoverable; a wrong entry in a calendar someone trusts is not. A missing `end_time`
-is never a constant -- a literal `"21:00"` against a 23:00 start is _before_ it,
-which the midnight-straddle roll then reads as spanning into the next day, turning an
-absent end time into a 22-hour event. In the calendar files it is stated as
-`DURATION:PT1H`, not a computed `DTEND`: on the night Toronto repeats 01:00, 01:30
-plus one wall-clock hour is a two-hour event, while a `DURATION` is elapsed time.
-
-**The frontend derives it the same way** (`DEFAULT_SET_DURATION_MS` in
-`frontend/src/utils/bandUtils.js`, applied in `prepareBands`). Until the Vol. 18
-readiness pass it left `endMs = 0`, so an open-ended closer ("12:25 – END") was
-"upcoming" forever, never "playing now", and dropped from My Route as finished.
-Keep the surfaces in step: one hour from the start.
-
-**A third surface: the My Route calendar export** (`frontend/src/utils/routeIcs.js`, #1251). It builds an `.ics` of only the fan's picked sets, entirely in the browser, and must follow the feed's rules exactly: after-midnight sets dated on the next calendar day, no start time omitted, a missing end stated as a one-hour `DURATION`, cancelled sets as `STATUS:CANCELLED`, and the same UID scheme. Change one and you change both. `DESCRIPTION` lines are joined with a real newline and escaped ONCE; joining with a literal `"\\n"` and then escaping produced `\\n`, which calendars show as the text "\n" (the server feed shipped that bug).
-
-The server feed's two fallbacks -- an unscheduled set is omitted, and a missing end
-is never a constant (`ical-no-fabricated-start-time`, `ical-end-time-derived-not-constant`)
--- are in the mutation gate. The My Route export is NOT: the gate covers `functions/`
-only, so its tests in `frontend/src/utils/__tests__/routeIcs.test.js` are the guard
-there. A fallback is invisible to every happy-path test by construction, which is how
-the constant survived in a file that already had four describe blocks.
-
-**Every calendar time is bound to Toronto (`DTSTART;TZID=America/Toronto` plus a
-`VTIMEZONE`), never floating.** A DTSTART without a TZID floats under RFC 5545,
-so a subscriber travelling west saw each set at the right hour in the WRONG zone;
-`X-WR-TIMEZONE` is a non-standard hint that does not prevent it. Two homes again,
-for the build-boundary reason: `functions/api/feeds/ical.js` and the on-device
-"add my route to calendar" export (#1261). Keep the blocks identical.
-
-The human-facing version of this, plus what to do when a set time changes or something looks wrong mid-event, is `docs/SHOW_DAY_RUNBOOK.md`. Keep the two in step — if a procedure changes, change both in the same commit.
+Incident detail: `docs/field-notes/lineup-cancellation.md`.
 
 ### A claim is not a delivery record (#1152)
 
-`band_follow_notifications` used **one** row to mean two things: _"I am sending
-to this person"_ and _"this person has been sent to."_ A Worker that died
-between the two -- and the gap is a live network round-trip wide -- left a row
-that every later reader, **resends included**, read as "already notified." The
-follower was dropped permanently and silently. Silence is the worst shape a mail
-bug can take: nothing errors, nothing retries, and the fan simply never hears.
+`band_follow_notifications` once used one row for both "sending to this person" and "sent". A Worker that died between the two left a row that every reader, resends included, read as delivered, and the follower was dropped silently. Migration 0065 split it into `claimed_at` (NOT NULL, defaults to now) and `delivered_at` (set **only** on provider confirmation), and dropped `notified_at`.
 
-Migration 0065 splits the row into `claimed_at` (NOT NULL, defaults to now) and
-`delivered_at` (nullable, set **only** on provider confirmation). It drops
-`notified_at`, which could only ever have restated one of the two.
+**Two rules, always tested as a pair:** an undelivered claim past its lease is retried; a delivered row is never retried, however old. Rule 1 alone is satisfied by retrying everything, which re-mails the whole history.
 
-**The two rules are a PAIR, and the second is not optional:**
+- Failed-send release matches that attempt's `claimed_at` and `delivered_at IS NULL`, so it cannot remove a later takeover or delivery.
+- `CLAIM_LEASE_MINUTES` (15) and `claimIsLiveSql(alias)` in `functions/utils/bandFollowNotify.js` are the single home for "does this row still speak for the follower?". Readers import it: `resend-announcement.js` and `events/[id]/metrics.js` (`would_notify_count`).
+- **Marking `delivered_at` on success is mandatory.** Left unmarked, a success looks like a crash and is re-mailed 15 minutes later. `announceDigest.js` is the easy one to miss.
+- **Guard tests live at the sender** (`notifyBandFollowers` called directly). The read filter and the takeover's `delivered_at IS NULL` are each independently sufficient, so handler-level tests survive breaking either one. Both sender tests are in the mutation gate.
+- **A confirmation write must never fail a delivered send.** Every `SET delivered_at` write is caught locally, logged, and still counted as sent: `bandFollowNotify.js`, `announceDigest.js`, `subscriberNotify.js`. `deliveryConfirmationGuard.test.js` finds each write, asserts by brace depth that it sits inside a `try`, asserts it finds at least three, and asserts its own detector can return false.
+- **Resend requests carry an `Idempotency-Key`:** `band-follow:<performanceId>:<followerId>`, `subscriber:<eventId>:<kind>:<subscriptionId>`, and `announce-digest:<sha256>` over the recipient and sorted performance ids. **Both 409s mean undelivered.** `concurrent_idempotent_requests` is still in flight; `invalid_idempotent_request` cannot prove a send, so it is logged at `error` and retried after the 24h key expiry. Postmark and MailChannels get no key; they have no equivalent.
 
-1. An **undelivered** claim past its lease is abandoned, and must be retried.
-2. A **delivered** row is never retried, however old.
-
-Rule 1 alone is satisfied by making _everything_ retryable -- which would
-re-mail the entire history on the first resend. That is why every test here
-comes in twos.
-
-Failed-send release is attempt-specific: it matches that attempt's `claimed_at`
-and `delivered_at IS NULL`, so a later takeover or delivery can never be removed.
-
-`CLAIM_LEASE_MINUTES` (15) and `claimIsLiveSql(alias)` live in
-`functions/utils/bandFollowNotify.js` and are the single home for "does this row
-still speak for the follower?". The sender and **every reader** must agree
-exactly; when they drift, one side is silently wrong about who has been mailed,
-and the symptom is a dropped fan or a duplicate. Current readers:
-`api/admin/bands/[id]/resend-announcement.js` (recipient filter) and
-`api/admin/events/[id]/metrics.js` (`would_notify_count`). A third reader
-imports the helper -- it does not hand-write the predicate.
-
-**Marking `delivered_at` on success is mandatory, not bookkeeping.** Once an
-undelivered claim past its lease is retryable, a successful send left unmarked
-is indistinguishable from a crashed one and gets re-mailed fifteen minutes
-later -- strictly worse than the bug this fixes. `announceDigest.js` is the easy
-one to miss: it claims conditionally (on `is_cancelled`, a _different_ concern)
-and had no delivery marking at all.
-
-**Why the guard tests live at the SENDER, not the handler.** The read filter and
-the takeover's own `delivered_at IS NULL` check are each _independently_
-sufficient to stop a re-send. So breaking either one alone leaves every
-handler-level test green -- verified by mutation, not assumed: the first draft
-of "never retries a delivered row" was written against the endpoint and survived
-both mutations, proving nothing. Calling `notifyBandFollowers` directly puts
-exactly one guard in play, which is what lets the test fail. Defence in depth and
-mutation-testability pull against each other here; prove each guard at the layer
-where it stands alone, and keep the endpoint test as documentation of the
-combined guarantee rather than evidence for it.
-
-Both sender-level tests are in the mutation gate.
-
-**A confirmation write must never be able to fail a delivered send.** Sending
-and recording are two phases with no atomicity between them. If the
-confirmation write throws and the throw ESCAPES, the caller's
-`Promise.allSettled` tally counts a **delivered** email as failed -- which
-invites the resend that turns a lost write into a duplicate. So each of these
-is caught locally, logged, and still counted as sent, because it was.
-
-There were **three** such sites at once, and the count is the lesson:
-`bandFollowNotify.js`, `announceDigest.js` and `subscriberNotify.js`. Only the
-first was written guarded; the second was named by review, and the third --
-shipped in #1149 -- was found only by sweeping the class afterwards. Nothing
-about an unguarded `await` at one of those call sites looks wrong locally.
-
-`functions/utils/__tests__/deliveryConfirmationGuard.test.js` retires the class:
-it discovers every non-test `SET delivered_at` write, asserts each is enclosed
-by a `try` (by brace depth, so a try block that _ended_ earlier in the same
-function does not count), asserts it still finds at least three, and asserts its
-own detector can return **false** -- otherwise every case passes vacuously.
-
-The provider window is closed on the Resend path by an `Idempotency-Key`: band
-follow mail uses `band-follow:<performanceId>:<followerId>`, subscriber mail uses
-`subscriber:<eventId>:<kind>:<subscriptionId>`, and each digest email uses
-`announce-digest:<sha256>` over its recipient and sorted performance ids. A
-same-payload retry gets Resend's original success back and sends nothing twice.
-**Both 409s are undelivered.** `concurrent_idempotent_requests` is a send still in
-flight. `invalid_idempotent_request` (same key, different payload) is tempting to
-read as "already sent", but Resend stores a key's first response _whatever it
-was_, so a reused key cannot prove a send; counting it delivered would silently
-drop a follower whose first attempt was rejected. It is logged at `error` and
-retried after the 24h key expiry: a possible late duplicate, never a silent drop.
-Postmark and MailChannels do not receive the key because they have no equivalent.
+The incident and the mutation evidence: `docs/field-notes/email-delivery.md`.
 
 ## Band Announcements
 
@@ -1026,136 +765,27 @@ The page then runs without CSP, so this harness cannot test anything CSP governs
 ### The mutation gate — documented invariants, proven executable
 
 ```bash
-make mutation-gate      # ~8s; NOT part of `make gate`
+make mutation-gate      # ~8s; NOT part of `make gate`; its own job in quality.yml
 ```
 
-**The problem it solves:** this repo has a recurring _vacuous test_ class —
-tests that pass against both the correct and the broken implementation. The
-worst instance is recorded under "Band Announcements": deleting
-`AND verified = 1` from either recipient query left **all 1,169 backend tests
-green**, because ten test files all seeded `verified = 1`, so no fixture could
-distinguish a gated query from an ungated one. The suite looked thorough and
-proved nothing about the property it most needed to prove.
+This repo's recurring defect is the **vacuous test**, one that passes against both the correct and the broken implementation: deleting `AND verified = 1` once left all 1,169 backend tests green. `scripts/mutation-gate.mjs` applies each documented invariant's one-line breaking mutation, runs the named tests, **requires them to go red**, then restores the file and verifies the restore.
 
-CLAUDE.md documents invariants in prose and asks contributors to "verify by
-mutation" by hand. Nothing enforced it, so it decayed. `scripts/mutation-gate.mjs`
-automates it: for each documented invariant it applies the exact one-line source
-mutation that would break it, runs the named test file(s), and **requires them to
-go red**. Then it restores the file and verifies the restore.
+- **A `find` string that is absent or matches more than once is a gate failure**, not a skip. When you reword a guarded line, update its `find`.
+- **A surviving mutant is a finding.** Fix the test, or record it in `KNOWN_SURVIVING` with an issue; never delete the entry to get green.
+- It refuses to run on a dirty tree (scoped to the files its table touches).
+- Each entry cites a section here as `CLAUDE.md '<Section>'`. `scripts/__tests__/mutationGateCitations.test.js` fails when no heading matches by prefix (backticks stripped, whitespace collapsed), so **renaming a cited heading fails the build**. A section's prose is unchecked: green means the references resolve, not that the words are current.
+- Scope is `functions/` only. A `frontend/` companion is a reasonable v2; `festivalDays.js` is the first candidate.
 
-**What it does and does not tie together — read this before relying on it.**
-The gate makes the listed _invariants_ executable: it proves each guarded
-behaviour still has a test that fails when the behaviour breaks, and a code
-change that alters or renames a guarded line fails the build as pattern drift.
-
-It does **not** read this file. Each entry carries the CLAUDE.md section name as
-a plain string, for whoever reads a failure. An earlier draft of this section
-claimed the gate cross-checked that name ("the prose cannot silently drift
-without a red build"), which was exactly the confidently-wrong documentation
-this whole file exists to prevent; it was caught in review, not by a test.
-
-**The pointer half is now checked**, by
-`scripts/__tests__/mutationGateCitations.test.js`: every `CLAUDE.md '<Section>'`
-an entry cites must still match a heading here, so renaming or deleting a cited
-section fails the build instead of leaving a dangling reference. The two gates
-are complementary and neither implies the other — verified by renaming
-`## Band Announcements` and watching `make mutation-gate` stay **green** while
-the citation test went red.
-
-Comparison strips backticks and collapses whitespace, which is load-bearing
-rather than cosmetic: the live heading is ``Public event visibility is `status`,
-never `is_published` (#800) — …`` while the citation is plain text, and a naive
-substring match reports that as dangling. It did, on the first run — a false
-positive caught by reading the heading instead of trusting the matcher.
-
-**What is still unchecked is the prose itself.** The guard proves a heading by
-that name exists, never that the words underneath still describe the invariant.
-Editing the body of a correctly-named section leaves both gates green, so a
-green build is still not evidence that this file's _content_ is current — only
-that its cross-references resolve.
-
-Three properties are load-bearing, each learned from a failure recorded in this
-file:
-
-- **A `find` string that is absent — or matches more than once — is a GATE
-  FAILURE, not a skip.** Patterns drift as code changes, and a gate whose
-  patterns silently no-op reports all-green while testing nothing. Same shape as
-  `lint-md` missing from `.PHONY`. If you rename or reword a guarded line, the
-  gate fails and you update the `find` field; that failure is the tool working.
-- **A surviving mutant is a real finding, reported loudly** with the invariant,
-  file and expected tests named. It means that invariant's tests are vacuous.
-  Do not delete the entry to get green — fix the test, or record it in
-  `KNOWN_SURVIVING` with an issue reference.
-- **It refuses to run on a dirty working tree** (scoped to the files its table
-  touches). It cannot tell its own mutation from an edit in progress, and a
-  crash mid-run could destroy real work.
-
-**Deliberately NOT part of `make gate`.** `gate` must stay fast and
-offline-capable; this shells out to git and spawns vitest once per mutation. It
-runs as its own job in `quality.yml`.
-
-**Scope is backend (`functions/`) only.** The frontend runs a separate vitest
-project with its own config and jsdom environment; wiring it in here would mean
-a second invocation with different flags and cwd. A `frontend/` companion is a
-reasonable v2 — the frontend after-midnight threshold in
-`frontend/src/utils/festivalDays.js` is the obvious first entry.
-
-**What it does NOT do:** it proves a _named_ test would catch a _specific_
-break. It says nothing about invariants absent from its table, nor about test
-quality generally. Ten entries is a floor, not a certificate — add one whenever
-you add or change a test for something this file documents.
+It proves named tests catch specific breaks, nothing more. Add an entry whenever you add or change a test for something documented here.
 
 ### Hand-rolled mutation runs — check the harness ran, not just its exit code
 
-`make mutation-gate` is the maintained path and has none of this problem. But
-ad-hoc mutation checks — strip a line, run a suite, expect red — are a constant
-habit here, and an exit code alone cannot tell "the test caught the mutation"
-apart from "the test never ran". Both are `1`.
+An exit code cannot tell "the test caught the mutation" from "the test never ran"; both are 1 (`No test files found`). Two cheap habits:
 
-Measured 2026-09-09 while gating #1133. Six mutations reported exit 1 and were
-recorded as caught. They were not: the log said
+- **Run the baseline first and require it green**, with a real passing count.
+- **Assert on the failing test's name**, not the exit code. That also exposes a mutation that fails everything for an unrelated reason, such as a leftover `.bind()` argument raising a bind-count error.
 
-```text
-No test files found, exiting with code 1
-```
-
-**The cause is zsh, and it will bite again.** The runner was wrapped in a
-function taking the suite list from a variable:
-
-```sh
-SUITES="dir/ a.test.js b.test.js"
-run() { npx vitest run $SUITES; }     # WRONG in zsh
-```
-
-**zsh does not word-split unquoted parameter expansions; bash does.** So vitest
-received one filter string containing spaces, matched nothing, and exited 1. The
-same function pasted into bash would have worked, which is exactly why it looks
-correct.
-
-Use an array and expand it **quoted** — `SUITES=(dir/ a.test.js)` then
-`"${SUITES[@]}"`, which is right in both shells — or pass the paths literally.
-Bare `$SUITES` on an array is the same bug mirrored: correct in zsh, but in bash
-it expands to the FIRST ELEMENT ONLY, so the runner quietly executes one suite,
-passes, and reports exit 0. That is the false-green direction, which this file
-holds to be the never-noticed kind.
-
-Two habits that catch it, both cheap:
-
-- **Run the baseline first and require it GREEN.** A baseline that is not
-  `exit=0` with a real passing count means the harness is broken before any
-  mutation is applied. This alone would have caught it six times over.
-- **Assert on the failing test NAME, not the exit code.** A caught mutation
-  names the test that caught it, and that name should be the one you predicted.
-  It also catches the _other_ false positive: a mutation that fails everything
-  for an unrelated reason. Dropping `AND p.event_id = ?` while leaving its
-  `.bind()` argument in place did exactly that — 12 tests failed on a bind-count
-  error, which looks like a strongly-caught mutation and proves nothing about
-  the predicate. Removing the bind too narrowed it to the single test that
-  actually distinguishes the gate.
-
-Same family as the rest of this file's tooling traps: a gate that reports a
-verdict without having looked. Here it failed red rather than green, which is
-lucky — a false red is noticed eventually, a false green never is.
+zsh does not word-split unquoted `$VAR`, so `npx vitest run $SUITES` passes one filter string and matches nothing. Bare `$ARR` in bash expands to the first element only, a false green. Use an array expanded quoted: `"${SUITES[@]}"`.
 
 ### The coverage floor — no handler may be entirely untested
 
@@ -1163,128 +793,38 @@ lucky — a false red is noticed eventually, a false green never is.
 make coverage-floor      # runs the coverage suite, then the check
 ```
 
-**The problem it solves:** coverage thresholds in `vitest.config.js` are
-**global averages**, and an average cannot see a file-shaped hole. A brand-new
-200-line handler with no tests moves the global number by a rounding error and
-passes. Measured on 2026-08-31: the backend sat at **81.67%** statements against
-a 75% floor while **three files were at 0%** — every line unexecuted, no test
-importing them at all.
+Global thresholds are averages and cannot see a file-shaped hole: on 2026-08-31 the backend was at 81.67% with three handlers at 0%. `scripts/check-coverage-floor.mjs` reads `coverage/coverage-final.json` and fails if any file under `functions/api/` has 0% statements. It runs in `quality.yml`'s coverage job directly after `npm run test:coverage`, which produces its input.
 
-`scripts/check-coverage-floor.mjs` reads `coverage/coverage-final.json` and
-fails if any file under `functions/api/` has 0% statement coverage. It runs in
-`quality.yml`'s existing **coverage** job, immediately after `npm run
-test:coverage` — it must stay in that job, because the file it reads exists only
-as a side effect of that step.
+- **The allowlist is empty (`MAX_ALLOWED = 0`).** Adding an entry means shipping an untested handler.
+- It measures **execution**, not filenames: backend suites are feature-named, so basename matching gives false positives.
+- A missing coverage file **fails**, and so does a mismatch between the on-disk inventory and the coverage map (a changed `coverage.include` would otherwise hide dark files).
+- vitest's own thresholds were tried and do not work: glob groups aggregate, and `perFile: true` produced 113 errors.
 
-**It landed with an EMPTY allowlist** (`MAX_ALLOWED = 0`), deliberately: the
-three dark files were covered first. An empty allowlist is strictly stronger
-than a seeded debt register and removes the "seed then forget" failure entirely.
-Adding an entry means shipping an untested handler — the thing being prevented.
-
-Three properties are load-bearing:
-
-- **It measures EXECUTION, not filenames.** The frontend ratchet
-  (`missingTestGate.test.js`) keys on a matching test file over 400 lines. That
-  does not transfer here: backend suites are feature-named — `api-key-auth.test.js`
-  covers `_middleware.js` — so basename matching flags 23 files, 18 of them at
-  59–92% coverage. Measuring execution has no false positives by construction.
-- **A missing coverage file is a FAILURE, not a skip**, with the command to
-  produce it. A gate that passes because its input is absent is worse than none.
-- **It detects its own blindness.** vitest reports untested files only because
-  `coverage.include` is set; if that changes, dark files vanish from the map and
-  a naive check would report "all clear" while seeing nothing. It compares the
-  on-disk inventory against the coverage map and fails when they diverge.
-
-**Why not vitest's own thresholds** — both were measured and neither works: a
-glob threshold group aggregates, so five 0% files hid inside the group average
-and it exited 0; `perFile: true` applies the global 75/68/84/76 to _every_ file
-and produced 113 errors.
-
-**What it does NOT do:** it proves a file was executed, not that it was tested
-well. One test that imports a handler and asserts nothing takes it off this
-list. That is why the mutation gate exists alongside it — this one catches
-"nobody started", that one catches "the test cannot fail". Neither replaces the
-other.
+It proves a file ran, not that it was tested well; the mutation gate covers that half.
 
 ### Before every commit — required checklist
 
-**Canonical entry point: `make gate`** — runs the Make targets `format` → `format-check` → `lint-all` → `test` → `build` (`format-check` wraps the `npm run format:check` script below) for both stacks with real exit codes (see `Makefile`, `AGENTS.md`). Run it before every commit; do not commit if it fails. The npm commands below are the explicit breakdown of what `make gate` runs, for when you need to run a subset or debug a failing step.
+**Run `make gate` before every commit; do not commit if it fails.** It runs `format` → `format-check` → `lint-all` → `test` → `build` for both stacks with real exit codes (`Makefile`, `AGENTS.md`). `lint-all` covers ESLint, `lint-md`, `lint-sh`, `lint-yaml`, `lint-sql` and `lint-json`. After Dependabot merges, run `npm ci` in both stacks first, or the gate tests stale dependencies.
 
-**`make gate` covers every file type we maintain, not just JavaScript.** Until
-2026-08-29 it ran ESLint and Prettier and nothing else, so 69 SQL files, 17 YAML
-files and 71 Markdown files were checked _only_ by CodeRabbit — after the PR was
-open, which is the force-push round-trip `make review` exists to avoid. `lint-all`
-now fans out to `lint` (ESLint), `lint-md`, `lint-sh`, `lint-yaml`, `lint-sql`
-and `lint-json`.
+Deliberate properties of those targets:
 
-Five things about those targets are deliberate:
+- **They fail with an install hint and never skip** (`shellcheck`, `yamllint`, `sqlfluff`). `scripts/__tests__/makefileGuards.test.js` fails if a target is missing from `.PHONY` or a recipe ends in a filter that masks its status (#1070).
+- File lists use `git ls-files --cached --others --exclude-standard`, so new untracked files are linted, and each recipe tests `[ -f "$f" ]`, so deleted-but-unstaged files are skipped.
+- `lint-json` passes the path as `process.argv[1]`, never interpolated into `node -e`. Loops accumulate `rc=1` in a `while` redirected from a file, because a piped `while` runs in a subshell.
+- `.yamllint` and `.markdownlint.json` are tuned to this corpus: a huge finding count means the config is wrong before it means debt. `lint-json` checks validity, not formatting.
+- `sqlfluff` skips `archive/` (unparseable, never-applied migrations).
 
-- **They fail with an install hint; they never skip.** `shellcheck`, `yamllint`
-  and `sqlfluff` are external. A target that passes when its tool is missing is
-  worse than no target — that is precisely the bug `lint-md` shipped with, where
-  it was absent from `.PHONY`, so a stray file named `lint-md` made `make` report
-  "up to date" and lint nothing. **Both that trap and the pipeline one below are
-  now guarded** by `scripts/__tests__/makefileGuards.test.js` (#1070): it fails
-  if any target is missing from `.PHONY`, or if a recipe ends in a filter whose
-  status would mask the real one. Both halves assert they can still find what
-  they scan for, because a parser that matches nothing reports "all clear"
-  forever.
-- **File lists use `git ls-files --cached --others --exclude-standard`**, not a
-  bare `git ls-files`. The latter sees only _tracked_ files, so a brand-new file
-  you have not `git add`ed — the one most likely to be wrong — sails through.
-  `--exclude-standard` still honours `.gitignore`. Each recipe then tests
-  `[ -f "$f" ]`, because that list _also_ names tracked files you have deleted
-  but not yet staged — a legitimate state that would otherwise hand a missing
-  path to the linter and fail the gate for no reason.
-- **`lint-json` passes the path as `process.argv[1]`, never interpolated into
-  the `node -e` source.** A filename containing a single quote would otherwise
-  close the JS string literal and execute whatever followed, on every
-  `make gate`. Each recipe also accumulates `rc=1` in a `while` loop
-  **redirected from a file** rather than `exit`ing inside a pipeline — a `while`
-  fed by a pipe runs in a subshell, where the exit never reaches the recipe. That is the same shape as the
-  status-capture bug in #882.
-- **`.yamllint` and `.markdownlint.json` are tuned to this corpus, not stock.**
-  `extends: default` alone produced 435 YAML findings, 353 of them `line-length`
-  at the default 80 chars, which no GitHub Actions workflow or OpenAPI spec
-  respects. Tuning took it to 1 real defect. Treat a huge finding count as
-  evidence the config is wrong for the corpus before treating it as debt.
-- **`lint-json` checks validity, not formatting.** Running Prettier over these
-  files only explodes compact arrays past `printWidth`, churning load-bearing
-  files like `_routes.json` while catching no defect. An unparseable file is the
-  real failure, and `ground-truth.json` has no code reading it that would fail
-  loudly.
-
-`sqlfluff` skips `archive/`: those migrations use `ALTER TABLE … ADD COLUMN IF
-NOT EXISTS`, which SQLite does not support and sqlfluff cannot parse. They are
-archived and never applied.
-
-Run all steps that apply. Do not commit if any step fails.
-
-**Frontend changes (`frontend/src/`):**
+To run a subset or debug one step:
 
 ```bash
-cd frontend
-npx prettier --write "src/**/*.{js,jsx,json,css}"  # fix formatting first
-npm run lint && npm run format:check                 # ESLint + verify format
-npm test -- --run                                    # unit tests
-npm run build                                        # catch import/compile errors E2E would catch
-```
-
-**Backend changes (`functions/`):**
-
-```bash
-npm run format              # prettier --write on functions/ + scripts/ (fix first)
-npm run format:check        # verify formatting is clean
-npm run lint                # ESLint on functions/ + scripts/ (must be 0 errors)
+# frontend
+cd frontend && npx prettier --write "src/**/*.{js,jsx,json,css}" && npm run lint && npm run format:check && npm test -- --run && npm run build
+# backend, from the repo root
+npm run format && npm run format:check && npm run lint && npm test
 npm run validate:openapi    # if docs/api-spec.yaml changed
-npm test                    # from repo root — runs fine locally, including Apple Silicon
 ```
 
-**Why `--write` before `--check`:** `format:check` (what CI runs) only reports errors — it never fixes them. Always run `--write` first so the commit is already clean.
-
-**Why `npm run build`:** E2E tests run against the built app. A build failure will fail E2E in CI without a clear error. Running `build` locally catches broken imports, missing exports, and Vite errors before they reach CI.
-
-**E2E tests** require a live wrangler dev server and are slow — run them only when changing routes, auth flows, or anything the E2E suite targets. The build check above catches most issues.
+Run `--write` before `--check` (CI's check never fixes), and `npm run build` because E2E runs the built app. Run E2E only when changing routes, auth flows, or what the suite targets.
 
 ### Before opening a PR — AI review gate
 
@@ -1358,86 +898,21 @@ Production evidence: `/api/admin/Users`, `/api/admin/MFA/setup` and `/api/Events
 
 ### The security tooling this repo actually has
 
-**Restored 2026-09-25, when the repo went public again:** `codeql.yml`,
-`secret-scan.yml` (gitleaks) and `dependency-review.yml`, unchanged from their
-last working versions. `protect-main` requires the **"Detect Secrets
-(gitleaks)"** check, so that workflow must exist. When the rulesets came back
-into force with it missing, every PR to `main` waited on a check that could
-never run. **If the repo goes private again, remove that check from the ruleset
-in the same change that deletes the workflow.**
+| Concern               | Covered by                                                                                                   |
+| --------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Secrets               | gitleaks (`secret-scan.yml`, required check "Detect Secrets (gitleaks)"); GitGuardian; CodeRabbit's gitleaks |
+| Dependency advisories | Snyk PR check; Dependabot alerts and security updates; `dependency-review.yml`                               |
+| Lockfile tampering    | `scripts/__tests__/lockfileIntegrity.test.js`                                                                |
+| SAST                  | CodeQL (`codeql.yml`); Semgrep (`semgrep.yml`, #1173)                                                        |
+| Review                | CodeRabbit                                                                                                   |
 
-The history below is kept because it happens again whenever the repo goes
-private. On the **Free** plan a private repo has no GitHub Advanced Security.
-The job logs recorded in #1174 show how each one failed. CodeQL's SARIF upload
-needs code scanning. gitleaks' scan completed (_"is an individual user. No
-license key is required"_), but the action's next API call returned `403`
-(job `104837284604`). dependency-review is refused outright (_"Dependency
-review is not supported on this repository ... along with GitHub Advanced
-Security"_). All three failed on every PR and were removed on 2026-09-16. **A permanently red check is worse than no check.** Red that always
-means nothing teaches you to stop reading red.
+- **If the repo goes private again**, CodeQL, gitleaks and dependency-review fail on the Free plan, which has no Advanced Security. Remove "Detect Secrets (gitleaks)" from the `protect-main` ruleset in the same change that deletes its workflow, or every PR waits on a check that cannot run. A permanently red check is worse than none.
+- **The gitleaks PR check scans every commit in the PR's range**, so a later commit cannot clear a fixture that trips it: rewrite the commit, or add its fingerprint to `.gitleaksignore` with a reason. Name test credentials so gitleaks' `generic-api-key` rule (a secret-like identifier assigned a high-entropy string) does not match.
+- **Semgrep's gate is the `Semgrep / Scan` job.** The Semgrep App's `semgrep-cloud-platform/scan` check passes regardless of findings. On a PR the job is diff-aware and fails on new findings; on push and weekly it reports without failing and uploads SARIF (category `semgrep`). Findings come from the JSON, never the exit code: semgrep can exit 0 with findings, and exit 0 without having run, so never remove the `test -s semgrep.json` guard. Exit 1 means blocking findings and goes on to the count; exit >1 means it could not run and fails the job. It runs under `env -u GITHUB_ACTIONS` (semgrep's own `git fetch` fails without persisted credentials) with `fetch-depth: 0` on the PR's head commit, diffing against `SEMGREP_BASELINE_REF`; `SEMGREP_*` variables restore the metadata. Dependabot and fork PRs skip loudly; any other run without `SEMGREP_APP_TOKEN` fails. Keep the gate in the workflow, not the Rule Board, which lives outside git.
+- **The weekly security digest** (`security-digest.yml`, `scripts/security-digest.mjs`, #1247) keeps one `security-digest` issue. It opens for any alert older than 7 days, a required scanner (`REQUIRED_SCANNERS`: CodeQL, Semgrep) with no analysis in 14 days, or an `npm audit` advisory not in `ACCEPTED_NPM_AUDIT`. A failed read fails the job; only a per-tool `404 "no analysis found"` means "none". Analyses are fetched per tool by name. `ACCEPTED_NPM_AUDIT` holds recorded decisions keyed `lockfile|package|advisory`, never by package alone; the digest lists accepted entries no longer flagged, so the list shrinks.
+- **Snyk Code is deliberately not enabled** (2026-09-22): Semgrep's gate lives in git.
 
-**What ran while the repo was private, each verified on a private Free-plan repo rather than assumed.** All of it still runs:
-
-| Concern               | Covered by                                                            | How we know it works here                                                                                    |
-| --------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Secrets               | GitGuardian; CodeRabbit's own gitleaks pass (`.coderabbit.yaml`)      | GitGuardian passed on #1171 and #1172 after the privacy change                                               |
-| Dependency advisories | Snyk PR check; Dependabot alerts + security updates                   | the push that privatised the repo was answered with _"GitHub found 3 vulnerabilities on …'s default branch"_ |
-| Lockfile tampering    | `scripts/__tests__/lockfileIntegrity.test.js`                         | a plain test in the suite — no plan tier involved, which is now the point                                    |
-| Review                | CodeRabbit                                                            | passed on both PRs                                                                                           |
-| SAST                  | `semgrep.yml` (rebuilt in #1173, Pro ruleset via `SEMGREP_APP_TOKEN`) | a planted finding turned the PR job red and named it; the same PR without it went green (#1185)              |
-
-**SAST is back, but read the right check.** `semgrep-cloud-platform/scan` is
-posted by the Semgrep **GitHub App** and reports **pass** on every PR no matter
-what it finds: the org's rules sit in the Rule Board's _Audit_ column, which
-records to semgrep.dev and posts nothing. **That check means nothing. The
-`Semgrep / Scan` job is the gate.**
-
-How the rebuilt `semgrep.yml` works (#1173):
-
-- **On a PR it is diff-aware and fails on any finding the PR introduces.** On
-  push and weekly it scans the full tree and _reports_ (warnings plus a job
-  summary) without failing, because `main` carries pre-existing findings (19 on
-  2026-09-22, 16 of them `detect-non-literal-regexp`) and a job that is red on
-  every push is noise, not a gate.
-- **Findings come from the JSON; the exit code only ever signals a failure to
-  run — and not reliably.** `semgrep ci` exits **0 with findings** (Audit-column
-  rules are non-blocking; verified with a planted finding), so the job counts
-  results in the JSON. Exit **1** means blocking findings and goes on to that
-  count. Exit **> 1** means "could not run" and fails the job. But semgrep also
-  exits **0 when it could not run** ("will succeed because there were no
-  blocking findings") and writes no JSON: seen twice on #1185, once from its own
-  `git fetch` and once in a semgrep.dev outage. The `test -s semgrep.json` guard
-  is what makes both red. Never remove it as redundant.
-- **It runs in plain-git mode, and needs full history.** When semgrep detects
-  GitHub Actions it runs its own `git fetch`, which fails with "could not read
-  Username" on a private repo with no persisted credentials (the #1184 trap).
-  So `semgrep ci` runs under `env -u GITHUB_ACTIONS`, diffing against
-  `SEMGREP_BASELINE_REF` using history that `fetch-depth: 0` already checked
-  out; `SEMGREP_*` variables restore the metadata. On a PR it checks out the
-  **head** commit, not GitHub's merge commit, so commits landed on `main` after
-  the PR opened are not scanned as this PR's.
-- **Dependabot and fork PRs skip, loudly.** Neither receives Actions secrets;
-  the job posts a notice and a "NOT SCANNED" summary rather than passing
-  silently. Any other run without the token **fails**: an OSS-only scan reports
-  all-clear while missing every rule that has found a real issue here.
-
-Do not "fix" the App's check by moving the Rule Board to "Comment": that is a
-dashboard setting, not in git, not reviewable in a PR, and silently reversible
-by anyone with account access. The gate lives in the workflow on purpose.
-
-**The weekly security digest** (`.github/workflows/security-digest.yml`, `scripts/security-digest.mjs`, #1247) opens, updates or closes ONE issue labelled `security-digest`. It exists because 23 code-scanning and 8 Dependabot alerts sat unnoticed for weeks in October 2026. It opens when any Dependabot or code-scanning alert is older than 7 days, when a required scanner (`REQUIRED_SCANNERS`: CodeQL, Semgrep) has NO analysis or none newer than 14 days, or when `npm audit` (both lockfiles) reports an advisory not in `ACCEPTED_NPM_AUDIT`. Three properties are load-bearing:
-
-- **A failed read fails the job; it never reports zero.** A digest that says "0" because it could not look is exactly the silent failure it replaces. The only tolerated failure is the API's `404 "no analysis found"` for one tool name, which means "none", and the required-scanner rule then flags it.
-- **Analyses are fetched per tool by name**, never as "the newest N". A dead scanner falls off a shared page behind a live one's frequent runs and looks absent instead of stale.
-- **`ACCEPTED_NPM_AUDIT` holds recorded decisions only, keyed `lockfile|package|advisory`** (today: two entries, #1267 and basic-ftp under Lighthouse CI). Never key by package alone: one package can carry several advisories, so a package-level entry silently accepts the next one published. The September Lighthouse CI decision (#1208) was package-level and would have hidden two October advisories. Without the list the issue stays open permanently, and an alarm that is always on gets ignored. The digest lists accepted entries that are no longer flagged, so the list shrinks.
-
-Semgrep SARIF is uploaded again (category `semgrep`) on push and schedule runs. Before that, the Security tab's Semgrep alerts were frozen at 2026-09-14 and never closed.
-
-**Snyk Code (Snyk's SAST) is deliberately not enabled** (decided 2026-09-22).
-The Snyk PR check covers dependency manifests only. Semgrep was chosen because
-its gate is in git and its Pro ruleset is measured on this repo; Snyk Code would
-spend the Free plan's monthly Code-test allowance on every PR and keep its gate
-in Snyk's dashboard.
+Plan-tier history, the job logs and the Semgrep investigation: `docs/field-notes/security-tooling.md`.
 
 ### Outbound requests go only to fixed addresses (SSRF)
 
@@ -1498,16 +973,7 @@ For the `_headers` document CSP:
 
 ### Where Cloudflare-facing settings actually live
 
-Most of what follows is **not** in `wrangler.toml` or any other file here — it
-is Cloudflare-side state, silently undoable, with nothing in the repo to hint
-that it mattered. That is why it is written down.
-
-**The last row is the deliberate exception, and it is the point of the table.**
-HSTS _is_ repo-managed; it appears here because the zone's own HSTS toggle reads
-"off", so anyone auditing Cloudflare concludes it is missing and reaches for the
-dashboard. The fix for anything HSTS-related is `frontend/public/_headers`, not
-Cloudflare. Read the layer column before changing anything — it is what tells
-you where to go:
+Most of this is Cloudflare-side state that can be silently undone, with nothing in the repo to show it mattered. Read the layer column before changing anything:
 
 | layer                    | where you change it                                                                 | items                                                                                        |
 | ------------------------ | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
@@ -1517,106 +983,12 @@ you where to go:
 | **Account** resources    | Cloudflare account                                                                  | D1 databases                                                                                 |
 | **This repository**      | `frontend/public/_headers`                                                          | **HSTS** — listed only because the zone toggle reading "off" is correct and looks like a gap |
 
-- **Preview deployments bind only the scratch D1** (2026-10-13). `wrangler.toml`
-  ends with an `[env.preview]` block, because Pages otherwise applies the top-level
-  D1, R2 and Analytics Engine bindings to previews too, and every deploy
-  overwrites the dashboard. Until then every preview was bound to
-  `settimes-production-db` and the production photo bucket: 40 stale previews
-  from Nov 2025 to Feb 2026, running code from before the pen-test fixes (#86)
-  with no secrets set, sat on `*.longweekend-bandcrawl.pages.dev` against
-  production data. They were deleted the same day. Never bind a production
-  resource under `env.preview`; edge E2E (#1292) gets only the scratch D1 there.
-  `scripts/__tests__/previewBindings.test.js` enforces both halves.
-- **Rocket Loader: disabled** — see the bullet above.
-- **`www` → apex 301 redirect rule** (#984, added 2026-08-29). A zone
-  `http_request_dynamic_redirect` phase ruleset, `www to apex (301, preserves
-path + query)`:
+- **Preview deployments bind only the scratch D1**, via the `[env.preview]` block in `wrangler.toml` (2026-10-13). Without it, previews inherit production D1 and R2. Never bind a production resource there; `scripts/__tests__/previewBindings.test.js` enforces both halves.
+- **Rocket Loader stays disabled**; strict CSP blocks the scripts it rewrites.
+- **`www` → apex is a zone _dynamic_ 301** (`concat("https://settimes.ca", http.request.uri.path)`, query preserved, #984). A static redirect would send every deep path to `/`. Keep `www` as a Pages custom domain: without it, old links become TLS errors instead of redirects. `/` deliberately emits no raw-HTML canonical, so if `www` ever stops redirecting, the duplicate-host problem returns.
+- **SSL/TLS is Full (strict), minimum TLS 1.2.** A proxied origin with a bad certificate fails closed, on purpose.
+- **HSTS is served from `frontend/public/_headers`**, so the zone's HSTS toggle reading "off" is correct. Do not also enable the zone toggle; check the live header before concluding anything is missing.
+- **DMARC:** `v=DMARC1; p=quarantine; adkim=r; aspf=r; pct=100; rua=mailto:dmarc@settimes.ca`. Alignment stays relaxed because iCloud (human mail) and Resend via SES (application mail, including band-follow confirmations) are both legitimate senders; strict alignment would quarantine confirmations silently. `p=reject` waits until reports show both paths pass. If no reports arrive within a few days, check that the catch-all routes `dmarc@`.
+- Removed 2026-08-29; do not recreate: `dev.settimes.ca` (a dead tunnel), the unused `ADMIN_PASSWORD`/`MASTER_PASSWORD` Pages vars, and the empty `bandcrawl-db` D1. To check whether a D1 is empty, query `sqlite_master`; the API's `num_tables` is wrong.
 
-  ```text
-  if    (http.host eq "www.settimes.ca")
-  then  redirect 301 -> concat("https://settimes.ca", http.request.uri.path)
-        preserve_query_string: true
-  ```
-
-  Before it, `www.settimes.ca` served the entire site at HTTP 200 as a full
-  duplicate of the apex, and both hosts ranked separately — the apex at 243
-  impressions / position 12.2 against `www` at 40 / 21.2.
-
-  Three things not to "simplify":
-  - **It must be a _dynamic_ redirect, not static.** A static one sends every
-    deep path to the homepage; the `concat(...)` expression is what carries
-    `/band/31` across.
-  - **Do not remove `www` as a Pages custom domain** to "clean up". The
-    redirect can only answer if `www` still resolves and terminates TLS —
-    removing it turns every old bookmark into a certificate error instead of a
-    redirect.
-  - **`/` still emits no raw-HTML canonical, deliberately** (see the SSR
-    ownership section: the homepage keeps client-side ownership of its identity
-    meta). That was survivable as a duplicate-host problem only because this
-    rule now leaves one live host. If `www` ever stops redirecting, the
-    duplicate returns and the canonical gap is what makes it bite.
-
-- **SSL/TLS mode: Full (strict)**, and **minimum TLS version 1.2** (both set
-  2026-08-29; they were `Full` and `1.0`). Strict is correct here because every
-  proxied origin is Cloudflare-owned with a valid certificate — apex and `www`
-  resolve to the Pages project, `band-photos` to `public.r2.dev`. Adding a
-  proxied record pointing at an origin with a self-signed or expired cert will
-  now fail closed rather than silently accept it, which is the intent.
-- **HSTS is served by the application, not the zone.** `frontend/public/_headers`
-  sends `max-age=31536000; includeSubDomains; preload`, so the zone-level HSTS
-  toggle reading "off" is correct and **not** a gap. Do not "fix" it by enabling
-  the zone setting as well; check the live header before concluding anything is
-  missing.
-
-**Removed 2026-08-29, recorded so they are not recreated by reflex:**
-
-- `dev.settimes.ca` — a `CNAME` to tunnel `b94985aa…`, which no longer exists.
-  It served HTTP 530 on the brand domain. The only live tunnel is a different id.
-- `ADMIN_PASSWORD` and `MASTER_PASSWORD` Pages production environment variables.
-  **Nothing read them** — every consumer in this repo uses `E2E_ADMIN_PASSWORD`
-  (`scripts/seed-e2e-admin.mjs`), which is local-only. They were unused
-  credentials sitting in production config.
-- The `bandcrawl-db` D1 database — verified empty (only Cloudflare's internal
-  `_cf_KV`, no user tables), referenced nowhere in the repo, bound to nothing.
-  The only D1 database is `settimes-production-db`. Note the API's `num_tables`
-  field is **not** trustworthy for this check: it reported `0` for the production
-  database too. Query `sqlite_master` instead.
-
-- **DMARC now reports** (added 2026-08-29). `_dmarc.settimes.ca` was
-  `p=quarantine` with **no `rua=`** — enforcing a policy whose effects nobody
-  could see, which is the worst of the two halves to have alone. `p` only
-  _requests_ a disposition; each receiver decides for itself, and a message
-  handled as suspicious typically produces no bounce and no error the sender
-  ever sees. Failures are therefore silent by default, which is exactly why the
-  reporting half is not optional.
-  Now:
-
-  ```text
-  v=DMARC1; p=quarantine; adkim=r; aspf=r; pct=100; rua=mailto:dmarc@settimes.ca
-  ```
-
-  Reports go to an iCloud **catch-all**, so no alias had to be created, and
-  because `rua` is on the _same_ domain as the record no external
-  `settimes.ca._report._dmarc.<host>` authorization TXT is needed — that
-  requirement only applies to a third-party reporting host.
-
-  **`adkim=r` / `aspf=r` must stay relaxed.** The domain has two independent
-  sending paths — iCloud for human mail (`sig1._domainkey`, `include:icloud.com`)
-  and Resend via Amazon SES for application mail (`resend._domainkey`,
-  `include:amazonses.com`, `send.settimes.ca`). Strict alignment would break the
-  SES path. The application path is the one that matters operationally: it
-  carries the **band-follow confirmation emails**, and since follows are double
-  opt-in, silently quarantined confirmations mean followers are never verified
-  and never receive announcements — with nothing anywhere reporting an error.
-
-  Reports typically begin arriving within 24–48h and are XML, usually gzipped
-  (compression is recommended by RFC 7489, not required — plain `.xml` is
-  valid). Both are conventions, not guarantees: providers report on their own
-  schedules and some never do. **If none arrive within a few days, treat that as
-  a prompt to check whether the catch-all routes `dmarc@` — it is a signal to
-  investigate, not proof of either a failure or of everything being fine.**
-
-  Deliberately not set: `ruf=` (forensic reports carry recipient PII and almost
-  no provider sends them), and `p=reject`, which is the stronger end state but
-  should wait until a few weeks of reports confirm both sending paths pass
-  cleanly.
+Before-and-after evidence, the redirect rule and DMARC reasoning: `docs/field-notes/cloudflare-settings.md`.

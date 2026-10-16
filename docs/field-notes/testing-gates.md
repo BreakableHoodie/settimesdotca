@@ -63,7 +63,7 @@ mutation-testing an assertion (see the vacuous-test class), applied to
 operational code instead of tests.
 
 ## Before every commit — required checklist
-**Canonical entry point: `make gate`** — runs the Make targets `format` → `format-check` → `lint-all` → `test` → `build` (`format-check` wraps the `npm run format:check` script below) for both stacks with real exit codes (see `Makefile`, `AGENTS.md`). Run it before every commit; do not commit if it fails. The npm commands below are the explicit breakdown of what `make gate` runs, for when you need to run a subset or debug a failing step.
+**Canonical entry point: `make gate`** — runs the Make targets `format` → `format-check` → `lint-all` → `check-citations` → `test` → `build` (`format-check` wraps the `npm run format:check` script below) for both stacks with real exit codes (see `Makefile`, `AGENTS.md`). Run it before every commit; do not commit if it fails. The npm commands below are per-stack subsets for running part of the gate or debugging a failing step; `validate:openapi` is conditional and not a `make gate` prerequisite.
 
 **`make gate` covers every file type we maintain, not just JavaScript.** Until
 2026-08-29 it ran ESLint and Prettier and nothing else, so 69 SQL files, 17 YAML

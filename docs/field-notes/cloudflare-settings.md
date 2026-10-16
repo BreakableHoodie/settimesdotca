@@ -34,7 +34,7 @@ you where to go:
   production data. They were deleted the same day. Never bind a production
   resource under `env.preview`; edge E2E (#1292) gets only the scratch D1 there.
   `scripts/__tests__/previewBindings.test.js` enforces both halves.
-- **Rocket Loader: disabled** — see the bullet above.
+- **Rocket Loader: disabled** — strict CSP blocks the inline scripts it rewrites.
 - **`www` → apex 301 redirect rule** (#984, added 2026-08-29). A zone
   `http_request_dynamic_redirect` phase ruleset, `www to apex (301, preserves
 path + query)`:

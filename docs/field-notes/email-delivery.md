@@ -86,5 +86,5 @@ flight. `invalid_idempotent_request` (same key, different payload) is tempting t
 read as "already sent", but Resend stores a key's first response _whatever it
 was_, so a reused key cannot prove a send; counting it delivered would silently
 drop a follower whose first attempt was rejected. It is logged at `error` and
-retried after the 24h key expiry: a possible late duplicate, never a silent drop.
+eligible for retry at once, though a retry cannot succeed until the 24h key expires: a possible late duplicate, never a silent drop.
 Postmark and MailChannels do not receive the key because they have no equivalent.

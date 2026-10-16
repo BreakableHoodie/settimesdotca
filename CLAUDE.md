@@ -661,7 +661,7 @@ Incident detail: `docs/field-notes/lineup-cancellation.md`.
 - **Marking `delivered_at` on success is mandatory.** Left unmarked, a success looks like a crash and is re-mailed 15 minutes later. `announceDigest.js` is the easy one to miss.
 - **Guard tests live at the sender** (`notifyBandFollowers` called directly). The read filter and the takeover's `delivered_at IS NULL` are each independently sufficient, so handler-level tests survive breaking either one. Both sender tests are in the mutation gate.
 - **A confirmation write must never fail a delivered send.** Every `SET delivered_at` write is caught locally, logged, and still counted as sent: `bandFollowNotify.js`, `announceDigest.js`, `subscriberNotify.js`. `deliveryConfirmationGuard.test.js` finds each write, asserts by brace depth that it sits inside a `try`, asserts it finds at least three, and asserts its own detector can return false.
-- **Resend requests carry an `Idempotency-Key`:** `band-follow:<performanceId>:<followerId>`, `subscriber:<eventId>:<kind>:<subscriptionId>`, and `announce-digest:<sha256>` over the recipient and sorted performance ids. **Both 409s mean undelivered.** `concurrent_idempotent_requests` is still in flight; `invalid_idempotent_request` cannot prove a send, so it is logged at `error` and retried after the 24h key expiry. Postmark and MailChannels get no key; they have no equivalent.
+- **Resend requests carry an `Idempotency-Key`:** `band-follow:<performanceId>:<followerId>`, `subscriber:<eventId>:<kind>:<subscriptionId>`, and `announce-digest:<sha256>` over the recipient and sorted performance ids. **Both 409s mean undelivered.** `concurrent_idempotent_requests` is still in flight; `invalid_idempotent_request` cannot prove a send, so it is logged at `error`. A retry may run at once, but it cannot succeed until the 24h key expires: a possible late duplicate, never a silent drop. Postmark and MailChannels get no key; they have no equivalent.
 
 The incident and the mutation evidence: `docs/field-notes/email-delivery.md`.
 
@@ -804,7 +804,7 @@ It proves a file ran, not that it was tested well; the mutation gate covers that
 
 ### Before every commit — required checklist
 
-**Run `make gate` before every commit; do not commit if it fails.** It runs `format` → `format-check` → `lint-all` → `test` → `build` for both stacks with real exit codes (`Makefile`, `AGENTS.md`). `lint-all` covers ESLint, `lint-md`, `lint-sh`, `lint-yaml`, `lint-sql` and `lint-json`. After Dependabot merges, run `npm ci` in both stacks first, or the gate tests stale dependencies.
+**Run `make gate` before every commit; do not commit if it fails.** It runs `format` → `format-check` → `lint-all` → `check-citations` → `test` → `build` for both stacks with real exit codes (`Makefile`, `AGENTS.md`). `lint-all` covers ESLint, `lint-md`, `lint-sh`, `lint-yaml`, `lint-sql` and `lint-json`. After Dependabot merges, run `npm ci` in both stacks first, or the gate tests stale dependencies.
 
 Deliberate properties of those targets:
 

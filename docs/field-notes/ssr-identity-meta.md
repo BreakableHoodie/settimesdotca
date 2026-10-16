@@ -18,7 +18,7 @@ The rejected alternative was marking SSR-injected tags `data-rh="true"` so Helme
 
 **Tradeoff, accepted:** since SSR only injects meta into the initial HTML response, identity meta now freezes at whatever that response's values were across client-side (in-app) navigation between SSR-injected routes — refreshed only by a full-page load. This doesn't affect crawlers or link-unfurl bots, which always fetch the specific URL fresh; it only affects a live DOM read after in-app navigation, which nothing in this codebase does.
 
-- **Every indexable route needs a Pages Function that injects its own meta.** `/event/*`, `/band/*`, `/venue/*` have always had one; the eight static pages go through the `STATIC_PAGES` registry in `functions/utils/staticPageMeta.js`, one 2-line route file each; `/events/*/recap` (the archive recap page, distinct from singular `/event/*`) is D1-backed like `/event/*`/`/band/*`/`/venue/*` rather than registry-driven — `functions/events/[slug]/recap.js` — because its title/description embed per-event stats (`total_sets`, `venue_count`) a static registry entry can't express.
+- **Every indexable route needs a Pages Function that injects its own meta**, except `/`, whose `index.html` head already is its correct meta (its Function injects body links only; see below). `/event/*`, `/band/*`, `/venue/*` have always had one; the eight static pages go through the `STATIC_PAGES` registry in `functions/utils/staticPageMeta.js`, one 2-line route file each; `/events/*/recap` (the archive recap page, distinct from singular `/event/*`) is D1-backed like `/event/*`/`/band/*`/`/venue/*` rather than registry-driven — `functions/events/[slug]/recap.js` — because its title/description embed per-event stats (`total_sets`, `venue_count`) a static registry entry can't express.
 
   **"Has a Function" is not the same as "the Function server-renders the URL people actually link to."** `/band/*` had a handler from the start, but it bailed to the un-injected shell for any non-numeric id — and _every_ public link to an artist is slug-built (`buildBandProfileHref`, used by ArtistsPage, StatsPage, EventRecapPage, EventTimeline, BandCard), while only the sitemap used the id form. So Googlebot crawled `/band/<slug>`, got 200 with the **homepage** title and no canonical, and 14 of them entered the index as duplicates of their own `/band/<id>` page — one ranking at position 49, two drawing clicks. `BandProfilePage` corrected the URL client-side, so the fix existed only after JS ran. Fixed in #983: `functions/band/[id].js` now resolves the slug through `normalizeBandName` (which agrees with `slugifyBandName` by construction — both reduce to `/[a-z0-9]/`) and **301**s to `/band/<id>`, query string preserved.
 
@@ -63,12 +63,13 @@ things about it are load-bearing:
 
 **The event-specific link is now injected by the homepage Function.** It links
 current public events in the existing raw-HTML `<noscript>` nav and changes
-body links only: the shell's `<head>` and response headers remain the static
-asset's values. The sitemap remains the primary event-discovery signal; the
+body links only: the shell's `<head>` is unchanged, policy headers are kept,
+representation headers are dropped and `Content-Type` is set
+(`headersForRewrittenShell()`). The sitemap remains the primary event-discovery signal; the
 homepage link is the strongest internal signal for which edition matters now.
 
-So `functions/sitemap.xml.js` is still the primary signal, and the only one that
-speaks about events.
+So `functions/sitemap.xml.js` is still the primary event-discovery signal, with
+the homepage's event links as the internal one.
 
 Which is why events are no longer emitted at a flat `weekly` / `0.8`. That rate
 made the live edition indistinguishable from four archived ones — twenty URLs

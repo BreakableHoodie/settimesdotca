@@ -36,6 +36,8 @@ const KNOWN_ABSENT = new Map([
   ["DataGapFilter.jsx", "superseded by LinksColumnFilter.jsx; cited as history"],
   ["/_routes.json", "the stale root copy removed in #786; CLAUDE.md says do not recreate it"],
   ["dist/index.html", "build output; produced by `npm run build`, never committed"],
+  ["playwright-report/", "Playwright output; written by a test run, gitignored, never committed"],
+  ["test-results/", "Playwright output; written by a test run, gitignored, never committed"],
   ["sessions/", "a directory fragment inside a table cell, not a full path"],
   ["admin/", "a directory fragment inside a table cell, not a full path"],
   [".claude/settings.local.json", "machine-local Claude settings; intentionally not committed"],

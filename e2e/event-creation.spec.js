@@ -1,6 +1,12 @@
 import { test, expect } from "@playwright/test";
 import { loginAsAdmin } from "./utils/session";
 
+// A date N days from now, as YYYY-MM-DD. Fixed dates here expired: "2026-10-15" became
+// a past date on 2026-10-16, and past dates are rejected by the form, so the create
+// test failed on main with no code change. Days ahead, not hours, so the UTC runner
+// and the Toronto-local validation agree on which day it is.
+const futureDate = (daysAhead) => new Date(Date.now() + daysAhead * 86_400_000).toISOString().slice(0, 10);
+
 const openEventsTab = async (page) => {
   await page.click('button:has-text("Events")');
 };
@@ -45,7 +51,7 @@ test.describe("Event Creation", () => {
 
     await page.fill('input[name="name"]', eventName);
     await page.fill('input[name="slug"]', eventSlug);
-    await page.fill('input[name="date"]', "2026-10-15");
+    await page.fill('input[name="date"]', futureDate(30));
 
     await page.click('button[type="submit"]:has-text("Create Event")');
     await expect(page.getByRole("heading", { name: "Create New Event" })).not.toBeVisible({ timeout: 15000 });
@@ -73,7 +79,7 @@ test.describe("Event Creation", () => {
 
     await page.fill('input[name="name"]', eventName);
     await page.fill('input[name="slug"]', eventSlug);
-    await page.fill('input[name="date"]', "2026-10-20");
+    await page.fill('input[name="date"]', futureDate(35));
     await page.click('button[type="submit"]:has-text("Create Event")');
     await expect(page.getByRole("heading", { name: "Create New Event" })).not.toBeVisible({ timeout: 15000 });
 
@@ -129,7 +135,7 @@ test.describe("Event Creation", () => {
 
     await page.fill('input[name="name"]', eventName);
     await page.fill('input[name="slug"]', eventSlug);
-    await page.fill('input[name="date"]', "2026-10-25");
+    await page.fill('input[name="date"]', futureDate(40));
     await page.click('button[type="submit"]:has-text("Create Event")');
     await expect(page.getByRole("heading", { name: "Create New Event" })).not.toBeVisible({ timeout: 15000 });
 
@@ -153,7 +159,7 @@ test.describe("Event Creation", () => {
 
     await page.fill('input[name="name"]', eventName);
     await page.fill('input[name="slug"]', eventSlug);
-    await page.fill('input[name="date"]', "2026-10-30");
+    await page.fill('input[name="date"]', futureDate(45));
     await page.click('button[type="submit"]:has-text("Create Event")');
     await expect(page.getByRole("heading", { name: "Create New Event" })).not.toBeVisible({ timeout: 15000 });
 

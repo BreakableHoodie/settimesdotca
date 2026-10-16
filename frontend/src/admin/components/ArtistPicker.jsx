@@ -1,8 +1,18 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
+import LoadError from './LoadError'
 import PropTypes from 'prop-types'
 import { BAND_PHOTO_CROP } from '../../utils/bandPhoto'
 
-export default function ArtistPicker({ artists, onSelect, onBulkSelect, onCancel, loading = false, venues = [] }) {
+export default function ArtistPicker({
+  artists,
+  onSelect,
+  onBulkSelect,
+  onCancel,
+  loading = false,
+  loadError = false,
+  onRetry,
+  venues = [],
+}) {
   const [query, setQuery] = useState('')
   const [checkedIds, setCheckedIds] = useState(new Set())
   const [bulkVenueId, setBulkVenueId] = useState('')
@@ -120,7 +130,8 @@ export default function ArtistPicker({ artists, onSelect, onBulkSelect, onCancel
             </div>
           )
         })}
-        {filtered.length === 0 && query && !loading && (
+        {loadError && artists.length === 0 && !loading && <LoadError what="the roster" onRetry={onRetry} />}
+        {filtered.length === 0 && query && !loading && !(loadError && artists.length === 0) && (
           <div className="p-8 text-center">
             <p className="text-white/50 mb-4">No artist found named &quot;{query}&quot;</p>
             <button
@@ -209,4 +220,6 @@ ArtistPicker.propTypes = {
   onCancel: PropTypes.func.isRequired,
   venues: PropTypes.array,
   loading: PropTypes.bool,
+  loadError: PropTypes.bool,
+  onRetry: PropTypes.func,
 }

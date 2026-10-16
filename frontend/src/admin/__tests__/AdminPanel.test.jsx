@@ -12,7 +12,14 @@ vi.mock('../../utils/adminApi', () => ({
   }),
 }))
 
-vi.mock('../EventsTab', () => ({ default: ({ events }) => <div>Events tab ({events.length})</div> }))
+vi.mock('../EventsTab', () => ({
+  default: ({ events, loadError, onEventsChange }) => (
+    <div>
+      Events tab ({events.length}){loadError && <span>Events load error</span>}
+      <button onClick={onEventsChange}>Retry events</button>
+    </div>
+  ),
+}))
 vi.mock('../VenuesTab', () => ({ default: () => <div>Venues tab</div> }))
 vi.mock('../RosterTab', () => ({ default: () => <div>Roster tab</div> }))
 vi.mock('../LineupTab', () => ({ default: () => <div>Lineup tab</div> }))
@@ -158,6 +165,24 @@ describe('AdminPanel', () => {
     renderPanel('admin', onLogout)
 
     await waitFor(() => expect(onLogout).toHaveBeenCalledOnce())
+  })
+
+  // #1323: the toast fades after 5s and events stays [], which EventsTab used
+  // to render as "No events yet". The panel must hand the tab a durable flag.
+  it('flags the events tab as failed (not empty) when loading events fails, and clears it on retry', async () => {
+    eventsApi.getAll.mockReset()
+    eventsApi.getAll.mockRejectedValueOnce(new Error('boom'))
+    eventsApi.getAll.mockResolvedValueOnce({ events })
+    renderPanel()
+
+    expect(await screen.findByText('Events load error')).toBeInTheDocument()
+    expect(screen.getByText(/Events tab \(0\)/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry events' }))
+
+    await waitFor(() => expect(eventsApi.getAll).toHaveBeenCalledTimes(2))
+    expect(await screen.findByText(/Events tab \(4\)/)).toBeInTheDocument()
+    expect(screen.queryByText('Events load error')).toBeNull()
   })
 
   it('shows a toast for a non-authentication loading failure', async () => {

@@ -248,9 +248,32 @@ describe('LineupTab — loading failure', () => {
     bandsApi.getByEvent.mockRejectedValueOnce(new Error('network down'))
     render(<LineupTab selectedEventId={37} selectedEvent={makeEvent()} events={[makeEvent()]} showToast={showToast} />)
     await waitFor(() => expect(showToast).toHaveBeenCalledWith('Failed to load schedule: network down', 'error'))
-    // The list must render its own empty state, not a blank screen, once the
-    // failed load settles `loading` back to false.
+    // A failed load must NOT read as "nothing scheduled yet" (#1323): that
+    // invites the admin to rebuild a lineup that is merely unreachable.
+    expect(await screen.findByText("Couldn't load the lineup.")).toBeInTheDocument()
+    expect(screen.queryByText('No performances scheduled yet.')).toBeNull()
+  })
+
+  it('Retry refetches and, once it resolves, renders the lineup in place of the error', async () => {
+    bandsApi.getByEvent.mockReset()
+    bandsApi.getByEvent.mockRejectedValueOnce(new Error('network down'))
+    bandsApi.getByEvent.mockResolvedValueOnce({ bands: [makeBand({ name: 'Recovered Act' })] })
+    render(<LineupTab selectedEventId={37} selectedEvent={makeEvent()} events={[makeEvent()]} showToast={showToast} />)
+    const alert = await screen.findByRole('alert')
+    expect(bandsApi.getByEvent).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(within(alert).getByRole('button', { name: 'Retry' }))
+
+    await waitFor(() => expect(bandsApi.getByEvent).toHaveBeenCalledTimes(2))
+    const table = await screen.findByRole('table')
+    expect(within(table).getByText('Recovered Act')).toBeInTheDocument()
+    expect(screen.queryByText("Couldn't load the lineup.")).toBeNull()
+  })
+
+  it('a genuinely empty lineup still shows the empty state, not the error', async () => {
+    await renderLineup({ bands: [] })
     expect(await screen.findByText('No performances scheduled yet.')).toBeInTheDocument()
+    expect(screen.queryByText("Couldn't load the lineup.")).toBeNull()
   })
 })
 

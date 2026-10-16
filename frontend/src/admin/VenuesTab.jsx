@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { venuesApi } from '../utils/adminApi'
+import LoadError from './components/LoadError'
 import { FIELD_LIMITS } from '../utils/validation'
 import { filterVenues, formatVenueAddress, sortVenues } from './utils/venueRoster'
 
@@ -24,6 +25,7 @@ function SortIcon({ col, sortConfig }) {
 export default function VenuesTab({ showToast, readOnly = false, canManage = false }) {
   const [venues, setVenues] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
   // Editing an existing venue is admin-only. Derived rather than cleared in an
@@ -51,7 +53,9 @@ export default function VenuesTab({ showToast, readOnly = false, canManage = fal
       setLoading(true)
       const result = await venuesApi.getAll()
       setVenues(result.venues || [])
+      setLoadError(false)
     } catch (err) {
+      setLoadError(true)
       showToast('Failed to load venues: ' + err.message, 'error')
     } finally {
       setLoading(false)
@@ -474,7 +478,9 @@ export default function VenuesTab({ showToast, readOnly = false, canManage = fal
 
       {/* Venues List */}
       <div className="bg-bg-purple rounded-lg border border-accent-500/20 overflow-hidden">
-        {filteredVenues.length === 0 ? (
+        {loadError && venues.length === 0 ? (
+          <LoadError what="venues" onRetry={loadVenues} />
+        ) : filteredVenues.length === 0 ? (
           <div className="p-8 text-center text-white/50">
             {venues.length === 0
               ? 'No venues yet. Add your first venue to get started!'

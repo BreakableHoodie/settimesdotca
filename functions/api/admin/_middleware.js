@@ -54,6 +54,37 @@ const KEY_FORBIDDEN_PREFIXES = [
 // Invite codes are forbidden entirely: GET exposes plaintext codes that can mint accounts.
 const KEY_READ_ONLY_PREFIXES = ["/api/admin/users", "/api/admin/api-keys"];
 
+// Every spelling of the request path the two lists above are checked against (#1327).
+// routePath() alone missed `%69nvite-codes`, `//invite-codes` and `bands%2f..%2finvite-codes`
+// in production; only the router kept them from a handler. So a key is refused if ANY
+// form matches: lowercased, then decoded until stable, then with slashes collapsed and
+// dot segments resolved. Encoded band names (`AC%2FDC`, `100%25`) stay allowed because no
+// form of them matches a listed prefix. Returns null when the path is malformed on the first
+// decode, which the caller refuses: it cannot be proven not to name a forbidden route.
+function keyPathForms(rawPathname) {
+  const forms = [rawPathname.toLowerCase()];
+  let decoded = forms[0];
+  for (let i = 0; i < 3; i++) {
+    let next;
+    try {
+      next = decodeURIComponent(decoded);
+    } catch {
+      // Only the FIRST decode proves the request malformed. A later failure is a
+      // literal "%" the first pass produced ("100%25" -> "100%"), so stop there.
+      if (i === 0) return null;
+      break;
+    }
+    if (next === decoded) break;
+    decoded = next;
+  }
+  const collapsed = decoded.replace(/\/{2,}/g, "/");
+  forms.push(collapsed, new URL(collapsed, "https://key-path.invalid").pathname);
+  return forms.map((form) => form.replace(/\/+$/, "") || "/");
+}
+
+const matchesPrefix = (forms, prefixes, exact = false) =>
+  forms.some((form) => prefixes.some((p) => form.startsWith(exact ? `${p}/` : p) || (exact && form === p)));
+
 function normalizeUser(user) {
   if (!user) return null;
   const displayName = user.name || [user.firstName, user.lastName].filter(Boolean).join(" ") || null;
@@ -343,7 +374,8 @@ export async function onRequest(context) {
     // the path, not of any particular key, so a valid key and a forged one are refused
     // identically. It also costs zero D1 round-trips, which is the right posture for a
     // path an attacker can hammer for free.
-    if (KEY_FORBIDDEN_PREFIXES.some((prefix) => path.startsWith(prefix))) {
+    const keyPaths = keyPathForms(rawPathname);
+    if (!keyPaths || matchesPrefix([path, ...keyPaths], KEY_FORBIDDEN_PREFIXES)) {
       log.warn("API key blocked from account self-service route", {
         keyPrefix: bearerValue.slice(0, DISPLAY_PREFIX_LENGTH),
         path: rawPathname,
@@ -360,7 +392,7 @@ export async function onRequest(context) {
     }
 
     if (
-      KEY_READ_ONLY_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`)) &&
+      matchesPrefix([path, ...keyPaths], KEY_READ_ONLY_PREFIXES, true) &&
       !["GET", "HEAD"].includes(request.method)
     ) {
       log.warn("API key blocked from identity-management mutation", {

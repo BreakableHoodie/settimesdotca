@@ -433,6 +433,53 @@ describe("API key authentication path (#744 part 3)", () => {
 
       expect(response.status).toBe(200);
     });
+
+    // #1327: each of these slipped past a startsWith on the lowercased path in
+    // production (measured 2026-10-16). Only the router stood between them and a handler.
+    const NON_CANONICAL = [
+      ["/api/admin/%69nvite-codes", "GET"],
+      ["/api/admin/%2569nvite-codes", "GET"],
+      ["/api/admin//invite-codes", "GET"],
+      ["/api/admin/bands%2f..%2finvite-codes", "GET"],
+      ["/api/admin/bands/%2e%2e/invite-codes", "GET"],
+      ["/api/admin/%6dfa/setup", "POST"],
+      ["/api/admin/%75sers", "POST"],
+      ["/api/admin//users/5", "PATCH"],
+      ["/api/admin/bands%2f..%2fapi-keys", "POST"],
+      ["/api/admin/%zz/users", "GET"],
+    ];
+
+    it.each(NON_CANONICAL)("refuses the non-canonical spelling %s (%s)", async (path, method) => {
+      const { env, rawDb } = createTestEnv({ role: "admin" });
+      const key = await seedKey(rawDb, { role: "admin" });
+
+      const reached = vi.fn(async () => new Response("ok", { status: 200 }));
+      const { response } = await runMiddleware(
+        env,
+        keyRequest(key.plaintext, { method, url: `https://example.test${path}` }),
+        reached,
+      );
+
+      expect(response.status).toBe(403);
+      expect((await response.json()).code).toBe("KEY_NOT_PERMITTED");
+      expect(reached).not.toHaveBeenCalled();
+    });
+
+    it("still lets an encoded band name through, slash included", async () => {
+      const { env, rawDb } = createTestEnv({ role: "admin" });
+      const key = await seedKey(rawDb, { role: "admin" });
+
+      for (const name of ["AC%2FDC", "Kepi%20Ghoulie", "100%25%20Real"]) {
+        const reached = vi.fn(async () => new Response("ok", { status: 200 }));
+        const { response } = await runMiddleware(
+          env,
+          keyRequest(key.plaintext, { url: `https://example.test/api/admin/bands/stats/${name}` }),
+          reached,
+        );
+        expect(response.status, name).toBe(200);
+        expect(reached, name).toHaveBeenCalled();
+      }
+    });
   });
 
   describe("identity-management mutations are refused", () => {

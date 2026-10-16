@@ -109,8 +109,17 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'API keys' — identity-management resources are readable by keys but key mutations cannot create or change identities",
     file: "functions/api/admin/_middleware.js",
-    find: '    if (\n      KEY_READ_ONLY_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`)) &&\n      !["GET", "HEAD"].includes(request.method)\n    ) {',
+    find: '    if (\n      matchesPrefix([path, ...keyPaths], KEY_READ_ONLY_PREFIXES, true) &&\n      !["GET", "HEAD"].includes(request.method)\n    ) {',
     replace: "    if (false) {",
+    tests: ["functions/api/admin/__tests__/api-key-auth.test.js"],
+  },
+  {
+    id: "api-key-denylist-non-canonical-paths",
+    invariant:
+      "CLAUDE.md 'API keys' — the key denylist is checked against every normalised spelling of the path, so %69nvite-codes, //users and bands%2f..%2fapi-keys are refused, not left to the router (#1327)",
+    file: "functions/api/admin/_middleware.js",
+    find: "    if (!keyPaths || matchesPrefix([path, ...keyPaths], KEY_FORBIDDEN_PREFIXES)) {",
+    replace: "    if (matchesPrefix([path], KEY_FORBIDDEN_PREFIXES)) {",
     tests: ["functions/api/admin/__tests__/api-key-auth.test.js"],
   },
   {

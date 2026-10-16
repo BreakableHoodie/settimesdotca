@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -60,6 +60,25 @@ describe("scrub-e2e-artifacts", () => {
     writeFileSync(path.join(root, "a.md"), `value: ${secret}\n`, "utf8");
     expect(scrub([root], [secret])).toEqual([]);
     expect(readFileSync(path.join(root, "a.md"), "utf8")).toBe("value: [REDACTED]\n");
+  });
+
+  it("drops HTML attachments whatever the extension's case", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "scrub-"));
+    // Base64 inside HTML hides the secret from the byte scan, so HTML is dropped, never scanned.
+    writeFileSync(path.join(root, "failure.HTML"), `<p>${Buffer.from(TYPED_VALUE).toString("base64")}</p>`);
+    writeFileSync(path.join(root, "page.Htm"), "<p>x</p>");
+    expect(scrub([root], [TYPED_VALUE])).toEqual([]);
+    expect(readdirSync(root)).toEqual([]);
+  });
+
+  it("removes symlinks instead of writing through them to a file outside the artifacts", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "scrub-"));
+    const outside = path.join(mkdtempSync(path.join(tmpdir(), "outside-")), "target.md");
+    writeFileSync(outside, `kept: ${TYPED_VALUE}\n`);
+    symlinkSync(outside, path.join(root, "link.md"));
+    expect(scrub([root], [TYPED_VALUE])).toEqual([]);
+    expect(readdirSync(root)).toEqual([]);
+    expect(readFileSync(outside, "utf8")).toBe(`kept: ${TYPED_VALUE}\n`);
   });
 
   it("uses a padded secret exactly, so the padded value cannot survive", () => {

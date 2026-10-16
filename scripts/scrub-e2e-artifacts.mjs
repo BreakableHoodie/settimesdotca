@@ -8,8 +8,8 @@
 // user, and the secret was rotated.
 //
 // What this does, for each directory given:
-//   1. Deletes traces (*.zip, *.trace, *.network) and any HTML report. Both are
-//      archives or embedded base64 that cannot be scrubbed in place.
+//   1. Deletes traces (*.zip, *.trace, *.network), HTML files and symlinks. Traces
+//      and HTML hold archives or base64 that cannot be scrubbed in place.
 //   2. Replaces every occurrence of each secret in the remaining files.
 //   3. Re-reads EVERY remaining file, binary included, and exits 1 if a secret
 //      or an archive survives. The workflow uploads only when this step
@@ -21,11 +21,12 @@
 // Secrets come from SCRUB_SECRETS (newline-separated), never argv, so they do
 // not reach the process list or the job log.
 
-import { existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const DROP_FILE = /\.(zip|trace|network)$/i;
+// HTML is dropped, never scanned: an attachment can carry the secret as base64.
+const DROP_FILE = /\.(zip|trace|network|html?)$/i;
 const DROP_DIR = new Set(["trace", "data"]); // Playwright trace and HTML-report payloads
 
 function* walk(dir) {
@@ -77,7 +78,9 @@ export function scrub(dirs, secrets) {
       if (sub.isDirectory() && DROP_DIR.has(sub.name)) rmSync(full, { recursive: true, force: true });
     }
     for (const file of walk(dir)) {
-      if (DROP_FILE.test(file) || file.endsWith(".html")) {
+      // A symlink is removed, never read: reading follows it, and the redacted
+      // write would land on its target outside these directories.
+      if (lstatSync(file).isSymbolicLink() || DROP_FILE.test(file)) {
         rmSync(file, { force: true });
         continue;
       }
@@ -99,8 +102,10 @@ export function scrub(dirs, secrets) {
   for (const dir of dirs) {
     if (!existsSync(dir)) continue;
     for (const file of walk(dir)) {
-      if (DROP_FILE.test(file) || file.endsWith(".html")) leaks.push(`${file}: archive or report survived`);
-      else if (statSync(file).isFile()) {
+      const stat = lstatSync(file);
+      if (stat.isSymbolicLink()) leaks.push(`${file}: symlink survived`);
+      else if (DROP_FILE.test(file)) leaks.push(`${file}: archive or report survived`);
+      else if (stat.isFile()) {
         const bytes = readFileSync(file);
         if (needles.some((n) => bytes.includes(n))) leaks.push(`${file}: secret survived`);
       }

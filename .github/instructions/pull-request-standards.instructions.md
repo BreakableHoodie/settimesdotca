@@ -119,12 +119,9 @@ Built and reviewed by Theo · 🤖 [Claude Code](https://claude.ai/claude-code)
 Run the applicable checklist from CLAUDE.md's "Before every commit" section.
 The full gate before merge:
 
-1. `npm run format:check` (backend) and `cd frontend && npm run format:check`
-2. `npm run lint`
-3. `npm test` (backend, may require Linux/CI) and `cd frontend && npm test -- --run`
-4. `npm run build --prefix frontend`
-5. `npm run validate:openapi` if `docs/api-spec.yaml` changed
-6. `git fetch origin && git rebase origin/main` — do this **every push**, not just on open
+1. `make gate` (format, format-check, lint-all, check-citations, test, build)
+2. `npm run validate:openapi` if `docs/api-spec.yaml` changed
+3. `git fetch origin && git rebase origin/main` — do this **every push**, not just on open
 
 ---
 

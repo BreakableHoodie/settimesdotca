@@ -1,3 +1,4 @@
+import { expect } from "@playwright/test";
 import { ADMIN_EMAIL, ADMIN_PASSWORD } from "../credentials";
 import { e2eTotpCode } from "../../scripts/e2e-totp.mjs";
 
@@ -35,4 +36,21 @@ export const submitAdminLogin = async (page) => {
   await codeInput.waitFor({ state: "visible", timeout: 15000 });
   await codeInput.fill(await e2eTotpCode(ADMIN_PASSWORD));
   await page.getByRole("button", { name: "Verify Code" }).click();
+};
+
+// Identity changes ask for a fresh 2FA code (#1324): the first one in a
+// 5-minute window opens the "Confirm it's you" dialog, later ones do not. Call
+// this right after the click that starts such a change. It waits until either
+// the dialog or the change's own success signal shows, and answers the dialog
+// only if it appeared.
+export const confirmStepUpIfPrompted = async (page, successMatcher) => {
+  const stepUpDialog = page.getByRole("dialog", { name: "Confirm it's you" });
+  const succeeded = page.locator("body", { hasText: successMatcher });
+  await expect(stepUpDialog.or(succeeded).first()).toBeVisible({ timeout: 10000 });
+  if (await stepUpDialog.isVisible()) {
+    await stepUpDialog.locator("#step-up-code").fill(await e2eTotpCode(ADMIN_PASSWORD));
+    await stepUpDialog.getByRole("button", { name: "Confirm" }).click();
+    await expect(stepUpDialog).not.toBeVisible();
+  }
+  await expect(page.locator("body")).toContainText(successMatcher, { timeout: 10000 });
 };

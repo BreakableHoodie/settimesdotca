@@ -39,10 +39,10 @@ export default defineConfig({
       // Headroom is kept at the previous ~1.3-1.8 points, so the ratchet is as
       // strict as before. A lower number here is NOT a coverage regression.
       thresholds: {
-        statements: 85,
-        branches: 78,
+        statements: 86,
+        branches: 79,
         functions: 91,
-        lines: 85,
+        lines: 87,
       },
       exclude: [
         "node_modules/",

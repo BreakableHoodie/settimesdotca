@@ -56,9 +56,9 @@ export async function allowEmailToRecipient(DB, email) {
 /** Log a suppressed send at the level its reason deserves. Never logs the address. */
 export function logRecipientSuppression(tag, { reason, logId }) {
   if (reason === "counter_unavailable") {
-    console.error(`[${tag}] Recipient cap unavailable; email suppressed (fail-closed):`, logId);
+    console.error("[%s] Recipient cap unavailable; email suppressed (fail-closed): %s", tag, logId);
   } else {
-    console.warn(`[${tag}] Recipient email cap reached; email not sent:`, logId);
+    console.warn("[%s] Recipient email cap reached; email not sent: %s", tag, logId);
   }
 }
 

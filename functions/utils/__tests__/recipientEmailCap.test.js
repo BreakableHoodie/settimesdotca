@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { createTestEnv, insertBand, insertEvent } from "../../api/test-utils.js";
 import * as followHandler from "../../api/bands/[name]/follow.js";
@@ -27,7 +28,7 @@ function setup() {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url, init) => {
-      if (String(url).includes("api.resend.com")) {
+      if (new URL(String(url)).hostname === "api.resend.com") {
         if (providerDown) return new Response("boom", { status: 500 });
         sent.push(...[JSON.parse(init.body).to].flat());
         return new Response(JSON.stringify({ id: "x" }), { status: 200 });
@@ -259,6 +260,12 @@ describe("per-recipient email cap (#1337)", () => {
     expect(errors).toContain("fail-closed");
     expect(errors).not.toContain("x@example.com");
     expect(console.warn.mock.calls.flat().join(" ")).not.toContain("cap reached");
+    // Nor the full digest: unsalted, it is a stable pseudonym a log reader could
+    // test known addresses against. Only the 8-char id may appear. Serialised,
+    // because the logger passes objects, which join() would print as [object Object].
+    const digest = createHash("sha256").update("x@example.com").digest("hex");
+    expect(JSON.stringify(console.error.mock.calls)).not.toContain(digest);
+    expect(JSON.stringify(console.error.mock.calls)).toContain(digest.slice(0, 8));
   });
 
   it("a real over-cap is a warning, not an error, and reports reason 'capped'", async () => {

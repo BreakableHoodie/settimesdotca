@@ -103,7 +103,9 @@ export default function PrivacyPage() {
                     <td className="py-2">Deleted at expiry</td>
                   </tr>
                   <tr>
-                    <td className="py-2 pr-4">Rate-limit counters</td>
+                    <td className="py-2 pr-4">
+                      Rate-limit counters (including a one-way code of an address that was sent a confirmation email)
+                    </td>
                     <td className="py-2">Up to about 25 hours</td>
                   </tr>
                   <tr>

@@ -30,6 +30,7 @@ import { parseJsonObjectBody } from "../../utils/request.js";
 import { publicEventStatusSql } from "../../utils/eventVisibility.js";
 import { CONSENT_VERSION, pendingConfirmationLiveSql } from "../../utils/consent.js";
 import { isDevRequest } from "../../utils/auth.js";
+import { allowEmailToRecipient, recipientLogId } from "../../utils/recipientEmailCap.js";
 
 const MAX_EMAIL_LENGTH = 320;
 const MAX_BATCH_SIZE = 30;
@@ -153,7 +154,27 @@ export async function onRequestPost(context) {
     // Every pair is delete-then-insert; only insert results count as new follows.
     const isNewBatch = results.some((r, index) => index % 2 === 1 && r.meta.changes > 0);
 
+    // Per-recipient cap (#1337): the whole batch is ONE email, so it costs one unit.
+    // Over the cap: send nothing, answer as on success, and drop this batch's pending
+    // rows (their confirm link was never mailed, and leaving them would turn every
+    // re-request into a no-op until they expire).
+    let emailAllowed = true;
     if (isNewBatch && isEmailConfigured(env)) {
+      emailAllowed = await allowEmailToRecipient(DB, email);
+      if (!emailAllowed) {
+        console.warn(
+          "[band-follow-batch] Recipient email cap reached; confirmation not sent:",
+          await recipientLogId(email),
+        );
+        try {
+          await DB.prepare("DELETE FROM band_follows WHERE batch_token = ? AND verified = 0").bind(batchToken).run();
+        } catch (err) {
+          console.error("[band-follow-batch] Failed to drop capped pending follows:", err);
+        }
+      }
+    }
+
+    if (isNewBatch && emailAllowed && isEmailConfigured(env)) {
       const bandListText = bands.results.map((b) => `• ${b.band_name}`).join("\n");
       const bandListHtml = bands.results.map((b) => `<li>${escapeHtml(b.band_name)}</li>`).join("");
 

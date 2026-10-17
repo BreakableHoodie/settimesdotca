@@ -710,6 +710,11 @@ Follow, subscriber, and single-band digest mail carries RFC 8058 one-click unsub
 
 Bot protection on the public email-input endpoints (follow, subscribe) goes through `verifyTurnstile()` in `functions/utils/turnstile.js`, which **fails closed in production**: if `TURNSTILE_SECRET_KEY` is unset it allows only local-dev requests and rejects everything else (mirrors `CSRF_SECRET`). The secret **must** be configured in the production Pages project.
 
+### Public senders cap emails per recipient (#1337)
+
+Follow, follow-batch, subscribe and resend-activation share ONE allowance per address: 5 emails per 24 h (`functions/utils/recipientEmailCap.js`), whatever IPs the requests come from. A batch is one email. The `rate_limits` key is `email-recipient:` plus a SHA-256 of the trimmed, lowercased address; the raw address is never stored or logged (logs carry 8 hex chars). The cap sits immediately before the send, so no-op paths do not burn it. Over the cap the response is byte-identical to success, so it cannot be used to probe addresses, and the pending row is dropped (an unmailed row would block re-requests for 7 days). It fails closed: a D1 error suppresses the email.
+**Retention:** `retention.js` prunes `rate_limits` at 30 min, but keeps `email-recipient:` keys 25 h; at 30 min the cap would reset itself. A new public sender that emails a caller-supplied address must call `allowEmailToRecipient`.
+
 ### Proof of consent is recorded at confirmation (#1289)
 
 Band follows and email subscriptions store `confirmed_at` and the `consent_version` that identifies the wording shown when the request was made; legacy rows remain NULL because their wording and confirmation time were not recorded. Bump `CONSENT_VERSION` whenever the follow/subscribe form wording or confirmation email wording changes. Confirmation writes use SQLite's `datetime('now')` and must never overwrite an existing confirmed timestamp.

@@ -10,6 +10,7 @@ import { getPublicBaseUrl } from "../../utils/publicUrl.js";
 import { parseJsonObjectBody } from "../../utils/request.js";
 import { CONSENT_VERSION, pendingConfirmationLiveSql } from "../../utils/consent.js";
 import { isDevRequest } from "../../utils/auth.js";
+import { allowEmailToRecipient, recipientLogId } from "../../utils/recipientEmailCap.js";
 
 const FREQUENCY_OPTIONS = new Set(["daily", "weekly", "monthly"]);
 const MAX_EMAIL_LENGTH = 320;
@@ -187,6 +188,18 @@ export async function onRequestPost(context) {
     // Send verification email
     const emailResult = await sendVerificationEmail(env, email, verificationToken);
 
+    // Capped (#1337): the token was never mailed, so drop the row we just created;
+    // otherwise a later request would only ever re-send, and that too would be capped.
+    if (emailResult.capped) {
+      try {
+        await env.DB.prepare("DELETE FROM email_subscriptions WHERE verification_token = ? AND verified = 0")
+          .bind(verificationToken)
+          .run();
+      } catch (err) {
+        console.error("[Subscribe] Failed to drop capped pending subscription:", err);
+      }
+    }
+
     if (!emailResult.delivered && emailResult.reason === "not_configured") {
       return subscriptionResponse(
         {
@@ -232,6 +245,12 @@ async function sendVerificationEmail(env, email, token) {
   `.trim();
 
   if (isEmailConfigured(env)) {
+    // Per-recipient cap (#1337). Over it: no email, and a result that matches no caller's
+    // "not_configured" branch, so the response is the ordinary success one.
+    if (!(await allowEmailToRecipient(env.DB, email))) {
+      console.warn("[Subscribe] Recipient email cap reached; verification not sent:", await recipientLogId(email));
+      return { delivered: false, reason: "recipient_capped", capped: true, verifyUrl };
+    }
     const emailResult = await sendEmail(env, {
       to: email,
       subject,

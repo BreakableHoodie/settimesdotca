@@ -9,6 +9,7 @@ import { getPublicBaseUrl } from "../../../utils/publicUrl.js";
 import { parseJsonObjectBody } from "../../../utils/request.js";
 import { CONSENT_VERSION, pendingConfirmationLiveSql } from "../../../utils/consent.js";
 import { isDevRequest } from "../../../utils/auth.js";
+import { allowEmailToRecipient, recipientLogId } from "../../../utils/recipientEmailCap.js";
 
 const MAX_EMAIL_LENGTH = 320;
 
@@ -87,7 +88,25 @@ export async function onRequestPost(context) {
     const publicUrl = getPublicBaseUrl(env);
     const confirmUrl = `${publicUrl}/api/bands/${band.id}/confirm-follow?token=${verificationToken}`;
 
+    // Per-recipient cap (#1337): over it, send nothing and answer exactly as on success.
+    // The pending row is removed too: it would otherwise sit unconfirmable (its token was
+    // never mailed) and make every re-request a no-op until it expires in 7 days.
+    let emailAllowed = true;
     if (isNewFollow && isEmailConfigured(env)) {
+      emailAllowed = await allowEmailToRecipient(DB, email);
+      if (!emailAllowed) {
+        console.warn("[band-follow] Recipient email cap reached; confirmation not sent:", await recipientLogId(email));
+        try {
+          await DB.prepare("DELETE FROM band_follows WHERE verification_token = ? AND verified = 0")
+            .bind(verificationToken)
+            .run();
+        } catch (err) {
+          console.error("[band-follow] Failed to drop capped pending follow:", err);
+        }
+      }
+    }
+
+    if (isNewFollow && emailAllowed && isEmailConfigured(env)) {
       // Use waitUntil so the Worker stays alive for the email after the response is returned.
       waitUntil(
         sendEmail(env, {

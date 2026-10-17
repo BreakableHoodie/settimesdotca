@@ -271,6 +271,33 @@ export const MUTATIONS = [
     tests: ["functions/api/admin/bands/__tests__/announce-double-opt-in.test.js"],
   },
   {
+    id: "recipient-cap-follow",
+    invariant:
+      "CLAUDE.md 'Public senders cap emails per recipient' — POST /api/bands/:name/follow counts each confirmation email against the per-address allowance",
+    file: "functions/api/bands/[name]/follow.js",
+    find: "emailAllowed = await allowEmailToRecipient(DB, email);",
+    replace: "emailAllowed = true;",
+    tests: ["functions/utils/__tests__/recipientEmailCap.test.js"],
+  },
+  {
+    id: "recipient-cap-key-hashed",
+    invariant:
+      "CLAUDE.md 'Public senders cap emails per recipient' — the rate_limits key is a digest of the address, never the raw address",
+    file: "functions/utils/recipientEmailCap.js",
+    find: "`${RECIPIENT_KEY_PREFIX}${hash}`",
+    replace: "`${RECIPIENT_KEY_PREFIX}${String(email).trim().toLowerCase()}`",
+    tests: ["functions/utils/__tests__/recipientEmailCap.test.js"],
+  },
+  {
+    id: "recipient-cap-counter-outlives-prune",
+    invariant:
+      "CLAUDE.md 'Public senders cap emails per recipient' — the retention job keeps a recipient counter for its whole 24 h window, or the cap resets itself",
+    file: "functions/utils/recipientEmailCap.js",
+    find: "RECIPIENT_EMAIL_WINDOW_SECONDS + 60 * 60;",
+    replace: "1800;",
+    tests: ["functions/utils/__tests__/recipientEmailCap.test.js"],
+  },
+  {
     id: "consent-confirmation-single-follow-timestamp",
     invariant:
       "CLAUDE.md 'Proof of consent is recorded at confirmation' — a single band follow confirmation records its SQLite timestamp",

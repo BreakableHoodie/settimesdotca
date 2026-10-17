@@ -17,11 +17,17 @@
 //                    disjoint (= vs !=) so they cannot double-count a row and the
 //                    reported figures stay correct regardless of execution order.
 //   rate_limits:     30 min (1800s) — stale fixed-window counters. The largest
-//                    configured window is 300s so this is intentionally 6× to
+//                    per-IP window is 300s so this is intentionally 6× to
 //                    give a buffer against races. Uses unixepoch() because the
 //                    column stores integer seconds, not ISO text.
+//                    EXCEPT 'email-recipient:%' keys (#1337), which hold a 24 h
+//                    per-address cap and are kept 25 h (90000s). At the 30 min
+//                    rule they would vanish half an hour after the last email,
+//                    and the cap would reset itself. The predicates are disjoint
+//                    (LIKE vs NOT LIKE), in one statement.
 
 import { pendingConfirmationLiveSql } from "../../../utils/consent.js";
+import { RECIPIENT_KEY_PREFIX, RECIPIENT_KEY_RETENTION_SECONDS } from "../../../utils/recipientEmailCap.js";
 
 export async function runRetentionCleanup(env) {
   const { DB } = env;
@@ -62,7 +68,15 @@ export async function runRetentionCleanup(env) {
           "DELETE FROM audit_log WHERE action = 'api_key.request' AND created_at < datetime('now', '-90 days')",
         ).run(),
     ],
-    ["rate_limits", () => DB.prepare("DELETE FROM rate_limits WHERE updated_at < unixepoch() - 1800").run()],
+    [
+      "rate_limits",
+      () =>
+        DB.prepare(
+          `DELETE FROM rate_limits
+           WHERE (key NOT LIKE '${RECIPIENT_KEY_PREFIX}%' AND updated_at < unixepoch() - 1800)
+              OR (key LIKE '${RECIPIENT_KEY_PREFIX}%' AND updated_at < unixepoch() - ${RECIPIENT_KEY_RETENTION_SECONDS})`,
+        ).run(),
+    ],
     [
       "band_follows",
       () => DB.prepare(`DELETE FROM band_follows WHERE verified = 0 AND NOT (${pendingConfirmationLiveSql()})`).run(),

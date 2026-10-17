@@ -11,6 +11,7 @@ import { sendEmail, isEmailConfigured } from "../../../../utils/email.js";
 import { buildResetPasswordEmail } from "../../../../utils/emailTemplates.js";
 import { revokeAllTrustedDevices } from "../../../../utils/trustedDevice.js";
 import { getPublicBaseUrl } from "../../../../utils/publicUrl.js";
+import { requireRecentStepUp } from "../../../../utils/stepUp.js";
 
 export async function onRequestPost(context) {
   const { request, env, params } = context;
@@ -21,6 +22,11 @@ export async function onRequestPost(context) {
   if (permCheck.error) {
     return permCheck.response;
   }
+
+  // Step-up before anything is read, minted or sent: the reset URL is an
+  // account-takeover lever (#1324).
+  const stepUpDenied = await requireRecentStepUp(context);
+  if (stepUpDenied) return stepUpDenied;
 
   const user = permCheck.user;
   const ipAddress = getClientIP(request);

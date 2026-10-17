@@ -1,7 +1,7 @@
 // #1253 review: admins and editors cannot turn their own 2FA off, so an admin
 // must be able to reset a colleague's lost authenticator without a D1 write.
 import { describe, expect, it } from "vitest";
-import { createTestEnv } from "../../../test-utils.js";
+import { createTestEnv, grantStepUp } from "../../../test-utils.js";
 import * as resetMfa from "../[id]/reset-mfa.js";
 
 function seedFactorState(rawDb, userId) {
@@ -34,7 +34,8 @@ async function callReset(env, headers, id) {
 
 describe("POST /api/admin/users/:id/reset-mfa (#1253)", () => {
   it("clears the editor's factor and ends everything authenticated under it", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     seedFactorState(rawDb, 2);
 
     const response = await callReset(env, headers, 2);
@@ -57,7 +58,8 @@ describe("POST /api/admin/users/:id/reset-mfa (#1253)", () => {
   });
 
   it("refuses an admin resetting their own factor and changes nothing", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     const response = await callReset(env, headers, 1);
     expect(response.status).toBe(400);
     expect((await response.json()).code).toBe("CANNOT_RESET_OWN_MFA");
@@ -73,7 +75,8 @@ describe("POST /api/admin/users/:id/reset-mfa (#1253)", () => {
   });
 
   it("returns 404 for a user that does not exist", async () => {
-    const { env, headers } = createTestEnv({ role: "admin" });
+    const { env, headers, rawDb, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     expect((await callReset(env, headers, 999)).status).toBe(404);
   });
 });

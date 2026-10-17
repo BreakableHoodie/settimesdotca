@@ -372,6 +372,16 @@ export async function checkPermission(context, requiredRole) {
     };
   }
 
+  // The middleware normally populates this. On the direct-call path (handlers
+  // invoked without it, as unit tests do) record the validated session so
+  // requireRecentStepUp() can find it; it never invents one.
+  if (!context.data?.session && auth.result.session?.id) {
+    context.data = {
+      ...context.data,
+      session: { id: auth.result.session.id, user_id: normalizedUser.userId },
+    };
+  }
+
   return { error: false, user: normalizedUser, lucia: auth.result.lucia, session: auth.result.session };
 }
 

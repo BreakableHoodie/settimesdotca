@@ -1753,6 +1753,59 @@ paths:
         "500":
           $ref: "#/components/responses/ServerError"
 
+  /api/admin/mfa/step-up:
+    post:
+      tags:
+        - Admin - MFA
+      summary: Re-prove the second factor for this session (step-up)
+      description: >-
+        Takes a current TOTP code or an unused backup code (which is spent) and
+        stamps the calling session for 5 minutes. Identity-changing routes
+        (delete or create a user, change a role, deactivate, reset 2FA or a
+        password, create an invite code, create or revoke an API key) answer
+        403 with code STEP_UP_REQUIRED until the session has stepped up. A
+        step-up on one session does not count for another. API keys are refused.
+        A wrong code is 400 INVALID_MFA_CODE (never 401, which signs the user
+        out), as on mfa/enable, mfa/disable and mfa/backup-codes. 400
+        MFA_NOT_ENABLED when the account has no 2FA; 409 MFA_CHANGED when the
+        factor changed during the request. 10 failed attempts per hour per user
+        (across step-up, backup-codes and disable, any IP) end the session: 401
+        STEP_UP_LOCKED.
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CodeRequest"
+      responses:
+        "200":
+          description: Session stepped up
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  stepUpExpiresAt:
+                    type: string
+                    format: date-time
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
   /api/admin/events:
     get:
       tags:
@@ -3333,7 +3386,11 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
     Forbidden:
-      description: Request was blocked by RBAC, CSRF validation, or same-origin validation
+      description: >-
+        Request was blocked by RBAC, CSRF validation, or same-origin validation.
+        Identity-changing admin routes answer code STEP_UP_REQUIRED (503 on a read
+        error) until the session has called POST /api/admin/mfa/step-up within
+        the last 5 minutes; API keys get STEP_UP_KEY_FORBIDDEN.
       content:
         application/json:
           schema:

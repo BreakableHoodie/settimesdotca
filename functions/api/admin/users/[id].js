@@ -6,6 +6,7 @@ import { checkPermission } from "../_middleware.js";
 import { auditLogStatement, auditLogStatementWhere } from "../../../utils/auditLogStatement.js";
 import { getClientIP, parseJsonObjectBody } from "../../../utils/request.js";
 import { validateId } from "../../../utils/validation.js";
+import { requireRecentStepUp } from "../../../utils/stepUp.js";
 
 // PATCH - Update user (admin only, users can update own name)
 export async function onRequestPatch(context) {
@@ -75,6 +76,20 @@ export async function onRequestPatch(context) {
           headers: { "Content-Type": "application/json" },
         },
       );
+    }
+
+    // Step-up (#1324) only for the identity changes: a role that differs from
+    // the stored one, a falsy isActive (read by truthiness like every other
+    // site here, so {"isActive": 0} deactivates), or a truthy isActive on an
+    // INACTIVE user (reactivation restores full access, including the ability
+    // to step up). Name edits need none. Before any write.
+    const stepUpNeeded =
+      (role !== undefined && role !== user.role) ||
+      (isActive !== undefined && !isActive) ||
+      (isActive !== undefined && Boolean(isActive) && Number(user.is_active) === 0);
+    if (stepUpNeeded) {
+      const stepUpDenied = await requireRecentStepUp(context);
+      if (stepUpDenied) return stepUpDenied;
     }
 
     // Build update query dynamically based on provided fields
@@ -241,6 +256,18 @@ export async function onRequestPatch(context) {
     // The pre-checks above provide the fast error. This predicate makes the
     // UPDATE itself win the race when two admins change each other at once.
     values.push(userId);
+
+    // A same-state send (the role the user already has, isActive true on an
+    // active user) skipped step-up. Pin the UPDATE to the state that was read,
+    // so a concurrent demotion or deactivation cannot be silently undone
+    // without one. Losing is a 409, not a write.
+    const guardsRole = role !== undefined && !roleChanged;
+    const guardsActive = isActive !== undefined && Boolean(isActive) && Number(user.is_active) === 1;
+    const staleGuard = guardsRole || guardsActive;
+    const staleConditions = (guardsRole ? " AND role = ?" : "") + (guardsActive ? " AND is_active = 1" : "");
+    const staleValues = guardsRole ? [user.role] : [];
+    // Placeholder order in the UPDATE: id, stale role, last-admin id.
+    values.push(...staleValues);
     if (protectsLastAdmin) {
       values.push(userId);
     }
@@ -263,11 +290,14 @@ export async function onRequestPatch(context) {
     // still record a change that never happened before the 404.
     const appliedConditions = [];
     const appliedBinds = [userId];
-    if (roleChanged) {
+    // Also for a same-role send: the audit row and revocations must not claim a
+    // change that the stale-state pin above refused.
+    if (role !== undefined) {
       appliedConditions.push("role = ?");
       appliedBinds.push(role);
     }
     if (deactivating) appliedConditions.push("is_active = 0");
+    else if (isActive !== undefined && isActive) appliedConditions.push("is_active = 1");
     const applied = {
       sql: `EXISTS (SELECT 1 FROM users WHERE id = ?${appliedConditions.map((c) => ` AND ${c}`).join("")})`,
       binds: appliedBinds,
@@ -278,7 +308,7 @@ export async function onRequestPatch(context) {
         `
         UPDATE users
         SET ${updates.join(", ")}
-        WHERE id = ?${lastAdminCondition}
+        WHERE id = ?${staleConditions}${lastAdminCondition}
       `,
       ).bind(...values),
     ];
@@ -331,6 +361,18 @@ export async function onRequestPatch(context) {
     // absent meta must not turn a committed write into a false failure).
     // Zero changes means the user was deleted mid-request, OR the last-admin
     // guard refused. Only a guarded update can be the latter, so ask the row.
+    if (userUpdate?.meta?.changes === 0 && staleGuard) {
+      if (await DB.prepare("SELECT 1 FROM users WHERE id = ?").bind(userId).first()) {
+        return new Response(
+          JSON.stringify({
+            error: "Conflict",
+            code: "USER_STATE_CHANGED",
+            message: "This user changed while you were editing. Reload and try again.",
+          }),
+          { status: 409, headers: { "Content-Type": "application/json" } },
+        );
+      }
+    }
     const deletedMidRequest =
       userUpdate?.meta?.changes === 0 &&
       (!protectsLastAdmin || !(await DB.prepare("SELECT 1 FROM users WHERE id = ?").bind(userId).first()));
@@ -409,6 +451,10 @@ export async function onRequestDelete(context) {
     if (permCheck.error) {
       return permCheck.response;
     }
+
+    // Step-up before anything is read or deleted (#1324).
+    const stepUpDenied = await requireRecentStepUp(context);
+    if (stepUpDenied) return stepUpDenied;
 
     const currentUser = permCheck.user;
 

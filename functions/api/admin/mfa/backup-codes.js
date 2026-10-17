@@ -3,7 +3,8 @@
 // Body: { code: string }
 
 import { checkPermission, auditLog } from "../_middleware.js";
-import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../utils/authAttempts.js";
+import { AUTH_ATTEMPT_TYPES } from "../../../utils/authAttempts.js";
+import { beginMfaGuess, settleQuietly } from "../../../utils/mfaGuessGate.js";
 import { verifyTotp, generateBackupCodes, hashBackupCode } from "../../../utils/totp.js";
 import { loadTotpSecret } from "../../../utils/mfaSecrets.js";
 import { getClientIP, parseJsonObjectBody } from "../../../utils/request.js";
@@ -69,23 +70,17 @@ export async function onRequestPost(context) {
     );
   }
 
-  const rateCheck = await checkAuthRateLimit(DB, {
+  // Pending attempt, per-user lockout (ends the session), per-IP limit (#1324).
+  const { attemptId, response: limited } = await beginMfaGuess(DB, {
     attemptType: AUTH_ATTEMPT_TYPES.mfaBackupCodes,
+    email: user.email,
     ipAddress,
-    scope: "user-and-ip",
+    sessionId: context.data?.session?.id,
+    userAgent: request.headers.get("User-Agent") || "unknown",
     userId,
   });
-  if (!rateCheck.allowed) {
-    return new Response(
-      JSON.stringify({
-        error: "Too many attempts",
-        message: `Too many failed backup code regeneration attempts. Please try again in ${rateCheck.remainingMinutes} minutes.`,
-      }),
-      {
-        status: 429,
-        headers: { "Content-Type": "application/json" },
-      },
-    );
+  if (limited) {
+    return limited;
   }
 
   let totpSecretState;
@@ -93,6 +88,7 @@ export async function onRequestPost(context) {
     totpSecretState = await loadTotpSecret(user.totp_secret, env);
   } catch (error) {
     console.error("[MFA Backup Codes] Failed to decrypt TOTP secret:", error?.message || error);
+    await settleQuietly(DB, attemptId, { success: false, failureReason: "totp_secret_error" });
     return new Response(
       JSON.stringify({
         error: "Server error",
@@ -107,23 +103,16 @@ export async function onRequestPost(context) {
 
   const valid = await verifyTotp(totpSecretState?.secret, code);
   if (!valid) {
-    await writeAuthAttempt(DB, {
-      attemptType: AUTH_ATTEMPT_TYPES.mfaBackupCodes,
-      email: user.email,
-      failureReason: "invalid_code",
-      ipAddress,
-      success: false,
-      userAgent: request.headers.get("User-Agent") || "unknown",
-      userId,
-    });
+    await settleQuietly(DB, attemptId, { success: false, failureReason: "invalid_code" });
 
     return new Response(
       JSON.stringify({
         error: "Authentication failed",
+        code: "INVALID_MFA_CODE",
         message: "Invalid authentication code",
       }),
       {
-        status: 401,
+        status: 400,
         headers: { "Content-Type": "application/json" },
       },
     );
@@ -146,6 +135,7 @@ export async function onRequestPost(context) {
     .run();
 
   if (written?.meta?.changes === 0) {
+    await settleQuietly(DB, attemptId, { success: false, failureReason: "mfa_changed" });
     return new Response(
       JSON.stringify({
         error: "Conflict",
@@ -156,14 +146,7 @@ export async function onRequestPost(context) {
     );
   }
 
-  await writeAuthAttempt(DB, {
-    attemptType: AUTH_ATTEMPT_TYPES.mfaBackupCodes,
-    email: user.email,
-    ipAddress,
-    success: true,
-    userAgent: request.headers.get("User-Agent") || "unknown",
-    userId,
-  });
+  await settleQuietly(DB, attemptId, { success: true });
 
   await auditLog(env, userId, "mfa.backup_codes.regenerated", "user", userId, { email: user.email }, ipAddress);
 

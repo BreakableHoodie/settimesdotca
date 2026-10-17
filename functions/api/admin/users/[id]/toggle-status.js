@@ -6,6 +6,7 @@ import { checkPermission } from "../../_middleware.js";
 import { auditLogStatement } from "../../../../utils/auditLogStatement.js";
 import { getClientIP } from "../../../../utils/request.js";
 import { validateId } from "../../../../utils/validation.js";
+import { requireRecentStepUp } from "../../../../utils/stepUp.js";
 
 export async function onRequestPost(context) {
   const { request, env, params } = context;
@@ -16,6 +17,12 @@ export async function onRequestPost(context) {
   if (permCheck.error) {
     return permCheck.response;
   }
+
+  // Both directions need step-up (#1324): deactivating cuts a person off, and
+  // reactivating restores full access, including the ability to step up
+  // itself. Before anything is read or written.
+  const stepUpDenied = await requireRecentStepUp(context);
+  if (stepUpDenied) return stepUpDenied;
 
   const user = permCheck.user;
   const ipAddress = getClientIP(request);
@@ -58,6 +65,7 @@ export async function onRequestPost(context) {
 
     // Toggle user status
     const newStatus = targetUser.is_active === 1 ? 0 : 1;
+
     const statements = [
       DB.prepare(
         `

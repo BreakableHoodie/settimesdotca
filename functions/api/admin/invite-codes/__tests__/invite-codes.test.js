@@ -1,11 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { createTestEnv } from "../../../test-utils";
+import { createTestEnv, grantStepUp } from "../../../test-utils";
 import * as inviteCodesHandler from "../../invite-codes.js";
 import * as inviteCodeHandler from "../../invite-codes/[code].js";
 
 describe("Admin invite codes API", () => {
   it("creates an invite code and lists it", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
 
     const createReq = new Request("https://example.test/api/admin/invite-codes", {
       method: "POST",
@@ -51,7 +52,8 @@ describe("Admin invite codes API", () => {
   });
 
   it("rejects invalid role", async () => {
-    const { env, headers } = createTestEnv({ role: "admin" });
+    const { env, headers, rawDb, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
 
     const createReq = new Request("https://example.test/api/admin/invite-codes", {
       method: "POST",
@@ -67,7 +69,8 @@ describe("Admin invite codes API", () => {
   });
 
   it("rejects invite for existing user email", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
 
     const existingEmail = "existing-user@example.com";
     rawDb
@@ -88,7 +91,8 @@ describe("Admin invite codes API", () => {
   });
 
   it("rejects an existing user's email in a different case", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     rawDb
       .prepare("INSERT INTO users (email, role, password_hash) VALUES (?, ?, 'placeholder')")
       .run("existing-user@example.com", "viewer");
@@ -107,7 +111,8 @@ describe("Admin invite codes API", () => {
   // A blank email trimmed to "" would read as "no email" and mint an OPEN
   // invite the admin never asked for.
   it("rejects a whitespace-only email instead of minting an open invite", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
 
     const res = await inviteCodesHandler.onRequestPost({
       request: new Request("https://example.test/api/admin/invite-codes", {
@@ -122,7 +127,8 @@ describe("Admin invite codes API", () => {
   });
 
   it("revokes an invite code", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
 
     const code = "test-revoke-code";
     rawDb
@@ -148,7 +154,8 @@ describe("Admin invite codes API", () => {
   });
 
   it("returns 404 when invite code does not exist", async () => {
-    const { env, headers } = createTestEnv({ role: "admin" });
+    const { env, headers, rawDb, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
 
     const deleteReq = new Request("https://example.test/api/admin/invite-codes/does-not-exist", {
       method: "DELETE",

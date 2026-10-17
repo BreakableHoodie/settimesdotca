@@ -2,6 +2,7 @@
 // DELETE /api/admin/api-keys/:id - Revoke an API key (admin only)
 
 import { checkPermission } from "../_middleware.js";
+import { requireRecentStepUp } from "../../../utils/stepUp.js";
 import { auditLogStatementForInsertedRow } from "../../../utils/auditLogStatement.js";
 import { getClientIP } from "../../../utils/request.js";
 import { validateId } from "../../../utils/validation.js";
@@ -13,6 +14,9 @@ export async function onRequestDelete(context) {
   if (permCheck.error) {
     return permCheck.response;
   }
+
+  const stepUpDenied = await requireRecentStepUp(context);
+  if (stepUpDenied) return stepUpDenied;
 
   const { valid, value: keyId } = validateId(params.id);
   if (!valid) {

@@ -1,11 +1,13 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AdminPanel from '../AdminPanel'
-import { eventsApi } from '../../utils/adminApi'
+import { eventsApi, registerStepUpPrompter } from '../../utils/adminApi'
 
 const authSubscribers = []
 vi.mock('../../utils/adminApi', () => ({
   eventsApi: { getAll: vi.fn() },
+  mfaApi: { stepUp: vi.fn() },
+  registerStepUpPrompter: vi.fn(() => () => {}),
   subscribeAdminAuthState: vi.fn(subscriber => {
     authSubscribers.push(subscriber)
     return () => {}
@@ -86,6 +88,24 @@ afterEach(() => {
 })
 
 describe('AdminPanel', () => {
+  it('mounts the step-up modal: a prompter is registered, and raising it opens the dialog', async () => {
+    renderPanel()
+    await screen.findByLabelText('Filter:')
+
+    expect(registerStepUpPrompter).toHaveBeenCalled()
+    const prompter = registerStepUpPrompter.mock.calls.at(-1)[0]
+    expect(screen.queryByRole('dialog', { name: /confirm it/i })).not.toBeInTheDocument()
+
+    let outcome
+    act(() => {
+      outcome = prompter()
+    })
+    expect(await screen.findByRole('dialog', { name: /confirm it/i })).toBeInTheDocument()
+
+    fireEvent.click(within(screen.getByRole('dialog', { name: /confirm it/i })).getByRole('button', { name: 'Cancel' }))
+    await expect(outcome).resolves.toBe(false)
+  })
+
   it('loads events and labels each lifecycle state in the event selector', async () => {
     renderPanel()
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createTestEnv } from "../../../test-utils.js";
+import { createTestEnv, grantStepUp } from "../../../test-utils.js";
 import * as collectionHandler from "../../api-keys.js";
 import * as itemHandler from "../[id].js";
 import * as userItemHandler from "../../users/[id].js";
@@ -45,7 +45,8 @@ describe("Admin API keys API", () => {
   });
 
   it("creates a key once, stores only its hash, and records its id and role", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     const { response, body } = await createKey(env, headers, { name: " Nightly deploy\u0000 ", role: "editor" });
 
     expect(response.status).toBe(201);
@@ -66,7 +67,8 @@ describe("Admin API keys API", () => {
   });
 
   it("lists explicit safe columns and never serialises the stored hash", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     const created = await createKey(env, headers);
     const stored = rawDb.prepare("SELECT key_hash FROM api_keys WHERE id = ?").get(created.body.apiKey.id);
 
@@ -83,7 +85,8 @@ describe("Admin API keys API", () => {
   });
 
   it("revokes a key immediately and rejects a second revoke", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     const created = await createKey(env, headers);
     const keyId = created.body.apiKey.id;
 
@@ -112,7 +115,8 @@ describe("Admin API keys API", () => {
   // IS NULL and both reach the batch. Simulated deterministically by revoking the row
   // between that read and the batch -- exactly what the losing request observes.
   it("returns 409 and writes no audit row when it loses a concurrent revoke", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     const created = await createKey(env, headers);
     const keyId = created.body.apiKey.id;
 
@@ -135,7 +139,8 @@ describe("Admin API keys API", () => {
   });
 
   it("writes exactly one audit row for a revoke that wins", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     const created = await createKey(env, headers);
     const keyId = created.body.apiKey.id;
 
@@ -159,7 +164,8 @@ describe("Admin API keys API", () => {
     ["an array", '["name"]'],
     ["a bare string", '"hello"'],
   ])("returns 400 rather than 500 for a body that is %s", async (_label, raw) => {
-    const { env, headers } = createTestEnv({ role: "admin" });
+    const { env, headers, rawDb, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
 
     const response = await collectionHandler.onRequestPost({
       request: new Request("https://example.test/api/admin/api-keys", {
@@ -174,7 +180,8 @@ describe("Admin API keys API", () => {
   });
 
   it("rejects an invalid id without querying api_keys", async () => {
-    const { env, headers } = createTestEnv({ role: "admin" });
+    const { env, headers, rawDb, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     const originalPrepare = env.DB.prepare;
     const queries = [];
     env.DB.prepare = (sql) => {
@@ -197,7 +204,8 @@ describe("Admin API keys API", () => {
   // Least privilege, and deliberately NOT the creator's role -- every key is minted
   // by an admin, so inheriting would make every key an admin key.
   it("defaults an omitted role to viewer rather than the creator's admin", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     const { body } = await createKey(env, headers, { name: "No role given" });
 
     expect(body.apiKey.role).toBe("viewer");
@@ -205,13 +213,15 @@ describe("Admin API keys API", () => {
   });
 
   it("rejects creating a key with an invalid role", async () => {
-    const { env, headers } = createTestEnv({ role: "admin" });
+    const { env, headers, rawDb, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     const { response } = await createKey(env, headers, { name: "Bad role", role: "superuser" });
     expect(response.status).toBe(400);
   });
 
   it("refuses to delete a user who owns keys without deleting the user", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     rawDb
       .prepare("INSERT INTO users (email, role, name, password_hash) VALUES (?, ?, ?, 'placeholder')")
       .run("key-owner@test.com", "editor", "Key Owner");
@@ -240,7 +250,8 @@ describe("Admin API keys API", () => {
   // other isActive site in users/[id].js reads truthiness, so all falsy values
   // deactivate the user -- and each must revoke their keys with it.
   it.each([false, 0])("revokes active keys when a user is deactivated with isActive=%s", async (isActive) => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     rawDb
       .prepare("INSERT INTO users (email, role, name, password_hash) VALUES (?, ?, ?, 'placeholder')")
       .run("deactivate-owner@test.com", "editor", "Deactivate Owner");
@@ -268,7 +279,8 @@ describe("Admin API keys API", () => {
   // and it silently skipped key revocation -- the exact "departed account keeps a
   // live credential" case #744 exists to close. Both paths get the same assertion.
   it("revokes active keys when a user is deactivated via toggle-status", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     rawDb
       .prepare("INSERT INTO users (email, role, name, password_hash) VALUES (?, ?, ?, 'placeholder')")
       .run("toggle-owner@test.com", "editor", "Toggle Owner");
@@ -297,7 +309,8 @@ describe("Admin API keys API", () => {
   // The backstop for a THIRD deactivation path nobody has written yet: a key whose
   // owner is inactive must not verify even if its own revoked_at was never set.
   it("refuses to verify a key whose owner is inactive, even when the key is unrevoked", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     rawDb
       .prepare("INSERT INTO users (email, role, name, password_hash) VALUES (?, ?, ?, 'placeholder')")
       .run("ghost-owner@test.com", "editor", "Ghost Owner");
@@ -325,7 +338,8 @@ describe("Admin API keys API", () => {
     ["admin", "viewer"],
     ["viewer", "editor"],
   ])("revokes active keys when a user's role changes from %s to %s", async (from, to) => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     rawDb
       .prepare("INSERT INTO users (email, role, name, password_hash) VALUES (?, ?, ?, 'placeholder')")
       .run("role-change@test.com", from, "Role Change");
@@ -347,7 +361,8 @@ describe("Admin API keys API", () => {
   });
 
   it("leaves keys alone when a PATCH re-sends the role the user already has", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     rawDb
       .prepare("INSERT INTO users (email, role, name, password_hash) VALUES (?, ?, ?, 'placeholder')")
       .run("same-role@test.com", "editor", "Same Role");
@@ -368,7 +383,8 @@ describe("Admin API keys API", () => {
   });
 
   it("leaves keys alone when a user is reactivated", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     rawDb
       .prepare("INSERT INTO users (email, role, name, password_hash, is_active) VALUES (?, ?, ?, 'placeholder', 0)")
       .run("reactivate-owner@test.com", "editor", "Reactivate Owner");

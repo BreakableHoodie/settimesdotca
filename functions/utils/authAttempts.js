@@ -1,6 +1,10 @@
 const DEFAULT_WINDOW_MS = 10 * 60 * 1000;
 const DEFAULT_MAX_FAILURES = 5;
 
+// Failed second-factor guesses are counted per USER, across these types, with
+// no IP in the key: a stolen session that rotates addresses is still one user.
+export const MFA_GUESS_LIMIT = Object.freeze({ maxFailures: 10, windowMs: 60 * 60 * 1000 });
+
 export const AUTH_ATTEMPT_TYPES = Object.freeze({
   login: "login",
   loginMfaChallenge: "login_mfa_challenge",
@@ -9,9 +13,25 @@ export const AUTH_ATTEMPT_TYPES = Object.freeze({
   mfaEnable: "mfa_enable",
   mfaDisable: "mfa_disable",
   mfaBackupCodes: "mfa_backup_codes",
+  mfaStepUp: "mfa_step_up",
 });
 
-function getRateLimitQuery(scope) {
+export function mfaGuessAttemptTypes() {
+  return [AUTH_ATTEMPT_TYPES.mfaStepUp, AUTH_ATTEMPT_TYPES.mfaBackupCodes, AUTH_ATTEMPT_TYPES.mfaDisable];
+}
+
+function getRateLimitQuery(scope, typeCount = 1) {
+  // One user, any IP, across several attempt types (#1324). The per-IP scopes
+  // are dodged by rotating addresses; this one is not.
+  if (scope === "user") {
+    return `SELECT COUNT(*) as count, MIN(created_at) as earliest_attempt
+      FROM auth_attempts
+      WHERE user_id = ?
+        AND attempt_type IN (${Array.from({ length: typeCount }, () => "?").join(", ")})
+        AND success = 0
+        AND created_at > ?`;
+  }
+
   if (scope === "ip") {
     return `SELECT COUNT(*) as count, MIN(created_at) as earliest_attempt
       FROM auth_attempts
@@ -76,7 +96,11 @@ export function fromSqliteDateTime(value) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-function getRateLimitBindings(scope, { email, ipAddress, userId, attemptType, windowStart }) {
+function getRateLimitBindings(scope, { email, ipAddress, userId, attemptType, attemptTypes, windowStart }) {
+  if (scope === "user") {
+    return [userId, ...(attemptTypes ?? [attemptType]), windowStart];
+  }
+
   if (scope === "ip") {
     return [ipAddress, attemptType, windowStart];
   }
@@ -100,6 +124,7 @@ export async function checkAuthRateLimit(
   DB,
   {
     attemptType,
+    attemptTypes = null,
     email = null,
     ipAddress,
     maxFailures = DEFAULT_MAX_FAILURES,
@@ -113,12 +138,16 @@ export async function checkAuthRateLimit(
   }
 
   const windowStart = toSqliteDateTime(new Date(Date.now() - windowMs));
-  const query = getRateLimitQuery(scope);
+  if (scope === "user" && (userId === null || userId === undefined)) {
+    throw new Error(`checkAuthRateLimit: userId is required for scope "user"`);
+  }
+  const query = getRateLimitQuery(scope, attemptTypes?.length ?? 1);
   const bindings = getRateLimitBindings(scope, {
     email,
     ipAddress,
     userId,
     attemptType,
+    attemptTypes,
     windowStart,
   });
 
@@ -155,10 +184,23 @@ export async function writeAuthAttempt(
     userId = null,
   },
 ) {
-  await DB.prepare(
+  const result = await DB.prepare(
     `INSERT INTO auth_attempts (user_id, email, ip_address, user_agent, attempt_type, success, failure_reason)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(userId, email, ipAddress, userAgent, attemptType, success ? 1 : 0, failureReason)
+    .run();
+  // The new row's id, so a caller that records an attempt BEFORE the check it
+  // belongs to can settle it afterwards (see settleAuthAttempt).
+  return result?.meta?.last_row_id ?? null;
+}
+
+// Settle a row written up front as a pending failure (#1324). A failed row is
+// what the rate limiter counts, so recording it before the code is checked
+// makes concurrent guesses count each other.
+export async function settleAuthAttempt(DB, id, { success, failureReason = null }) {
+  if (id === null || id === undefined) return;
+  await DB.prepare("UPDATE auth_attempts SET success = ?, failure_reason = ? WHERE id = ?")
+    .bind(success ? 1 : 0, success ? null : failureReason, id)
     .run();
 }

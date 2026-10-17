@@ -133,17 +133,73 @@ export function subscribeAdminAuthState(subscriber) {
   }
 }
 
+// Step-up re-authentication (#1324). Identity-changing routes answer 403
+// STEP_UP_REQUIRED until the user re-proves their second factor. The admin
+// panel registers a prompter (StepUpModal) that resolves true once the user has
+// stepped up, false if they cancel. The original request is then retried ONCE.
+// Concurrent 403s share a single prompt.
+let stepUpPrompter = null
+let stepUpPromptInFlight = null
+
+export function registerStepUpPrompter(prompter) {
+  stepUpPrompter = prompter
+  return () => {
+    if (stepUpPrompter === prompter) stepUpPrompter = null
+  }
+}
+
+function requestStepUp() {
+  if (!stepUpPrompter) return Promise.resolve(false)
+  if (!stepUpPromptInFlight) {
+    const prompter = stepUpPrompter
+    stepUpPromptInFlight = Promise.resolve()
+      .then(() => prompter())
+      .then(result => result === true)
+      .catch(err => {
+        console.error('[adminApi] step-up prompter threw:', err)
+        return false
+      })
+      .finally(() => {
+        stepUpPromptInFlight = null
+      })
+  }
+  return stepUpPromptInFlight
+}
+
+async function readErrorPayload(response) {
+  try {
+    return await response.clone().json()
+  } catch (_error) {
+    return null
+  }
+}
+
 async function fetchWithCSRFRetry(url, options = {}, retries = 1) {
   const response = await fetch(url, options)
-  if (response.status !== 403 || retries <= 0) {
+  if (response.status !== 403) {
     return response
   }
 
-  let payload
-  try {
-    payload = await response.clone().json()
-  } catch (_error) {
-    payload = null
+  const payload = await readErrorPayload(response)
+
+  if (payload?.code === 'STEP_UP_REQUIRED') {
+    // No prompter registered: hand back the 403 so the caller throws it as
+    // it always has.
+    if (!stepUpPrompter) return response
+    if (!(await requestStepUp())) {
+      // The user cancelled. Say so, rather than surfacing the server's
+      // "confirm with your 2FA code" as if the request had merely failed.
+      const cancelled = new Error('Cancelled \u2014 nothing was changed.')
+      cancelled.status = 403
+      cancelled.code = 'STEP_UP_CANCELLED'
+      cancelled.details = payload
+      throw cancelled
+    }
+    return fetch(url, { ...options, headers: refreshCSRFHeader(options.headers) })
+  }
+
+  if (retries <= 0) {
+    return response
   }
 
   const isCsrfError =
@@ -422,6 +478,18 @@ export const mfaApi = {
 
   async disable(code) {
     const response = await fetchWithCSRFRetry(`${API_BASE}/mfa/disable`, {
+      method: 'POST',
+      headers: getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ code }),
+    })
+    return handleResponse(response)
+  },
+
+  // Re-prove the second factor for this session (#1324). The code is a current
+  // TOTP code or an unused backup code.
+  async stepUp(code) {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/mfa/step-up`, {
       method: 'POST',
       headers: getHeaders(),
       credentials: 'include',

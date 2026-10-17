@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeEach, afterEach, vi } from "vitest";
-import { createTestEnv } from "../../../test-utils.js";
+import { createTestEnv, grantStepUp } from "../../../test-utils.js";
 import * as resetHandler from "../[id]/reset-password.js";
 
 describe("Admin user password reset API", () => {
@@ -18,7 +18,8 @@ describe("Admin user password reset API", () => {
   });
 
   test("admin generates reset token and logs action", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     env.EMAIL_PROVIDER = "mailchannels";
     env.EMAIL_FROM = "no-reply@settimes.ca";
     rawDb
@@ -34,7 +35,7 @@ describe("Admin user password reset API", () => {
       request,
       env,
       params: { id: String(user.id) },
-      data: { user: { userId: 1, role: "admin", email: "admin@test" } },
+      data: { user: { userId: 1, role: "admin", email: "admin@test" }, session: { id: sessionId, user_id: 1 } },
     });
     expect(response.status).toBe(200);
     const payload = await response.json();
@@ -78,7 +79,8 @@ describe("Admin user password reset API", () => {
   });
 
   test("rejects non-integer user id with 400", async () => {
-    const { env, headers } = createTestEnv({ role: "admin" });
+    const { env, headers, rawDb, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     const request = new Request(`https://example.test/api/admin/users/1;DROP TABLE users/reset-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...headers },
@@ -88,13 +90,14 @@ describe("Admin user password reset API", () => {
       request,
       env,
       params: { id: "1;DROP TABLE users" },
-      data: { user: { userId: 1, role: "admin", email: "admin@test" } },
+      data: { user: { userId: 1, role: "admin", email: "admin@test" }, session: { id: sessionId, user_id: 1 } },
     });
     expect(response.status).toBe(400);
   });
 
   test("rejects reset for inactive user", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     rawDb
       .prepare("INSERT INTO users (email, role, name, is_active, password_hash) VALUES (?, ?, ?, ?, 'placeholder')")
       .run("inactive@test.com", "viewer", "Inactive", 0);
@@ -108,7 +111,7 @@ describe("Admin user password reset API", () => {
       request,
       env,
       params: { id: String(user.id) },
-      data: { user: { userId: 1, role: "admin", email: "admin@test" } },
+      data: { user: { userId: 1, role: "admin", email: "admin@test" }, session: { id: sessionId, user_id: 1 } },
     });
     expect(response.status).toBe(400);
   });

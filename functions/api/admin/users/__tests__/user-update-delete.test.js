@@ -1,10 +1,23 @@
 import { describe, expect, test } from "vitest";
-import { createTestEnv } from "../../../test-utils.js";
+import { createTestEnv, grantStepUp } from "../../../test-utils.js";
 import * as userItemHandler from "../[id].js";
+
+// One stamped session per acting admin: step-up is per session (#1324).
+function stepUpSessionFor(rawDb, userId, sessionId) {
+  const id = sessionId ?? crypto.randomUUID();
+  if (sessionId === undefined) {
+    rawDb
+      .prepare("INSERT INTO lucia_sessions (id, user_id, expires_at) VALUES (?, ?, ?)")
+      .run(id, userId, Math.floor(Date.now() / 1000) + 3600);
+  }
+  grantStepUp(rawDb, id);
+  return { id, user_id: userId };
+}
 
 describe("Admin user item API", () => {
   test("admin updates user role and name with audit log", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     // Insert a viewer user to update
     rawDb
       .prepare("INSERT INTO users (email, role, name, password_hash) VALUES (?, ?, ?, 'placeholder')")
@@ -35,7 +48,8 @@ describe("Admin user item API", () => {
   // The read happens before the batch. A user deleted in between makes the
   // UPDATE match nothing; the audit row must not claim the change happened.
   test("a user deleted mid-request gets a 404 and no audit row", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     rawDb
       .prepare("INSERT INTO users (email, role, name, password_hash) VALUES (?, ?, ?, 'placeholder')")
       .run("gone@test.com", "viewer", "Gone Soon");
@@ -66,7 +80,8 @@ describe("Admin user item API", () => {
   // A guarded change (demoting an admin) that finds its target deleted must
   // still answer 404, not the last-admin 400.
   test("an admin deleted mid-demotion gets a 404, not the last-admin error", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     rawDb
       .prepare("INSERT INTO users (email, role, name, password_hash, is_active) VALUES (?, ?, ?, 'placeholder', 1)")
       .run("second-admin@test.com", "admin", "Second Admin");
@@ -91,7 +106,8 @@ describe("Admin user item API", () => {
   });
 
   test("cannot demote last admin", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     const soleAdmin = rawDb.prepare("SELECT * FROM users WHERE role = 'admin'").get();
     const request = new Request(`https://example.test/api/admin/users/${soleAdmin.id}`, {
       method: "PATCH",
@@ -113,7 +129,8 @@ describe("Admin user item API", () => {
   // was wrongly refused. It now counts the OTHER active admins, as the
   // deactivation check does.
   test("can demote an inactive admin while another active admin remains", async () => {
-    const { env, rawDb } = createTestEnv({ role: "admin" });
+    const { env, rawDb, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     rawDb
       .prepare(
         "INSERT INTO users (email, role, name, password_hash, is_active) VALUES (?, 'admin', ?, 'placeholder', 0)",
@@ -129,7 +146,7 @@ describe("Admin user item API", () => {
       }),
       env,
       params: { id: String(dormant.id) },
-      data: { user: { userId: 1, role: "admin" } },
+      data: { user: { userId: 1, role: "admin" }, session: { id: sessionId, user_id: 1 } },
     });
 
     expect(response.status).toBe(200);
@@ -137,11 +154,16 @@ describe("Admin user item API", () => {
   });
 
   test("concurrent cross-demotions leave one active admin", async () => {
-    const { env, rawDb } = createTestEnv({ role: "admin" });
+    const { env, rawDb, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     rawDb
       .prepare("INSERT INTO users (email, role, name, password_hash) VALUES (?, 'admin', ?, 'placeholder')")
       .run("second-admin@test.com", "Second Admin");
     const secondAdmin = rawDb.prepare("SELECT id FROM users WHERE email = ?").get("second-admin@test.com");
+    const sessions = new Map([
+      [1, stepUpSessionFor(rawDb, 1, sessionId)],
+      [secondAdmin.id, stepUpSessionFor(rawDb, secondAdmin.id)],
+    ]);
 
     const makeContext = (actorId, targetId) => ({
       request: new Request(`https://example.test/api/admin/users/${targetId}`, {
@@ -151,7 +173,7 @@ describe("Admin user item API", () => {
       }),
       env,
       params: { id: String(targetId) },
-      data: { user: { userId: actorId, role: "admin" } },
+      data: { user: { userId: actorId, role: "admin" }, session: sessions.get(actorId) },
     });
 
     const [first, second] = await Promise.all([
@@ -174,11 +196,16 @@ describe("Admin user item API", () => {
   // change that did not happen. A two-batch version could leave a demoted user
   // with live keys if the second batch failed.
   test("a lost last-admin race writes nothing; the winner revokes its target's keys in the same batch", async () => {
-    const { env, rawDb } = createTestEnv({ role: "admin" });
+    const { env, rawDb, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     rawDb
       .prepare("INSERT INTO users (email, role, name, password_hash) VALUES (?, 'admin', ?, 'placeholder')")
       .run("second-admin@test.com", "Second Admin");
     const secondAdmin = rawDb.prepare("SELECT id FROM users WHERE email = ?").get("second-admin@test.com");
+    const sessions = new Map([
+      [1, stepUpSessionFor(rawDb, 1, sessionId)],
+      [secondAdmin.id, stepUpSessionFor(rawDb, secondAdmin.id)],
+    ]);
     const seedKey = (ownerId, hash) =>
       rawDb
         .prepare(
@@ -197,7 +224,7 @@ describe("Admin user item API", () => {
         }),
         env,
         params: { id: String(targetId) },
-        data: { user: { userId: actorId, role: "admin" } },
+        data: { user: { userId: actorId, role: "admin" }, session: sessions.get(actorId) },
       });
     await Promise.all([patch(1, secondAdmin.id), patch(secondAdmin.id, 1)]);
 
@@ -217,7 +244,8 @@ describe("Admin user item API", () => {
   });
 
   test("admin deactivates user and sets deactivation metadata", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     rawDb
       .prepare("INSERT INTO users (email, role, name, password_hash) VALUES (?, ?, ?, 'placeholder')")
       .run("tempuser@test.com", "viewer", "Temp User");
@@ -246,7 +274,8 @@ describe("Admin user item API", () => {
   });
 
   test("cannot delete self", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     const admin = rawDb.prepare("SELECT * FROM users WHERE role = 'admin'").get();
     const request = new Request(`https://example.test/api/admin/users/${admin.id}`, {
       method: "DELETE",
@@ -261,7 +290,8 @@ describe("Admin user item API", () => {
   });
 
   test("admin permanently deletes a non-admin user and logs action", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
     rawDb
       .prepare("INSERT INTO users (email, role, name, password_hash) VALUES (?, ?, ?, 'placeholder')")
       .run("delme@test.com", "viewer", "Del Me");
@@ -285,7 +315,8 @@ describe("Admin user item API", () => {
   });
 
   test("deleting user unlinks created content instead of cascading delete", async () => {
-    const { env, rawDb, headers, user: _user } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, user: _user, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
 
     // Create a user to be deleted
     rawDb

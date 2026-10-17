@@ -313,11 +313,20 @@ export function createTestEnv({ role = "editor", mfaEnrolled = role === "admin" 
     },
     rawDb,
     role,
+    sessionId,
     headers: {
       "x-test-role": role,
       Authorization: `Bearer ${sessionId}`,
     },
   };
+}
+
+// Stamp a session as recently stepped up (#1324). Deliberately NOT done by
+// createTestEnv: a default stamp would let every identity-route test pass
+// without the step-up the route requires, which is the guard's whole point.
+// `secondsAgo` backdates the stamp to test the window edge.
+export function grantStepUp(rawDb, sessionId, secondsAgo = 0) {
+  rawDb.prepare("UPDATE lucia_sessions SET step_up_at = unixepoch() - ? WHERE id = ?").run(secondsAgo, sessionId);
 }
 
 export function insertShareLink(

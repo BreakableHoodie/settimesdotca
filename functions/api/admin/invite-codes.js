@@ -4,6 +4,7 @@
 // DELETE /api/admin/invite-codes/[code] - Revoke invite code (admin only)
 
 import { checkPermission, auditLog } from "./_middleware.js";
+import { requireRecentStepUp } from "../../utils/stepUp.js";
 import { isValidEmail, isValidRole, validationErrorResponse, FIELD_LIMITS } from "../../utils/validation.js";
 import { getClientIP, parseJsonObjectBody } from "../../utils/request.js";
 import { toSqliteDateTime } from "../../utils/authAttempts.js";
@@ -70,6 +71,10 @@ export async function onRequestPost(context) {
   if (permCheck.error) {
     return permCheck.response;
   }
+
+  // An invite code mints an account, possibly an admin one (#1324).
+  const stepUpDenied = await requireRecentStepUp(context);
+  if (stepUpDenied) return stepUpDenied;
 
   const user = permCheck.user;
   const ipAddress = getClientIP(request);

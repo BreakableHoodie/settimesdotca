@@ -6,6 +6,7 @@ import BottomNav from './components/BottomNav'
 import ContextBanner from './components/ContextBanner'
 import Breadcrumbs from './components/Breadcrumbs'
 import MfaSettingsModal from './components/MfaSettingsModal'
+import StepUpModal from './components/StepUpModal'
 import { Button, Loading, Alert, ConfirmDialog, Modal } from '../components/ui'
 
 // Tabs are code-split, not just conditionally rendered. They were already
@@ -581,6 +582,9 @@ export default function AdminPanel({ currentUser, onLogout }) {
           canDisable={!currentUser?.mfaEnrolmentRequired}
         />
       )}
+
+      {/* Re-confirm the second factor for identity changes (#1324). Last, so it stacks above any open modal. */}
+      <StepUpModal />
 
       {/* Bottom Navigation (Mobile Only) */}
       <BottomNav

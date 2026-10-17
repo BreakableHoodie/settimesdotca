@@ -17,15 +17,18 @@ import {
 
 let sent;
 let pending;
+let providerDown;
 const waitUntil = (p) => pending.push(p);
 
 function setup() {
   sent = [];
   pending = [];
+  providerDown = false;
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url, init) => {
       if (String(url).includes("api.resend.com")) {
+        if (providerDown) return new Response("boom", { status: 500 });
         sent.push(...[JSON.parse(init.body).to].flat());
         return new Response(JSON.stringify({ id: "x" }), { status: 200 });
       }
@@ -34,6 +37,7 @@ function setup() {
   );
   vi.spyOn(console, "warn").mockImplementation(() => {});
   vi.spyOn(console, "log").mockImplementation(() => {});
+  vi.spyOn(console, "error").mockImplementation(() => {});
   vi.spyOn(console, "info").mockImplementation(() => {});
   const ctx = createTestEnv();
   Object.assign(ctx.env, { EMAIL_PROVIDER: "resend", RESEND_API_KEY: "test-key", EMAIL_FROM: "noreply@example.test" });
@@ -236,7 +240,10 @@ describe("per-recipient email cap (#1337)", () => {
       },
     };
     vi.spyOn(console, "error").mockImplementation(() => {});
-    expect(await allowEmailToRecipient(failingDb, "a@example.com")).toBe(false);
+    expect(await allowEmailToRecipient(failingDb, "a@example.com")).toMatchObject({
+      allowed: false,
+      reason: "counter_unavailable",
+    });
   });
 
   it("a sender sends nothing, and still answers normally, when the counter table is broken", async () => {
@@ -246,6 +253,91 @@ describe("per-recipient email cap (#1337)", () => {
     const res = await follow(env, bands[0], "x@example.com", "203.0.113.1");
     expect(res).toEqual({ status: 200, body: { success: true } });
     expect(sent).toHaveLength(0);
+    // An outage is logged as an outage at error level, never as "cap reached".
+    const errors = console.error.mock.calls.flat().join(" ");
+    expect(errors).toContain("Recipient cap unavailable");
+    expect(errors).toContain("fail-closed");
+    expect(errors).not.toContain("x@example.com");
+    expect(console.warn.mock.calls.flat().join(" ")).not.toContain("cap reached");
+  });
+
+  it("a real over-cap is a warning, not an error, and reports reason 'capped'", async () => {
+    const { env, bands } = setup();
+    for (let i = 0; i < 6; i++) await follow(env, bands[i], "victim@example.com", `203.0.113.${i + 1}`);
+    expect(console.warn.mock.calls.flat().join(" ")).toContain("cap reached");
+    expect(console.error.mock.calls.flat().join(" ")).not.toContain("Recipient cap unavailable");
+    for (let i = 0; i < 5; i++) await allowEmailToRecipient(env.DB, "z@example.com");
+    expect(await allowEmailToRecipient(env.DB, "z@example.com")).toMatchObject({ allowed: false, reason: "capped" });
+  });
+
+  it("counter outage gives the same response on every sender", async () => {
+    const { env, rawDb, bands } = setup();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    insertInactiveUser(rawDb, "outage@example.com");
+    const ok = await subscribe(env, "fine@example.com", "g0", "203.0.113.1");
+    rawDb.exec("DROP TABLE rate_limits");
+    expect(await subscribe(env, "outage@example.com", "g0", "203.0.113.2")).toEqual(ok);
+    expect((await batch(env, bands.slice(0, 2), "outage@example.com", "203.0.113.3")).body).toEqual({ success: true });
+    expect((await resend(env, "outage@example.com", "203.0.113.4")).body.success).toBe(true);
+    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM band_follows").get().n).toBe(0);
+    expect(
+      rawDb.prepare("SELECT activation_token FROM users WHERE email = ?").get("outage@example.com").activation_token,
+    ).toBeNull();
+    expect(sent).toHaveLength(1);
+  });
+});
+
+describe("an unmailed pending row never blocks a re-request", () => {
+  it("follow: a provider failure leaves no row, and an immediate re-request sends again", async () => {
+    const { env, rawDb, bands } = setup();
+    providerDown = true;
+    const first = await follow(env, bands[0], "flaky@example.com", "203.0.113.1");
+    expect(first.status).toBe(200);
+    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM band_follows WHERE email = ?").get("flaky@example.com").n).toBe(0);
+    providerDown = false;
+    await follow(env, bands[0], "flaky@example.com", "203.0.113.2");
+    expect(sent).toEqual(["flaky@example.com"]);
+    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM band_follows WHERE email = ?").get("flaky@example.com").n).toBe(1);
+  });
+
+  it("follow: a thrown send also leaves no row", async () => {
+    const { env, rawDb, bands } = setup();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network")));
+    await follow(env, bands[0], "throws@example.com", "203.0.113.1");
+    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM band_follows WHERE email = ?").get("throws@example.com").n).toBe(0);
+  });
+
+  it("follow-batch: a provider failure leaves no rows, and an immediate re-request sends again", async () => {
+    const { env, rawDb, bands } = setup();
+    providerDown = true;
+    await batch(env, bands.slice(0, 3), "flaky@example.com", "203.0.113.1");
+    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM band_follows WHERE email = ?").get("flaky@example.com").n).toBe(0);
+    providerDown = false;
+    await batch(env, bands.slice(0, 3), "flaky@example.com", "203.0.113.2");
+    expect(sent).toEqual(["flaky@example.com"]);
+    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM band_follows WHERE email = ?").get("flaky@example.com").n).toBe(3);
+  });
+
+  it("subscribe: a provider failure leaves no row, and an immediate re-request sends again", async () => {
+    const { env, rawDb } = setup();
+    providerDown = true;
+    await subscribe(env, "flaky@example.com", "g0", "203.0.113.1");
+    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM email_subscriptions").get().n).toBe(0);
+    providerDown = false;
+    const again = await subscribe(env, "flaky@example.com", "g0", "203.0.113.2");
+    expect(again.status).toBe(201);
+    expect(sent).toEqual(["flaky@example.com"]);
+    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM email_subscriptions").get().n).toBe(1);
+  });
+
+  it("a request that would be a no-op does not spend the allowance (pre-read)", async () => {
+    const { env, rawDb, bands } = setup();
+    await follow(env, bands[0], "once@example.com", "203.0.113.1");
+    await follow(env, bands[0], "once@example.com", "203.0.113.2");
+    await batch(env, [bands[0]], "once@example.com", "203.0.113.3");
+    const row = rawDb.prepare("SELECT count FROM rate_limits WHERE key LIKE 'email-recipient:%'").get();
+    expect(row.count).toBe(1);
   });
 });
 

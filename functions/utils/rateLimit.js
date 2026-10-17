@@ -193,11 +193,15 @@ export async function checkRateLimitByKey(DB, key, config, logContext = {}) {
       ...logContext,
     });
     // Fail closed: block the request when the counter is unavailable.
+    // `failed: true` tells this apart from a real over-limit result, which also has
+    // allowed:false. Callers that only gate on `allowed` are unaffected; one that LOGS why
+    // (the per-recipient email cap) must not report a counter outage as abuse protection.
     return {
       allowed: false,
       remaining: 0,
       resetAt: now + config.window,
       limit: config.requests,
+      failed: true,
     };
   }
 }

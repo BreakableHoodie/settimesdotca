@@ -11,6 +11,7 @@ export class MockD1Database {
       performances: [],
     };
     this.idCounter = 1;
+    this.rateLimitCounts = new Map();
   }
 
   _isPendingConfirmationLive(createdAt) {
@@ -30,7 +31,6 @@ export class MockD1Database {
         first: async () => {
           if (!query.toLowerCase().includes("rate_limits")) return null;
           const [key, now] = params;
-          this.rateLimitCounts = this.rateLimitCounts ?? new Map();
           const count = (this.rateLimitCounts.get(key) ?? 0) + 1;
           this.rateLimitCounts.set(key, count);
           return { count, window_start: now };
@@ -459,5 +459,6 @@ export class MockD1Database {
       performances: [],
     };
     this.idCounter = 1;
+    this.rateLimitCounts = new Map();
   }
 }

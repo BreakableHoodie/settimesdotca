@@ -273,10 +273,46 @@ export const MUTATIONS = [
   {
     id: "recipient-cap-follow",
     invariant:
-      "CLAUDE.md 'Public senders cap emails per recipient' — POST /api/bands/:name/follow counts each confirmation email against the per-address allowance",
+      "CLAUDE.md 'Public senders cap emails per recipient' — POST /api/bands/:name/follow checks the per-address allowance before it writes",
     file: "functions/api/bands/[name]/follow.js",
-    find: "emailAllowed = await allowEmailToRecipient(DB, email);",
-    replace: "emailAllowed = true;",
+    find: "const cap = await allowEmailToRecipient(DB, email);",
+    replace: "const cap = { allowed: true };",
+    tests: ["functions/utils/__tests__/recipientEmailCap.test.js"],
+  },
+  {
+    id: "recipient-cap-follow-batch",
+    invariant:
+      "CLAUDE.md 'Public senders cap emails per recipient' — POST /api/bands/follow-batch checks the per-address allowance before it writes",
+    file: "functions/api/bands/follow-batch.js",
+    find: "const cap = await allowEmailToRecipient(DB, email);",
+    replace: "const cap = { allowed: true };",
+    tests: ["functions/utils/__tests__/recipientEmailCap.test.js"],
+  },
+  {
+    id: "recipient-cap-subscribe",
+    invariant:
+      "CLAUDE.md 'Public senders cap emails per recipient' — POST /api/subscriptions/subscribe checks the per-address allowance before it emails",
+    file: "functions/api/subscriptions/subscribe.js",
+    find: "const cap = await allowEmailToRecipient(env.DB, email);",
+    replace: "const cap = { allowed: true };",
+    tests: ["functions/utils/__tests__/recipientEmailCap.test.js"],
+  },
+  {
+    id: "recipient-cap-resend-activation",
+    invariant:
+      "CLAUDE.md 'Public senders cap emails per recipient' — POST /api/auth/resend-activation checks the per-address allowance before rotating the token",
+    file: "functions/api/auth/resend-activation.js",
+    find: "const cap = await allowEmailToRecipient(DB, email);",
+    replace: "const cap = { allowed: true };",
+    tests: ["functions/utils/__tests__/recipientEmailCap.test.js"],
+  },
+  {
+    id: "recipient-cap-retention-like-swap",
+    invariant:
+      "CLAUDE.md 'Public senders cap emails per recipient' — the retention prune treats email-recipient keys and ordinary keys by different predicates (LIKE vs NOT LIKE)",
+    file: "functions/api/admin/maintenance/retention.js",
+    find: "key NOT LIKE '${RECIPIENT_KEY_PREFIX}%' AND",
+    replace: "key LIKE '${RECIPIENT_KEY_PREFIX}%' AND",
     tests: ["functions/utils/__tests__/recipientEmailCap.test.js"],
   },
   {

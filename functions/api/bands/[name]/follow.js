@@ -9,9 +9,24 @@ import { getPublicBaseUrl } from "../../../utils/publicUrl.js";
 import { parseJsonObjectBody } from "../../../utils/request.js";
 import { CONSENT_VERSION, pendingConfirmationLiveSql } from "../../../utils/consent.js";
 import { isDevRequest } from "../../../utils/auth.js";
-import { allowEmailToRecipient, recipientLogId } from "../../../utils/recipientEmailCap.js";
+import { allowEmailToRecipient, logRecipientSuppression } from "../../../utils/recipientEmailCap.js";
 
 const MAX_EMAIL_LENGTH = 320;
+
+// A pending row whose confirmation was never mailed can never be confirmed, yet a live one
+// makes every re-request a no-op until it expires in 7 days. Delete it by its own token.
+async function dropPendingFollow(DB, verificationToken) {
+  try {
+    await DB.prepare("DELETE FROM band_follows WHERE verification_token = ? AND verified = 0")
+      .bind(verificationToken)
+      .run();
+  } catch (err) {
+    console.error(
+      "[band-follow] Failed to drop unmailed pending follow; re-requests are blocked until it expires:",
+      err,
+    );
+  }
+}
 
 export async function onRequestPost(context) {
   const { request, env, params, waitUntil } = context;
@@ -60,6 +75,30 @@ export async function onRequestPost(context) {
       });
     }
 
+    // Per-recipient cap (#1337), checked BEFORE the write so a capped request inserts
+    // nothing: no pending row whose token was never mailed, hence nothing to clean up.
+    // A pre-read keeps a request that would be a no-op (already following, or a live
+    // pending row) from spending the allowance. A race between read and write can cost
+    // one unit at most. Over the cap: send nothing, answer exactly as on success.
+    if (isEmailConfigured(env)) {
+      const existing = await DB.prepare(
+        `SELECT 1 AS found FROM band_follows
+         WHERE email = ? AND band_profile_id = ? AND (verified = 1 OR ${pendingConfirmationLiveSql()})`,
+      )
+        .bind(email, band.id)
+        .first();
+      if (!existing) {
+        const cap = await allowEmailToRecipient(DB, email);
+        if (!cap.allowed) {
+          logRecipientSuppression("band-follow", cap);
+          return new Response(JSON.stringify({ success: true }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+      }
+    }
+
     // Atomic upsert — INSERT OR IGNORE avoids the SELECT-then-INSERT race where two
     // concurrent requests both pass the existence check and one hits the UNIQUE constraint.
     //
@@ -88,25 +127,7 @@ export async function onRequestPost(context) {
     const publicUrl = getPublicBaseUrl(env);
     const confirmUrl = `${publicUrl}/api/bands/${band.id}/confirm-follow?token=${verificationToken}`;
 
-    // Per-recipient cap (#1337): over it, send nothing and answer exactly as on success.
-    // The pending row is removed too: it would otherwise sit unconfirmable (its token was
-    // never mailed) and make every re-request a no-op until it expires in 7 days.
-    let emailAllowed = true;
     if (isNewFollow && isEmailConfigured(env)) {
-      emailAllowed = await allowEmailToRecipient(DB, email);
-      if (!emailAllowed) {
-        console.warn("[band-follow] Recipient email cap reached; confirmation not sent:", await recipientLogId(email));
-        try {
-          await DB.prepare("DELETE FROM band_follows WHERE verification_token = ? AND verified = 0")
-            .bind(verificationToken)
-            .run();
-        } catch (err) {
-          console.error("[band-follow] Failed to drop capped pending follow:", err);
-        }
-      }
-    }
-
-    if (isNewFollow && emailAllowed && isEmailConfigured(env)) {
       // Use waitUntil so the Worker stays alive for the email after the response is returned.
       waitUntil(
         sendEmail(env, {
@@ -115,13 +136,15 @@ export async function onRequestPost(context) {
           text: `Someone (hopefully you) asked to follow ${band.name} on SetTimes.\n\nConfirm to be notified when they join a lineup:\n${confirmUrl}\n\nIf this wasn't you, ignore this email — you won't be subscribed.`,
           html: `<p>Someone (hopefully you) asked to follow <strong>${escapeHtml(band.name)}</strong> on SetTimes.</p><p><a href="${escapeHtml(confirmUrl)}">Confirm your follow</a> to be notified when they join a lineup.</p><p>If this wasn't you, just ignore this email — you won't be subscribed.</p>`,
         })
-          .then((emailResult) => {
+          .then(async (emailResult) => {
             if (!emailResult?.delivered) {
               console.warn("[band-follow] Confirmation email not delivered:", emailResult?.reason);
+              await dropPendingFollow(DB, verificationToken);
             }
           })
-          .catch((err) => {
+          .catch(async (err) => {
             console.error("[band-follow] Failed to send confirmation email:", err);
+            await dropPendingFollow(DB, verificationToken);
           }),
       );
     }

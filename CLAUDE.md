@@ -712,8 +712,10 @@ Bot protection on the public email-input endpoints (follow, subscribe) goes thro
 
 ### Public senders cap emails per recipient (#1337)
 
-Follow, follow-batch, subscribe and resend-activation share ONE allowance per address: 5 emails per 24 h (`functions/utils/recipientEmailCap.js`), whatever IPs the requests come from. A batch is one email. The `rate_limits` key is `email-recipient:` plus a SHA-256 of the trimmed, lowercased address; the raw address is never stored or logged (logs carry 8 hex chars). The cap sits immediately before the send, so no-op paths do not burn it. Over the cap the response is byte-identical to success, so it cannot be used to probe addresses, and the pending row is dropped (an unmailed row would block re-requests for 7 days). It fails closed: a D1 error suppresses the email.
-**Retention:** `retention.js` prunes `rate_limits` at 30 min, but keeps `email-recipient:` keys 25 h; at 30 min the cap would reset itself. A new public sender that emails a caller-supplied address must call `allowEmailToRecipient`.
+Follow, follow-batch, subscribe and resend-activation share ONE allowance per address: 5 emails per 24 h (`functions/utils/recipientEmailCap.js`), whatever IPs the requests come from. A batch is one email. The `rate_limits` key is `email-recipient:` plus a SHA-256 of the trimmed, lowercased address; the raw address is never stored or logged (logs carry 8 hex chars). The cap is checked **before the write** (follow, batch, subscribe) or before the token rotates (resend-activation), so a capped request inserts nothing. A pre-read keeps a no-op request from spending the allowance. Over the cap the response is identical to success. It fails closed, and `allowEmailToRecipient` returns `reason: "capped"` (warn) or `"counter_unavailable"` (error), because a D1 outage must not be logged as abuse protection working.
+**A failed provider send drops that request's own pending row** (by its token or batch token), or re-requests no-op for 7 days.
+**Retention:** `retention.js` prunes `rate_limits` at 30 min but keeps `email-recipient:` keys 25 h; otherwise the cap resets itself. A new public sender that emails a caller-supplied address must call `allowEmailToRecipient`.
+**Exempt, deliberately:** invite signup (`admin/auth/signup.js`) sends an activation email uncapped. It needs a valid single-use invite code, so it is not an open door like the four above.
 
 ### Proof of consent is recorded at confirmation (#1289)
 

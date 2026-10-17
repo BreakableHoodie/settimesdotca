@@ -30,22 +30,36 @@ async function sha256Hex(text) {
 
 /**
  * Count one email to `email` against its 24 h allowance.
- * Returns true if the email may be sent, false if the address is over the cap.
- * Fails CLOSED: checkRateLimitByKey reports allowed:false when the counter
- * cannot be written, so a D1 error suppresses the email rather than uncapping it.
+ * Returns `{ allowed, reason, logId }`: reason is "capped" (a real over-cap) or
+ * "counter_unavailable" (the counter could not be written) when `allowed` is false.
+ * Fails CLOSED either way: a D1 error suppresses the email rather than uncapping it.
+ * The two reasons are told apart because they mean different things to whoever reads
+ * the logs: one is abuse protection working, the other is an outage.
  *
- * Callers must skip the send, return their normal success response, and log only
- * `recipientLogId(email)` (the first 8 hex chars of the digest), never the address.
+ * `logId` is the first 8 hex chars of the digest, the only form of the address that
+ * may be logged. Callers skip the send, return their normal success response, and
+ * report through logRecipientSuppression().
  */
 export async function allowEmailToRecipient(DB, email) {
   const hash = await sha256Hex(String(email).trim().toLowerCase());
+  const logId = hash.slice(0, 8);
   const result = await checkRateLimitByKey(
     DB,
     `${RECIPIENT_KEY_PREFIX}${hash}`,
     { requests: RECIPIENT_EMAIL_CAP, window: RECIPIENT_EMAIL_WINDOW_SECONDS },
-    { recipientHash: hash.slice(0, 8) },
+    { recipientHash: logId },
   );
-  return result.allowed;
+  if (result.allowed) return { allowed: true, reason: null, logId };
+  return { allowed: false, reason: result.failed ? "counter_unavailable" : "capped", logId };
+}
+
+/** Log a suppressed send at the level its reason deserves. Never logs the address. */
+export function logRecipientSuppression(tag, { reason, logId }) {
+  if (reason === "counter_unavailable") {
+    console.error(`[${tag}] Recipient cap unavailable; email suppressed (fail-closed):`, logId);
+  } else {
+    console.warn(`[${tag}] Recipient email cap reached; email not sent:`, logId);
+  }
 }
 
 /** First 8 hex chars of the recipient digest, for logs. */

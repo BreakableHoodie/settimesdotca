@@ -30,10 +30,23 @@ import { parseJsonObjectBody } from "../../utils/request.js";
 import { publicEventStatusSql } from "../../utils/eventVisibility.js";
 import { CONSENT_VERSION, pendingConfirmationLiveSql } from "../../utils/consent.js";
 import { isDevRequest } from "../../utils/auth.js";
-import { allowEmailToRecipient, recipientLogId } from "../../utils/recipientEmailCap.js";
+import { allowEmailToRecipient, logRecipientSuppression } from "../../utils/recipientEmailCap.js";
 
 const MAX_EMAIL_LENGTH = 320;
 const MAX_BATCH_SIZE = 30;
+
+// Rows whose confirmation was never mailed can never be confirmed, yet live ones make every
+// re-request a no-op until they expire in 7 days. Delete this request's by its own batch token.
+async function dropPendingBatch(DB, batchToken) {
+  try {
+    await DB.prepare("DELETE FROM band_follows WHERE batch_token = ? AND verified = 0").bind(batchToken).run();
+  } catch (err) {
+    console.error(
+      "[band-follow-batch] Failed to drop unmailed pending follows; re-requests are blocked until they expire:",
+      err,
+    );
+  }
+}
 
 export async function onRequestPost(context) {
   const { request, env, waitUntil } = context;
@@ -123,6 +136,33 @@ export async function onRequestPost(context) {
     const publicUrl = getPublicBaseUrl(env);
     const confirmUrl = `${publicUrl}/api/bands/confirm-follow-batch?token=${batchToken}`;
 
+    // Per-recipient cap (#1337), checked BEFORE the write so a capped request inserts
+    // nothing and there is no unmailed pending row to clean up. The whole batch is ONE
+    // email, so it costs one unit; a batch where every band is already followed (or has
+    // a live pending row) would be a no-op and spends nothing. A race between this read
+    // and the write can cost one unit at most. Over the cap: send nothing, answer as on
+    // success.
+    if (isEmailConfigured(env)) {
+      const bandIds = bands.results.map((b) => b.band_profile_id);
+      const covered = await DB.prepare(
+        `SELECT COUNT(DISTINCT band_profile_id) AS n FROM band_follows
+         WHERE email = ? AND band_profile_id IN (${bandIds.map(() => "?").join(",")})
+           AND (verified = 1 OR ${pendingConfirmationLiveSql()})`,
+      )
+        .bind(email, ...bandIds)
+        .first();
+      if ((covered?.n ?? 0) < bandIds.length) {
+        const cap = await allowEmailToRecipient(DB, email);
+        if (!cap.allowed) {
+          logRecipientSuppression("band-follow-batch", cap);
+          return new Response(JSON.stringify({ success: true }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+      }
+    }
+
     // Build one INSERT OR IGNORE per band. Each row gets a unique per-row
     // verification_token and unsubscribe_token (both have UNIQUE constraints),
     // plus the shared batch_token. DB.batch() is atomic: if any write fails, all
@@ -154,27 +194,7 @@ export async function onRequestPost(context) {
     // Every pair is delete-then-insert; only insert results count as new follows.
     const isNewBatch = results.some((r, index) => index % 2 === 1 && r.meta.changes > 0);
 
-    // Per-recipient cap (#1337): the whole batch is ONE email, so it costs one unit.
-    // Over the cap: send nothing, answer as on success, and drop this batch's pending
-    // rows (their confirm link was never mailed, and leaving them would turn every
-    // re-request into a no-op until they expire).
-    let emailAllowed = true;
     if (isNewBatch && isEmailConfigured(env)) {
-      emailAllowed = await allowEmailToRecipient(DB, email);
-      if (!emailAllowed) {
-        console.warn(
-          "[band-follow-batch] Recipient email cap reached; confirmation not sent:",
-          await recipientLogId(email),
-        );
-        try {
-          await DB.prepare("DELETE FROM band_follows WHERE batch_token = ? AND verified = 0").bind(batchToken).run();
-        } catch (err) {
-          console.error("[band-follow-batch] Failed to drop capped pending follows:", err);
-        }
-      }
-    }
-
-    if (isNewBatch && emailAllowed && isEmailConfigured(env)) {
       const bandListText = bands.results.map((b) => `• ${b.band_name}`).join("\n");
       const bandListHtml = bands.results.map((b) => `<li>${escapeHtml(b.band_name)}</li>`).join("");
 
@@ -199,13 +219,15 @@ export async function onRequestPost(context) {
             "<p>If this wasn't you, just ignore this email — you won't be subscribed.</p>",
           ].join(""),
         })
-          .then((emailResult) => {
+          .then(async (emailResult) => {
             if (!emailResult?.delivered) {
               console.warn("[band-follow-batch] Confirmation email not delivered:", emailResult?.reason);
+              await dropPendingBatch(DB, batchToken);
             }
           })
-          .catch((err) => {
+          .catch(async (err) => {
             console.error("[band-follow-batch] Failed to send confirmation email:", err);
+            await dropPendingBatch(DB, batchToken);
           }),
       );
     }

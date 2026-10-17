@@ -47,7 +47,6 @@ const POLICY = {
   "PATCH /api/admin/bands/bulk": "editor",
   "POST /api/admin/bands/import": "editor",
   "POST /api/admin/bands/photos": "editor",
-  "DELETE /api/admin/bands/photos": "editor",
   "GET /api/admin/bands/stats/[name]": "viewer",
   "GET /api/admin/events": "viewer",
   "POST /api/admin/events": "editor",

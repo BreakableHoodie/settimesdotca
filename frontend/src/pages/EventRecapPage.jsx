@@ -104,7 +104,7 @@ export default function EventRecapPage() {
     setLoading(true)
     setError(null)
 
-    fetchPublicJson(`/api/events/${slug}/recap`)
+    fetchPublicJson(`/api/events/${encodeURIComponent(slug)}/recap`)
       .then(json => {
         if (!cancelled) setData(json)
       })

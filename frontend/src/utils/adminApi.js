@@ -183,9 +183,18 @@ async function fetchWithCSRFRetry(url, options = {}, retries = 1) {
   const payload = await readErrorPayload(response)
 
   if (payload?.code === 'STEP_UP_REQUIRED') {
-    // No prompter, or the user cancelled: hand back the 403 so the caller
-    // throws it as it always has.
-    if (!(await requestStepUp())) return response
+    // No prompter registered: hand back the 403 so the caller throws it as
+    // it always has.
+    if (!stepUpPrompter) return response
+    if (!(await requestStepUp())) {
+      // The user cancelled. Say so, rather than surfacing the server's
+      // "confirm with your 2FA code" as if the request had merely failed.
+      const cancelled = new Error('Cancelled \u2014 nothing was changed.')
+      cancelled.status = 403
+      cancelled.code = 'STEP_UP_CANCELLED'
+      cancelled.details = payload
+      throw cancelled
+    }
     return fetch(url, { ...options, headers: refreshCSRFHeader(options.headers) })
   }
 

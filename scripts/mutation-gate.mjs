@@ -910,9 +910,153 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'Step-up re-authentication for identity changes' — a backup code is spent only over the list that was read, so a replay or concurrent spend cannot also stamp (#1324)",
     file: "functions/api/admin/mfa/step-up.js",
-    find: "WHERE id = ? AND totp_enabled = ? AND totp_secret IS ? AND backup_codes IS ?`,",
-    replace: "WHERE id = ? AND (? IS NULL OR 1) AND (? IS NULL OR 1) AND (? IS NULL OR 1)`,",
+    find: '? "totp_enabled = ? AND totp_secret IS ? AND backup_codes IS ?"',
+    replace: '? "totp_enabled = ? AND totp_secret IS ? AND (? IS NULL OR 1)"',
     tests: ["functions/api/admin/mfa/__tests__/step-up.test.js"],
+  },
+  {
+    id: "step-up-wrong-code-is-400-not-401",
+    invariant:
+      "CLAUDE.md 'Step-up re-authentication for identity changes' \u2014 a wrong step-up code is 400 INVALID_MFA_CODE; a 401 would sign the user out in the admin client (#1324)",
+    file: "functions/api/admin/mfa/step-up.js",
+    find: '    return json(400, {\n      error: "Authentication failed",',
+    replace: '    return json(401, {\n      error: "Authentication failed",',
+    tests: ["functions/api/admin/mfa/__tests__/step-up.test.js"],
+  },
+  {
+    id: "mfa-enable-wrong-code-is-400-not-401",
+    invariant:
+      "CLAUDE.md 'Step-up re-authentication for identity changes' \u2014 a wrong code on mfa/enable is 400, never a 401 that signs the user out (#1324)",
+    file: "functions/api/admin/mfa/enable.js",
+    find: '        message: "Invalid authentication code",\n      }),\n      {\n        status: 400,',
+    replace: '        message: "Invalid authentication code",\n      }),\n      {\n        status: 401,',
+    tests: ["functions/api/admin/mfa/__tests__/wrong-code-status.test.js"],
+  },
+  {
+    id: "mfa-disable-wrong-code-is-400-not-401",
+    invariant:
+      "CLAUDE.md 'Step-up re-authentication for identity changes' \u2014 a wrong code on mfa/disable is 400, never a 401 that signs the user out (#1324)",
+    file: "functions/api/admin/mfa/disable.js",
+    find: '        message: "Invalid authentication code",\n      }),\n      {\n        status: 400,',
+    replace: '        message: "Invalid authentication code",\n      }),\n      {\n        status: 401,',
+    tests: ["functions/api/admin/mfa/__tests__/wrong-code-status.test.js"],
+  },
+  {
+    id: "mfa-backup-codes-wrong-code-is-400-not-401",
+    invariant:
+      "CLAUDE.md 'Step-up re-authentication for identity changes' \u2014 a wrong code on mfa/backup-codes is 400, never a 401 that signs the user out (#1324)",
+    file: "functions/api/admin/mfa/backup-codes.js",
+    find: '        message: "Invalid authentication code",\n      }),\n      {\n        status: 400,',
+    replace: '        message: "Invalid authentication code",\n      }),\n      {\n        status: 401,',
+    tests: ["functions/api/admin/mfa/__tests__/wrong-code-status.test.js"],
+  },
+  {
+    id: "step-up-user-limit-counts-every-guess-endpoint",
+    invariant:
+      "CLAUDE.md 'Step-up re-authentication for identity changes' \u2014 the per-user lockout counts failures across step-up, backup-codes and disable together (#1324)",
+    file: "functions/utils/authAttempts.js",
+    find: "  return [AUTH_ATTEMPT_TYPES.mfaStepUp, AUTH_ATTEMPT_TYPES.mfaBackupCodes, AUTH_ATTEMPT_TYPES.mfaDisable];",
+    replace: "  return [AUTH_ATTEMPT_TYPES.mfaStepUp];",
+    tests: ["functions/api/admin/mfa/__tests__/step-up.test.js"],
+  },
+  {
+    id: "step-up-user-limit-threshold",
+    invariant:
+      "CLAUDE.md 'Step-up re-authentication for identity changes' \u2014 ten failed guesses per hour per user, no IP in the key, locks step-up (#1324)",
+    file: "functions/api/admin/mfa/step-up.js",
+    find: "    maxFailures: MFA_GUESS_LIMIT.maxFailures + 1,",
+    replace: "    maxFailures: 1000,",
+    tests: ["functions/api/admin/mfa/__tests__/step-up.test.js"],
+  },
+  {
+    id: "step-up-lockout-ends-the-session",
+    invariant:
+      "CLAUDE.md 'Step-up re-authentication for identity changes' \u2014 hitting the per-user limit deletes the session (#1324)",
+    file: "functions/api/admin/mfa/step-up.js",
+    find: '    await DB.prepare("DELETE FROM lucia_sessions WHERE id = ?").bind(sessionId).run();',
+    replace: "    // session kept",
+    tests: ["functions/api/admin/mfa/__tests__/step-up.test.js"],
+  },
+  {
+    id: "step-up-records-attempt-before-verifying",
+    invariant:
+      "CLAUDE.md 'Step-up re-authentication for identity changes' \u2014 the attempt is recorded as a failed row BEFORE the code is checked, so concurrent guesses count each other (#1324)",
+    file: "functions/api/admin/mfa/step-up.js",
+    find: '    failureReason: "pending",\n    ipAddress,\n    success: false,',
+    replace: '    failureReason: "pending",\n    ipAddress,\n    success: true,',
+    tests: ["functions/api/admin/mfa/__tests__/step-up.test.js"],
+  },
+  {
+    id: "step-up-spend-and-stamp-commit-together",
+    invariant:
+      "CLAUDE.md 'Step-up re-authentication for identity changes' \u2014 a backup-code spend carries the same session predicate as the stamp, so if either loses neither applies (#1324)",
+    file: "functions/api/admin/mfa/step-up.js",
+    find: "AND ${sessionStillExists}",
+    replace: "AND (? IS NOT NULL AND ? IS NOT NULL)",
+    tests: ["functions/api/admin/mfa/__tests__/step-up.test.js"],
+  },
+  {
+    id: "step-up-success-record-never-fails-the-request",
+    invariant:
+      "CLAUDE.md 'Step-up re-authentication for identity changes' \u2014 a failing attempt-record write never turns a landed step-up into an error (#1324)",
+    file: "functions/api/admin/mfa/step-up.js",
+    find: '    console.error("[MFA Step-up] Failed to settle auth attempt:", error?.message || error);',
+    replace: "    throw error;",
+    tests: ["functions/api/admin/mfa/__tests__/step-up.test.js"],
+  },
+  {
+    id: "step-up-secret-error-is-recorded",
+    invariant:
+      "CLAUDE.md 'Step-up re-authentication for identity changes' \u2014 an unreadable TOTP secret records a failed attempt before the 500 (#1324)",
+    file: "functions/api/admin/mfa/step-up.js",
+    find: 'failureReason: "totp_secret_error"',
+    replace: 'failureReason: "x"',
+    tests: ["functions/api/admin/mfa/__tests__/step-up.test.js"],
+  },
+  {
+    id: "rbac-role-check-refuses-before-step-up",
+    invariant:
+      "CLAUDE.md 'Step-up re-authentication for identity changes' \u2014 the role check on an identity route refuses a lower role (the boundary test steps the caller up so only the role check can) (#1324)",
+    file: "functions/api/admin/users/[id]/reset-mfa.js",
+    find: "  if (permCheck.error) {\n    return permCheck.response;\n  }",
+    replace: "  if (false) {\n    return permCheck.response;\n  }",
+    tests: ["functions/api/admin/__tests__/rbacBoundaries.test.js"],
+  },
+  {
+    id: "step-up-middleware-passes-session-to-handlers",
+    invariant:
+      "CLAUDE.md 'Step-up re-authentication for identity changes' \u2014 the real middleware hands the session to the handler, so a stamped session satisfies step-up (#1324)",
+    file: "functions/api/admin/_middleware.js",
+    find: "      session: sessionData,",
+    replace: "      session: undefined,",
+    tests: ["functions/api/admin/__tests__/stepUpBoundaries.test.js"],
+  },
+  {
+    id: "step-up-toggle-status-both-directions",
+    invariant:
+      "CLAUDE.md 'Step-up re-authentication for identity changes' \u2014 reactivating a user needs step-up as much as deactivating (#1324)",
+    file: "functions/api/admin/users/[id]/toggle-status.js",
+    find: "  if (stepUpDenied) return stepUpDenied;",
+    replace: "  if (false) return stepUpDenied;",
+    tests: ["functions/api/admin/__tests__/stepUpBoundaries.test.js"],
+  },
+  {
+    id: "step-up-patch-reactivation",
+    invariant:
+      "CLAUDE.md 'Step-up re-authentication for identity changes' \u2014 PATCH that flips an inactive user to active needs step-up (#1324)",
+    file: "functions/api/admin/users/[id].js",
+    find: "(isActive !== undefined && Boolean(isActive) && Number(user.is_active) === 0);",
+    replace: "false;",
+    tests: ["functions/api/admin/__tests__/stepUpBoundaries.test.js"],
+  },
+  {
+    id: "step-up-patch-same-role-pinned-to-read-state",
+    invariant:
+      "CLAUDE.md 'Step-up re-authentication for identity changes' \u2014 a same-role PATCH (no step-up) is pinned to the role it read, so a concurrent demotion is not undone (#1324)",
+    file: "functions/api/admin/users/[id].js",
+    find: "const guardsRole = role !== undefined && !roleChanged;",
+    replace: "const guardsRole = false;",
+    tests: ["functions/api/admin/__tests__/stepUpBoundaries.test.js"],
   },
 ];
 

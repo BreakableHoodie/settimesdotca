@@ -101,4 +101,37 @@ describe('StepUpModal (#1324)', () => {
     unmount()
     await expect(outcome).resolves.toBe(false)
   })
+
+  it('Escape while a submit is in flight does not drop the step-up', async () => {
+    let finish
+    mfaApi.stepUp.mockReturnValue(
+      new Promise(resolve => {
+        finish = resolve
+      })
+    )
+    render(<StepUpModal />)
+    const outcome = raisePrompt()
+    const settled = vi.fn()
+    outcome.then(settled)
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.change(within(dialog).getByLabelText('Authentication code'), { target: { value: '123456' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm' }))
+    await waitFor(() => expect(mfaApi.stepUp).toHaveBeenCalled())
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await Promise.resolve()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(settled).not.toHaveBeenCalled()
+
+    finish({ success: true })
+    await expect(outcome).resolves.toBe(true)
+  })
+
+  it('Escape when idle cancels', async () => {
+    render(<StepUpModal />)
+    const outcome = raisePrompt()
+    await screen.findByRole('dialog')
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await expect(outcome).resolves.toBe(false)
+  })
 })

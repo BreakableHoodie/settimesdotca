@@ -13,7 +13,8 @@
 //      a step-up on a DIFFERENT session of the same user does not count.
 //
 // "always"      = every call needs step-up.
-// "conditional" = only the dangerous variant does; the safe variants are
+// "conditional" = only identity changes do (PATCH: a different role,
+//                 deactivation, or reactivation); the safe variants are
 //                 asserted to work WITHOUT step-up so the condition cannot
 //                 silently widen or narrow.
 import { readFileSync, readdirSync, existsSync } from "node:fs";
@@ -21,12 +22,14 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestEnv, grantStepUp } from "../../test-utils.js";
+import { onRequest } from "../_middleware.js";
+import { generateCSRFToken } from "../../../utils/csrf.js";
 import { STEP_UP_WINDOW_SECONDS } from "../../../utils/stepUp.js";
 
 const STEP_UP_POLICY = {
   "DELETE /api/admin/users/[id]": "always",
   "PATCH /api/admin/users/[id]": "conditional",
-  "POST /api/admin/users/[id]/toggle-status": "conditional",
+  "POST /api/admin/users/[id]/toggle-status": "always",
   "POST /api/admin/users/[id]/reset-mfa": "always",
   "POST /api/admin/users/[id]/reset-password": "always",
   "POST /api/admin/users": "always",
@@ -43,7 +46,29 @@ const NOT_STEP_UP = {
 
 const ADMIN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const FAMILIES = ["users", "invite-codes", "api-keys"];
-const HANDLER_PATTERN = /export async function (onRequest(Post|Put|Patch|Delete))\(context\)\s*\{/g;
+// Every exported onRequest* in any spelling: `export async function`,
+// `export function`, `export const`. A match that is not a known method (a
+// bare `onRequest`, `onRequestAll`) cannot be classified and FAILS the build
+// rather than being skipped.
+const HANDLER_PATTERN =
+  /export\s+(?:async\s+)?function\s+(onRequest\w*)\s*\(|export\s+(?:const|let)\s+(onRequest\w*)\s*=/g;
+const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const READ_ONLY = new Set(["GET", "HEAD", "OPTIONS"]);
+
+// Pure, so the detector itself can be tested against every spelling.
+export function parseHandlers(source) {
+  const declarations = [...source.matchAll(HANDLER_PATTERN)];
+  return declarations.map((declaration, index) => {
+    const handlerName = declaration[1] ?? declaration[2];
+    const bodyStart = declaration.index + declaration[0].length;
+    const bodyEnd = declarations[index + 1]?.index ?? source.length;
+    return {
+      handlerName,
+      method: handlerName.replace(/^onRequest/, "").toUpperCase(),
+      body: source.slice(bodyStart, bodyEnd),
+    };
+  });
+}
 
 function familyFiles() {
   const out = [];
@@ -65,29 +90,44 @@ function familyFiles() {
 function discover() {
   return familyFiles().flatMap((filePath) => {
     const source = readFileSync(filePath, "utf8");
-    const declarations = [...source.matchAll(HANDLER_PATTERN)];
     const rel = path.relative(ADMIN_ROOT, filePath).replaceAll(path.sep, "/").replace(/\.js$/, "");
-    return declarations.map((declaration, index) => {
-      const bodyStart = declaration.index + declaration[0].length;
-      const bodyEnd = declarations[index + 1]?.index ?? source.length;
-      const method = declaration[1].replace("onRequest", "").toUpperCase();
-      return {
-        key: `${method} /api/admin/${rel}`,
-        filePath,
-        handlerName: declaration[1],
-        source,
-        body: source.slice(bodyStart, bodyEnd),
-      };
-    });
+    return parseHandlers(source).map((handler) => ({
+      ...handler,
+      key: `${handler.method} /api/admin/${rel}`,
+      filePath,
+      source,
+    }));
   });
 }
 
-const HANDLERS = discover();
+const ALL_HANDLERS = discover();
+const UNCLASSIFIED = ALL_HANDLERS.filter((h) => !MUTATING.has(h.method) && !READ_ONLY.has(h.method));
+const HANDLERS = ALL_HANDLERS.filter((h) => MUTATING.has(h.method));
 const BY_KEY = Object.fromEntries(HANDLERS.map((h) => [h.key, h]));
 
 describe("step-up policy matches the code (#1324)", () => {
   it("discovers the identity handlers it is meant to police", () => {
     expect(HANDLERS.length).toBeGreaterThanOrEqual(Object.keys(STEP_UP_POLICY).length);
+  });
+
+  it("classifies every exported onRequest* (a bare onRequest or an odd name fails, never skips)", () => {
+    expect(UNCLASSIFIED.map((h) => `${h.key} (${h.handlerName})`)).toEqual([]);
+  });
+
+  it("the detector matches every export spelling and flags what it cannot classify", () => {
+    const sample = [
+      "export async function onRequestPost(context) {}",
+      "export function onRequestPatch(context) {}",
+      "export const onRequestDelete = async (context) => {};",
+      "export async function onRequest(context) {}",
+      "export const onRequestGet = async () => {};",
+    ].join("\n");
+    const parsed = parseHandlers(sample);
+    expect(parsed.map((h) => h.method)).toEqual(["POST", "PATCH", "DELETE", "", "GET"]);
+    const mutating = parsed.filter((h) => MUTATING.has(h.method)).length;
+    const unclassified = parsed.filter((h) => !MUTATING.has(h.method) && !READ_ONLY.has(h.method)).length;
+    expect(mutating).toBe(3);
+    expect(unclassified).toBe(1);
   });
 
   it("every mutating identity handler is in the policy or explicitly exempt", () => {
@@ -298,14 +338,18 @@ describe("step-up routes refuse a session that has not stepped up, and write not
         const before = tableSnapshot(s.rawDb);
         const { response, after } = await call(s.route, key, s);
         expect(response.status).toBe(403);
+        expect((await response.json()).code).toBe("STEP_UP_REQUIRED");
         expect(after).toEqual(before);
       });
     });
   }
 });
 
-describe("conditional step-up routes: only the dangerous variant needs it (#1324)", () => {
+describe("conditional step-up routes: only identity changes need it (#1324)", () => {
   const PATCH = "PATCH /api/admin/users/[id]";
+  const TOGGLE = "POST /api/admin/users/[id]/toggle-status";
+
+  const inactive = (s) => s.rawDb.prepare("UPDATE users SET is_active = 0 WHERE id = ?").run(Number(s.params.id));
 
   for (const body of [{ role: "editor" }, { isActive: 0 }, { isActive: false }]) {
     it(`PATCH ${JSON.stringify(body)} needs step-up and writes nothing without it`, async () => {
@@ -318,6 +362,20 @@ describe("conditional step-up routes: only the dangerous variant needs it (#1324
     });
   }
 
+  it("PATCH {isActive: true} on an INACTIVE user (reactivation) needs step-up and writes nothing without it", async () => {
+    const s = setup(PATCH, { isActive: true });
+    inactive(s);
+    const before = tableSnapshot(s.rawDb);
+    const { response, after } = await call(s.route, PATCH, s);
+    expect(response.status).toBe(403);
+    expect((await response.json()).code).toBe("STEP_UP_REQUIRED");
+    expect(after).toEqual(before);
+
+    grantStepUp(s.rawDb, s.sessionId);
+    expect((await call(s.route, PATCH, s)).response.status).toBe(200);
+    expect(s.rawDb.prepare("SELECT is_active FROM users WHERE id = ?").get(Number(s.params.id)).is_active).toBe(1);
+  });
+
   for (const body of [{ name: "Renamed" }, { role: "viewer" }, { isActive: true }]) {
     it(`PATCH ${JSON.stringify(body)} (not an identity change) needs none`, async () => {
       const s = setup(PATCH, body);
@@ -326,13 +384,122 @@ describe("conditional step-up routes: only the dangerous variant needs it (#1324
     });
   }
 
-  it("toggle-status: reactivating needs no step-up", async () => {
-    const key = "POST /api/admin/users/[id]/toggle-status";
-    const s = setup(key);
-    s.rawDb.prepare("UPDATE users SET is_active = 0 WHERE id = ?").run(Number(s.params.id));
-    const { response } = await call(s.route, key, s);
-    expect(response.status).toBe(200);
+  it("toggle-status needs step-up in BOTH directions: reactivation is refused without it", async () => {
+    const s = setup(TOGGLE);
+    inactive(s);
+    const before = tableSnapshot(s.rawDb);
+    const { response, after } = await call(s.route, TOGGLE, s);
+    expect(response.status).toBe(403);
+    expect((await response.json()).code).toBe("STEP_UP_REQUIRED");
+    expect(after).toEqual(before);
+
+    grantStepUp(s.rawDb, s.sessionId);
+    expect((await call(s.route, TOGGLE, s)).response.status).toBe(200);
     expect(s.rawDb.prepare("SELECT is_active FROM users WHERE id = ?").get(Number(s.params.id)).is_active).toBe(1);
+  });
+
+  // A same-state send skips step-up, so its UPDATE is pinned to the state it
+  // read. A concurrent change by another admin then makes it lose with a 409
+  // instead of silently undoing that change without a step-up.
+  it("PATCH {role: <current role>} loses to a concurrent demotion with 409, writing nothing", async () => {
+    const s = setup(PATCH, { role: "editor" });
+    s.rawDb.prepare("UPDATE users SET role = 'editor' WHERE id = ?").run(Number(s.params.id));
+    const realPrepare = s.env.DB.prepare.bind(s.env.DB);
+    s.env.DB = {
+      ...s.env.DB,
+      prepare(sql) {
+        // Between the read and the write, another admin demotes the user.
+        if (/^\s*UPDATE users\s+SET/.test(sql)) {
+          s.rawDb.prepare("UPDATE users SET role = 'viewer' WHERE id = ?").run(Number(s.params.id));
+        }
+        return realPrepare(sql);
+      },
+    };
+    const { response } = await call(s.route, PATCH, s);
+    expect(response.status).toBe(409);
+    expect((await response.json()).code).toBe("USER_STATE_CHANGED");
+    expect(s.rawDb.prepare("SELECT role FROM users WHERE id = ?").get(Number(s.params.id)).role).toBe("viewer");
+    expect(s.rawDb.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action = 'user.updated'").get().n).toBe(0);
+  });
+
+  it("PATCH {isActive: true} on an active user loses to a concurrent deactivation with 409", async () => {
+    const s = setup(PATCH, { isActive: true });
+    const realPrepare = s.env.DB.prepare.bind(s.env.DB);
+    s.env.DB = {
+      ...s.env.DB,
+      prepare(sql) {
+        if (/^\s*UPDATE users\s+SET/.test(sql)) {
+          s.rawDb.prepare("UPDATE users SET is_active = 0 WHERE id = ?").run(Number(s.params.id));
+        }
+        return realPrepare(sql);
+      },
+    };
+    const { response } = await call(s.route, PATCH, s);
+    expect(response.status).toBe(409);
+    expect(s.rawDb.prepare("SELECT is_active FROM users WHERE id = ?").get(Number(s.params.id)).is_active).toBe(0);
+  });
+});
+
+// The real middleware path (#1324): session cookie + CSRF, `next` bound to the
+// handler. The direct-call cases above rely on checkPermission's fallback to
+// find the session; this is the path production runs.
+describe("step-up through the real admin middleware", () => {
+  async function viaMiddleware(key, s, { body } = {}) {
+    const route = ROUTES[key];
+    const module = await import(pathToFileURL(path.join(ADMIN_ROOT, route.file)).href);
+    const [method, routePath] = key.split(" ");
+    const concretePath = routePath.replace("[id]", s.params.id ?? "1");
+    const url = `https://example.test${concretePath}`;
+    const cookie = `session_token=${s.sessionId}`;
+    const csrfToken = generateCSRFToken(new Request(url, { method, headers: { Cookie: cookie } }), s.env);
+    const init = {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: `${cookie}; csrf_token=${csrfToken}`,
+        "X-CSRF-Token": csrfToken,
+      },
+    };
+    const payload = body ?? route.body;
+    if (payload !== undefined) init.body = JSON.stringify(payload);
+    const context = { env: s.env, request: new Request(url, init), data: {}, params: s.params };
+    context.next = async () => module[route.handler](context);
+    return onRequest(context);
+  }
+
+  for (const key of Object.keys(ROUTES)) {
+    it(`${key}: 403 STEP_UP_REQUIRED unstamped (nothing written), success once stamped`, async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => ({ ok: true, text: async () => "" })),
+      );
+      try {
+        const s = setup(key);
+        const before = tableSnapshot(s.rawDb);
+        const denied = await viaMiddleware(key, s);
+        expect(denied.status).toBe(403);
+        expect((await denied.json()).code).toBe("STEP_UP_REQUIRED");
+        expect(tableSnapshot(s.rawDb)).toEqual(before);
+
+        grantStepUp(s.rawDb, s.sessionId);
+        const allowed = await viaMiddleware(key, s);
+        expect(allowed.status).toBe(ROUTES[key].ok);
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+  }
+
+  it("a step-up stamped on another session of the same user does not satisfy the middleware path", async () => {
+    const key = "POST /api/admin/users/[id]/reset-mfa";
+    const s = setup(key);
+    s.rawDb
+      .prepare("INSERT INTO lucia_sessions (id, user_id, expires_at) VALUES ('other-session', 1, ?)")
+      .run(Math.floor(Date.now() / 1000) + 3600);
+    grantStepUp(s.rawDb, "other-session");
+    const denied = await viaMiddleware(key, s);
+    expect(denied.status).toBe(403);
+    expect((await denied.json()).code).toBe("STEP_UP_REQUIRED");
   });
 });
 

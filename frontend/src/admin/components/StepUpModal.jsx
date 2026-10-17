@@ -58,7 +58,10 @@ export default function StepUpModal() {
   return (
     <Modal
       isOpen={open}
-      onClose={() => settle(false)}
+      onClose={() => {
+        // Escape mid-submit must not drop a step-up that is about to succeed.
+        if (!submitting) settle(false)
+      }}
       title="Confirm it's you"
       size="sm"
       showCloseButton={false}

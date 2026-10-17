@@ -18,6 +18,12 @@ export async function onRequestPost(context) {
     return permCheck.response;
   }
 
+  // Both directions need step-up (#1324): deactivating cuts a person off, and
+  // reactivating restores full access, including the ability to step up
+  // itself. Before anything is read or written.
+  const stepUpDenied = await requireRecentStepUp(context);
+  if (stepUpDenied) return stepUpDenied;
+
   const user = permCheck.user;
   const ipAddress = getClientIP(request);
 
@@ -60,12 +66,6 @@ export async function onRequestPost(context) {
     // Toggle user status
     const newStatus = targetUser.is_active === 1 ? 0 : 1;
 
-    // Only a deactivation needs step-up (#1324); reactivating restores access
-    // an admin already granted. Before the batch that writes and revokes.
-    if (newStatus === 0) {
-      const stepUpDenied = await requireRecentStepUp(context);
-      if (stepUpDenied) return stepUpDenied;
-    }
     const statements = [
       DB.prepare(
         `

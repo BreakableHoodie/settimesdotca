@@ -5,9 +5,20 @@
 // Proves the signed-in user still holds their second factor and stamps THIS
 // session (lucia_sessions.step_up_at). Identity-changing routes then accept the
 // session for STEP_UP_WINDOW_SECONDS. See functions/utils/stepUp.js.
+//
+// A wrong code is 400 INVALID_MFA_CODE, never 401: the admin client treats any
+// 401 as "session gone" and signs the user out. The one deliberate 401 besides
+// "no valid session" is STEP_UP_LOCKED, which ends the session too.
 
 import { checkPermission, auditLog } from "../_middleware.js";
-import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../utils/authAttempts.js";
+import {
+  AUTH_ATTEMPT_TYPES,
+  MFA_GUESS_LIMIT,
+  checkAuthRateLimit,
+  mfaGuessAttemptTypes,
+  settleAuthAttempt,
+  writeAuthAttempt,
+} from "../../../utils/authAttempts.js";
 import { verifyTotp, verifyBackupCode } from "../../../utils/totp.js";
 import { loadTotpSecret } from "../../../utils/mfaSecrets.js";
 import { getClientIP, parseJsonObjectBody } from "../../../utils/request.js";
@@ -25,6 +36,15 @@ function parseBackupCodes(raw) {
   } catch (error) {
     console.error("Failed to parse backup codes:", error);
     return [];
+  }
+}
+
+// Never throws: the work this records has already happened (or already failed).
+async function settleQuietly(DB, id, outcome) {
+  try {
+    await settleAuthAttempt(DB, id, outcome);
+  } catch (error) {
+    console.error("[MFA Step-up] Failed to settle auth attempt:", error?.message || error);
   }
 }
 
@@ -75,13 +95,49 @@ export async function onRequestPost(context) {
     });
   }
 
+  // Record the attempt BEFORE checking the code, as a failed row (#1324).
+  // Checking first and recording after lets parallel requests all read a count
+  // of 0; a row written up front is counted by every request that follows. The
+  // limits below therefore count THIS row too, hence the `+ 1`.
+  const attemptId = await writeAuthAttempt(DB, {
+    attemptType: AUTH_ATTEMPT_TYPES.mfaStepUp,
+    email: user.email,
+    failureReason: "pending",
+    ipAddress,
+    success: false,
+    userAgent,
+    userId,
+  });
+
+  // Per USER, no IP, across every 2FA-guessing endpoint: rotating addresses
+  // does not help a stolen session. Hitting it ends the session, on purpose.
+  const userLimit = await checkAuthRateLimit(DB, {
+    attemptType: AUTH_ATTEMPT_TYPES.mfaStepUp,
+    attemptTypes: mfaGuessAttemptTypes(),
+    maxFailures: MFA_GUESS_LIMIT.maxFailures + 1,
+    scope: "user",
+    userId,
+    windowMs: MFA_GUESS_LIMIT.windowMs,
+  });
+  if (!userLimit.allowed) {
+    await settleQuietly(DB, attemptId, { success: false, failureReason: "user_locked" });
+    await DB.prepare("DELETE FROM lucia_sessions WHERE id = ?").bind(sessionId).run();
+    return json(401, {
+      error: "Session ended",
+      code: "STEP_UP_LOCKED",
+      message: "Too many failed confirmation attempts. Sign in again.",
+    });
+  }
+
   const rateCheck = await checkAuthRateLimit(DB, {
     attemptType: AUTH_ATTEMPT_TYPES.mfaStepUp,
     ipAddress,
+    maxFailures: 6,
     scope: "user-and-ip",
     userId,
   });
   if (!rateCheck.allowed) {
+    await settleQuietly(DB, attemptId, { success: false, failureReason: "rate_limited" });
     return json(429, {
       error: "Too many attempts",
       message: `Too many failed attempts. Please try again in ${rateCheck.remainingMinutes} minutes.`,
@@ -113,59 +169,61 @@ export async function onRequestPost(context) {
   }
 
   if (!verified && totpSecretError) {
+    await settleQuietly(DB, attemptId, { success: false, failureReason: "totp_secret_error" });
     return json(500, { error: "Server error", message: "Failed to verify MFA code" });
   }
 
   if (!verified) {
-    await writeAuthAttempt(DB, {
-      attemptType: AUTH_ATTEMPT_TYPES.mfaStepUp,
-      email: user.email,
-      failureReason: "invalid_code",
-      ipAddress,
-      success: false,
-      userAgent,
-      userId,
+    await settleQuietly(DB, attemptId, { success: false, failureReason: "invalid_code" });
+    return json(400, {
+      error: "Authentication failed",
+      code: "INVALID_MFA_CODE",
+      message: "Invalid authentication code",
     });
-    return json(401, { error: "Authentication failed", message: "Invalid authentication code" });
   }
 
+  // The stamp and (for a backup code) the spend commit together or not at
+  // all. Both carry the SAME predicate, over the factor as it was read and the
+  // session still existing, and the stamp goes first so the spend cannot make
+  // its predicate false. If either matches nothing, both did.
+  const factorPredicate = usedBackupCode
+    ? "totp_enabled = ? AND totp_secret IS ? AND backup_codes IS ?"
+    : "totp_enabled = ? AND totp_secret IS ?";
+  const factorBindings = usedBackupCode
+    ? [user.totp_enabled, user.totp_secret ?? null, user.backup_codes ?? null]
+    : [user.totp_enabled, user.totp_secret ?? null];
+  const factorStillRead = `EXISTS (SELECT 1 FROM users WHERE id = ? AND ${factorPredicate})`;
+  const sessionStillExists = "EXISTS (SELECT 1 FROM lucia_sessions WHERE id = ? AND user_id = ?)";
+
+  const statements = [
+    DB.prepare(
+      `UPDATE lucia_sessions SET step_up_at = unixepoch()
+       WHERE id = ? AND user_id = ? AND ${factorStillRead}`,
+    ).bind(sessionId, userId, userId, ...factorBindings),
+  ];
   if (usedBackupCode) {
-    // Spend the code only over the list this request read (#1253): two
-    // requests presenting the same code must not both succeed, and a reset
-    // that landed meanwhile must not be undone. Nothing is stamped if the
-    // write lost.
     const nextCodes =
       remainingBackupCodes && remainingBackupCodes.length > 0 ? JSON.stringify(remainingBackupCodes) : null;
-    const written = await DB.prepare(
-      `UPDATE users SET backup_codes = ?
-       WHERE id = ? AND totp_enabled = ? AND totp_secret IS ? AND backup_codes IS ?`,
-    )
-      .bind(nextCodes, userId, user.totp_enabled, user.totp_secret ?? null, user.backup_codes ?? null)
-      .run();
-    if (written?.meta?.changes === 0) {
-      return json(409, {
-        error: "Conflict",
-        code: "MFA_CHANGED",
-        message: "Two-factor settings changed. Try again.",
-      });
-    }
+    statements.push(
+      DB.prepare(
+        `UPDATE users SET backup_codes = ?
+         WHERE id = ? AND ${factorPredicate} AND ${sessionStillExists}`,
+      ).bind(nextCodes, userId, ...factorBindings, sessionId, userId),
+    );
   }
 
-  const stamped = await DB.prepare("UPDATE lucia_sessions SET step_up_at = unixepoch() WHERE id = ? AND user_id = ?")
-    .bind(sessionId, userId)
-    .run();
-  if (stamped?.meta?.changes === 0) {
-    return json(401, { error: "Unauthorized", message: "Valid session required" });
+  const results = await DB.batch(statements);
+  if (results.some((result) => result?.meta?.changes === 0)) {
+    await settleQuietly(DB, attemptId, { success: false, failureReason: "mfa_changed" });
+    return json(409, {
+      error: "Conflict",
+      code: "MFA_CHANGED",
+      message: "Two-factor settings changed. Try again.",
+    });
   }
 
-  await writeAuthAttempt(DB, {
-    attemptType: AUTH_ATTEMPT_TYPES.mfaStepUp,
-    email: user.email,
-    ipAddress,
-    success: true,
-    userAgent,
-    userId,
-  });
+  // From here the step-up has happened. Nothing below may turn it into an error.
+  await settleQuietly(DB, attemptId, { success: true });
   await auditLog(env, userId, "mfa.step_up", "user", userId, { backupCode: usedBackupCode }, ipAddress);
 
   return json(200, {

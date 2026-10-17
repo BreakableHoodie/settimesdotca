@@ -227,17 +227,24 @@ describe('step-up re-authentication', () => {
     document.cookie = 'csrf_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/'
   })
 
-  it('retries the original request exactly once after a successful step-up', async () => {
-    global.fetch.mockResolvedValueOnce(stepUpRequired()).mockResolvedValueOnce(json(200, { success: true }))
+  it('retries a PATCH once with the same method and body and a CSRF header after a successful step-up', async () => {
+    global.fetch.mockResolvedValueOnce(stepUpRequired()).mockResolvedValueOnce(json(200, { id: 7 }))
     const { usersApi, registerStepUpPrompter } = await import('../adminApi.js')
     const prompter = vi.fn().mockResolvedValue(true)
     registerStepUpPrompter(prompter)
 
-    await expect(usersApi.resetMfa(7)).resolves.toEqual({ success: true })
+    await expect(usersApi.update(7, { role: 'admin' })).resolves.toEqual({ id: 7 })
 
     expect(prompter).toHaveBeenCalledTimes(1)
     expect(global.fetch).toHaveBeenCalledTimes(2)
-    expect(global.fetch.mock.calls[1][0]).toBe('/api/admin/users/7/reset-mfa')
+    const [firstUrl, first] = global.fetch.mock.calls[0]
+    const [secondUrl, second] = global.fetch.mock.calls[1]
+    expect(secondUrl).toBe(firstUrl)
+    expect(secondUrl).toBe('/api/admin/users/7')
+    expect(second.method).toBe('PATCH')
+    expect(second.body).toBe(first.body)
+    expect(JSON.parse(second.body)).toEqual({ role: 'admin' })
+    expect(second.headers['X-CSRF-Token']).toBe('test-csrf-token')
   })
 
   it('does not retry a second time if the retry is refused again', async () => {
@@ -252,14 +259,15 @@ describe('step-up re-authentication', () => {
     expect(global.fetch).toHaveBeenCalledTimes(2)
   })
 
-  it('rethrows the 403 without retrying when the user cancels', async () => {
+  it('throws STEP_UP_CANCELLED without retrying when the user cancels', async () => {
     global.fetch.mockResolvedValue(stepUpRequired())
     const { usersApi, registerStepUpPrompter } = await import('../adminApi.js')
     registerStepUpPrompter(vi.fn().mockResolvedValue(false))
 
     await expect(usersApi.resetMfa(7)).rejects.toMatchObject({
       status: 403,
-      details: { code: 'STEP_UP_REQUIRED' },
+      code: 'STEP_UP_CANCELLED',
+      message: 'Cancelled \u2014 nothing was changed.',
     })
     expect(global.fetch).toHaveBeenCalledTimes(1)
   })
@@ -331,5 +339,39 @@ describe('step-up re-authentication', () => {
     expect(url).toBe('/api/admin/mfa/step-up')
     expect(init.method).toBe('POST')
     expect(JSON.parse(init.body)).toEqual({ code: '123456' })
+  })
+
+  // A wrong code is a 400, never a 401: handleResponse signs the user out on
+  // every 401. These go through the REAL response path, unlike the modal test
+  // that mocks mfaApi.stepUp with a rejection (#1324).
+  it.each([
+    ['stepUp', api => api.mfaApi.stepUp('000000')],
+    ['disable', api => api.mfaApi.disable('000000')],
+    ['regenerateBackupCodes', api => api.mfaApi.regenerateBackupCodes('000000')],
+    ['enable', api => api.mfaApi.enable('000000')],
+  ])('mfaApi.%s: a 400 INVALID_MFA_CODE rejects with the message and never signs the user out', async (_name, call) => {
+    global.fetch.mockResolvedValue(
+      json(400, { error: 'Authentication failed', code: 'INVALID_MFA_CODE', message: 'Invalid authentication code' })
+    )
+    const api = await import('../adminApi.js')
+    const onUnauthorized = vi.fn()
+    const unsubscribe = api.subscribeAdminAuthState({ onUnauthorized })
+
+    await expect(call(api)).rejects.toMatchObject({ status: 400, message: 'Invalid authentication code' })
+
+    expect(onUnauthorized).not.toHaveBeenCalled()
+    unsubscribe()
+  })
+
+  it('a 401 (no valid session) still signs the user out, so the 400 above is the only thing keeping a typo from doing so', async () => {
+    global.fetch.mockResolvedValue(json(401, { error: 'Unauthorized', message: 'Valid session required' }))
+    const api = await import('../adminApi.js')
+    const onUnauthorized = vi.fn()
+    const unsubscribe = api.subscribeAdminAuthState({ onUnauthorized })
+
+    await expect(api.mfaApi.stepUp('000000')).rejects.toMatchObject({ status: 401 })
+
+    expect(onUnauthorized).toHaveBeenCalledTimes(1)
+    unsubscribe()
   })
 })

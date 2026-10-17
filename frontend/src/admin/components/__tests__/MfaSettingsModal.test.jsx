@@ -32,4 +32,16 @@ describe('MfaSettingsModal required mode', () => {
     expect(await screen.findByText('Admins and editors keep two-factor authentication on.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Disable MFA' })).not.toBeInTheDocument()
   })
+
+  // A wrong code is a 400 now (a 401 would sign the user out); the modal must
+  // still show the server's message (#1324).
+  it('shows the wrong-code message and stays open', async () => {
+    mfaApi.status.mockResolvedValue({ totpEnabled: true })
+    mfaApi.disable.mockRejectedValue(Object.assign(new Error('Invalid authentication code'), { status: 400 }))
+    render(<MfaSettingsModal isOpen onClose={vi.fn()} />)
+    const input = await screen.findByLabelText('Authenticator code', { selector: '#mfa-verify-backup' })
+    fireEvent.change(input, { target: { value: '000000' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Disable MFA' }))
+    expect(await screen.findByText('Invalid authentication code')).toBeInTheDocument()
+  })
 })

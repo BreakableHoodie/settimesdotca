@@ -27,7 +27,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
-import { createTestEnv, insertBand, insertEvent, insertVenue } from "../../test-utils.js";
+import { createTestEnv, grantStepUp, insertBand, insertEvent, insertVenue } from "../../test-utils.js";
 
 const POLICY = {
   "GET /api/admin/analytics/subscriptions": "admin",
@@ -229,7 +229,11 @@ describe("admin RBAC boundaries: a lower role is refused and nothing is written"
   for (const testCase of CASES) {
     it(`${testCase.method} ${testCase.path} refuses ${testCase.role}`, async () => {
       const module = await import(pathToFileURL(testCase.filePath).href);
-      const { env, rawDb, headers } = createTestEnv({ role: testCase.role });
+      const { env, rawDb, headers, sessionId } = createTestEnv({ role: testCase.role });
+      // Stepped up, so ONLY the role check can refuse this call (#1324). Without
+      // it identity routes answer STEP_UP_REQUIRED first and a broken role
+      // check on them would go unnoticed.
+      grantStepUp(rawDb, sessionId);
       seedTargets(rawDb);
       const requestInit = { method: testCase.method, headers };
       // The platform rejects a body on GET/HEAD.
@@ -245,6 +249,9 @@ describe("admin RBAC boundaries: a lower role is refused and nothing is written"
       });
 
       expect(response.status).toBe(403);
+      const refusal = await response.json();
+      expect(refusal.code).not.toBe("STEP_UP_REQUIRED");
+      expect(refusal.message).toBe("Insufficient permissions");
       expect(tableSnapshot(rawDb)).toEqual(before);
     });
   }

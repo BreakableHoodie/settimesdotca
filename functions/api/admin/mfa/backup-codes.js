@@ -120,10 +120,11 @@ export async function onRequestPost(context) {
     return new Response(
       JSON.stringify({
         error: "Authentication failed",
+        code: "INVALID_MFA_CODE",
         message: "Invalid authentication code",
       }),
       {
-        status: 401,
+        status: 400,
         headers: { "Content-Type": "application/json" },
       },
     );

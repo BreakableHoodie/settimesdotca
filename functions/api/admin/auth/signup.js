@@ -12,6 +12,7 @@ import {
 import { logger } from "../../../utils/logger.js";
 import { getPublicBaseUrl } from "../../../utils/publicUrl.js";
 import { auditLog } from "../_middleware.js";
+import { hashInviteCode } from "../../../utils/inviteCodes.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -117,6 +118,11 @@ export async function onRequestPost(context) {
       );
     }
 
+    // SECURITY: invite codes are stored as digests (#1334), so every lookup
+    // below binds the hash. A submitted `sha256:...` or `retired:<id>` is hashed
+    // like any other string and matches nothing.
+    const inviteCodeHash = await hashInviteCode(inviteCode);
+
     // SECURITY: Validate invite code
     const invite = await DB.prepare(
       `
@@ -125,9 +131,10 @@ export async function onRequestPost(context) {
       AND is_active = 1
       AND expires_at > datetime('now')
       AND used_by_user_id IS NULL
+      AND used_at IS NULL
     `,
     )
-      .bind(inviteCode)
+      .bind(inviteCodeHash)
       .first();
 
     if (!invite) {
@@ -248,6 +255,8 @@ export async function onRequestPost(context) {
     // Now the INSERT only fires while the invite is STILL unclaimed (the same
     // predicate as the validation SELECT), and the claim UPDATE fires exactly
     // when the INSERT did, because it requires the user that INSERT created.
+    // "Unused" means used_by_user_id IS NULL AND used_at IS NULL: deleting the
+    // user SETs used_by_user_id NULL (FK), which alone would reopen the invite.
     // A claim keyed only on `used_by_user_id IS NULL` stamped used_at on an
     // invite that closed mid-request, with no user behind it. D1 runs a batch
     // as one transaction and serialises writers, so of two racing batches only
@@ -255,7 +264,7 @@ export async function onRequestPost(context) {
     // changes === 0.
     const INVITE_STILL_OPEN = `EXISTS (
       SELECT 1 FROM invite_codes
-      WHERE code = ? AND is_active = 1 AND expires_at > datetime('now') AND used_by_user_id IS NULL
+      WHERE code = ? AND is_active = 1 AND expires_at > datetime('now') AND used_by_user_id IS NULL AND used_at IS NULL
     )`;
     const [created, claimed] = await DB.batch([
       DB.prepare(
@@ -272,7 +281,7 @@ export async function onRequestPost(context) {
         0,
         activationToken,
         activationExpires,
-        inviteCode,
+        inviteCodeHash,
       ),
       // The claim is keyed on the user THIS batch inserted (found by this
       // request's fresh activation token), not on a second clock check. D1
@@ -282,9 +291,9 @@ export async function onRequestPost(context) {
       DB.prepare(
         `UPDATE invite_codes
          SET used_by_user_id = (SELECT id FROM users WHERE activation_token = ?), used_at = datetime('now')
-         WHERE code = ? AND used_by_user_id IS NULL
+         WHERE code = ? AND used_by_user_id IS NULL AND used_at IS NULL
            AND EXISTS (SELECT 1 FROM users WHERE activation_token = ?)`,
-      ).bind(activationToken, inviteCode, activationToken),
+      ).bind(activationToken, inviteCodeHash, activationToken),
     ]);
 
     // Only an EXPLICIT changes === 0 means "lost the race" (CLAUDE.md: an

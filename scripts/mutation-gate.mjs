@@ -420,6 +420,51 @@ export const MUTATIONS = [
     tests: ["functions/api/admin/api-keys/__tests__/api-keys.test.js"],
   },
   {
+    id: "invite-list-returns-no-code",
+    invariant:
+      "CLAUDE.md 'Invite codes are stored hashed' — GET /api/admin/invite-codes projects no `code` column; a stolen admin session must not read an unused invite (#1334)",
+    file: "functions/api/admin/invite-codes.js",
+    find: "        ic.code_prefix,\n        ic.email,",
+    replace: "        ic.code,\n        ic.code_prefix,\n        ic.email,",
+    tests: ["functions/api/admin/invite-codes/__tests__/invite-codes.test.js"],
+  },
+  {
+    id: "invite-signup-lookup-binds-hash",
+    invariant:
+      "CLAUDE.md 'Invite codes are stored hashed' — signup hashes the submitted code before the SELECT, so the plaintext matches and a submitted sha256:/retired: value matches nothing (#1334)",
+    file: "functions/api/admin/auth/signup.js",
+    find: "      .bind(inviteCodeHash)\n      .first();",
+    replace: "      .bind(inviteCode)\n      .first();",
+    tests: ["functions/api/admin/invite-codes/__tests__/invite-codes.test.js"],
+  },
+  {
+    id: "invite-open-check-requires-unused-used-at",
+    invariant:
+      "CLAUDE.md 'Invite codes are stored hashed' — signup treats an invite as open only while used_at IS NULL too, because deleting the user nulls used_by_user_id and would reopen it",
+    file: "functions/api/admin/auth/signup.js",
+    find: "      AND used_by_user_id IS NULL\n      AND used_at IS NULL\n",
+    replace: "      AND used_by_user_id IS NULL\n",
+    tests: ["functions/api/admin/invite-codes/__tests__/invite-codes.test.js"],
+  },
+  {
+    id: "invite-signup-claim-binds-hash",
+    invariant:
+      "CLAUDE.md 'Invite codes are stored hashed' — the claim UPDATE matches the digest too, so a redeemed invite is actually marked used (#1334)",
+    file: "functions/api/admin/auth/signup.js",
+    find: ").bind(activationToken, inviteCodeHash, activationToken),",
+    replace: ").bind(activationToken, inviteCode, activationToken),",
+    tests: ["functions/api/admin/invite-codes/__tests__/invite-codes.test.js"],
+  },
+  {
+    id: "invite-users-route-stores-hash",
+    invariant:
+      "CLAUDE.md 'Invite codes are stored hashed' — POST /api/admin/users stores the digest, never the plaintext it emails (#1334)",
+    file: "functions/api/admin/users.js",
+    find: ".bind(codeHash, codePrefix, email, role, currentUser.userId, expiresAt)",
+    replace: ".bind(inviteCode, codePrefix, email, role, currentUser.userId, expiresAt)",
+    tests: ["functions/api/admin/invite-codes/__tests__/invite-codes.test.js"],
+  },
+  {
     id: "public-event-visibility-gate",
     invariant:
       "CLAUDE.md 'Public event visibility is status, never is_published' — publicEventStatusSql() must gate to published/archived only, never draft",
@@ -705,8 +750,8 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'RBAC Roles' — the invite claim does not re-check expiry; datetime('now') is not stable across a batch, so an invite expiring between INSERT and claim would leave a 201 signup with its invite reusable (#1252 review)",
     file: "functions/api/admin/auth/signup.js",
-    find: "WHERE code = ? AND used_by_user_id IS NULL\n",
-    replace: "WHERE code = ? AND used_by_user_id IS NULL AND expires_at > datetime('now')\n",
+    find: "WHERE code = ? AND used_by_user_id IS NULL AND used_at IS NULL\n",
+    replace: "WHERE code = ? AND used_by_user_id IS NULL AND used_at IS NULL AND expires_at > datetime('now')\n",
     tests: ["functions/api/admin/auth/__tests__/signup.test.js"],
   },
   {

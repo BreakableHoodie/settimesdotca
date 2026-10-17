@@ -12,7 +12,7 @@ import * as resetPasswordHandler from "../users/[id]/reset-password.js";
 import * as apiKeysHandler from "../api-keys.js";
 import * as apiKeyItemHandler from "../api-keys/[id].js";
 import * as inviteCodesHandler from "../invite-codes.js";
-import * as inviteCodeItemHandler from "../invite-codes/[code].js";
+import * as inviteCodeItemHandler from "../invite-codes/[id].js";
 
 const BASE_URL = "https://example.test/api/admin/me";
 const API_KEYS_URL = "https://example.test/api/admin/api-keys";

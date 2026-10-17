@@ -40,7 +40,7 @@ const STEP_UP_POLICY = {
 
 // Mutating identity-family handlers that deliberately need no step-up.
 const NOT_STEP_UP = {
-  "DELETE /api/admin/invite-codes/[code]":
+  "DELETE /api/admin/invite-codes/[id]":
     "revoking an unused invite only removes the ability to create an account; it grants nothing",
 };
 

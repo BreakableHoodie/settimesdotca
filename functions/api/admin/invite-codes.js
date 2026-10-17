@@ -1,13 +1,17 @@
 // Admin invite codes endpoint
 // POST /api/admin/invite-codes - Create new invite code (admin only)
 // GET /api/admin/invite-codes - List invite codes (admin only)
-// DELETE /api/admin/invite-codes/[code] - Revoke invite code (admin only)
+// DELETE /api/admin/invite-codes/[id] - Revoke invite code by id (admin only)
+//
+// The plaintext code exists only in the POST response (#1334): the database
+// stores a digest, and no read path returns the code or the digest.
 
 import { checkPermission, auditLog } from "./_middleware.js";
 import { requireRecentStepUp } from "../../utils/stepUp.js";
 import { isValidEmail, isValidRole, validationErrorResponse, FIELD_LIMITS } from "../../utils/validation.js";
 import { getClientIP, parseJsonObjectBody } from "../../utils/request.js";
 import { toSqliteDateTime } from "../../utils/authAttempts.js";
+import { generateInviteCode } from "../../utils/inviteCodes.js";
 
 // GET - List all invite codes
 export async function onRequestGet(context) {
@@ -24,7 +28,16 @@ export async function onRequestGet(context) {
     const result = await DB.prepare(
       `
       SELECT
-        ic.*,
+        ic.id,
+        ic.code_prefix,
+        ic.email,
+        ic.role,
+        ic.created_by_user_id,
+        ic.used_by_user_id,
+        ic.created_at,
+        ic.used_at,
+        ic.expires_at,
+        ic.is_active,
         creator.email as creator_email,
         creator.name as creator_name,
         used_by.email as used_by_email,
@@ -126,7 +139,7 @@ export async function onRequestPost(context) {
     }
 
     // Generate invite code
-    const inviteCode = crypto.randomUUID();
+    const { plaintext: inviteCode, codeHash, codePrefix } = await generateInviteCode();
 
     // Calculate expiration
     const expiresAt = toSqliteDateTime(new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000));
@@ -134,12 +147,12 @@ export async function onRequestPost(context) {
     // Insert invite code
     const result = await DB.prepare(
       `
-      INSERT INTO invite_codes (code, email, role, created_by_user_id, expires_at)
-      VALUES (?, ?, ?, ?, ?)
-      RETURNING *
+      INSERT INTO invite_codes (code, code_prefix, email, role, created_by_user_id, expires_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+      RETURNING id, code_prefix, email, role, created_by_user_id, created_at, expires_at, is_active
     `,
     )
-      .bind(inviteCode, email, role, user.userId, expiresAt)
+      .bind(codeHash, codePrefix, email, role, user.userId, expiresAt)
       .first();
 
     // Audit log
@@ -160,7 +173,9 @@ export async function onRequestPost(context) {
     return new Response(
       JSON.stringify({
         success: true,
-        inviteCode: result,
+        // The plaintext is shown exactly once, here. `code` is the secret;
+        // the rest is the stored row minus the digest.
+        inviteCode: { ...result, code: inviteCode },
       }),
       {
         status: 201,

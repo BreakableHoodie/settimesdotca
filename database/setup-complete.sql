@@ -260,7 +260,7 @@ CREATE TABLE IF NOT EXISTS invite_codes (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   used_at TEXT,                           -- When the invite was used
   expires_at TEXT NOT NULL,               -- Expiration timestamp
-  is_active INTEGER NOT NULL DEFAULT 1,   -- 0 = disabled, 1 = active
+  is_active INTEGER NOT NULL DEFAULT 1, code_prefix TEXT,   -- 0 = disabled, 1 = active
 
   FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
   FOREIGN KEY (used_by_user_id) REFERENCES users(id) ON DELETE SET NULL

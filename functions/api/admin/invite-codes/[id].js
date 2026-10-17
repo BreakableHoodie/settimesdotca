@@ -1,14 +1,16 @@
 // Admin invite code management
-// DELETE /api/admin/invite-codes/[code] - Revoke invite code
+// DELETE /api/admin/invite-codes/[id] - Revoke invite code by numeric id
+//
+// By id, not by code (#1334): the plaintext is not stored, so it cannot be a key.
 
 import { checkPermission, auditLog } from "../_middleware.js";
 import { getClientIP } from "../../../utils/request.js";
+import { validateId } from "../../../utils/validation.js";
 
 // DELETE - Revoke invite code
 export async function onRequestDelete(context) {
   const { request, env, params } = context;
   const { DB } = env;
-  const { code } = params;
 
   // RBAC: Require admin role
   const permCheck = await checkPermission(context, "admin");
@@ -16,12 +18,22 @@ export async function onRequestDelete(context) {
     return permCheck.response;
   }
 
+  const { valid, value: inviteId } = validateId(params.id);
+  if (!valid) {
+    return new Response(JSON.stringify({ error: "Invalid ID", code: "INVALID_ID" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   const user = permCheck.user;
   const ipAddress = getClientIP(request);
 
   try {
     // Check if invite exists
-    const invite = await DB.prepare(`SELECT * FROM invite_codes WHERE code = ?`).bind(code).first();
+    const invite = await DB.prepare(`SELECT id, email, used_by_user_id, used_at FROM invite_codes WHERE id = ?`)
+      .bind(inviteId)
+      .first();
 
     if (!invite) {
       return new Response(
@@ -37,7 +49,7 @@ export async function onRequestDelete(context) {
     }
 
     // Deactivate invite code
-    await DB.prepare(`UPDATE invite_codes SET is_active = 0 WHERE code = ?`).bind(code).run();
+    await DB.prepare(`UPDATE invite_codes SET is_active = 0 WHERE id = ?`).bind(inviteId).run();
 
     // Audit log
     await auditLog(
@@ -47,7 +59,7 @@ export async function onRequestDelete(context) {
       "invite_code",
       invite.id,
       {
-        wasUsed: invite.used_by_user_id !== null,
+        wasUsed: invite.used_by_user_id !== null || invite.used_at !== null,
         inviteMode: invite.email ? "email_restricted" : "open",
       },
       ipAddress,

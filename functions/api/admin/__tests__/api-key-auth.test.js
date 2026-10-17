@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { onRequest, checkPermission } from "../_middleware.js";
-import { createTestEnv } from "../../test-utils.js";
+import { createTestEnv, grantStepUp } from "../../test-utils.js";
 import { generateApiKey, verifyApiKey } from "../../../utils/apiKeys.js";
 import { toSqliteDateTime } from "../../../utils/authAttempts.js";
 import { generateCSRFToken } from "../../../utils/csrf.js";
@@ -385,6 +385,7 @@ describe("API key authentication path (#744 part 3)", () => {
     const SELF_SERVICE = [
       ["/api/admin/mfa/setup", "POST"],
       ["/api/admin/mfa/enable", "POST"],
+      ["/api/admin/mfa/step-up", "POST"],
       ["/api/admin/sessions", "GET"],
       ["/api/admin/sessions/revoke-all", "POST"],
       ["/api/admin/trusted-devices", "GET"],
@@ -652,6 +653,7 @@ describe("API key authentication path (#744 part 3)", () => {
       const { env, rawDb, headers } = createTestEnv({ role: "admin" });
       const before = rawDb.prepare("SELECT COUNT(*) AS count FROM invite_codes").get().count;
       const sessionId = headers.Authorization.replace("Bearer ", "");
+      grantStepUp(rawDb, sessionId); // minting an invite requires a recent step-up (#1324)
       const cookie = `session_token=${sessionId}`;
       const csrfRequest = new Request("https://example.test/api/admin/invite-codes", {
         method: "POST",

@@ -32,6 +32,7 @@ vi.mock('../components/BottomNav', () => ({
 }))
 vi.mock('../components/ContextBanner', () => ({ default: () => null }))
 vi.mock('../components/Breadcrumbs', () => ({ default: () => null }))
+vi.mock('../components/StepUpModal', () => ({ default: () => null }))
 vi.mock('../components/MfaSettingsModal', () => ({
   default: ({ isOpen, required, onLogout }) =>
     isOpen ? (

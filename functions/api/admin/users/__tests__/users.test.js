@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { createTestEnv } from "../../../test-utils";
+import { createTestEnv, grantStepUp } from "../../../test-utils";
 import * as usersHandler from "../../users.js";
 
 describe("Admin users API", () => {
   it("allows admins to list users", async () => {
-    const { env, headers } = createTestEnv({ role: "admin" });
+    const { env, headers, rawDb, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
 
     const request = new Request("https://example.test/api/admin/users", {
       headers,
@@ -31,7 +32,8 @@ describe("Admin users API", () => {
   });
 
   it("invites users and logs the action", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
 
     const request = new Request("https://example.test/api/admin/users", {
       method: "POST",
@@ -91,7 +93,8 @@ describe("Admin users API", () => {
   });
 
   it("rejects duplicate user emails", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
 
     rawDb
       .prepare("INSERT INTO users (email, role, password_hash) VALUES (?, ?, 'placeholder')")

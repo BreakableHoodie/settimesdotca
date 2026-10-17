@@ -3,6 +3,7 @@
 // GET /api/admin/api-keys - List API keys (admin only)
 
 import { checkPermission } from "./_middleware.js";
+import { requireRecentStepUp } from "../../utils/stepUp.js";
 import { auditLogStatementForInsertedRow } from "../../utils/auditLogStatement.js";
 import { generateApiKey } from "../../utils/apiKeys.js";
 import { toSqliteDateTime } from "../../utils/authAttempts.js";
@@ -44,6 +45,10 @@ export async function onRequestPost(context) {
   if (permCheck.error) {
     return permCheck.response;
   }
+
+  // Minting a bearer credential is an identity change (#1324).
+  const stepUpDenied = await requireRecentStepUp(context);
+  if (stepUpDenied) return stepUpDenied;
 
   try {
     const parsed = await parseJsonObjectBody(request);

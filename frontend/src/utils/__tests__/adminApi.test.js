@@ -207,3 +207,129 @@ describe('2FA enrolment required', () => {
     expect(init.method).toBe('POST')
   })
 })
+
+// Step-up re-authentication (#1324). Identity routes answer 403 STEP_UP_REQUIRED;
+// the registered prompter decides whether the request is retried (once).
+describe('step-up re-authentication', () => {
+  const json = (status, body) =>
+    new globalThis.Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+  const stepUpRequired = () => json(403, { error: 'Forbidden', code: 'STEP_UP_REQUIRED', message: 'Confirm with 2FA.' })
+
+  beforeEach(() => {
+    vi.resetModules()
+    document.cookie = 'csrf_token=test-csrf-token; path=/'
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+    document.cookie = 'csrf_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/'
+  })
+
+  it('retries the original request exactly once after a successful step-up', async () => {
+    global.fetch.mockResolvedValueOnce(stepUpRequired()).mockResolvedValueOnce(json(200, { success: true }))
+    const { usersApi, registerStepUpPrompter } = await import('../adminApi.js')
+    const prompter = vi.fn().mockResolvedValue(true)
+    registerStepUpPrompter(prompter)
+
+    await expect(usersApi.resetMfa(7)).resolves.toEqual({ success: true })
+
+    expect(prompter).toHaveBeenCalledTimes(1)
+    expect(global.fetch).toHaveBeenCalledTimes(2)
+    expect(global.fetch.mock.calls[1][0]).toBe('/api/admin/users/7/reset-mfa')
+  })
+
+  it('does not retry a second time if the retry is refused again', async () => {
+    global.fetch.mockResolvedValue(stepUpRequired())
+    const { usersApi, registerStepUpPrompter } = await import('../adminApi.js')
+    const prompter = vi.fn().mockResolvedValue(true)
+    registerStepUpPrompter(prompter)
+
+    await expect(usersApi.resetMfa(7)).rejects.toMatchObject({ status: 403 })
+
+    expect(prompter).toHaveBeenCalledTimes(1)
+    expect(global.fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('rethrows the 403 without retrying when the user cancels', async () => {
+    global.fetch.mockResolvedValue(stepUpRequired())
+    const { usersApi, registerStepUpPrompter } = await import('../adminApi.js')
+    registerStepUpPrompter(vi.fn().mockResolvedValue(false))
+
+    await expect(usersApi.resetMfa(7)).rejects.toMatchObject({
+      status: 403,
+      details: { code: 'STEP_UP_REQUIRED' },
+    })
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('rethrows when no prompter is registered, as before', async () => {
+    global.fetch.mockResolvedValue(stepUpRequired())
+    const { usersApi } = await import('../adminApi.js')
+
+    await expect(usersApi.resetMfa(7)).rejects.toMatchObject({ status: 403 })
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('treats a throwing prompter as a cancel', async () => {
+    global.fetch.mockResolvedValue(stepUpRequired())
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { usersApi, registerStepUpPrompter } = await import('../adminApi.js')
+    registerStepUpPrompter(() => {
+      throw new Error('modal bug')
+    })
+
+    await expect(usersApi.resetMfa(7)).rejects.toMatchObject({ status: 403 })
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('shares one prompt between concurrent 403s and retries both', async () => {
+    let call = 0
+    global.fetch.mockImplementation(async () => {
+      call += 1
+      return call <= 2 ? stepUpRequired() : json(200, { success: true })
+    })
+    const { usersApi, registerStepUpPrompter } = await import('../adminApi.js')
+    let release
+    const prompter = vi.fn(
+      () =>
+        new Promise(resolve => {
+          release = resolve
+        })
+    )
+    registerStepUpPrompter(prompter)
+
+    const first = usersApi.resetMfa(7)
+    const second = usersApi.resetMfa(8)
+    await vi.waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2))
+    await vi.waitFor(() => expect(prompter).toHaveBeenCalledTimes(1))
+    release(true)
+
+    await expect(Promise.all([first, second])).resolves.toEqual([{ success: true }, { success: true }])
+    expect(prompter).toHaveBeenCalledTimes(1)
+    expect(global.fetch).toHaveBeenCalledTimes(4)
+  })
+
+  it('an ordinary 403 never raises the prompt', async () => {
+    global.fetch.mockResolvedValue(json(403, { error: 'Forbidden', message: 'Insufficient permissions' }))
+    const { usersApi, registerStepUpPrompter } = await import('../adminApi.js')
+    const prompter = vi.fn().mockResolvedValue(true)
+    registerStepUpPrompter(prompter)
+
+    await expect(usersApi.resetMfa(7)).rejects.toMatchObject({ status: 403 })
+    expect(prompter).not.toHaveBeenCalled()
+  })
+
+  it('mfaApi.stepUp posts the code to the step-up route', async () => {
+    global.fetch.mockResolvedValue(json(200, { success: true }))
+    const { mfaApi } = await import('../adminApi.js')
+
+    await mfaApi.stepUp('123456')
+
+    const [url, init] = global.fetch.mock.calls[0]
+    expect(url).toBe('/api/admin/mfa/step-up')
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(init.body)).toEqual({ code: '123456' })
+  })
+})

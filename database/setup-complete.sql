@@ -316,7 +316,7 @@ CREATE TABLE IF NOT EXISTS lucia_sessions (
   remember_me INTEGER DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   last_activity_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+, step_up_at INTEGER);
 
 CREATE INDEX IF NOT EXISTS idx_lucia_sessions_user_id ON lucia_sessions(user_id);
 

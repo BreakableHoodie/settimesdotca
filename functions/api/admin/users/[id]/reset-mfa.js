@@ -11,6 +11,7 @@
 import { checkPermission } from "../../_middleware.js";
 import { auditLogStatement } from "../../../../utils/auditLogStatement.js";
 import { getClientIP } from "../../../../utils/request.js";
+import { requireRecentStepUp } from "../../../../utils/stepUp.js";
 import { validateId } from "../../../../utils/validation.js";
 
 export async function onRequestPost(context) {
@@ -21,6 +22,9 @@ export async function onRequestPost(context) {
   if (permCheck.error) {
     return permCheck.response;
   }
+
+  const stepUpDenied = await requireRecentStepUp(context);
+  if (stepUpDenied) return stepUpDenied;
 
   const admin = permCheck.user;
   const ipAddress = getClientIP(request);

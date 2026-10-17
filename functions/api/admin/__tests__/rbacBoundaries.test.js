@@ -73,6 +73,7 @@ const POLICY = {
   "POST /api/admin/mfa/disable": "viewer",
   "POST /api/admin/mfa/enable": "viewer",
   "POST /api/admin/mfa/setup": "viewer",
+  "POST /api/admin/mfa/step-up": "viewer",
   "GET /api/admin/mfa/status": "viewer",
   "GET /api/admin/sessions": "self",
   "DELETE /api/admin/sessions": "self",

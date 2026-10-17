@@ -869,6 +869,51 @@ export const MUTATIONS = [
     replace: 'WHERE id = ? AND ? IS NOT NULL",',
     tests: ["functions/api/admin/mfa/__tests__/mfa-settings.test.js"],
   },
+  {
+    id: "step-up-reset-mfa-requires-step-up",
+    invariant:
+      "CLAUDE.md 'Step-up re-authentication for identity changes' — resetting another user's 2FA needs a recent step-up on this session (#1324)",
+    file: "functions/api/admin/users/[id]/reset-mfa.js",
+    find: "  if (stepUpDenied) return stepUpDenied;",
+    replace: "  if (false) return stepUpDenied;",
+    tests: ["functions/api/admin/__tests__/stepUpBoundaries.test.js"],
+  },
+  {
+    id: "step-up-window-enforced",
+    invariant:
+      "CLAUDE.md 'Step-up re-authentication for identity changes' — a step-up older than the 5-minute window no longer counts (#1324)",
+    file: "functions/utils/stepUp.js",
+    find: "AND step_up_at IS NOT NULL AND step_up_at > unixepoch() - ?`,",
+    replace: "AND step_up_at IS NOT NULL AND ? IS NOT NULL`,",
+    tests: ["functions/api/admin/__tests__/stepUpBoundaries.test.js"],
+  },
+  {
+    id: "step-up-bound-to-this-session",
+    invariant:
+      "CLAUDE.md 'Step-up re-authentication for identity changes' — a step-up on another session of the same user does not count (#1324)",
+    file: "functions/utils/stepUp.js",
+    find: "WHERE id = ? AND user_id = ? AND step_up_at",
+    replace: "WHERE ? IS NOT NULL AND user_id = ? AND step_up_at",
+    tests: ["functions/api/admin/__tests__/stepUpBoundaries.test.js"],
+  },
+  {
+    id: "step-up-refuses-api-keys",
+    invariant:
+      "CLAUDE.md 'Step-up re-authentication for identity changes' — an API key never satisfies step-up, even on a stamped session (#1324)",
+    file: "functions/utils/stepUp.js",
+    find: "  if (context.data?.apiKey) {",
+    replace: "  if (false) {",
+    tests: ["functions/api/admin/__tests__/stepUpBoundaries.test.js"],
+  },
+  {
+    id: "step-up-backup-code-spend-bound-to-read-list",
+    invariant:
+      "CLAUDE.md 'Step-up re-authentication for identity changes' — a backup code is spent only over the list that was read, so a replay or concurrent spend cannot also stamp (#1324)",
+    file: "functions/api/admin/mfa/step-up.js",
+    find: "WHERE id = ? AND totp_enabled = ? AND totp_secret IS ? AND backup_codes IS ?`,",
+    replace: "WHERE id = ? AND (? IS NULL OR 1) AND (? IS NULL OR 1) AND (? IS NULL OR 1)`,",
+    tests: ["functions/api/admin/mfa/__tests__/step-up.test.js"],
+  },
 ];
 
 // ============================================================================

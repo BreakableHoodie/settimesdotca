@@ -6,6 +6,7 @@ import { checkPermission } from "../../_middleware.js";
 import { auditLogStatement } from "../../../../utils/auditLogStatement.js";
 import { getClientIP } from "../../../../utils/request.js";
 import { validateId } from "../../../../utils/validation.js";
+import { requireRecentStepUp } from "../../../../utils/stepUp.js";
 
 export async function onRequestPost(context) {
   const { request, env, params } = context;
@@ -58,6 +59,13 @@ export async function onRequestPost(context) {
 
     // Toggle user status
     const newStatus = targetUser.is_active === 1 ? 0 : 1;
+
+    // Only a deactivation needs step-up (#1324); reactivating restores access
+    // an admin already granted. Before the batch that writes and revokes.
+    if (newStatus === 0) {
+      const stepUpDenied = await requireRecentStepUp(context);
+      if (stepUpDenied) return stepUpDenied;
+    }
     const statements = [
       DB.prepare(
         `

@@ -9,6 +9,7 @@ export const AUTH_ATTEMPT_TYPES = Object.freeze({
   mfaEnable: "mfa_enable",
   mfaDisable: "mfa_disable",
   mfaBackupCodes: "mfa_backup_codes",
+  mfaStepUp: "mfa_step_up",
 });
 
 function getRateLimitQuery(scope) {

@@ -3,6 +3,7 @@
 // POST /api/admin/users - Create new user
 
 import { checkPermission, auditLog } from "./_middleware.js";
+import { requireRecentStepUp } from "../../utils/stepUp.js";
 import { validateEntity, VALIDATION_SCHEMAS, validationErrorResponse } from "../../utils/validation.js";
 import { getClientIP, parseJsonObjectBody } from "../../utils/request.js";
 import { sendEmail, isEmailConfigured } from "../../utils/email.js";
@@ -77,6 +78,11 @@ export async function onRequestPost(context) {
     if (permCheck.error) {
       return permCheck.response;
     }
+
+    // Creating an account with a role is an identity change (#1324); before
+    // any write, token or email.
+    const stepUpDenied = await requireRecentStepUp(context);
+    if (stepUpDenied) return stepUpDenied;
 
     const currentUser = permCheck.user;
 

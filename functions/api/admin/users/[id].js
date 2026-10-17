@@ -6,6 +6,7 @@ import { checkPermission } from "../_middleware.js";
 import { auditLogStatement, auditLogStatementWhere } from "../../../utils/auditLogStatement.js";
 import { getClientIP, parseJsonObjectBody } from "../../../utils/request.js";
 import { validateId } from "../../../utils/validation.js";
+import { requireRecentStepUp } from "../../../utils/stepUp.js";
 
 // PATCH - Update user (admin only, users can update own name)
 export async function onRequestPatch(context) {
@@ -75,6 +76,15 @@ export async function onRequestPatch(context) {
           headers: { "Content-Type": "application/json" },
         },
       );
+    }
+
+    // Step-up (#1324) only for the two identity changes: a role that differs
+    // from the stored one, or a falsy isActive (read by truthiness like every
+    // other site here, so {"isActive": 0} deactivates). Name edits need none.
+    // Before any write.
+    if ((role !== undefined && role !== user.role) || (isActive !== undefined && !isActive)) {
+      const stepUpDenied = await requireRecentStepUp(context);
+      if (stepUpDenied) return stepUpDenied;
     }
 
     // Build update query dynamically based on provided fields
@@ -409,6 +419,10 @@ export async function onRequestDelete(context) {
     if (permCheck.error) {
       return permCheck.response;
     }
+
+    // Step-up before anything is read or deleted (#1324).
+    const stepUpDenied = await requireRecentStepUp(context);
+    if (stepUpDenied) return stepUpDenied;
 
     const currentUser = permCheck.user;
 

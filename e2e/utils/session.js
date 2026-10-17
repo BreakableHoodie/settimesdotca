@@ -40,17 +40,21 @@ export const submitAdminLogin = async (page) => {
 
 // Identity changes ask for a fresh 2FA code (#1324): the first one in a
 // 5-minute window opens the "Confirm it's you" dialog, later ones do not. Call
-// this right after the click that starts such a change. It waits until either
-// the dialog or the change's own success signal shows, and answers the dialog
-// only if it appeared.
-export const confirmStepUpIfPrompted = async (page, successMatcher) => {
+// this right after the click that starts such a change, passing a locator for
+// the change's own success signal (a toast, or a result dialog). It waits until
+// either that or the step-up dialog shows, and answers the dialog only if it
+// appeared. Pass an element, never a page-text pattern: the table's own copy
+// can match a loose pattern and end the wait before the dialog opens, which is
+// how the first version skipped the prompt in CI.
+export const successToast = (page, matcher) => page.getByRole("alert").filter({ hasText: matcher });
+
+export const confirmStepUpIfPrompted = async (page, succeeded) => {
   const stepUpDialog = page.getByRole("dialog", { name: "Confirm it's you" });
-  const succeeded = page.locator("body", { hasText: successMatcher });
   await expect(stepUpDialog.or(succeeded).first()).toBeVisible({ timeout: 10000 });
   if (await stepUpDialog.isVisible()) {
     await stepUpDialog.locator("#step-up-code").fill(await e2eTotpCode(ADMIN_PASSWORD));
     await stepUpDialog.getByRole("button", { name: "Confirm" }).click();
     await expect(stepUpDialog).not.toBeVisible();
   }
-  await expect(page.locator("body")).toContainText(successMatcher, { timeout: 10000 });
+  await expect(succeeded.first()).toBeVisible({ timeout: 10000 });
 };

@@ -4,7 +4,8 @@
 
 import { checkPermission, auditLog } from "../_middleware.js";
 import { mfaRequiredForRole } from "../../../utils/mfaPolicy.js";
-import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../utils/authAttempts.js";
+import { AUTH_ATTEMPT_TYPES } from "../../../utils/authAttempts.js";
+import { beginMfaGuess, settleQuietly } from "../../../utils/mfaGuessGate.js";
 import { verifyTotp, verifyBackupCode } from "../../../utils/totp.js";
 import { loadTotpSecret } from "../../../utils/mfaSecrets.js";
 import { getClientIP, parseJsonObjectBody } from "../../../utils/request.js";
@@ -97,23 +98,17 @@ export async function onRequestPost(context) {
     );
   }
 
-  const rateCheck = await checkAuthRateLimit(DB, {
+  // Pending attempt, per-user lockout (ends the session), per-IP limit (#1324).
+  const { attemptId, response: limited } = await beginMfaGuess(DB, {
     attemptType: AUTH_ATTEMPT_TYPES.mfaDisable,
+    email: user.email,
     ipAddress,
-    scope: "user-and-ip",
+    sessionId: context.data?.session?.id,
+    userAgent: request.headers.get("User-Agent") || "unknown",
     userId,
   });
-  if (!rateCheck.allowed) {
-    return new Response(
-      JSON.stringify({
-        error: "Too many attempts",
-        message: `Too many failed attempts. Please try again in ${rateCheck.remainingMinutes} minutes.`,
-      }),
-      {
-        status: 429,
-        headers: { "Content-Type": "application/json" },
-      },
-    );
+  if (limited) {
+    return limited;
   }
 
   let verified = false;
@@ -139,6 +134,7 @@ export async function onRequestPost(context) {
   }
 
   if (!verified && totpSecretError) {
+    await settleQuietly(DB, attemptId, { success: false, failureReason: "totp_secret_error" });
     return new Response(
       JSON.stringify({
         error: "Server error",
@@ -152,15 +148,7 @@ export async function onRequestPost(context) {
   }
 
   if (!verified) {
-    await writeAuthAttempt(DB, {
-      attemptType: AUTH_ATTEMPT_TYPES.mfaDisable,
-      email: user.email,
-      failureReason: "invalid_code",
-      ipAddress,
-      success: false,
-      userAgent: request.headers.get("User-Agent") || "unknown",
-      userId,
-    });
+    await settleQuietly(DB, attemptId, { success: false, failureReason: "invalid_code" });
 
     return new Response(
       JSON.stringify({
@@ -185,14 +173,7 @@ export async function onRequestPost(context) {
 
   await revokeAllTrustedDevices(DB, userId);
 
-  await writeAuthAttempt(DB, {
-    attemptType: AUTH_ATTEMPT_TYPES.mfaDisable,
-    email: user.email,
-    ipAddress,
-    success: true,
-    userAgent: request.headers.get("User-Agent") || "unknown",
-    userId,
-  });
+  await settleQuietly(DB, attemptId, { success: true });
 
   await auditLog(env, userId, "mfa.disabled", "user", userId, { email: user.email }, ipAddress);
 

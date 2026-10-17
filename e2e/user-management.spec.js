@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { confirmStepUpIfPrompted, loginAsAdmin } from "./utils/session";
+import { confirmStepUpIfPrompted, loginAsAdmin, successToast } from "./utils/session";
 
 const openUsersTab = async (page) => {
   await page.click('button:has-text("Users")');
@@ -11,7 +11,12 @@ const uniqueSuffix = () => `${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 // with a URL-copy view (email delivery failed). Both cases are handled here.
 const clickAndWaitForToast = async (page, selector, matcher) => {
   await page.click(selector);
-  await confirmStepUpIfPrompted(page, matcher);
+  // Email delivered -> toast. Email failed (CI has no provider) -> the modal
+  // switches to its "Invite Created" view. Either one means the change landed.
+  await confirmStepUpIfPrompted(
+    page,
+    successToast(page, matcher).or(page.getByRole("heading", { name: "Invite Created" })),
+  );
   // If email delivery failed the modal stays open showing the invite URL.
   // Close it so subsequent test steps are not blocked by the overlay.
   const inviteCreatedHeading = page.getByRole("heading", { name: "Invite Created" });
@@ -151,7 +156,7 @@ test.describe("User Management", () => {
     await expect(page.getByRole("dialog")).toBeVisible();
     await expect(page.getByRole("dialog")).toContainText("Deactivate User");
     await page.getByRole("dialog").getByRole("button", { name: "Deactivate" }).click();
-    await confirmStepUpIfPrompted(page, /deactivated/i);
+    await confirmStepUpIfPrompted(page, successToast(page, /deactivated/i));
 
     // Full page reload flushes wrangler D1 local write-through and guarantees fresh DB state.
     // Fast tab navigation (previous approach) races the miniflare SQLite commit.
@@ -165,6 +170,6 @@ test.describe("User Management", () => {
     await expect(page.getByRole("dialog")).toBeVisible();
     await expect(page.getByRole("dialog")).toContainText("Activate User");
     await page.getByRole("dialog").getByRole("button", { name: "Activate" }).click();
-    await confirmStepUpIfPrompted(page, /activated/i);
+    await confirmStepUpIfPrompted(page, successToast(page, /\bactivated/i));
   });
 });

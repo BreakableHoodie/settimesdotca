@@ -1058,6 +1058,42 @@ export const MUTATIONS = [
     replace: "const guardsRole = false;",
     tests: ["functions/api/admin/__tests__/stepUpBoundaries.test.js"],
   },
+  {
+    id: "mfa-guess-gate-per-user-threshold",
+    invariant:
+      "CLAUDE.md 'Step-up re-authentication for identity changes' \u2014 backup-codes and disable share the per-user guess limit (10 per hour, no IP) (#1324)",
+    file: "functions/utils/mfaGuessGate.js",
+    find: "    maxFailures: MFA_GUESS_LIMIT.maxFailures + 1,",
+    replace: "    maxFailures: 1000,",
+    tests: ["functions/api/admin/mfa/__tests__/mfa-guess-limit.test.js"],
+  },
+  {
+    id: "mfa-guess-gate-lockout-ends-session",
+    invariant:
+      "CLAUDE.md 'Step-up re-authentication for identity changes' \u2014 hitting the per-user limit on backup-codes or disable deletes the session (#1324)",
+    file: "functions/utils/mfaGuessGate.js",
+    find: '      await DB.prepare("DELETE FROM lucia_sessions WHERE id = ?").bind(sessionId).run();',
+    replace: "      // session kept",
+    tests: ["functions/api/admin/mfa/__tests__/mfa-guess-limit.test.js"],
+  },
+  {
+    id: "mfa-backup-codes-enforces-guess-limit",
+    invariant:
+      "CLAUDE.md 'Step-up re-authentication for identity changes' \u2014 backup-codes actually enforces the shared guess limit, since a correct TOTP there returns plaintext backup codes (#1324)",
+    file: "functions/api/admin/mfa/backup-codes.js",
+    find: "  if (limited) {",
+    replace: "  if (false) {",
+    tests: ["functions/api/admin/mfa/__tests__/mfa-guess-limit.test.js"],
+  },
+  {
+    id: "mfa-disable-enforces-guess-limit",
+    invariant:
+      "CLAUDE.md 'Step-up re-authentication for identity changes' \u2014 disable actually enforces the shared guess limit (#1324)",
+    file: "functions/api/admin/mfa/disable.js",
+    find: "  if (limited) {",
+    replace: "  if (false) {",
+    tests: ["functions/api/admin/mfa/__tests__/mfa-guess-limit.test.js"],
+  },
 ];
 
 // ============================================================================

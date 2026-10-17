@@ -883,8 +883,8 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'RBAC Roles' — enabling 2FA writes only if the pending secret is still the one the code was verified against, so a second setup or an admin reset mid-request wins (#1253 review)",
     file: "functions/api/admin/mfa/enable.js",
-    find: "     WHERE id = ? AND totp_enabled = 0 AND totp_secret = ?`,",
-    replace: "     WHERE id = ? AND totp_enabled = 0 AND ? IS NOT NULL`,",
+    find: "     WHERE id = ? AND totp_enabled = 0 AND totp_secret = ?\n",
+    replace: "     WHERE id = ? AND totp_enabled = 0 AND ? IS NOT NULL\n",
     tests: ["functions/api/admin/mfa/__tests__/mfa-settings.test.js"],
   },
   {
@@ -1036,8 +1036,8 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'Step-up re-authentication for identity changes' \u2014 a backup-code spend carries the same session predicate as the stamp, so if either loses neither applies (#1324)",
     file: "functions/api/admin/mfa/step-up.js",
-    find: "AND ${sessionStillExists}",
-    replace: "AND (? IS NOT NULL AND ? IS NOT NULL)",
+    find: "SET backup_codes = ?\n         WHERE id = ? AND ${factorPredicate} AND ${sessionStillExists}",
+    replace: "SET backup_codes = ?\n         WHERE id = ? AND ${factorPredicate} AND (? IS NOT NULL AND ? IS NOT NULL)",
     tests: ["functions/api/admin/mfa/__tests__/step-up.test.js"],
   },
   {

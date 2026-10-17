@@ -146,6 +146,15 @@ export async function verifyTotpStep(secret, code, window = 1) {
   return matchedStep;
 }
 
+// The answer when a code matches the secret but its time step was already
+// accepted (#1333). Only a code that matches gets it, so it reveals nothing a
+// wrong code would not; it exists so a user holding the code their authenticator
+// still shows is told to wait, not that the code is "invalid".
+export const TOTP_CODE_ALREADY_USED = Object.freeze({
+  code: "TOTP_CODE_ALREADY_USED",
+  message: "This code was just used. Wait for the next code from your authenticator app.",
+});
+
 // True when `step` is a match that has not been accepted before. `lastStep` is
 // users.totp_last_step (NULL = nothing accepted yet).
 export function totpStepIsFresh(step, lastStep) {

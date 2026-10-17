@@ -4,7 +4,13 @@
 
 import { checkPermission, auditLog } from "../_middleware.js";
 import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../utils/authAttempts.js";
-import { verifyTotpStep, totpStepIsFresh, generateBackupCodes, hashBackupCode } from "../../../utils/totp.js";
+import {
+  verifyTotpStep,
+  totpStepIsFresh,
+  TOTP_CODE_ALREADY_USED,
+  generateBackupCodes,
+  hashBackupCode,
+} from "../../../utils/totp.js";
 import { loadTotpSecret } from "../../../utils/mfaSecrets.js";
 import { getClientIP, parseJsonObjectBody } from "../../../utils/request.js";
 import { revokeAllTrustedDevices } from "../../../utils/trustedDevice.js";
@@ -125,6 +131,21 @@ export async function onRequestPost(context) {
 
   const matchedStep = await verifyTotpStep(totpSecretState?.secret, code);
   const valid = totpStepIsFresh(matchedStep, user.totp_last_step);
+  if (matchedStep !== null && !valid) {
+    await writeAuthAttempt(DB, {
+      attemptType: AUTH_ATTEMPT_TYPES.mfaEnable,
+      email: user.email,
+      failureReason: "replayed_code",
+      ipAddress,
+      success: false,
+      userAgent: request.headers.get("User-Agent") || "unknown",
+      userId,
+    });
+    return new Response(JSON.stringify({ error: "Authentication failed", ...TOTP_CODE_ALREADY_USED }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
   if (!valid) {
     await writeAuthAttempt(DB, {
       attemptType: AUTH_ATTEMPT_TYPES.mfaEnable,

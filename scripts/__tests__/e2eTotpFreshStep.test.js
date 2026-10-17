@@ -2,24 +2,22 @@ import { describe, expect, it } from "vitest";
 import { e2eTotpCode, markTotpStepSpent, msUntilNextTotpStep, nextE2eTotpCode } from "../e2e-totp.mjs";
 
 // The server accepts each TOTP step once (#1333), so E2E must never present a
-// step twice. Steps now-1, now and now+1 are valid at any instant.
+// step twice. It offers the current and next step only (see e2e-totp.mjs).
 describe("nextE2eTotpCode", () => {
   const PASSWORD = "e2e-test-placeholder-fresh-step";
   const STEP = 30_000;
   const now = 1_900_000_000_000;
   const current = Math.floor(now / STEP);
 
-  it("hands out each valid step once, earliest first, then null until the next window", async () => {
+  it("hands out the current then the next step once each, then null until the next window", async () => {
     const first = await nextE2eTotpCode(PASSWORD, now);
     const second = await nextE2eTotpCode(PASSWORD, now);
-    const third = await nextE2eTotpCode(PASSWORD, now);
-    expect([first.step, second.step, third.step]).toEqual([current - 1, current, current + 1]);
-    expect(first.code).toBe(await e2eTotpCode(PASSWORD, (current - 1) * STEP));
+    expect([first.step, second.step]).toEqual([current, current + 1]);
+    expect(first.code).toBe(await e2eTotpCode(PASSWORD, current * STEP));
     expect(await nextE2eTotpCode(PASSWORD, now)).toBeNull();
 
-    // Two windows later, now+1 is the previous step and already spent.
-    const later = await nextE2eTotpCode(PASSWORD, now + 2 * STEP);
-    expect(later.step).toBe(current + 2);
+    // One window later, current+1 is now the current step and already spent.
+    expect((await nextE2eTotpCode(PASSWORD, now + STEP)).step).toBe(current + 2);
   });
 
   it("skips a step another worker reported spent", async () => {

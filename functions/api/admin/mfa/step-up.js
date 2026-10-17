@@ -19,7 +19,7 @@ import {
   settleAuthAttempt,
   writeAuthAttempt,
 } from "../../../utils/authAttempts.js";
-import { verifyTotpStep, totpStepIsFresh, verifyBackupCode } from "../../../utils/totp.js";
+import { verifyTotpStep, totpStepIsFresh, verifyBackupCode, TOTP_CODE_ALREADY_USED } from "../../../utils/totp.js";
 import { loadTotpSecret } from "../../../utils/mfaSecrets.js";
 import { getClientIP, parseJsonObjectBody } from "../../../utils/request.js";
 import { STEP_UP_WINDOW_SECONDS } from "../../../utils/stepUp.js";
@@ -151,6 +151,7 @@ export async function onRequestPost(context) {
   let remainingBackupCodes = null;
   let totpSecretError = null;
   let matchedStep = null;
+  let replayedCode = false;
 
   try {
     const totpSecretState = await loadTotpSecret(user.totp_secret, env);
@@ -160,6 +161,8 @@ export async function onRequestPost(context) {
       if (totpStepIsFresh(step, user.totp_last_step)) {
         matchedStep = step;
         verified = true;
+      } else if (step !== null) {
+        replayedCode = true;
       }
     }
   } catch (error) {
@@ -167,7 +170,7 @@ export async function onRequestPost(context) {
     console.error("[MFA Step-up] Failed to verify TOTP:", error?.message || error);
   }
 
-  if (!verified) {
+  if (!verified && !replayedCode) {
     const result = await verifyBackupCode(code, parseBackupCodes(user.backup_codes));
     if (result.valid) {
       verified = true;
@@ -179,6 +182,11 @@ export async function onRequestPost(context) {
   if (!verified && totpSecretError) {
     await settleQuietly(DB, attemptId, { success: false, failureReason: "totp_secret_error" });
     return json(500, { error: "Server error", message: "Failed to verify MFA code" });
+  }
+
+  if (!verified && replayedCode) {
+    await settleQuietly(DB, attemptId, { success: false, failureReason: "replayed_code" });
+    return json(400, { error: "Authentication failed", ...TOTP_CODE_ALREADY_USED });
   }
 
   if (!verified) {
@@ -240,19 +248,24 @@ export async function onRequestPost(context) {
 
   const results = await DB.batch(statements);
   if (results.some((result) => result?.meta?.changes === 0)) {
-    // If the factor is untouched, the step was spent by a parallel request with
-    // this same code: answer exactly as for a wrong code (#1333).
+    // Work out why the batch matched nothing (#1333). Factor changed: 409.
+    // Factor intact and the step now spent at or past ours: a parallel request
+    // used this same code, so answer "already used". Factor intact and the step
+    // NOT spent: the stamp lost for another reason (the session was deleted
+    // mid-request), which is not a guess and must not be counted as one.
     if (claimsStep) {
-      const factorUnchanged = await DB.prepare(`SELECT 1 FROM users WHERE id = ? AND ${baseFactorPredicate}`)
+      const factorRow = await DB.prepare(
+        `SELECT totp_last_step AS last_step FROM users WHERE id = ? AND ${baseFactorPredicate}`,
+      )
         .bind(userId, ...baseFactorBindings)
         .first();
-      if (factorUnchanged) {
-        await settleQuietly(DB, attemptId, { success: false, failureReason: "invalid_code" });
-        return json(400, {
-          error: "Authentication failed",
-          code: "INVALID_MFA_CODE",
-          message: "Invalid authentication code",
-        });
+      if (factorRow) {
+        if (factorRow.last_step !== null && factorRow.last_step >= matchedStep) {
+          await settleQuietly(DB, attemptId, { success: false, failureReason: "replayed_code" });
+          return json(400, { error: "Authentication failed", ...TOTP_CODE_ALREADY_USED });
+        }
+        await settleQuietly(DB, attemptId, { success: false, failureReason: "session_gone" });
+        return json(401, { error: "Unauthorized", message: "Valid session required" });
       }
     }
     await settleQuietly(DB, attemptId, { success: false, failureReason: "mfa_changed" });

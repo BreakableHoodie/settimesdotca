@@ -37,17 +37,20 @@ const freshTotpCode = async () => {
   }
 };
 
-// Types codes into `input` and submits until `accepted` shows. A refusal means
-// another worker spent that step; the next call moves past it. Five tries
-// covers every valid step in two windows.
-const submitTotpUntilAccepted = async (input, submit, accepted, refused) => {
-  for (let attempt = 0; attempt < 5; attempt += 1) {
+// Types a fresh code into `input` and submits until `accepted` shows. Only an
+// "already used" refusal is retried: it means another process spent that step.
+// Any other refusal (a genuinely invalid code) fails the test, so a server that
+// wrongly rejects valid codes cannot be hidden by the retry.
+const submitTotpUntilAccepted = async (page, input, submit, accepted) => {
+  const alreadyUsed = page.getByRole("alert").filter({ hasText: /just used/i });
+  for (let attempt = 0; attempt < 4; attempt += 1) {
     await input.fill(await freshTotpCode());
     await submit.click();
-    await expect(accepted.or(refused).first()).toBeVisible({ timeout: 15000 });
+    await expect(accepted.or(alreadyUsed).first()).toBeVisible({ timeout: 15000 });
     if (await accepted.first().isVisible()) return;
+    test.info().annotations.push({ type: "totp-step-already-used", description: `attempt ${attempt + 1}` });
   }
-  throw new Error("TOTP code refused five times in a row");
+  throw new Error("TOTP code refused as already used four times in a row");
 };
 
 // Password, then the 2FA code: the E2E admin is enrolled like every real admin
@@ -61,10 +64,10 @@ export const submitAdminLogin = async (page) => {
   const codeInput = page.locator("#mfa-code");
   await codeInput.waitFor({ state: "visible", timeout: 15000 });
   await submitTotpUntilAccepted(
+    page,
     codeInput,
     page.getByRole("button", { name: "Verify Code" }),
     page.locator('button[role="tab"]'),
-    page.getByRole("alert").filter({ hasText: /invalid authentication code/i }),
   );
 };
 
@@ -83,10 +86,10 @@ export const confirmStepUpIfPrompted = async (page, succeeded) => {
   await expect(stepUpDialog.or(succeeded).first()).toBeVisible({ timeout: 10000 });
   if (await stepUpDialog.isVisible()) {
     await submitTotpUntilAccepted(
+      page,
       stepUpDialog.locator("#step-up-code"),
       stepUpDialog.getByRole("button", { name: "Confirm" }),
       succeeded,
-      stepUpDialog.getByRole("alert").filter({ hasText: /invalid authentication code/i }),
     );
   }
   await expect(succeeded.first()).toBeVisible({ timeout: 10000 });

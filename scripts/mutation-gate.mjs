@@ -1194,6 +1194,33 @@ export const MUTATIONS = [
     tests: ["functions/api/admin/mfa/__tests__/totp-replay.test.js"],
   },
   {
+    id: "totp-login-replay-answers-already-used",
+    invariant:
+      "CLAUDE.md 'Step-up re-authentication' \u2014 a code that matches but whose step is spent is answered TOTP_CODE_ALREADY_USED, not as a wrong code (#1333)",
+    file: "functions/api/admin/auth/mfa/verify.js",
+    find: "if (!verified && replayedCode) {",
+    replace: "if (false) {",
+    tests: ["functions/api/admin/mfa/__tests__/totp-replay.test.js"],
+  },
+  {
+    id: "totp-step-up-replay-answers-already-used",
+    invariant:
+      "CLAUDE.md 'Step-up re-authentication' \u2014 step-up answers a spent step with TOTP_CODE_ALREADY_USED, not INVALID_MFA_CODE (#1333)",
+    file: "functions/api/admin/mfa/step-up.js",
+    find: "if (!verified && replayedCode) {",
+    replace: "if (false) {",
+    tests: ["functions/api/admin/mfa/__tests__/totp-replay.test.js"],
+  },
+  {
+    id: "totp-step-up-deleted-session-is-not-a-guess",
+    invariant:
+      "CLAUDE.md 'Step-up re-authentication' \u2014 a step-up whose stamp lost to a deleted session is 401 session_gone, never counted as a replayed code (#1333)",
+    file: "functions/api/admin/mfa/step-up.js",
+    find: "if (factorRow.last_step !== null && factorRow.last_step >= matchedStep) {",
+    replace: "if (true) {",
+    tests: ["functions/api/admin/mfa/__tests__/totp-replay.test.js"],
+  },
+  {
     id: "totp-admin-reset-clears-spent-step",
     invariant:
       "CLAUDE.md 'RBAC Roles' \u2014 an admin 2FA reset clears totp_last_step, so a stale step from the old secret cannot refuse the new authenticator (#1333)",

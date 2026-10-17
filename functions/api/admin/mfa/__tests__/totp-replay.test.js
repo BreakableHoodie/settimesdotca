@@ -5,7 +5,8 @@
 // by an endpoint that never records the step.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestEnv, grantStepUp } from "../../../test-utils.js";
-import { generateTotpCode } from "../../../../utils/totp.js";
+import { generateTotpCode, hashBackupCode } from "../../../../utils/totp.js";
+import { isEncryptedTotpSecret } from "../../../../utils/mfaSecrets.js";
 import * as stepUpHandler from "../step-up.js";
 import * as disableHandler from "../disable.js";
 import * as backupCodesHandler from "../backup-codes.js";
@@ -16,6 +17,7 @@ import * as resetMfa from "../../users/[id]/reset-mfa.js";
 
 const SECRET = "JBSWY3DPEHPK3PXP"; // createTestEnv's enrolled secret
 const STEP_MS = 30_000;
+const ALREADY_USED = "This code was just used. Wait for the next code from your authenticator app.";
 const currentStep = () => Math.floor(Date.now() / STEP_MS);
 const advanceOneStep = () => vi.setSystemTime(Date.now() + STEP_MS);
 
@@ -93,11 +95,19 @@ describe("login MFA step (auth/mfa/verify)", () => {
     const sessionsBefore = rawDb.prepare("SELECT COUNT(*) AS n FROM lucia_sessions WHERE user_id = 1").get().n;
     const replay = await login(env, seedChallenge(rawDb), code);
     expect(replay.status).toBe(401);
-    expect((await replay.json()).message).toBe("Invalid authentication code");
+    expect(await replay.json()).toMatchObject({ code: "TOTP_CODE_ALREADY_USED", message: ALREADY_USED });
     expect(rawDb.prepare("SELECT COUNT(*) AS n FROM lucia_sessions WHERE user_id = 1").get().n).toBe(sessionsBefore);
     expect(rawDb.prepare("SELECT failure_reason FROM auth_attempts WHERE success = 0").all()).toEqual([
-      { failure_reason: "invalid_code" },
+      { failure_reason: "replayed_code" },
     ]);
+  });
+
+  it("a code that matches nothing is still the plain wrong-code answer, not 'already used'", async () => {
+    const { env, rawDb } = createTestEnv({ role: "admin" });
+    const good = await generateTotpCode(SECRET);
+    const res = await login(env, seedChallenge(rawDb), good === "000000" ? "111111" : "000000");
+    expect(res.status).toBe(401);
+    expect((await res.json()).message).toBe("Invalid authentication code");
   });
 
   it("accepts the next time-step's code", async () => {
@@ -133,6 +143,7 @@ describe("login MFA step (auth/mfa/verify)", () => {
     const res = await login(env, seedChallenge(rawDb), await generateTotpCode(SECRET));
     expect(fired()).toBe(true);
     expect(res.status).toBe(401);
+    expect((await res.json()).code).toBe("TOTP_CODE_ALREADY_USED");
     expect(rawDb.prepare("SELECT COUNT(*) AS n FROM lucia_sessions WHERE user_id = 1").get().n).toBe(1); // the seeded one
     expect(rawDb.prepare("SELECT used FROM mfa_challenges").get().used).toBe(0);
   });
@@ -163,8 +174,13 @@ describe("step-up (mfa/step-up)", () => {
     rawDb.prepare("UPDATE lucia_sessions SET step_up_at = NULL WHERE id = ?").run(sessionId);
     const replay = await postTo(stepUpHandler, "step-up", env, headers, { code });
     expect(replay.status).toBe(400);
-    expect((await replay.json()).code).toBe("INVALID_MFA_CODE");
+    expect(await replay.json()).toMatchObject({ code: "TOTP_CODE_ALREADY_USED", message: ALREADY_USED });
     expect(rawDb.prepare("SELECT step_up_at FROM lucia_sessions WHERE id = ?").get(sessionId).step_up_at).toBeNull();
+    expect(
+      rawDb
+        .prepare("SELECT failure_reason FROM auth_attempts WHERE attempt_type = 'mfa_step_up' AND success = 0")
+        .all(),
+    ).toEqual([{ failure_reason: "replayed_code" }]);
   });
 
   it("accepts the next time-step's code", async () => {
@@ -188,7 +204,25 @@ describe("step-up (mfa/step-up)", () => {
     ]);
     expect(results.map((r) => r.status).sort()).toEqual([200, 400]);
     const loser = results.find((r) => r.status === 400);
-    expect((await loser.json()).code).toBe("INVALID_MFA_CODE");
+    expect((await loser.json()).code).toBe("TOTP_CODE_ALREADY_USED");
+  });
+
+  it("a session deleted mid-request is 401 session_gone, not a counted wrong guess", async () => {
+    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    const prepare = env.DB.prepare.bind(env.DB);
+    env.DB.prepare = (sql) => {
+      if (sql.startsWith("UPDATE lucia_sessions SET step_up_at")) {
+        rawDb.prepare("DELETE FROM lucia_sessions WHERE id = ?").run(sessionId);
+      }
+      return prepare(sql);
+    };
+    const res = await postTo(stepUpHandler, "step-up", env, headers, { code: await generateTotpCode(SECRET) });
+    expect(res.status).toBe(401);
+    expect((await res.json()).message).toBe("Valid session required");
+    expect(rawDb.prepare("SELECT failure_reason FROM auth_attempts WHERE attempt_type = 'mfa_step_up'").all()).toEqual([
+      { failure_reason: "session_gone" },
+    ]);
+    expect(lastStep(rawDb, 1)).toBeNull();
   });
 });
 
@@ -199,7 +233,11 @@ describe("disable (mfa/disable)", () => {
     rawDb.prepare("UPDATE users SET totp_last_step = ? WHERE id = 3").run(currentStep());
     const replay = await postTo(disableHandler, "disable", env, headers, { code: await generateTotpCode(SECRET) });
     expect(replay.status).toBe(400);
+    expect(await replay.json()).toMatchObject({ code: "TOTP_CODE_ALREADY_USED", message: ALREADY_USED });
     expect(rawDb.prepare("SELECT totp_enabled FROM users WHERE id = 3").get().totp_enabled).toBe(1);
+    expect(rawDb.prepare("SELECT failure_reason FROM auth_attempts WHERE success = 0").all()).toEqual([
+      { failure_reason: "replayed_code" },
+    ]);
 
     advanceOneStep();
     expect(
@@ -215,6 +253,7 @@ describe("disable (mfa/disable)", () => {
     const res = await postTo(disableHandler, "disable", env, headers, { code: await generateTotpCode(SECRET) });
     expect(fired()).toBe(true);
     expect(res.status).toBe(400);
+    expect((await res.json()).code).toBe("TOTP_CODE_ALREADY_USED");
     expect(rawDb.prepare("SELECT totp_enabled FROM users WHERE id = 3").get().totp_enabled).toBe(1);
   });
 
@@ -240,7 +279,9 @@ describe("backup-code regeneration (mfa/backup-codes)", () => {
 
     const replay = await postTo(backupCodesHandler, "backup-codes", env, headers, { code });
     expect(replay.status).toBe(400);
-    expect((await replay.json()).backupCodes).toBeUndefined();
+    const replayBody = await replay.json();
+    expect(replayBody.code).toBe("TOTP_CODE_ALREADY_USED");
+    expect(replayBody.backupCodes).toBeUndefined();
     expect(rawDb.prepare("SELECT backup_codes FROM users WHERE id = 1").get().backup_codes).toBe(storedAfterFirst);
   });
 
@@ -264,7 +305,9 @@ describe("backup-code regeneration (mfa/backup-codes)", () => {
     });
     expect(fired()).toBe(true);
     expect(res.status).toBe(400);
-    expect((await res.json()).backupCodes).toBeUndefined();
+    const body = await res.json();
+    expect(body.code).toBe("TOTP_CODE_ALREADY_USED");
+    expect(body.backupCodes).toBeUndefined();
     expect(rawDb.prepare("SELECT backup_codes FROM users WHERE id = 1").get().backup_codes).toBe(before);
   });
 
@@ -299,7 +342,11 @@ describe("enrolment (mfa/enable)", () => {
     rawDb.prepare("UPDATE users SET totp_last_step = ? WHERE id = 1").run(currentStep());
     const res = await postTo(enableHandler, "enable", env, headers, { code: await generateTotpCode(secret) });
     expect(res.status).toBe(400);
+    expect((await res.json()).code).toBe("TOTP_CODE_ALREADY_USED");
     expect(rawDb.prepare("SELECT totp_enabled FROM users WHERE id = 1").get().totp_enabled).toBe(0);
+    expect(rawDb.prepare("SELECT failure_reason FROM auth_attempts WHERE success = 0").all()).toEqual([
+      { failure_reason: "replayed_code" },
+    ]);
   });
 
   it("a freshly enrolled user cannot reuse the enrolling code at step-up, but the next code works", async () => {
@@ -311,12 +358,31 @@ describe("enrolment (mfa/enable)", () => {
     const authed = { ...headers, Authorization: `Bearer ${newSession}` };
     expect(sessionId).not.toBe(newSession);
 
-    expect((await postTo(stepUpHandler, "step-up", env, authed, { code })).status).toBe(400);
+    const reused = await postTo(stepUpHandler, "step-up", env, authed, { code });
+    expect(reused.status).toBe(400);
+    expect((await reused.json()).code).toBe("TOTP_CODE_ALREADY_USED");
     advanceOneStep();
     expect((await postTo(stepUpHandler, "step-up", env, authed, { code: await generateTotpCode(secret) })).status).toBe(
       200,
     );
     expect(rawDb.prepare("SELECT totp_enabled FROM users WHERE id = 1").get().totp_enabled).toBe(1);
+  });
+});
+
+describe("re-encrypting the same secret keeps the spent step", () => {
+  it("a backup-code login that re-encrypts the legacy plaintext secret leaves totp_last_step alone", async () => {
+    const { env, rawDb } = createTestEnv({ role: "admin" });
+    rawDb
+      .prepare("UPDATE users SET totp_last_step = 12345, backup_codes = ? WHERE id = 1")
+      .run(JSON.stringify([await hashBackupCode("ABCD-12")]));
+    const res = await login(env, seedChallenge(rawDb), "ABCD-12");
+    expect(res.status).toBe(200);
+    // The write really happened (plaintext -> encrypted) ...
+    expect(isEncryptedTotpSecret(rawDb.prepare("SELECT totp_secret FROM users WHERE id = 1").get().totp_secret)).toBe(
+      true,
+    );
+    // ... and did not touch the step.
+    expect(lastStep(rawDb, 1)).toBe(12345);
   });
 });
 

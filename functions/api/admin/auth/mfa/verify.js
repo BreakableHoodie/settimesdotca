@@ -3,7 +3,7 @@
 // Body: { mfaToken: string, code: string, rememberDevice?: boolean }
 
 import { generateCSRFToken, setCSRFCookie } from "../../../../utils/csrf.js";
-import { verifyTotpStep, totpStepIsFresh, verifyBackupCode } from "../../../../utils/totp.js";
+import { verifyTotpStep, totpStepIsFresh, verifyBackupCode, TOTP_CODE_ALREADY_USED } from "../../../../utils/totp.js";
 import { getClientIP, parseJsonObjectBody } from "../../../../utils/request.js";
 import { initializeLucia } from "../../../../utils/auth.js";
 import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../../utils/authAttempts.js";
@@ -201,6 +201,10 @@ export async function onRequestPost(context) {
     }
 
     let matchedStep = null;
+    // A code that matches the secret but whose step is already spent. Reveals
+    // nothing new (only a matching code gets this answer) and is not worth a
+    // backup-code attempt: the user is holding a real code, just a used one.
+    let replayedCode = false;
     if (totpSecretState?.secret) {
       try {
         const step = await verifyTotpStep(totpSecretState.secret, code);
@@ -209,6 +213,8 @@ export async function onRequestPost(context) {
         if (totpStepIsFresh(step, challenge.totp_last_step)) {
           matchedStep = step;
           verified = true;
+        } else if (step !== null) {
+          replayedCode = true;
         }
       } catch (totpError) {
         console.error("[MFA Verify] TOTP verification threw:", totpError?.message || totpError);
@@ -231,10 +237,11 @@ export async function onRequestPost(context) {
         .run();
       if (claimed?.meta?.changes === 0) {
         verified = false;
+        replayedCode = true;
       }
     }
 
-    if (!verified) {
+    if (!verified && !replayedCode) {
       const backupCodes = parseBackupCodes(challenge.backup_codes);
       const backupResult = await verifyBackupCode(code, backupCodes);
       if (backupResult.valid) {
@@ -262,6 +269,29 @@ export async function onRequestPost(context) {
         }),
         {
           status: 500,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    if (!verified && replayedCode) {
+      await writeAuthAttempt(DB, {
+        attemptType: AUTH_ATTEMPT_TYPES.mfa,
+        email: challenge.email,
+        failureReason: "replayed_code",
+        ipAddress,
+        success: false,
+        userAgent,
+        userId: challenge.user_id,
+      });
+
+      return new Response(
+        JSON.stringify({
+          error: "Authentication failed",
+          ...TOTP_CODE_ALREADY_USED,
+        }),
+        {
+          status: 401,
           headers: { "Content-Type": "application/json" },
         },
       );

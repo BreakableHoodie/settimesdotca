@@ -74,7 +74,7 @@ export async function onRequestPost(context) {
   // enable committing in between can never be overwritten back to disabled.
   const written = await DB.prepare(
     `UPDATE users
-     SET totp_secret = ?, totp_enabled = 0, backup_codes = NULL
+     SET totp_secret = ?, totp_enabled = 0, backup_codes = NULL, totp_last_step = NULL
      WHERE id = ? AND totp_enabled = 0`,
   )
     .bind(encryptedSecret, userId)

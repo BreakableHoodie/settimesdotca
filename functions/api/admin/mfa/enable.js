@@ -4,7 +4,13 @@
 
 import { checkPermission, auditLog } from "../_middleware.js";
 import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../utils/authAttempts.js";
-import { verifyTotp, generateBackupCodes, hashBackupCode } from "../../../utils/totp.js";
+import {
+  verifyTotpStep,
+  totpStepIsFresh,
+  TOTP_CODE_ALREADY_USED,
+  generateBackupCodes,
+  hashBackupCode,
+} from "../../../utils/totp.js";
 import { loadTotpSecret } from "../../../utils/mfaSecrets.js";
 import { getClientIP, parseJsonObjectBody } from "../../../utils/request.js";
 import { revokeAllTrustedDevices } from "../../../utils/trustedDevice.js";
@@ -44,7 +50,9 @@ export async function onRequestPost(context) {
     );
   }
 
-  const user = await DB.prepare("SELECT email, totp_secret, totp_enabled FROM users WHERE id = ?").bind(userId).first();
+  const user = await DB.prepare("SELECT email, totp_secret, totp_enabled, totp_last_step FROM users WHERE id = ?")
+    .bind(userId)
+    .first();
 
   if (!user) {
     return new Response(
@@ -121,7 +129,23 @@ export async function onRequestPost(context) {
     );
   }
 
-  const valid = await verifyTotp(totpSecretState?.secret, code);
+  const matchedStep = await verifyTotpStep(totpSecretState?.secret, code);
+  const valid = totpStepIsFresh(matchedStep, user.totp_last_step);
+  if (matchedStep !== null && !valid) {
+    await writeAuthAttempt(DB, {
+      attemptType: AUTH_ATTEMPT_TYPES.mfaEnable,
+      email: user.email,
+      failureReason: "replayed_code",
+      ipAddress,
+      success: false,
+      userAgent: request.headers.get("User-Agent") || "unknown",
+      userId,
+    });
+    return new Response(JSON.stringify({ error: "Authentication failed", ...TOTP_CODE_ALREADY_USED }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
   if (!valid) {
     await writeAuthAttempt(DB, {
       attemptType: AUTH_ATTEMPT_TYPES.mfaEnable,
@@ -157,10 +181,11 @@ export async function onRequestPost(context) {
   const enrolledSecret = totpSecretState?.shouldPersist ? totpSecretState.encryptedSecret : user.totp_secret;
   const written = await DB.prepare(
     `UPDATE users
-     SET totp_enabled = 1, backup_codes = ?, totp_secret = ?
-     WHERE id = ? AND totp_enabled = 0 AND totp_secret = ?`,
+     SET totp_enabled = 1, backup_codes = ?, totp_secret = ?, totp_last_step = ?
+     WHERE id = ? AND totp_enabled = 0 AND totp_secret = ?
+       AND (totp_last_step IS NULL OR totp_last_step < ?)`,
   )
-    .bind(JSON.stringify(hashedCodes), enrolledSecret, userId, user.totp_secret)
+    .bind(JSON.stringify(hashedCodes), enrolledSecret, matchedStep, userId, user.totp_secret, matchedStep)
     .run();
 
   if (written?.meta?.changes === 0) {

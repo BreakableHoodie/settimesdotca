@@ -19,7 +19,7 @@ import {
   settleAuthAttempt,
   writeAuthAttempt,
 } from "../../../utils/authAttempts.js";
-import { verifyTotp, verifyBackupCode } from "../../../utils/totp.js";
+import { verifyTotpStep, totpStepIsFresh, verifyBackupCode, TOTP_CODE_ALREADY_USED } from "../../../utils/totp.js";
 import { loadTotpSecret } from "../../../utils/mfaSecrets.js";
 import { getClientIP, parseJsonObjectBody } from "../../../utils/request.js";
 import { STEP_UP_WINDOW_SECONDS } from "../../../utils/stepUp.js";
@@ -81,7 +81,9 @@ export async function onRequestPost(context) {
     return json(400, { error: "Bad request", message: "Authentication code is required" });
   }
 
-  const user = await DB.prepare("SELECT email, totp_secret, totp_enabled, backup_codes FROM users WHERE id = ?")
+  const user = await DB.prepare(
+    "SELECT email, totp_secret, totp_enabled, backup_codes, totp_last_step FROM users WHERE id = ?",
+  )
     .bind(userId)
     .first();
   if (!user) {
@@ -148,18 +150,27 @@ export async function onRequestPost(context) {
   let usedBackupCode = false;
   let remainingBackupCodes = null;
   let totpSecretError = null;
+  let matchedStep = null;
+  let replayedCode = false;
 
   try {
     const totpSecretState = await loadTotpSecret(user.totp_secret, env);
     if (totpSecretState?.secret) {
-      verified = await verifyTotp(totpSecretState.secret, code);
+      // One accepted code per time step (#1333); a replayed step is a wrong code.
+      const step = await verifyTotpStep(totpSecretState.secret, code);
+      if (totpStepIsFresh(step, user.totp_last_step)) {
+        matchedStep = step;
+        verified = true;
+      } else if (step !== null) {
+        replayedCode = true;
+      }
     }
   } catch (error) {
     totpSecretError = error;
     console.error("[MFA Step-up] Failed to verify TOTP:", error?.message || error);
   }
 
-  if (!verified) {
+  if (!verified && !replayedCode) {
     const result = await verifyBackupCode(code, parseBackupCodes(user.backup_codes));
     if (result.valid) {
       verified = true;
@@ -171,6 +182,11 @@ export async function onRequestPost(context) {
   if (!verified && totpSecretError) {
     await settleQuietly(DB, attemptId, { success: false, failureReason: "totp_secret_error" });
     return json(500, { error: "Server error", message: "Failed to verify MFA code" });
+  }
+
+  if (!verified && replayedCode) {
+    await settleQuietly(DB, attemptId, { success: false, failureReason: "replayed_code" });
+    return json(400, { error: "Authentication failed", ...TOTP_CODE_ALREADY_USED });
   }
 
   if (!verified) {
@@ -186,12 +202,22 @@ export async function onRequestPost(context) {
   // all. Both carry the SAME predicate, over the factor as it was read and the
   // session still existing, and the stamp goes first so the spend cannot make
   // its predicate false. If either matches nothing, both did.
-  const factorPredicate = usedBackupCode
+  //
+  // A TOTP code also claims its time step (#1333). The claim rides in the same
+  // predicate, so the stamp commits only if the step is still unspent, and the
+  // step write (second, so it cannot falsify the stamp's predicate) carries it
+  // too. A parallel request with the same code matches nothing in either.
+  const baseFactorPredicate = usedBackupCode
     ? "totp_enabled = ? AND totp_secret IS ? AND backup_codes IS ?"
     : "totp_enabled = ? AND totp_secret IS ?";
-  const factorBindings = usedBackupCode
+  const baseFactorBindings = usedBackupCode
     ? [user.totp_enabled, user.totp_secret ?? null, user.backup_codes ?? null]
     : [user.totp_enabled, user.totp_secret ?? null];
+  const claimsStep = !usedBackupCode && matchedStep !== null;
+  const factorPredicate = claimsStep
+    ? `${baseFactorPredicate} AND (totp_last_step IS NULL OR totp_last_step < ?)`
+    : baseFactorPredicate;
+  const factorBindings = claimsStep ? [...baseFactorBindings, matchedStep] : baseFactorBindings;
   const factorStillRead = `EXISTS (SELECT 1 FROM users WHERE id = ? AND ${factorPredicate})`;
   const sessionStillExists = "EXISTS (SELECT 1 FROM lucia_sessions WHERE id = ? AND user_id = ?)";
 
@@ -201,6 +227,14 @@ export async function onRequestPost(context) {
        WHERE id = ? AND user_id = ? AND ${factorStillRead}`,
     ).bind(sessionId, userId, userId, ...factorBindings),
   ];
+  if (claimsStep) {
+    statements.push(
+      DB.prepare(
+        `UPDATE users SET totp_last_step = ?
+         WHERE id = ? AND ${factorPredicate} AND ${sessionStillExists}`,
+      ).bind(matchedStep, userId, ...factorBindings, sessionId, userId),
+    );
+  }
   if (usedBackupCode) {
     const nextCodes =
       remainingBackupCodes && remainingBackupCodes.length > 0 ? JSON.stringify(remainingBackupCodes) : null;
@@ -214,6 +248,26 @@ export async function onRequestPost(context) {
 
   const results = await DB.batch(statements);
   if (results.some((result) => result?.meta?.changes === 0)) {
+    // Work out why the batch matched nothing (#1333). Factor changed: 409.
+    // Factor intact and the step now spent at or past ours: a parallel request
+    // used this same code, so answer "already used". Factor intact and the step
+    // NOT spent: the stamp lost for another reason (the session was deleted
+    // mid-request), which is not a guess and must not be counted as one.
+    if (claimsStep) {
+      const factorRow = await DB.prepare(
+        `SELECT totp_last_step AS last_step FROM users WHERE id = ? AND ${baseFactorPredicate}`,
+      )
+        .bind(userId, ...baseFactorBindings)
+        .first();
+      if (factorRow) {
+        if (factorRow.last_step !== null && factorRow.last_step >= matchedStep) {
+          await settleQuietly(DB, attemptId, { success: false, failureReason: "replayed_code" });
+          return json(400, { error: "Authentication failed", ...TOTP_CODE_ALREADY_USED });
+        }
+        await settleQuietly(DB, attemptId, { success: false, failureReason: "session_gone" });
+        return json(401, { error: "Unauthorized", message: "Valid session required" });
+      }
+    }
     await settleQuietly(DB, attemptId, { success: false, failureReason: "mfa_changed" });
     return json(409, {
       error: "Conflict",

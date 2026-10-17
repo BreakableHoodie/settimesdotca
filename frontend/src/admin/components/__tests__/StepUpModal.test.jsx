@@ -76,6 +76,18 @@ describe('StepUpModal (#1324)', () => {
     expect(settled).not.toHaveBeenCalled()
   })
 
+  it("shows the server's 'code was just used' message, so the user knows to wait for the next code", async () => {
+    const message = 'This code was just used. Wait for the next code from your authenticator app.'
+    mfaApi.stepUp.mockRejectedValue(new Error(message))
+    render(<StepUpModal />)
+    raisePrompt()
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.change(within(dialog).getByLabelText('Authentication code'), { target: { value: '123456' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirm' }))
+
+    expect(await within(dialog).findByText(message)).toBeInTheDocument()
+  })
+
   it('Cancel resolves false and closes', async () => {
     render(<StepUpModal />)
     const outcome = raisePrompt()

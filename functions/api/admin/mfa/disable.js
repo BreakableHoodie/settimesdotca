@@ -6,7 +6,7 @@ import { checkPermission, auditLog } from "../_middleware.js";
 import { mfaRequiredForRole } from "../../../utils/mfaPolicy.js";
 import { AUTH_ATTEMPT_TYPES } from "../../../utils/authAttempts.js";
 import { beginMfaGuess, settleQuietly } from "../../../utils/mfaGuessGate.js";
-import { verifyTotp, verifyBackupCode } from "../../../utils/totp.js";
+import { verifyTotpStep, totpStepIsFresh, verifyBackupCode, TOTP_CODE_ALREADY_USED } from "../../../utils/totp.js";
 import { loadTotpSecret } from "../../../utils/mfaSecrets.js";
 import { getClientIP, parseJsonObjectBody } from "../../../utils/request.js";
 import { revokeAllTrustedDevices } from "../../../utils/trustedDevice.js";
@@ -68,7 +68,9 @@ export async function onRequestPost(context) {
     );
   }
 
-  const user = await DB.prepare("SELECT email, totp_secret, totp_enabled, backup_codes FROM users WHERE id = ?")
+  const user = await DB.prepare(
+    "SELECT email, totp_secret, totp_enabled, backup_codes, totp_last_step FROM users WHERE id = ?",
+  )
     .bind(userId)
     .first();
 
@@ -112,6 +114,7 @@ export async function onRequestPost(context) {
   }
 
   let verified = false;
+  let replayedCode = false;
   let totpSecretError = null;
   let totpSecretState = null;
   if (user.totp_secret) {
@@ -124,10 +127,34 @@ export async function onRequestPost(context) {
   }
 
   if (totpSecretState?.secret) {
-    verified = await verifyTotp(totpSecretState.secret, code);
+    // One accepted code per time step (#1333); a spent step is "already used".
+    const step = await verifyTotpStep(totpSecretState.secret, code);
+    if (totpStepIsFresh(step, user.totp_last_step)) {
+      // Claim the step before the effect, bound to the factor just verified.
+      const claimed = await DB.prepare(
+        `UPDATE users SET totp_last_step = ?
+         WHERE id = ? AND totp_enabled = 1 AND totp_secret IS ?
+           AND (totp_last_step IS NULL OR totp_last_step < ?)`,
+      )
+        .bind(step, userId, user.totp_secret ?? null, step)
+        .run();
+      verified = claimed?.meta?.changes !== 0;
+      if (!verified) {
+        // Lost the claim: a parallel request spent this step, unless the factor
+        // itself changed underneath us (then it is just a failed code).
+        const row = await DB.prepare(
+          "SELECT totp_last_step AS last_step FROM users WHERE id = ? AND totp_enabled = 1 AND totp_secret IS ?",
+        )
+          .bind(userId, user.totp_secret ?? null)
+          .first();
+        replayedCode = Boolean(row) && row.last_step !== null && row.last_step >= step;
+      }
+    } else if (step !== null) {
+      replayedCode = true;
+    }
   }
 
-  if (!verified) {
+  if (!verified && !replayedCode) {
     const backupCodes = parseBackupCodes(user.backup_codes);
     const result = await verifyBackupCode(code, backupCodes);
     verified = result.valid;
@@ -145,6 +172,14 @@ export async function onRequestPost(context) {
         headers: { "Content-Type": "application/json" },
       },
     );
+  }
+
+  if (!verified && replayedCode) {
+    await settleQuietly(DB, attemptId, { success: false, failureReason: "replayed_code" });
+    return new Response(JSON.stringify({ error: "Authentication failed", ...TOTP_CODE_ALREADY_USED }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   if (!verified) {
@@ -165,7 +200,7 @@ export async function onRequestPost(context) {
 
   await DB.prepare(
     `UPDATE users
-     SET totp_enabled = 0, totp_secret = NULL, backup_codes = NULL
+     SET totp_enabled = 0, totp_secret = NULL, backup_codes = NULL, totp_last_step = NULL
      WHERE id = ?`,
   )
     .bind(userId)

@@ -3,6 +3,7 @@ import { createTestEnv, grantStepUp } from "../../../test-utils";
 import * as inviteCodesHandler from "../../invite-codes.js";
 import * as inviteCodeHandler from "../../invite-codes/[id].js";
 import * as usersHandler from "../../users.js";
+import * as userItemHandler from "../../users/[id].js";
 import * as signupHandler from "../../auth/signup.js";
 import { hashInviteCode } from "../../../../utils/inviteCodes.js";
 
@@ -292,5 +293,32 @@ describe("Invite codes are stored hashed (#1334)", () => {
 
     expect((await signup(env, viaCodes.inviteCode.code, "plain@test.com")).status).toBe(201);
     expect(claimed()).not.toBeNull();
+  });
+
+  it("deleting the invited user does not reopen the invite (used_at survives the FK SET NULL)", async () => {
+    const { env, rawDb, headers, viaUsers } = await createViaBothRoutes();
+    env.ALLOW_ADMIN_SIGNUP = "true";
+    const id = viaUsers.invite.id;
+    const code = new URL(viaUsers.inviteUrl).searchParams.get("code");
+
+    expect((await signup(env, code, "hash-check@test.com")).status).toBe(201);
+    const user = rawDb.prepare("SELECT id FROM users WHERE email = ?").get("hash-check@test.com");
+
+    const del = await userItemHandler.onRequestDelete({
+      request: new Request(`https://example.test/api/admin/users/${user.id}`, { method: "DELETE", headers }),
+      env,
+      params: { id: String(user.id) },
+    });
+    expect(del.status, await del.clone().text()).toBe(200);
+    // Precondition: the FK really did null the pointer, so only used_at holds the line.
+    const row = rawDb.prepare("SELECT used_by_user_id, used_at FROM invite_codes WHERE id = ?").get(id);
+    expect(row.used_by_user_id).toBeNull();
+    expect(row.used_at).not.toBeNull();
+
+    expect((await signup(env, code, "hash-check@test.com")).status).toBe(403);
+    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM users WHERE email = ?").get("hash-check@test.com").n).toBe(0);
+    // Refused by the validation SELECT itself (not only the later EXISTS re-check).
+    const last = rawDb.prepare("SELECT failure_reason FROM auth_attempts ORDER BY id DESC LIMIT 1").get();
+    expect(last.failure_reason).toBe("invalid_invite_code");
   });
 });

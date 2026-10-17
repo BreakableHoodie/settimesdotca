@@ -438,6 +438,15 @@ export const MUTATIONS = [
     tests: ["functions/api/admin/invite-codes/__tests__/invite-codes.test.js"],
   },
   {
+    id: "invite-open-check-requires-unused-used-at",
+    invariant:
+      "CLAUDE.md 'Invite codes are stored hashed' — signup treats an invite as open only while used_at IS NULL too, because deleting the user nulls used_by_user_id and would reopen it",
+    file: "functions/api/admin/auth/signup.js",
+    find: "      AND used_by_user_id IS NULL\n      AND used_at IS NULL\n",
+    replace: "      AND used_by_user_id IS NULL\n",
+    tests: ["functions/api/admin/invite-codes/__tests__/invite-codes.test.js"],
+  },
+  {
     id: "invite-signup-claim-binds-hash",
     invariant:
       "CLAUDE.md 'Invite codes are stored hashed' — the claim UPDATE matches the digest too, so a redeemed invite is actually marked used (#1334)",

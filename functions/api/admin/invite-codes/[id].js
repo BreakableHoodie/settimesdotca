@@ -31,7 +31,7 @@ export async function onRequestDelete(context) {
 
   try {
     // Check if invite exists
-    const invite = await DB.prepare(`SELECT id, email, used_by_user_id FROM invite_codes WHERE id = ?`)
+    const invite = await DB.prepare(`SELECT id, email, used_by_user_id, used_at FROM invite_codes WHERE id = ?`)
       .bind(inviteId)
       .first();
 
@@ -59,7 +59,7 @@ export async function onRequestDelete(context) {
       "invite_code",
       invite.id,
       {
-        wasUsed: invite.used_by_user_id !== null,
+        wasUsed: invite.used_by_user_id !== null || invite.used_at !== null,
         inviteMode: invite.email ? "email_restricted" : "open",
       },
       ipAddress,

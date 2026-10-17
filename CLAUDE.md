@@ -611,6 +611,7 @@ An invite code is a bearer credential that mints an account, possibly an admin o
 - **Signup hashes the submitted code** before the SELECT, the `EXISTS` re-check and the claim `UPDATE`, so a submitted `sha256:...` or `retired:<id>` matches nothing. Never bind the raw code.
 - Dead rows (used, revoked, expired) were retired by migration 0071 to `code = 'retired:<id>'`; live rows were converted by a one-off script after deploy, because SQLite cannot SHA-256.
 - `GET /api/admin/invite-codes` projects explicit columns with no `code`. `POST /api/admin/users` returns an explicit `invite` projection and the URL only when email delivery failed. No audit row or log carries the code.
+- **"Unused" is `used_by_user_id IS NULL AND used_at IS NULL`.** `used_by_user_id` is `ON DELETE SET NULL`, so deleting the user alone would reopen the invite and let the same link mint another account; `used_at` survives. Every signup open-check (SELECT, EXISTS, claim) carries both.
 - **Revoke is by id**: `DELETE /api/admin/invite-codes/[id]`, because a digest cannot be a URL key. Any new invite writer must call `generateInviteCode()` and return the plaintext once; `invite-codes.test.js` scans both creation routes through GET.
 
 ### Time validation is shape AND range — `isValidTime()` is the only home (#1089)

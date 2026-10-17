@@ -131,6 +131,7 @@ export async function onRequestPost(context) {
       AND is_active = 1
       AND expires_at > datetime('now')
       AND used_by_user_id IS NULL
+      AND used_at IS NULL
     `,
     )
       .bind(inviteCodeHash)
@@ -254,6 +255,8 @@ export async function onRequestPost(context) {
     // Now the INSERT only fires while the invite is STILL unclaimed (the same
     // predicate as the validation SELECT), and the claim UPDATE fires exactly
     // when the INSERT did, because it requires the user that INSERT created.
+    // "Unused" means used_by_user_id IS NULL AND used_at IS NULL: deleting the
+    // user SETs used_by_user_id NULL (FK), which alone would reopen the invite.
     // A claim keyed only on `used_by_user_id IS NULL` stamped used_at on an
     // invite that closed mid-request, with no user behind it. D1 runs a batch
     // as one transaction and serialises writers, so of two racing batches only
@@ -261,7 +264,7 @@ export async function onRequestPost(context) {
     // changes === 0.
     const INVITE_STILL_OPEN = `EXISTS (
       SELECT 1 FROM invite_codes
-      WHERE code = ? AND is_active = 1 AND expires_at > datetime('now') AND used_by_user_id IS NULL
+      WHERE code = ? AND is_active = 1 AND expires_at > datetime('now') AND used_by_user_id IS NULL AND used_at IS NULL
     )`;
     const [created, claimed] = await DB.batch([
       DB.prepare(
@@ -288,7 +291,7 @@ export async function onRequestPost(context) {
       DB.prepare(
         `UPDATE invite_codes
          SET used_by_user_id = (SELECT id FROM users WHERE activation_token = ?), used_at = datetime('now')
-         WHERE code = ? AND used_by_user_id IS NULL
+         WHERE code = ? AND used_by_user_id IS NULL AND used_at IS NULL
            AND EXISTS (SELECT 1 FROM users WHERE activation_token = ?)`,
       ).bind(activationToken, inviteCodeHash, activationToken),
     ]);

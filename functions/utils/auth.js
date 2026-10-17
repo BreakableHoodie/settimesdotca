@@ -53,7 +53,7 @@ export function initializeLucia(DB, request = null, env = null) {
     async validateSession(sessionId) {
       const row = await DB.prepare(
         `SELECT s.id, s.user_id, s.expires_at,
-                u.email, u.role, u.name, u.first_name, u.last_name, u.is_active
+                u.email, u.role, u.name, u.first_name, u.last_name, u.is_active, u.totp_enabled
          FROM lucia_sessions s
          JOIN users u ON u.id = s.user_id
          WHERE s.id = ?`,
@@ -83,6 +83,7 @@ export function initializeLucia(DB, request = null, env = null) {
           firstName: row.first_name,
           lastName: row.last_name,
           isActive: row.is_active,
+          mfaEnabled: Number(row.totp_enabled) === 1,
         },
       };
     },

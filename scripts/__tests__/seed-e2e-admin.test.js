@@ -2,6 +2,8 @@ import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { verifyTotp } from "../../functions/utils/totp.js";
+import { deriveE2eTotpSecret, e2eTotpCode } from "../e2e-totp.mjs";
 
 const scriptsDirectory = dirname(dirname(fileURLToPath(import.meta.url)));
 const scriptPath = join(scriptsDirectory, "seed-e2e-admin.mjs");
@@ -66,5 +68,20 @@ describe("seed-e2e-admin", () => {
     expect(output).toContain("INSERT OR REPLACE INTO users");
     expect(output).toContain("'admin@example.com'");
     expect(output).toContain("'admin'");
+  });
+
+  // Admins must have 2FA (#1253), so the seeded admin is enrolled and the
+  // browser tests type a code. The seeder and the tests derive the secret
+  // independently; if they ever disagree, every admin E2E spec stalls on the
+  // code screen with no hint why. This pins the two halves together.
+  it("enrols the admin in 2FA with the secret the browser tests generate codes from", async () => {
+    const password = "placeholder-not-a-real-password";
+    const output = runScript(["--email", "admin@example.com"], password);
+    const secret = await deriveE2eTotpSecret(password);
+
+    expect(output).toMatch(/totp_secret, totp_enabled\) VALUES \(.*'([A-Z2-7]+)', 1\);$/);
+    expect(output.match(/'([A-Z2-7]+)', 1\);$/)[1]).toBe(secret);
+    expect(await verifyTotp(secret, await e2eTotpCode(password))).toBe(true);
+    expect(await deriveE2eTotpSecret("a-different-placeholder")).not.toBe(secret);
   });
 });

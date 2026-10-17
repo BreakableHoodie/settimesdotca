@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react'
-import { eventsApi } from '../utils/adminApi'
+import { eventsApi, subscribeAdminAuthState } from '../utils/adminApi'
 import UserSettings from './UserSettings'
 import PlatformSettings from './PlatformSettings'
 import BottomNav from './components/BottomNav'
@@ -97,6 +97,12 @@ export default function AdminPanel({ currentUser, onLogout }) {
   const [showWizard, setShowWizard] = useState(() => Boolean(getStoredWizardDraft()))
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [showMfaModal, setShowMfaModal] = useState(false)
+  // Admins and editors must enrol in 2FA first (#1253). Known from the
+  // session user, and also learned from any 403 MFA_SETUP_REQUIRED.
+  const [mfaGateHit, setMfaGateHit] = useState(false)
+  const mustEnrolMfa = Boolean(currentUser?.mfaEnrolmentRequired && !currentUser?.mfaEnabled) || mfaGateHit
+
+  useEffect(() => subscribeAdminAuthState({ onMfaSetupRequired: () => setMfaGateHit(true) }), [])
 
   const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type })
@@ -526,7 +532,26 @@ export default function AdminPanel({ currentUser, onLogout }) {
         variant="danger"
       />
 
-      <MfaSettingsModal isOpen={showMfaModal} onClose={() => setShowMfaModal(false)} />
+      {mustEnrolMfa ? (
+        <MfaSettingsModal
+          isOpen
+          required
+          canDisable={false}
+          onClose={() => {}}
+          // A full reload re-reads the session user and refetches the data
+          // every gated request was refused.
+          onEnabled={() => window.location.reload()}
+          // Same path as the header's Logout: the next person to sign in on
+          // this browser must not inherit this user's tab, event or draft.
+          onLogout={confirmLogout}
+        />
+      ) : (
+        <MfaSettingsModal
+          isOpen={showMfaModal}
+          onClose={() => setShowMfaModal(false)}
+          canDisable={!currentUser?.mfaEnrolmentRequired}
+        />
+      )}
 
       {/* Bottom Navigation (Mobile Only) */}
       <BottomNav

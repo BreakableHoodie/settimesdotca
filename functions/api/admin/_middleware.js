@@ -11,6 +11,7 @@ import { auditLogStatement } from "../../utils/auditLogStatement.js";
 import { API_KEY_PREFIX, DISPLAY_PREFIX_LENGTH, verifyApiKey } from "../../utils/apiKeys.js";
 import { apiKeyRateLimitKey, checkRateLimitByKey, rateLimitResponse } from "../../utils/rateLimit.js";
 import { routePath, trimTrailingSlashes } from "../../utils/routePath.js";
+import { MFA_ENROLMENT_ROUTES, mfaRequiredForRole } from "../../utils/mfaPolicy.js";
 
 export { auditLogStatement } from "../../utils/auditLogStatement.js";
 
@@ -146,7 +147,26 @@ function normalizeUser(user) {
     firstName: user.firstName || null,
     lastName: user.lastName || null,
     isActive: user.isActive,
+    mfaEnabled: user.mfaEnabled === true,
+    mfaEnrolmentRequired: mfaRequiredForRole(user.role),
   };
+}
+
+// Admins and editors must enrol in 2FA before using the admin area (#1253).
+// Until they do, every session-authenticated route except enrolment answers
+// 403 MFA_SETUP_REQUIRED. Checked on BOTH session paths: the middleware and
+// checkPermission's own enforceSession fallback.
+function mfaSetupRequiredResponse(request, user) {
+  if (!user.mfaEnrolmentRequired || user.mfaEnabled) return null;
+  if (MFA_ENROLMENT_ROUTES.has(routePath(request))) return null;
+  return new Response(
+    JSON.stringify({
+      error: "Two-factor authentication required",
+      code: "MFA_SETUP_REQUIRED",
+      message: "Set up two-factor authentication to continue.",
+    }),
+    { status: 403, headers: { "Content-Type": "application/json" } },
+  );
 }
 
 async function resolveSession(request, env) {
@@ -332,6 +352,10 @@ export async function checkPermission(context, requiredRole) {
   }
 
   const normalizedUser = normalizeUser(auth.result.user);
+  const fallbackMfaResponse = mfaSetupRequiredResponse(request, normalizedUser);
+  if (fallbackMfaResponse) {
+    return { error: true, response: fallbackMfaResponse };
+  }
   const userLevel = levelOf(normalizedUser.role);
   const requiredLevel = roleHierarchy[requiredRole];
 
@@ -557,6 +581,11 @@ export async function onRequest(context) {
     const { session, user, sessionId, sessionMeta, lucia } = result;
 
     const normalizedUser = normalizeUser(user);
+
+    const mfaResponse = mfaSetupRequiredResponse(request, normalizedUser);
+    if (mfaResponse) {
+      return mfaResponse;
+    }
 
     const sessionData = {
       id: sessionId,

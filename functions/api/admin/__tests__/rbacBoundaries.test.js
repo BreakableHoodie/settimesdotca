@@ -85,6 +85,7 @@ const POLICY = {
   "DELETE /api/admin/users/[id]": "admin",
   "POST /api/admin/users/[id]/reset-password": "admin",
   "POST /api/admin/users/[id]/toggle-status": "admin",
+  "POST /api/admin/users/[id]/reset-mfa": "admin",
   "GET /api/admin/venues": "viewer",
   "POST /api/admin/venues": "editor",
   "PUT /api/admin/venues/[id]": "admin",

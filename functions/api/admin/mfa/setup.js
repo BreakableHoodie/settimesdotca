@@ -70,13 +70,28 @@ export async function onRequestPost(context) {
     );
   }
 
-  await DB.prepare(
+  // `AND totp_enabled = 0` re-checks the 409 guard above at write time, so an
+  // enable committing in between can never be overwritten back to disabled.
+  const written = await DB.prepare(
     `UPDATE users
      SET totp_secret = ?, totp_enabled = 0, backup_codes = NULL
-     WHERE id = ?`,
+     WHERE id = ? AND totp_enabled = 0`,
   )
     .bind(encryptedSecret, userId)
     .run();
+
+  if (written?.meta?.changes === 0) {
+    return new Response(
+      JSON.stringify({
+        error: "Conflict",
+        message: "MFA is already enabled for this account",
+      }),
+      {
+        status: 409,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
 
   await auditLog(env, userId, "mfa.setup", "user", userId, { email: user.email }, ipAddress);
 

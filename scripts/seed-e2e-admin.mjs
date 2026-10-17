@@ -1,4 +1,5 @@
 import { hashPassword } from "../functions/utils/crypto.js";
+import { deriveE2eTotpSecret } from "./e2e-totp.mjs";
 
 const args = process.argv.slice(2);
 const emailIdx = args.indexOf("--email");
@@ -35,7 +36,10 @@ const email = args[emailIdx + 1];
 const esc = (v) => v.replace(/'/g, "''");
 
 const hash = await hashPassword(password);
+// Enrolled in 2FA, as every admin must be (#1253). Stored plaintext: the
+// login path encrypts it on first use wherever MFA_TOTP_ENCRYPTION_KEY is set.
+const totpSecret = await deriveE2eTotpSecret(password);
 
 process.stdout.write(
-  `INSERT OR REPLACE INTO users (id, email, name, password_hash, role, is_active, activated_at) VALUES (100, '${esc(email)}', 'E2E Admin', '${esc(hash)}', 'admin', 1, datetime('now'));`,
+  `INSERT OR REPLACE INTO users (id, email, name, password_hash, role, is_active, activated_at, totp_secret, totp_enabled) VALUES (100, '${esc(email)}', 'E2E Admin', '${esc(hash)}', 'admin', 1, datetime('now'), '${esc(totpSecret)}', 1);`,
 );

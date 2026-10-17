@@ -1,10 +1,15 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AdminPanel from '../AdminPanel'
 import { eventsApi } from '../../utils/adminApi'
 
+const authSubscribers = []
 vi.mock('../../utils/adminApi', () => ({
   eventsApi: { getAll: vi.fn() },
+  subscribeAdminAuthState: vi.fn(subscriber => {
+    authSubscribers.push(subscriber)
+    return () => {}
+  }),
 }))
 
 vi.mock('../EventsTab', () => ({ default: ({ events }) => <div>Events tab ({events.length})</div> }))
@@ -20,7 +25,19 @@ vi.mock('../components/BottomNav', () => ({
 }))
 vi.mock('../components/ContextBanner', () => ({ default: () => null }))
 vi.mock('../components/Breadcrumbs', () => ({ default: () => null }))
-vi.mock('../components/MfaSettingsModal', () => ({ default: () => null }))
+vi.mock('../components/MfaSettingsModal', () => ({
+  default: ({ isOpen, required, onLogout }) =>
+    isOpen ? (
+      <div>
+        {required ? 'MFA enrolment required' : 'MFA settings'}
+        {required && onLogout && (
+          <button type="button" onClick={onLogout}>
+            Log out of enrolment
+          </button>
+        )}
+      </div>
+    ) : null,
+}))
 vi.mock('../../components/ui', () => ({
   Alert: ({ children }) => <div>{children}</div>,
   Button: ({ children, onClick }) => <button onClick={onClick}>{children}</button>,
@@ -161,5 +178,51 @@ describe('AdminPanel', () => {
     window.dispatchEvent(new CustomEvent('filterBand', { detail: { bandName: 'Alpha Wolves' } }))
     expect(await screen.findByText('Roster tab')).toBeInTheDocument()
     expect(sessionStorage.getItem('filterBandName')).toBe('Alpha Wolves')
+  })
+})
+
+// #1253: admins and editors must enrol in 2FA before using the admin area.
+describe('AdminPanel 2FA enrolment', () => {
+  it('logging out from required enrolment clears persisted admin context', async () => {
+    const onLogout = vi.fn()
+    sessionStorage.setItem('adminActiveTab', 'roster')
+    sessionStorage.setItem('adminSelectedEventId', '7')
+    sessionStorage.setItem('adminEventWizardDraft', JSON.stringify({ currentStep: 2, eventData: { name: 'Draft' } }))
+    render(
+      <AdminPanel currentUser={{ role: 'editor', mfaEnrolmentRequired: true, mfaEnabled: false }} onLogout={onLogout} />
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Log out of enrolment' }))
+
+    expect(onLogout).toHaveBeenCalledOnce()
+    expect(sessionStorage.getItem('adminActiveTab')).toBeNull()
+    expect(sessionStorage.getItem('adminSelectedEventId')).toBeNull()
+    expect(sessionStorage.getItem('adminEventWizardDraft')).toBeNull()
+  })
+
+  it('opens the required enrolment modal for an admin without 2FA', async () => {
+    render(
+      <AdminPanel currentUser={{ role: 'admin', mfaEnrolmentRequired: true, mfaEnabled: false }} onLogout={vi.fn()} />
+    )
+    expect(await screen.findByText('MFA enrolment required')).toBeInTheDocument()
+  })
+
+  it('does not open it for an enrolled admin or a viewer without 2FA', async () => {
+    render(
+      <AdminPanel currentUser={{ role: 'admin', mfaEnrolmentRequired: true, mfaEnabled: true }} onLogout={vi.fn()} />
+    )
+    render(
+      <AdminPanel currentUser={{ role: 'viewer', mfaEnrolmentRequired: false, mfaEnabled: false }} onLogout={vi.fn()} />
+    )
+    await screen.findAllByLabelText('Filter:')
+    expect(screen.queryByText('MFA enrolment required')).not.toBeInTheDocument()
+  })
+
+  it('opens it when the server answers MFA_SETUP_REQUIRED', async () => {
+    authSubscribers.length = 0
+    render(<AdminPanel currentUser={{ role: 'editor' }} onLogout={vi.fn()} />)
+    expect(screen.queryByText('MFA enrolment required')).not.toBeInTheDocument()
+    act(() => authSubscribers.forEach(subscriber => subscriber.onMfaSetupRequired?.()))
+    expect(await screen.findByText('MFA enrolment required')).toBeInTheDocument()
   })
 })

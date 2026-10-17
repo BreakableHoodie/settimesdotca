@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { Key, Pencil, Plus, Trash, UserCheck, UserX } from 'lucide-react'
+import { Key, Pencil, Plus, ShieldOff, Trash, UserCheck, UserX } from 'lucide-react'
 import RoleBadge from './components/RoleBadge'
 import UserFormModal from './components/UserFormModal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
@@ -29,6 +29,7 @@ export default function UserManagement({ showToast }) {
   const [statusFilter, setStatusFilter] = useState('all')
   const [pendingDelete, setPendingDelete] = useState(null)
   const [pendingToggle, setPendingToggle] = useState(null)
+  const [pendingMfaReset, setPendingMfaReset] = useState(null)
   const [pendingInviteUrl, setPendingInviteUrl] = useState(null)
 
   const resolveDisplayName = resolveUserDisplayName
@@ -162,6 +163,22 @@ export default function UserManagement({ showToast }) {
     } catch {
       showToast('Failed to update user status', 'error')
       await fetchUsers()
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleResetMfa = async () => {
+    if (!pendingMfaReset) return
+
+    const target = pendingMfaReset
+    setPendingMfaReset(null)
+    setActionLoading(true)
+    try {
+      await usersApi.resetMfa(target.id)
+      showToast(`Two-factor authentication reset for ${target.email}`, 'success')
+    } catch (err) {
+      showToast(err.message || 'Failed to reset two-factor authentication', 'error')
     } finally {
       setActionLoading(false)
     }
@@ -337,6 +354,15 @@ export default function UserManagement({ showToast }) {
                         </button>
                         <button
                           type="button"
+                          onClick={() => setPendingMfaReset(user)}
+                          className="text-accent-400 hover:text-accent-400/80 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
+                          aria-label={`Reset two-factor authentication for ${user.email}`}
+                          disabled={actionLoading}
+                        >
+                          <ShieldOff size={14} />
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => setPendingToggle(user)}
                           className={`transition ${
                             user.isActive
@@ -408,6 +434,14 @@ export default function UserManagement({ showToast }) {
                     disabled={actionLoading}
                   >
                     Reset Password
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPendingMfaReset(user)}
+                    className="px-4 py-2 min-h-[44px] bg-accent-500/80 hover:bg-accent-500 text-bg-navy rounded text-sm"
+                    disabled={actionLoading}
+                  >
+                    Reset 2FA
                   </button>
                   <button
                     type="button"
@@ -514,6 +548,18 @@ export default function UserManagement({ showToast }) {
         variant="danger"
         onConfirm={handleDeleteUser}
         onCancel={() => setPendingDelete(null)}
+      />
+
+      {/* Reset 2FA confirmation (#1253) */}
+      <ConfirmDialog
+        isOpen={!!pendingMfaReset}
+        title="Reset Two-Factor Authentication"
+        message={`Reset two-factor authentication for ${pendingMfaReset?.email}? They will be signed out everywhere, their API keys will be revoked, and they will set up a new authenticator on their next login.`}
+        confirmText="Reset 2FA"
+        cancelText="Cancel"
+        variant="danger"
+        onConfirm={handleResetMfa}
+        onCancel={() => setPendingMfaReset(null)}
       />
 
       {/* Toggle status confirmation */}

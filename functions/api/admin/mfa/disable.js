@@ -3,6 +3,7 @@
 // Body: { code: string }
 
 import { checkPermission, auditLog } from "../_middleware.js";
+import { mfaRequiredForRole } from "../../../utils/mfaPolicy.js";
 import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../utils/authAttempts.js";
 import { verifyTotp, verifyBackupCode } from "../../../utils/totp.js";
 import { loadTotpSecret } from "../../../utils/mfaSecrets.js";
@@ -28,6 +29,19 @@ export async function onRequestPost(context) {
   const auth = await checkPermission(context, "viewer");
   if (auth.error) {
     return auth.response;
+  }
+
+  // Admins and editors must keep 2FA on (#1253). Refused before the code is
+  // even checked: the answer does not depend on it.
+  if (mfaRequiredForRole(auth.user.role)) {
+    return new Response(
+      JSON.stringify({
+        error: "Two-factor authentication is required for your role",
+        code: "MFA_REQUIRED_FOR_ROLE",
+        message: "Admins and editors cannot turn off two-factor authentication.",
+      }),
+      { status: 403, headers: { "Content-Type": "application/json" } },
+    );
   }
 
   const userId = auth.user.userId;

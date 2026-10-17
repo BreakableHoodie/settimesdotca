@@ -798,6 +798,77 @@ export const MUTATIONS = [
     replace: '        env?.ENVIRONMENT === "production";',
     tests: ["functions/__tests__/environmentFailsClosed.test.js"],
   },
+  {
+    id: "mfa-required-middleware-gate",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — an admin or editor without 2FA reaches only the enrolment routes; every other admin route answers 403 MFA_SETUP_REQUIRED (#1253)",
+    file: "functions/api/admin/_middleware.js",
+    find: "    const mfaResponse = mfaSetupRequiredResponse(request, normalizedUser);",
+    replace: "    const mfaResponse = null;",
+    tests: ["functions/api/admin/__tests__/mfaRequired.test.js"],
+  },
+  {
+    id: "mfa-required-checkpermission-fallback",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — checkPermission's own session fallback enforces the same 2FA enrolment rule as the middleware (#1253)",
+    file: "functions/api/admin/_middleware.js",
+    find: "  const fallbackMfaResponse = mfaSetupRequiredResponse(request, normalizedUser);",
+    replace: "  const fallbackMfaResponse = null;",
+    tests: ["functions/api/admin/__tests__/mfaRequired.test.js"],
+  },
+  {
+    id: "mfa-disable-refused-for-required-roles",
+    invariant: "CLAUDE.md 'RBAC Roles' — admins and editors cannot turn 2FA off (#1253)",
+    file: "functions/api/admin/mfa/disable.js",
+    find: "  if (mfaRequiredForRole(auth.user.role)) {",
+    replace: "  if (false) {",
+    tests: ["functions/api/admin/mfa/__tests__/mfa-settings.test.js"],
+  },
+  {
+    id: "mfa-enable-revokes-password-only-sessions",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — enrolling in 2FA revokes every session opened with the password alone, so a phished pre-enrolment session cannot inherit full access (#1253 review)",
+    file: "functions/api/admin/mfa/enable.js",
+    find: "  await lucia.invalidateUserSessions(userId);",
+    replace: "  // sessions kept",
+    tests: ["functions/api/admin/__tests__/mfaRequired.test.js"],
+  },
+  {
+    id: "mfa-enable-bound-to-verified-secret",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — enabling 2FA writes only if the pending secret is still the one the code was verified against, so a second setup or an admin reset mid-request wins (#1253 review)",
+    file: "functions/api/admin/mfa/enable.js",
+    find: "     WHERE id = ? AND totp_enabled = 0 AND totp_secret = ?`,",
+    replace: "     WHERE id = ? AND totp_enabled = 0 AND ? IS NOT NULL`,",
+    tests: ["functions/api/admin/mfa/__tests__/mfa-settings.test.js"],
+  },
+  {
+    id: "mfa-enable-session-dropped-after-concurrent-reset",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — a reset committing between enrolment and session issue must not leave the freshly issued session alive (#1253 review)",
+    file: "functions/api/admin/mfa/enable.js",
+    find: "  if (!stillEnrolled) {",
+    replace: "  if (false) {",
+    tests: ["functions/api/admin/mfa/__tests__/mfa-settings.test.js"],
+  },
+  {
+    id: "mfa-login-backup-code-spend-not-restored",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — a login writes backup codes only over the list it verified, so a concurrent login cannot restore a spent code (#1253 review)",
+    file: "functions/api/admin/auth/mfa/verify.js",
+    find: "AND backup_codes IS ?`,",
+    replace: "AND (? IS NULL OR 1)`,",
+    tests: ["functions/api/admin/auth/__tests__/mfa.test.js"],
+  },
+  {
+    id: "mfa-backup-codes-regen-bound-to-enrolled-secret",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — regenerating backup codes never writes an old secret back over an admin reset (#1253 review)",
+    file: "functions/api/admin/mfa/backup-codes.js",
+    find: 'WHERE id = ? AND totp_enabled = 1 AND totp_secret = ?",',
+    replace: 'WHERE id = ? AND ? IS NOT NULL",',
+    tests: ["functions/api/admin/mfa/__tests__/mfa-settings.test.js"],
+  },
 ];
 
 // ============================================================================

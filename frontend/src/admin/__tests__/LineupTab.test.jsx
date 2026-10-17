@@ -323,6 +323,34 @@ describe('LineupTab — load failure across events and races (#1323)', () => {
     expect(screen.queryByText('Event37 Act')).toBeNull()
     expect(within(screen.getByRole('table')).getByText('Event38 Act')).toBeInTheDocument()
   })
+
+  // A save still in flight for event A holds A's loadData. Its reload would
+  // take the newest request id, so request order alone let it replace B.
+  it("a save that finishes after switching events does not reload the previous event's lineup", async () => {
+    const eventA = makeEvent({ id: 37 })
+    const eventB = makeEvent({ id: 38 })
+    let finishSaveA
+    eventsApi.updateSchedule.mockReset()
+    eventsApi.updateSchedule.mockImplementationOnce(() => new Promise(res => (finishSaveA = res)))
+    bandsApi.getByEvent.mockReset()
+    bandsApi.getByEvent.mockImplementation(id => Promise.resolve({ bands: [makeBand({ id, name: `Event${id} Act` })] }))
+    const { rerender } = render(renderFor(eventA))
+    fireEvent.click(await screen.findByRole('button', { name: /Schedule/i }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Trigger schedule save' }))
+    await waitFor(() => expect(eventsApi.updateSchedule).toHaveBeenCalledTimes(1))
+
+    rerender(renderFor(eventB))
+    const table = await screen.findByRole('table')
+    expect(within(table).getByText('Event38 Act')).toBeInTheDocument()
+    const loadsBefore = bandsApi.getByEvent.mock.calls.length
+
+    finishSaveA({ success: true })
+    await new Promise(res => setTimeout(res, 20))
+
+    expect(bandsApi.getByEvent.mock.calls.slice(loadsBefore)).toEqual([])
+    expect(screen.queryByText('Event37 Act')).toBeNull()
+    expect(within(screen.getByRole('table')).getByText('Event38 Act')).toBeInTheDocument()
+  })
 })
 
 describe('LineupTab — roster load failure reaches the picker (#1323)', () => {

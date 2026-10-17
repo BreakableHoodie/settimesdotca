@@ -116,20 +116,33 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
   // Latest-wins guard: a slow response for a previous event (or an earlier
   // reload) must not overwrite newer state.
   const loadReqRef = useRef(0)
+  // Request order alone does not protect event identity: a handler that
+  // awaited a write for event A still holds A's loadData, and its reload would
+  // take the newest request id and replace B's lineup. Every load checks the
+  // event is still the selected one, before it takes an id and before it
+  // applies its response.
+  const currentEventRef = useRef(selectedEventId)
+  useEffect(() => {
+    currentEventRef.current = selectedEventId
+  }, [selectedEventId])
 
   const loadData = useCallback(async () => {
+    // A stale call must not take a request id: that would orphan the current
+    // event's in-flight load and leave it loading forever.
+    if (selectedEventId !== currentEventRef.current) return true
     const reqId = ++loadReqRef.current
+    const isStale = () => reqId !== loadReqRef.current || selectedEventId !== currentEventRef.current
     try {
       setLoading(true)
       const [venuesRes, bandsRes] = await Promise.all([venuesApi.getAll(), bandsApi.getByEvent(selectedEventId)])
 
-      if (reqId !== loadReqRef.current) return true
+      if (isStale()) return true
       setVenues(venuesRes.venues || [])
       setBands(bandsRes.bands || [])
       setLoadError(false)
       return true
     } catch (err) {
-      if (reqId !== loadReqRef.current) return false
+      if (isStale()) return false
       setLoadError(true)
       showToast('Failed to load schedule: ' + err.message, 'error')
       // Returns a boolean rather than rethrowing: every existing caller

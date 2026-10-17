@@ -11,6 +11,7 @@
  */
 
 import { randomUUID } from "crypto";
+import { hashInviteCode, inviteCodePrefix } from "../functions/utils/inviteCodes.js";
 
 const isLocal = process.argv.includes("--local");
 const isProd = process.argv.includes("--prod");
@@ -24,12 +25,17 @@ if (!isLocal && !isProd) {
 // Generate a secure invite code
 const inviteCode = randomUUID();
 const expiresIn = 7; // days
-const expiryDate = new Date(Date.now() + expiresIn * 24 * 60 * 60 * 1000).toISOString();
+// SQLite format (space separator, no 'T'): the signup query compares expires_at
+// with datetime('now') as a string (SEC-F1).
+const expiryDate = new Date(Date.now() + expiresIn * 24 * 60 * 60 * 1000).toISOString().replace("T", " ").slice(0, 19);
+// The database stores a digest, never the code itself (#1334).
+const storedCode = await hashInviteCode(inviteCode);
+const storedPrefix = inviteCodePrefix(inviteCode);
 
 console.log("\n🔐 Admin Invite Code Generated\n");
 console.log("═".repeat(60));
 console.log(`📧 Invite Code: ${inviteCode}`);
-console.log(`⏰ Expires: ${new Date(expiryDate).toLocaleString()} (7 days)`);
+console.log(`⏰ Expires: ${new Date(`${expiryDate.replace(" ", "T")}Z`).toLocaleString()} (7 days)`);
 console.log(`🎯 Role: admin`);
 console.log("═".repeat(60));
 
@@ -38,7 +44,7 @@ if (isLocal) {
   console.log("\n1. Insert into your local database:");
   console.log("\n   wrangler d1 execute settimes-db --local --command=\\");
   console.log(
-    `   "INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES ('${inviteCode}', 'admin', '${expiryDate}', 1);"`,
+    `   "INSERT INTO invite_codes (code, code_prefix, role, expires_at, is_active) VALUES ('${storedCode}', '${storedPrefix}', 'admin', '${expiryDate}', 1);"`,
   );
   console.log("\n2. Use this code when signing up at http://localhost:8788/admin");
 } else {
@@ -46,7 +52,7 @@ if (isLocal) {
   console.log("\n1. Insert into your production database:");
   console.log("\n   wrangler d1 execute settimes-db --command=\\");
   console.log(
-    `   "INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES ('${inviteCode}', 'admin', '${expiryDate}', 1);"`,
+    `   "INSERT INTO invite_codes (code, code_prefix, role, expires_at, is_active) VALUES ('${storedCode}', '${storedPrefix}', 'admin', '${expiryDate}', 1);"`,
   );
   console.log("\n2. Use this code when signing up at your production URL");
 }

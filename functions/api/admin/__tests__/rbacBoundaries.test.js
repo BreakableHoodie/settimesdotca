@@ -66,7 +66,7 @@ const POLICY = {
   "POST /api/admin/flush-announce-digest": "editor",
   "GET /api/admin/invite-codes": "admin",
   "POST /api/admin/invite-codes": "admin",
-  "DELETE /api/admin/invite-codes/[code]": "admin",
+  "DELETE /api/admin/invite-codes/[id]": "admin",
   "POST /api/admin/maintenance/cleanup-sessions": "admin",
   "GET /api/admin/me": "self",
   "POST /api/admin/mfa/backup-codes": "viewer",

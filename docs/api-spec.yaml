@@ -3060,6 +3060,9 @@ paths:
       tags:
         - Admin - Invites
       summary: List invite codes
+      description: >-
+        Returns metadata only (id, display prefix, role, status, timestamps). The
+        code itself is never returned: it is stored as a digest (#1334).
       security:
         - AdminSessionCookie: []
       responses:
@@ -3075,6 +3078,9 @@ paths:
       tags:
         - Admin - Invites
       summary: Create an invite code
+      description: >-
+        The only response that ever contains the plaintext `code`. It is not
+        recoverable afterwards.
       security:
         - AdminSessionCookie: []
           CsrfToken: []
@@ -3098,7 +3104,7 @@ paths:
         "500":
           $ref: "#/components/responses/ServerError"
 
-  /api/admin/invite-codes/{code}:
+  /api/admin/invite-codes/{id}:
     delete:
       tags:
         - Admin - Invites
@@ -3107,11 +3113,11 @@ paths:
         - AdminSessionCookie: []
           CsrfToken: []
       parameters:
-        - name: code
+        - name: id
           in: path
           required: true
           schema:
-            type: string
+            type: integer
       responses:
         "200":
           description: Invite code revoked
@@ -3119,6 +3125,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MessageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
         "500":

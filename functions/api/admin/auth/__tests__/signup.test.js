@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createTestEnv } from "../../../test-utils";
 import * as signupHandler from "../signup.js";
 import { toSqliteDateTime } from "../../../../utils/authAttempts.js";
+import { hashInviteCode } from "../../../../utils/inviteCodes.js";
 
 // Production writes invite_codes.expires_at via toSqliteDateTime() (space
 // separator, no 'T') and compares it with `expires_at > datetime('now')`
@@ -42,7 +43,7 @@ describe("admin signup", () => {
     const expiresAt = daysFromNow(7);
     rawDb
       .prepare("INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES (?, ?, ?, ?)")
-      .run(inviteCode, "editor", expiresAt, 1);
+      .run(await hashInviteCode(inviteCode), "editor", expiresAt, 1);
 
     const request = new Request("https://example.test/api/admin/auth/signup", {
       method: "POST",
@@ -72,7 +73,7 @@ describe("admin signup", () => {
 
     // The invite is claimed BY THIS USER. (toBeDefined() was vacuous here:
     // null is defined, so an unclaimed invite passed.)
-    const usedInvite = rawDb.prepare("SELECT * FROM invite_codes WHERE code = ?").get(inviteCode);
+    const usedInvite = rawDb.prepare("SELECT * FROM invite_codes WHERE code = ?").get(await hashInviteCode(inviteCode));
     expect(usedInvite.used_by_user_id).toBe(createdUser.id);
     expect(usedInvite.used_at).toBeTruthy();
     expect(createdUser.is_active).toBe(0);
@@ -92,7 +93,7 @@ describe("admin signup", () => {
     const inviteCode = "RACE-INVITE-CODE-1255";
     rawDb
       .prepare("INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES (?, ?, ?, ?)")
-      .run(inviteCode, "admin", daysFromNow(7), 1);
+      .run(await hashInviteCode(inviteCode), "admin", daysFromNow(7), 1);
 
     const signup = (email) =>
       signupHandler.onRequestPost({
@@ -111,7 +112,9 @@ describe("admin signup", () => {
       .prepare("SELECT id, email FROM users WHERE email IN ('racer.a@example.com', 'racer.b@example.com')")
       .all();
     expect(racers).toHaveLength(1);
-    const invite = rawDb.prepare("SELECT used_by_user_id FROM invite_codes WHERE code = ?").get(inviteCode);
+    const invite = rawDb
+      .prepare("SELECT used_by_user_id FROM invite_codes WHERE code = ?")
+      .get(await hashInviteCode(inviteCode));
     expect(invite.used_by_user_id).toBe(racers[0].id);
   });
 
@@ -124,10 +127,10 @@ describe("admin signup", () => {
     const inviteCode = "CLOSES-MID-REQUEST-1252";
     rawDb
       .prepare("INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES (?, ?, ?, ?)")
-      .run(inviteCode, "editor", daysFromNow(7), 1);
+      .run(await hashInviteCode(inviteCode), "editor", daysFromNow(7), 1);
     const batch = env.DB.batch.bind(env.DB);
-    env.DB.batch = (statements) => {
-      rawDb.prepare("UPDATE invite_codes SET is_active = 0 WHERE code = ?").run(inviteCode);
+    env.DB.batch = async (statements) => {
+      rawDb.prepare("UPDATE invite_codes SET is_active = 0 WHERE code = ?").run(await hashInviteCode(inviteCode));
       return batch(statements);
     };
 
@@ -142,7 +145,9 @@ describe("admin signup", () => {
 
     expect(response.status).toBe(403);
     expect(rawDb.prepare("SELECT COUNT(*) AS n FROM users WHERE email = 'late@example.com'").get().n).toBe(0);
-    const invite = rawDb.prepare("SELECT used_at, used_by_user_id FROM invite_codes WHERE code = ?").get(inviteCode);
+    const invite = rawDb
+      .prepare("SELECT used_at, used_by_user_id FROM invite_codes WHERE code = ?")
+      .get(await hashInviteCode(inviteCode));
     expect(invite).toEqual({ used_at: null, used_by_user_id: null });
   });
 
@@ -156,11 +161,13 @@ describe("admin signup", () => {
     const inviteCode = "EXPIRES-MID-BATCH-1252";
     rawDb
       .prepare("INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES (?, ?, ?, ?)")
-      .run(inviteCode, "editor", daysFromNow(7), 1);
+      .run(await hashInviteCode(inviteCode), "editor", daysFromNow(7), 1);
     const batch = env.DB.batch.bind(env.DB);
     env.DB.batch = async ([insertUser, claimInvite, ...rest]) => {
       const first = await batch([insertUser]);
-      rawDb.prepare("UPDATE invite_codes SET expires_at = ? WHERE code = ?").run(daysFromNow(-1), inviteCode);
+      rawDb
+        .prepare("UPDATE invite_codes SET expires_at = ? WHERE code = ?")
+        .run(daysFromNow(-1), await hashInviteCode(inviteCode));
       const second = await batch([claimInvite, ...rest]);
       return [...first, ...second];
     };
@@ -176,7 +183,9 @@ describe("admin signup", () => {
 
     expect(response.status).toBe(201);
     const user = rawDb.prepare("SELECT id FROM users WHERE email = 'edge@example.com'").get();
-    const invite = rawDb.prepare("SELECT used_by_user_id FROM invite_codes WHERE code = ?").get(inviteCode);
+    const invite = rawDb
+      .prepare("SELECT used_by_user_id FROM invite_codes WHERE code = ?")
+      .get(await hashInviteCode(inviteCode));
     expect(invite.used_by_user_id).toBe(user.id);
   });
 
@@ -188,7 +197,7 @@ describe("admin signup", () => {
     const inviteCode = "MIXED-CASE-EMAIL-1252";
     rawDb
       .prepare("INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES (?, ?, ?, ?)")
-      .run(inviteCode, "editor", daysFromNow(7), 1);
+      .run(await hashInviteCode(inviteCode), "editor", daysFromNow(7), 1);
 
     const response = await signupHandler.onRequestPost({
       request: new Request("https://example.test/api/admin/auth/signup", {
@@ -212,7 +221,7 @@ describe("admin signup", () => {
     const expiresAt = sameDayPastExpiry();
     rawDb
       .prepare("INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES (?, ?, ?, ?)")
-      .run(expiredCode, "editor", expiresAt, 1);
+      .run(await hashInviteCode(expiredCode), "editor", expiresAt, 1);
 
     const request = new Request("https://example.test/api/admin/auth/signup", {
       method: "POST",
@@ -243,7 +252,7 @@ describe("admin signup", () => {
     const existingUser = rawDb.prepare("SELECT id FROM users WHERE email = ?").get("existing@example.com");
     rawDb
       .prepare("INSERT INTO invite_codes (code, role, expires_at, is_active, used_by_user_id) VALUES (?, ?, ?, ?, ?)")
-      .run(usedCode, "editor", futureDate, 1, existingUser.id);
+      .run(await hashInviteCode(usedCode), "editor", futureDate, 1, existingUser.id);
 
     const request = new Request("https://example.test/api/admin/auth/signup", {
       method: "POST",
@@ -276,7 +285,7 @@ describe("admin signup", () => {
     const expiresAt = daysFromNow(7);
     rawDb
       .prepare("INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES (?, ?, ?, ?)")
-      .run(inviteCode, "editor", expiresAt, 1);
+      .run(await hashInviteCode(inviteCode), "editor", expiresAt, 1);
 
     const request = new Request("https://example.test/api/admin/auth/signup", {
       method: "POST",
@@ -307,7 +316,7 @@ describe("admin signup", () => {
     const expiresAt = daysFromNow(7);
     rawDb
       .prepare("INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES (?, ?, ?, ?)")
-      .run(inviteCode, "editor", expiresAt, 1);
+      .run(await hashInviteCode(inviteCode), "editor", expiresAt, 1);
 
     const request = new Request("https://example.test/api/admin/auth/signup", {
       method: "POST",

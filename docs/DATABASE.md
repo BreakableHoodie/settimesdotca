@@ -80,29 +80,29 @@ each one.
 
 One row per band-crawl event (e.g. Vol. 16, Vol. 17).
 
-| Column               | Type    | Notes                                                                                                             |
-| -------------------- | ------- | ----------------------------------------------------------------------------------------------------------------- |
-| `id`                 | INTEGER | PK, autoincrement                                                                                                 |
-| `name`               | TEXT    | NOT NULL                                                                                                          |
-| `date`               | TEXT    | NOT NULL, `YYYY-MM-DD`                                                                                            |
-| `end_date`           | TEXT    | Nullable; added in migration 0038 for multi-day events                                                            |
-| `slug`               | TEXT    | NOT NULL, UNIQUE                                                                                                  |
+| Column               | Type    | Notes                                                                                                                                                                       |
+| -------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                 | INTEGER | PK, autoincrement                                                                                                                                                           |
+| `name`               | TEXT    | NOT NULL                                                                                                                                                                    |
+| `date`               | TEXT    | NOT NULL, `YYYY-MM-DD`                                                                                                                                                      |
+| `end_date`           | TEXT    | Nullable; added in migration 0038 for multi-day events                                                                                                                      |
+| `slug`               | TEXT    | NOT NULL, UNIQUE                                                                                                                                                            |
 | `status`             | TEXT    | DEFAULT `'draft'` (also `'published'`, `'archived'`) — the sole publication gate (`events.is_published` dropped in migration 0059; see CLAUDE.md "Public event visibility") |
-| `archived_at`        | TEXT    | Nullable                                                                                                          |
-| `description`        | TEXT    | Nullable                                                                                                          |
-| `city`               | TEXT    | Nullable                                                                                                          |
-| `ticket_url`         | TEXT    | Nullable                                                                                                          |
-| `ticket_price`       | REAL    | Nullable                                                                                                          |
-| `presented_by`       | TEXT    | Nullable                                                                                                          |
-| `presented_by_url`   | TEXT    | Nullable                                                                                                          |
-| `venue_info`         | TEXT    | Nullable (JSON)                                                                                                   |
-| `social_links`       | TEXT    | Nullable (JSON)                                                                                                   |
-| `theme_colors`       | TEXT    | Nullable (JSON)                                                                                                   |
-| `reveal_mode`        | INTEGER | NOT NULL, DEFAULT 0 — added in migration 0034; gates whether unannounced performances show in the public schedule |
-| `created_by_user_id` | INTEGER | Nullable, FK → `users(id)`                                                                                        |
-| `updated_by_user_id` | INTEGER | Nullable, FK → `users(id)`                                                                                        |
-| `created_at`         | TEXT    | NOT NULL, DEFAULT `datetime('now')`                                                                               |
-| `updated_at`         | TEXT    | DEFAULT `datetime('now')`, bumped on UPDATE by the `update_events_timestamp` trigger                              |
+| `archived_at`        | TEXT    | Nullable                                                                                                                                                                    |
+| `description`        | TEXT    | Nullable                                                                                                                                                                    |
+| `city`               | TEXT    | Nullable                                                                                                                                                                    |
+| `ticket_url`         | TEXT    | Nullable                                                                                                                                                                    |
+| `ticket_price`       | REAL    | Nullable                                                                                                                                                                    |
+| `presented_by`       | TEXT    | Nullable                                                                                                                                                                    |
+| `presented_by_url`   | TEXT    | Nullable                                                                                                                                                                    |
+| `venue_info`         | TEXT    | Nullable (JSON)                                                                                                                                                             |
+| `social_links`       | TEXT    | Nullable (JSON)                                                                                                                                                             |
+| `theme_colors`       | TEXT    | Nullable (JSON)                                                                                                                                                             |
+| `reveal_mode`        | INTEGER | NOT NULL, DEFAULT 0 — added in migration 0034; gates whether unannounced performances show in the public schedule                                                           |
+| `created_by_user_id` | INTEGER | Nullable, FK → `users(id)`                                                                                                                                                  |
+| `updated_by_user_id` | INTEGER | Nullable, FK → `users(id)`                                                                                                                                                  |
+| `created_at`         | TEXT    | NOT NULL, DEFAULT `datetime('now')`                                                                                                                                         |
+| `updated_at`         | TEXT    | DEFAULT `datetime('now')`, bumped on UPDATE by the `update_events_timestamp` trigger                                                                                        |
 
 Indexes: `idx_events_slug(slug)`, `idx_events_status(status)`,
 `idx_events_archived(archived_at)`,
@@ -260,8 +260,8 @@ Added in migration 0035.
 | `consent_ip`         | TEXT    | Nullable — added in migration 0045                                                                                                                                       |
 | `consent_method`     | TEXT    | NOT NULL, DEFAULT `'web_form'` — added in migration 0045                                                                                                                 |
 | `batch_token`        | TEXT    | Nullable — added in migration 0047; ties together rows from one batch-follow submission so a multi-band follow sends a single confirmation email instead of one per band |
-| `confirmed_at`       | TEXT    | Nullable — set when the double opt-in is confirmed |
-| `consent_version`    | TEXT    | Nullable — wording/version shown when consent was given |
+| `confirmed_at`       | TEXT    | Nullable — set when the double opt-in is confirmed                                                                                                                       |
+| `consent_version`    | TEXT    | Nullable — wording/version shown when consent was given                                                                                                                  |
 
 Constraint: `UNIQUE(email, band_profile_id)`. Indexes:
 `idx_band_follows_band(band_profile_id)`, `idx_band_follows_email(email)`,
@@ -273,13 +273,13 @@ Per-follower delivery tracking for "this band just got announced" emails.
 Added in migration 0041 to replace a fire-once latch that silently dropped
 fans whose first send failed.
 
-| Column           | Type    | Notes                                               |
-| ---------------- | ------- | --------------------------------------------------- |
-| `id`             | INTEGER | PK, autoincrement                                   |
-| `performance_id` | INTEGER | NOT NULL, FK → `performances(id)` ON DELETE CASCADE |
-| `band_follow_id` | INTEGER | NOT NULL, FK → `band_follows(id)` ON DELETE CASCADE |
+| Column           | Type    | Notes                                                                |
+| ---------------- | ------- | -------------------------------------------------------------------- |
+| `id`             | INTEGER | PK, autoincrement                                                    |
+| `performance_id` | INTEGER | NOT NULL, FK → `performances(id)` ON DELETE CASCADE                  |
+| `band_follow_id` | INTEGER | NOT NULL, FK → `band_follows(id)` ON DELETE CASCADE                  |
 | `claimed_at`     | TEXT    | NOT NULL, DEFAULT `datetime('now')` — claim time, not delivery proof |
-| `delivered_at`   | TEXT    | Nullable — set only after the provider confirms delivery |
+| `delivered_at`   | TEXT    | Nullable — set only after the provider confirms delivery             |
 
 Constraint: `UNIQUE(performance_id, band_follow_id)`. An undelivered claim past
 the lease is retryable; a delivered row is permanent. Index:
@@ -311,18 +311,18 @@ Constraint: `UNIQUE(band_follow_id, performance_id)`. Indexes:
 Server-side snapshot backing a shareable `/s/[slug]` schedule link. Added in
 migration 0037; `view_count` added in migration 0040.
 
-| Column            | Type    | Notes                                                                                                                              |
-| ----------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `id`              | INTEGER | PK, autoincrement                                                                                                                  |
-| `slug`            | TEXT    | NOT NULL, UNIQUE                                                                                                                   |
-| `event_id`        | INTEGER | NOT NULL, FK → `events(id)` ON DELETE CASCADE                                                                                      |
-| `event_slug`      | TEXT    | NOT NULL                                                                                                                           |
-| `performance_ids` | TEXT    | NOT NULL (JSON array)                                                                                                              |
-| `band_names`      | TEXT    | NOT NULL (JSON array)                                                                                                              |
-| `created_at`      | TEXT    | NOT NULL, DEFAULT `datetime('now')`                                                                                                |
-| `expires_at`      | TEXT    | NOT NULL                                                                                                                           |
-| `view_count`      | INTEGER | NOT NULL, DEFAULT 0 — **unique visitors per link, all-time** (#705). Derived: `COUNT(*)` over `share_link_views`, recomputed whenever a new visitor row is inserted. Not incremented per fetch, and not counted on the post-import refetch (see `GET /api/schedule/share/[slug]`) |
-| `view_count_legacy` | INTEGER | Nullable — each link's pre-#705 per-fetch count, preserved at the dedupe cutover (migration 0058). Nothing reads it; it keeps the cutover reversible |
+| Column              | Type    | Notes                                                                                                                                                                                                                                                                             |
+| ------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                | INTEGER | PK, autoincrement                                                                                                                                                                                                                                                                 |
+| `slug`              | TEXT    | NOT NULL, UNIQUE                                                                                                                                                                                                                                                                  |
+| `event_id`          | INTEGER | NOT NULL, FK → `events(id)` ON DELETE CASCADE                                                                                                                                                                                                                                     |
+| `event_slug`        | TEXT    | NOT NULL                                                                                                                                                                                                                                                                          |
+| `performance_ids`   | TEXT    | NOT NULL (JSON array)                                                                                                                                                                                                                                                             |
+| `band_names`        | TEXT    | NOT NULL (JSON array)                                                                                                                                                                                                                                                             |
+| `created_at`        | TEXT    | NOT NULL, DEFAULT `datetime('now')`                                                                                                                                                                                                                                               |
+| `expires_at`        | TEXT    | NOT NULL                                                                                                                                                                                                                                                                          |
+| `view_count`        | INTEGER | NOT NULL, DEFAULT 0 — **unique visitors per link, all-time** (#705). Derived: `COUNT(*)` over `share_link_views`, recomputed whenever a new visitor row is inserted. Not incremented per fetch, and not counted on the post-import refetch (see `GET /api/schedule/share/[slug]`) |
+| `view_count_legacy` | INTEGER | Nullable — each link's pre-#705 per-fetch count, preserved at the dedupe cutover (migration 0058). Nothing reads it; it keeps the cutover reversible                                                                                                                              |
 
 Indexes: `idx_share_links_slug(slug)`, `idx_share_links_expires_at(expires_at)`.
 
@@ -330,15 +330,15 @@ Indexes: `idx_share_links_slug(slug)`, `idx_share_links_expires_at(expires_at)`.
 
 One row per (share link, visitor). The dedupe ledger behind `share_links.view_count` (#705).
 
-| Column         | Type | Notes                                                                                                        |
-| -------------- | ---- | ------------------------------------------------------------------------------------------------------------ |
-| `slug`         | TEXT | NOT NULL, part of PK, FK → `share_links(slug)` ON DELETE CASCADE                                              |
+| Column         | Type | Notes                                                                                                                                                                                             |
+| -------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `slug`         | TEXT | NOT NULL, part of PK, FK → `share_links(slug)` ON DELETE CASCADE                                                                                                                                  |
 | `visitor_hash` | TEXT | NOT NULL, part of PK — SHA-256 of `ip\|user-agent\|slug` (`functions/utils/visitorDedupe.js`). The raw IP is never stored; the slug salts each link so a visitor is not correlatable across links |
-| `first_seen`   | TEXT | NOT NULL, DEFAULT `datetime('now')` — written only by the default, never from JS                              |
+| `first_seen`   | TEXT | NOT NULL, DEFAULT `datetime('now')` — written only by the default, never from JS                                                                                                                  |
 
 Index: `idx_share_link_views_slug(slug)`.
 
-**The `ON DELETE CASCADE` does not fire for the expiry cron.** `functions/scheduled/expire-share-links.js` runs via `_scheduled.js`, which never passes through `_middleware.js` where `PRAGMA foreign_keys = ON` is set, and D1 defaults it OFF. That cron therefore deletes ledger rows explicitly, child-first, in a `DB.batch()`. The cascade *is* live on the event-deletion path, which is an HTTP request.
+**The `ON DELETE CASCADE` does not fire for the expiry cron.** `functions/scheduled/expire-share-links.js` runs via `_scheduled.js`, which never passes through `_middleware.js` where `PRAGMA foreign_keys = ON` is set, and D1 defaults it OFF. That cron therefore deletes ledger rows explicitly, child-first, in a `DB.batch()`. The cascade _is_ live on the event-deletion path, which is an HTTP request.
 Per `CLAUDE.md`, `share_links` — not telemetry events — is the source of truth
 for share create/view counts.
 
@@ -371,8 +371,8 @@ Created by `POST /api/subscriptions/subscribe`.
 | `last_email_sent`    | TEXT    | Nullable                                                               |
 | `consent_ip`         | TEXT    | Nullable — added in migration 0045                                     |
 | `consent_method`     | TEXT    | NOT NULL, DEFAULT `'web_form'` — added in migration 0045               |
-| `confirmed_at`       | TEXT    | Nullable — set when the subscription is confirmed                     |
-| `consent_version`    | TEXT    | Nullable — wording/version shown when consent was given               |
+| `confirmed_at`       | TEXT    | Nullable — set when the subscription is confirmed                      |
+| `consent_version`    | TEXT    | Nullable — wording/version shown when consent was given                |
 
 Constraint: `UNIQUE(email, city, genre)`. Indexes:
 `idx_subscriptions_email(email)`, `idx_subscriptions_city_genre(city, genre)`,
@@ -413,14 +413,14 @@ Per-subscription, per-event delivery claims. `claimed_at` is not proof of
 delivery; undelivered claims past the lease are retryable, while
 `delivered_at` makes a successful delivery permanent.
 
-| Column            | Type    | Notes |
-| ----------------- | ------- | ----- |
-| `id`              | INTEGER | PK |
+| Column            | Type    | Notes                                                      |
+| ----------------- | ------- | ---------------------------------------------------------- |
+| `id`              | INTEGER | PK                                                         |
 | `subscription_id` | INTEGER | NOT NULL, FK → `email_subscriptions(id)` ON DELETE CASCADE |
-| `event_id`        | INTEGER | NOT NULL, FK → `events(id)` ON DELETE CASCADE |
-| `kind`            | TEXT    | NOT NULL |
-| `claimed_at`      | TEXT    | NOT NULL, default `datetime('now')` |
-| `delivered_at`    | TEXT    | Nullable |
+| `event_id`        | INTEGER | NOT NULL, FK → `events(id)` ON DELETE CASCADE              |
+| `kind`            | TEXT    | NOT NULL                                                   |
+| `claimed_at`      | TEXT    | NOT NULL, default `datetime('now')`                        |
+| `delivered_at`    | TEXT    | Nullable                                                   |
 
 Constraint: `UNIQUE(subscription_id, event_id, kind)`. Index:
 `idx_subscription_notifications_lookup(event_id, kind, subscription_id)`.
@@ -431,13 +431,13 @@ One row per (event, performance, anonymous session), recorded when a fan adds
 a performance to their schedule (`POST /api/schedule/build`); read by the
 admin event metrics endpoint.
 
-| Column           | Type    | Notes                                               |
-| ---------------- | ------- | --------------------------------------------------- |
-| `id`             | INTEGER | PK, autoincrement                                   |
-| `event_id`       | INTEGER | NOT NULL, FK → `events(id)` ON DELETE CASCADE       |
-| `performance_id` | INTEGER | NOT NULL, FK → `performances(id)` ON DELETE CASCADE |
+| Column           | Type    | Notes                                                                                      |
+| ---------------- | ------- | ------------------------------------------------------------------------------------------ |
+| `id`             | INTEGER | PK, autoincrement                                                                          |
+| `event_id`       | INTEGER | NOT NULL, FK → `events(id)` ON DELETE CASCADE                                              |
+| `performance_id` | INTEGER | NOT NULL, FK → `performances(id)` ON DELETE CASCADE                                        |
 | `visitor_hash`   | TEXT    | NOT NULL — per-event pseudonym derived from the schedule session, never the raw session ID |
-| `created_at`     | TEXT    | NOT NULL, DEFAULT `datetime('now')`                 |
+| `created_at`     | TEXT    | NOT NULL, DEFAULT `datetime('now')`                                                        |
 
 Indexes: `idx_schedule_builds_event(event_id)`,
 `idx_schedule_builds_created(created_at)`, plus the UNIQUE index
@@ -524,18 +524,19 @@ and a partial unique index `idx_mfa_challenges_active_user(user_id) WHERE used =
 Admin-issued signup invites (bypassed only by the test-only
 `ALLOW_ADMIN_SIGNUP` env var — never set in production). Added in migration 0009.
 
-| Column               | Type    | Notes                                                  |
-| -------------------- | ------- | ------------------------------------------------------ |
-| `id`                 | INTEGER | PK, autoincrement                                      |
-| `code`               | TEXT    | NOT NULL, UNIQUE                                       |
-| `email`              | TEXT    | Nullable                                               |
-| `role`               | TEXT    | NOT NULL, DEFAULT `'editor'`                           |
-| `created_by_user_id` | INTEGER | Nullable, FK → `users(id)` ON DELETE SET NULL          |
-| `used_by_user_id`    | INTEGER | Nullable, FK → `users(id)` ON DELETE SET NULL          |
-| `created_at`         | TEXT    | NOT NULL, DEFAULT `datetime('now')`                    |
-| `used_at`            | TEXT    | Nullable                                               |
-| `expires_at`         | TEXT    | NOT NULL — see "SQLite datetime" gotcha above (SEC-F1) |
-| `is_active`          | INTEGER | NOT NULL, DEFAULT 1                                    |
+| Column               | Type    | Notes                                                                     |
+| -------------------- | ------- | ------------------------------------------------------------------------- |
+| `id`                 | INTEGER | PK, autoincrement                                                         |
+| `code`               | TEXT    | NOT NULL, UNIQUE. `sha256:<hex>` digest; `retired:<id>` once dead (#1334) |
+| `code_prefix`        | TEXT    | Nullable. First 8 characters of the plaintext, display only               |
+| `email`              | TEXT    | Nullable                                                                  |
+| `role`               | TEXT    | NOT NULL, DEFAULT `'editor'`                                              |
+| `created_by_user_id` | INTEGER | Nullable, FK → `users(id)` ON DELETE SET NULL                             |
+| `used_by_user_id`    | INTEGER | Nullable, FK → `users(id)` ON DELETE SET NULL                             |
+| `created_at`         | TEXT    | NOT NULL, DEFAULT `datetime('now')`                                       |
+| `used_at`            | TEXT    | Nullable                                                                  |
+| `expires_at`         | TEXT    | NOT NULL — see "SQLite datetime" gotcha above (SEC-F1)                    |
+| `is_active`          | INTEGER | NOT NULL, DEFAULT 1                                                       |
 
 Indexes: `idx_invite_codes_code(code)`,
 `idx_invite_codes_active(is_active, expires_at)`,
@@ -692,18 +693,18 @@ Machine credentials issued by admins. The plaintext key is returned once and
 only its hash is stored. The creator reference is `ON DELETE RESTRICT`, so
 deleting a user who owns a key is refused until the account is deactivated.
 
-| Column       | Type    | Notes |
-| ------------ | ------- | ----- |
-| `id`         | INTEGER | PK, autoincrement |
-| `name`       | TEXT    | NOT NULL |
-| `key_prefix` | TEXT    | NOT NULL, non-secret display prefix |
-| `key_hash`   | TEXT    | NOT NULL, UNIQUE |
-| `role`       | TEXT    | NOT NULL, `viewer` / `editor` / `admin` |
-| `created_by` | INTEGER | NOT NULL, FK → `users(id)` ON DELETE RESTRICT |
-| `created_at` | TEXT    | NOT NULL, default `datetime('now')` |
-| `expires_at` | TEXT    | NOT NULL, SQLite datetime with a space separator |
-| `last_used_at` | TEXT  | Nullable |
-| `revoked_at` | TEXT    | Nullable |
+| Column         | Type    | Notes                                            |
+| -------------- | ------- | ------------------------------------------------ |
+| `id`           | INTEGER | PK, autoincrement                                |
+| `name`         | TEXT    | NOT NULL                                         |
+| `key_prefix`   | TEXT    | NOT NULL, non-secret display prefix              |
+| `key_hash`     | TEXT    | NOT NULL, UNIQUE                                 |
+| `role`         | TEXT    | NOT NULL, `viewer` / `editor` / `admin`          |
+| `created_by`   | INTEGER | NOT NULL, FK → `users(id)` ON DELETE RESTRICT    |
+| `created_at`   | TEXT    | NOT NULL, default `datetime('now')`              |
+| `expires_at`   | TEXT    | NOT NULL, SQLite datetime with a space separator |
+| `last_used_at` | TEXT    | Nullable                                         |
+| `revoked_at`   | TEXT    | Nullable                                         |
 
 ### Metrics
 
@@ -743,14 +744,14 @@ Constraint: `UNIQUE(page, date)`. Index: `idx_page_views_date(date)`.
 
 Per-event, per-day aggregate counters.
 
-| Column         | Type    | Notes |
-| -------------- | ------- | ----- |
-| `id`           | INTEGER | PK, autoincrement |
-| `event_id`     | INTEGER | NOT NULL |
-| `date`         | TEXT    | NOT NULL, `YYYY-MM-DD` |
-| `event_views`  | INTEGER | DEFAULT 0 |
-| `ticket_clicks`| INTEGER | DEFAULT 0 |
-| `created_at`   | TEXT    | DEFAULT `datetime('now')` |
+| Column          | Type    | Notes                     |
+| --------------- | ------- | ------------------------- |
+| `id`            | INTEGER | PK, autoincrement         |
+| `event_id`      | INTEGER | NOT NULL                  |
+| `date`          | TEXT    | NOT NULL, `YYYY-MM-DD`    |
+| `event_views`   | INTEGER | DEFAULT 0                 |
+| `ticket_clicks` | INTEGER | DEFAULT 0                 |
+| `created_at`    | TEXT    | DEFAULT `datetime('now')` |
 
 Constraint: `UNIQUE(event_id, date)`. Index: `idx_event_daily_stats_date(date)`.
 

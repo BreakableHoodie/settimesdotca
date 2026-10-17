@@ -12,6 +12,7 @@ import {
 import { logger } from "../../../utils/logger.js";
 import { getPublicBaseUrl } from "../../../utils/publicUrl.js";
 import { auditLog } from "../_middleware.js";
+import { hashInviteCode } from "../../../utils/inviteCodes.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -117,6 +118,11 @@ export async function onRequestPost(context) {
       );
     }
 
+    // SECURITY: invite codes are stored as digests (#1334), so every lookup
+    // below binds the hash. A submitted `sha256:...` or `retired:<id>` is hashed
+    // like any other string and matches nothing.
+    const inviteCodeHash = await hashInviteCode(inviteCode);
+
     // SECURITY: Validate invite code
     const invite = await DB.prepare(
       `
@@ -127,7 +133,7 @@ export async function onRequestPost(context) {
       AND used_by_user_id IS NULL
     `,
     )
-      .bind(inviteCode)
+      .bind(inviteCodeHash)
       .first();
 
     if (!invite) {
@@ -272,7 +278,7 @@ export async function onRequestPost(context) {
         0,
         activationToken,
         activationExpires,
-        inviteCode,
+        inviteCodeHash,
       ),
       // The claim is keyed on the user THIS batch inserted (found by this
       // request's fresh activation token), not on a second clock check. D1
@@ -284,7 +290,7 @@ export async function onRequestPost(context) {
          SET used_by_user_id = (SELECT id FROM users WHERE activation_token = ?), used_at = datetime('now')
          WHERE code = ? AND used_by_user_id IS NULL
            AND EXISTS (SELECT 1 FROM users WHERE activation_token = ?)`,
-      ).bind(activationToken, inviteCode, activationToken),
+      ).bind(activationToken, inviteCodeHash, activationToken),
     ]);
 
     // Only an EXPLICIT changes === 0 means "lost the race" (CLAUDE.md: an

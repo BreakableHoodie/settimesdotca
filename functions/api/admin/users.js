@@ -10,6 +10,7 @@ import { sendEmail, isEmailConfigured } from "../../utils/email.js";
 import { buildInviteEmail } from "../../utils/emailTemplates.js";
 import { getPublicBaseUrl } from "../../utils/publicUrl.js";
 import { toSqliteDateTime } from "../../utils/authAttempts.js";
+import { generateInviteCode } from "../../utils/inviteCodes.js";
 
 // GET - List all users (admin only)
 export async function onRequestGet(context) {
@@ -124,19 +125,19 @@ export async function onRequestPost(context) {
       );
     }
 
-    const inviteCode = crypto.randomUUID();
+    const { plaintext: inviteCode, codeHash, codePrefix } = await generateInviteCode();
     const expiresInDays = 7;
     const expiresAt = toSqliteDateTime(new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000));
 
     // Create invite code
     const invite = await DB.prepare(
       `
-      INSERT INTO invite_codes (code, email, role, created_by_user_id, expires_at)
-      VALUES (?, ?, ?, ?, ?)
-      RETURNING *
+      INSERT INTO invite_codes (code, code_prefix, email, role, created_by_user_id, expires_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+      RETURNING id, email, role, expires_at, code_prefix
     `,
     )
-      .bind(inviteCode, email, role, currentUser.userId, expiresAt)
+      .bind(codeHash, codePrefix, email, role, currentUser.userId, expiresAt)
       .first();
 
     const baseUrl = getPublicBaseUrl(env);

@@ -590,7 +590,7 @@ Three traps here, each of which was live:
 `context.data.user.role` is **the key's role, never its creator's**, and `context.data.apiKey` carries `{ id, keyPrefix, role }`; endpoints need no changes because `checkPermission` reads `context.data.user`. `context.data.user.userId` is **the creator's**, and that is the sharp edge: an endpoint that reads `userId` as "the human in this browser" acts on the creator's own account. A security review found five such endpoints live (MFA setup and enable, the sessions list, revoke-all, trusted devices). So:
 
 - `KEY_FORBIDDEN_PREFIXES` 403s self-service families (`KEY_NOT_PERMITTED`) **before** the key is verified, for every key role including `admin`. `/api/admin/me` is deliberately not listed. Both key prefix checks run against every normalised spelling of the path (`keyPathForms`, #1327), because no single normalisation is known to match the router's: percent-decoding to a fixed point, NFKC folding, `\` as a separator, and `..` resolved at each decode depth. A path still decoding after 4 rounds, or malformed on the first, is refused outright. Add a bypass you find to `NON_CANONICAL` in `api-key-auth.test.js` rather than special-casing it.
-- Keys are read-only on `/api/admin/users` and `/api/admin/api-keys` (mutations refused before key verification), and barred from `/api/admin/invite-codes` entirely, because its GET exposes plaintext codes. Identity management is a human act.
+- Keys are read-only on `/api/admin/users` and `/api/admin/api-keys` (mutations refused before key verification), and barred from `/api/admin/invite-codes` entirely, because an invite code mints an account and identity management is a human act. (Its GET no longer returns codes, #1334; the bar stays.)
 - `revoke-all.js` calls `checkPermission(context, "viewer")` itself. Viewer, so self-service logout works at every role.
 - `apiKeySelfService.test.js` fails on any admin handler with no `checkPermission` that is neither denylisted nor in `REVIEWED_UNGATED_ROUTES`. It catches only the ungated shape: the MFA shape (viewer-gated, acting on self) is covered by name, and a new self-service family outside these prefixes needs a human to notice.
 
@@ -602,6 +602,16 @@ Related rules:
 - `parseCookies` (`cookies.js`) trims cookie names and keeps values that contain `=`.
 
 The review's findings table and the corrected reasoning: `docs/field-notes/api-keys.md`.
+
+### Invite codes are stored hashed (#1334)
+
+An invite code is a bearer credential that mints an account, possibly an admin one, so it is handled like an API key: **the plaintext exists only in the creation response and the invite link.** `functions/utils/inviteCodes.js` owns the scheme.
+
+- `invite_codes.code` holds `'sha256:' || hex(SHA-256(plaintext))`; `code_prefix` holds the first 8 plaintext characters for display. The digest is fast and unsalted for the same reason as API keys (122 random bits, looked up by equality).
+- **Signup hashes the submitted code** before the SELECT, the `EXISTS` re-check and the claim `UPDATE`, so a submitted `sha256:...` or `retired:<id>` matches nothing. Never bind the raw code.
+- Dead rows (used, revoked, expired) were retired by migration 0071 to `code = 'retired:<id>'`; live rows were converted by a one-off script after deploy, because SQLite cannot SHA-256.
+- `GET /api/admin/invite-codes` projects explicit columns with no `code`. `POST /api/admin/users` returns an explicit `invite` projection and the URL only when email delivery failed. No audit row or log carries the code.
+- **Revoke is by id**: `DELETE /api/admin/invite-codes/[id]`, because a digest cannot be a URL key. Any new invite writer must call `generateInviteCode()` and return the plaintext once; `invite-codes.test.js` scans both creation routes through GET.
 
 ### Time validation is shape AND range — `isValidTime()` is the only home (#1089)
 

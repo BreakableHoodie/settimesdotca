@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createTestEnv } from "../../../test-utils";
 import { hashPassword } from "../../../../utils/crypto.js";
 import { generateTotpCode, generateTotpSecret, hashBackupCode } from "../../../../utils/totp.js";
@@ -150,6 +150,40 @@ describe("admin mfa", () => {
 
     const user = rawDb.prepare("SELECT backup_codes FROM users WHERE id = ?").get(1);
     expect(user.backup_codes).toBeNull();
+  });
+
+  it("counts the guess when the TOTP secret cannot be loaded and the backup code is wrong (#1335)", async () => {
+    const { env, rawDb } = createTestEnv({ role: "admin" });
+    const encryptedSecret = await encryptTotpSecret(generateTotpSecret(), env);
+    rawDb
+      .prepare("UPDATE users SET totp_secret = ?, totp_enabled = 1, backup_codes = NULL WHERE id = 1")
+      .run(encryptedSecret);
+    const mfaToken = crypto.randomUUID();
+    rawDb
+      .prepare(
+        `INSERT INTO mfa_challenges (token, user_id, ip_address, user_agent, expires_at)
+         VALUES (?, 1, '127.0.0.1', 'test-agent', ?)`,
+      )
+      .run(mfaToken, new Date(Date.now() + 5 * 60 * 1000).toISOString());
+    env.MFA_TOTP_ENCRYPTION_KEY = "";
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const response = await mfaVerifyHandler.onRequestPost({
+      request: new Request("https://example.test/api/admin/auth/mfa/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "CF-Connecting-IP": "127.0.0.1", "User-Agent": "test-agent" },
+        body: JSON.stringify({ mfaToken, code: "WRONG-CODE" }),
+      }),
+      env,
+    });
+    errors.mockRestore();
+
+    expect(response.status).toBe(500);
+    expect(
+      rawDb
+        .prepare("SELECT success, failure_reason, user_id FROM auth_attempts WHERE attempt_type = ?")
+        .all(AUTH_ATTEMPT_TYPES.mfa),
+    ).toEqual([{ success: 0, failure_reason: "totp_secret_error", user_id: 1 }]);
   });
 
   it("replaces any previously active MFA challenge when login issues a new token", async () => {

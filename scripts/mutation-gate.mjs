@@ -1139,6 +1139,78 @@ export const MUTATIONS = [
     replace: "  if (false) {",
     tests: ["functions/api/admin/mfa/__tests__/mfa-guess-limit.test.js"],
   },
+  {
+    id: "totp-login-step-claim-is-conditional",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' \u2014 one accepted TOTP code per time step per user: the login step write is conditional, so two parallel logins with one code cannot both win (#1333)",
+    file: "functions/api/admin/auth/mfa/verify.js",
+    find: "AND (totp_last_step IS NULL OR totp_last_step < ?)`,",
+    replace: "AND ? IS NOT NULL`,",
+    tests: ["functions/api/admin/mfa/__tests__/totp-replay.test.js"],
+  },
+  {
+    id: "totp-step-up-claim-is-in-the-stamp-predicate",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' \u2014 the step-up stamp commits only if the TOTP step is still unspent, so a parallel request with the same code cannot also stamp (#1333)",
+    file: "functions/api/admin/mfa/step-up.js",
+    find: "? `${baseFactorPredicate} AND (totp_last_step IS NULL OR totp_last_step < ?)`",
+    replace: "? `${baseFactorPredicate} AND ? IS NOT NULL`",
+    tests: ["functions/api/admin/mfa/__tests__/totp-replay.test.js"],
+  },
+  {
+    id: "totp-step-must-be-strictly-greater",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' \u2014 a code is accepted only when its step is strictly greater than users.totp_last_step; an equal step is a replay (#1333)",
+    file: "functions/utils/totp.js",
+    find: "lastStep === undefined || step > lastStep);",
+    replace: "lastStep === undefined || step >= lastStep);",
+    tests: ["functions/utils/__tests__/totp.test.js", "functions/api/admin/mfa/__tests__/totp-replay.test.js"],
+  },
+  {
+    id: "totp-verify-returns-the-matched-step",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' \u2014 verifyTotpStep returns the matched time-step counter, which callers record; losing it makes replay protection a no-op (#1333)",
+    file: "functions/utils/totp.js",
+    find: "  return matchedStep;\n}",
+    replace: "  return matchedStep === null ? null : 0;\n}",
+    tests: ["functions/utils/__tests__/totp.test.js", "functions/api/admin/mfa/__tests__/totp-replay.test.js"],
+  },
+  {
+    id: "totp-disable-step-claim-is-conditional",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' \u2014 mfa/disable claims the TOTP step with a conditional write before it acts (#1333)",
+    file: "functions/api/admin/mfa/disable.js",
+    find: "AND (totp_last_step IS NULL OR totp_last_step < ?)`,",
+    replace: "AND ? IS NOT NULL`,",
+    tests: ["functions/api/admin/mfa/__tests__/totp-replay.test.js"],
+  },
+  {
+    id: "totp-backup-codes-step-claim-is-conditional",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' \u2014 mfa/backup-codes claims the TOTP step with a conditional write before it issues codes (#1333)",
+    file: "functions/api/admin/mfa/backup-codes.js",
+    find: "AND (totp_last_step IS NULL OR totp_last_step < ?)`,",
+    replace: "AND ? IS NOT NULL`,",
+    tests: ["functions/api/admin/mfa/__tests__/totp-replay.test.js"],
+  },
+  {
+    id: "totp-admin-reset-clears-spent-step",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' \u2014 an admin 2FA reset clears totp_last_step, so a stale step from the old secret cannot refuse the new authenticator (#1333)",
+    file: "functions/api/admin/users/[id]/reset-mfa.js",
+    find: "backup_codes = NULL, totp_last_step = NULL, updated_at",
+    replace: "backup_codes = NULL, updated_at",
+    tests: ["functions/api/admin/mfa/__tests__/totp-replay.test.js"],
+  },
+  {
+    id: "mfa-login-counts-guess-when-secret-unreadable",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' \u2014 a login guess made while the TOTP secret cannot be loaded still counts toward the rate limit (#1335)",
+    file: "functions/api/admin/auth/mfa/verify.js",
+    find: 'await writeAuthAttempt(DB, {\n        attemptType: AUTH_ATTEMPT_TYPES.mfa,\n        email: challenge.email,\n        failureReason: "totp_secret_error",\n        ipAddress,\n        success: false,\n        userAgent,\n        userId: challenge.user_id,\n      });',
+    replace: "// attempt not recorded",
+    tests: ["functions/api/admin/auth/__tests__/mfa.test.js"],
+  },
 ];
 
 // ============================================================================

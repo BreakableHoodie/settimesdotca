@@ -5,7 +5,7 @@
 import { checkPermission, auditLog } from "../_middleware.js";
 import { AUTH_ATTEMPT_TYPES } from "../../../utils/authAttempts.js";
 import { beginMfaGuess, settleQuietly } from "../../../utils/mfaGuessGate.js";
-import { verifyTotp, generateBackupCodes, hashBackupCode } from "../../../utils/totp.js";
+import { verifyTotpStep, totpStepIsFresh, generateBackupCodes, hashBackupCode } from "../../../utils/totp.js";
 import { loadTotpSecret } from "../../../utils/mfaSecrets.js";
 import { getClientIP, parseJsonObjectBody } from "../../../utils/request.js";
 
@@ -42,7 +42,9 @@ export async function onRequestPost(context) {
     );
   }
 
-  const user = await DB.prepare("SELECT email, totp_secret, totp_enabled FROM users WHERE id = ?").bind(userId).first();
+  const user = await DB.prepare("SELECT email, totp_secret, totp_enabled, totp_last_step FROM users WHERE id = ?")
+    .bind(userId)
+    .first();
 
   if (!user) {
     return new Response(
@@ -101,7 +103,21 @@ export async function onRequestPost(context) {
     );
   }
 
-  const valid = await verifyTotp(totpSecretState?.secret, code);
+  // One accepted code per time step (#1333); a replayed step is a wrong code.
+  const matchedStep = await verifyTotpStep(totpSecretState?.secret, code);
+  let valid = totpStepIsFresh(matchedStep, user.totp_last_step);
+  if (valid) {
+    // Claim the step BEFORE the new codes exist, bound to the factor verified.
+    // Losing means a parallel request spent this code: refuse like a wrong one.
+    const claimed = await DB.prepare(
+      `UPDATE users SET totp_last_step = ?
+       WHERE id = ? AND totp_enabled = 1 AND totp_secret = ?
+         AND (totp_last_step IS NULL OR totp_last_step < ?)`,
+    )
+      .bind(matchedStep, userId, user.totp_secret, matchedStep)
+      .run();
+    valid = claimed?.meta?.changes !== 0;
+  }
   if (!valid) {
     await settleQuietly(DB, attemptId, { success: false, failureReason: "invalid_code" });
 

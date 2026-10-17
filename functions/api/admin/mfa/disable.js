@@ -6,7 +6,7 @@ import { checkPermission, auditLog } from "../_middleware.js";
 import { mfaRequiredForRole } from "../../../utils/mfaPolicy.js";
 import { AUTH_ATTEMPT_TYPES } from "../../../utils/authAttempts.js";
 import { beginMfaGuess, settleQuietly } from "../../../utils/mfaGuessGate.js";
-import { verifyTotp, verifyBackupCode } from "../../../utils/totp.js";
+import { verifyTotpStep, totpStepIsFresh, verifyBackupCode } from "../../../utils/totp.js";
 import { loadTotpSecret } from "../../../utils/mfaSecrets.js";
 import { getClientIP, parseJsonObjectBody } from "../../../utils/request.js";
 import { revokeAllTrustedDevices } from "../../../utils/trustedDevice.js";
@@ -68,7 +68,9 @@ export async function onRequestPost(context) {
     );
   }
 
-  const user = await DB.prepare("SELECT email, totp_secret, totp_enabled, backup_codes FROM users WHERE id = ?")
+  const user = await DB.prepare(
+    "SELECT email, totp_secret, totp_enabled, backup_codes, totp_last_step FROM users WHERE id = ?",
+  )
     .bind(userId)
     .first();
 
@@ -124,7 +126,19 @@ export async function onRequestPost(context) {
   }
 
   if (totpSecretState?.secret) {
-    verified = await verifyTotp(totpSecretState.secret, code);
+    // One accepted code per time step (#1333); a replayed step is a wrong code.
+    const step = await verifyTotpStep(totpSecretState.secret, code);
+    if (totpStepIsFresh(step, user.totp_last_step)) {
+      // Claim the step before the effect, bound to the factor just verified.
+      const claimed = await DB.prepare(
+        `UPDATE users SET totp_last_step = ?
+         WHERE id = ? AND totp_enabled = 1 AND totp_secret IS ?
+           AND (totp_last_step IS NULL OR totp_last_step < ?)`,
+      )
+        .bind(step, userId, user.totp_secret ?? null, step)
+        .run();
+      verified = claimed?.meta?.changes !== 0;
+    }
   }
 
   if (!verified) {
@@ -165,7 +179,7 @@ export async function onRequestPost(context) {
 
   await DB.prepare(
     `UPDATE users
-     SET totp_enabled = 0, totp_secret = NULL, backup_codes = NULL
+     SET totp_enabled = 0, totp_secret = NULL, backup_codes = NULL, totp_last_step = NULL
      WHERE id = ?`,
   )
     .bind(userId)

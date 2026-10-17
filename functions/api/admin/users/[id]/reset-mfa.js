@@ -60,7 +60,7 @@ export async function onRequestPost(context) {
 
     await DB.batch([
       DB.prepare(
-        "UPDATE users SET totp_enabled = 0, totp_secret = NULL, backup_codes = NULL, updated_at = datetime('now') WHERE id = ?",
+        "UPDATE users SET totp_enabled = 0, totp_secret = NULL, backup_codes = NULL, totp_last_step = NULL, updated_at = datetime('now') WHERE id = ?",
       ).bind(userId),
       DB.prepare("DELETE FROM lucia_sessions WHERE user_id = ?").bind(userId),
       DB.prepare("DELETE FROM trusted_devices WHERE user_id = ?").bind(userId),

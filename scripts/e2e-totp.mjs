@@ -27,3 +27,33 @@ export async function deriveE2eTotpSecret(password) {
 export async function e2eTotpCode(password, timeMs = Date.now()) {
   return generateTotpCode(await deriveE2eTotpSecret(password), timeMs);
 }
+
+// The server accepts each TOTP time-step once per user (#1333), and the ±1
+// window means steps now-1, now and now+1 are all valid at any instant. Every
+// E2E code goes through here, so two logins (or a login and a step-up) in the
+// same 30 s never present the same step. `lastStep` is per process; another
+// worker may have spent a step too, which callers learn from a refusal and
+// report back through `markTotpStepSpent`.
+const STEP_MS = 30_000;
+let lastStep = -Infinity;
+
+export function markTotpStepSpent(step) {
+  if (step > lastStep) lastStep = step;
+}
+
+// { code, step } for the earliest still-valid step after the last spent one,
+// or null when all three valid steps are spent (wait for the next window).
+export async function nextE2eTotpCode(password, nowMs = Date.now()) {
+  const current = Math.floor(nowMs / STEP_MS);
+  for (const step of [current - 1, current, current + 1]) {
+    if (step > lastStep) {
+      markTotpStepSpent(step);
+      return { code: await e2eTotpCode(password, step * STEP_MS), step };
+    }
+  }
+  return null;
+}
+
+export function msUntilNextTotpStep(nowMs = Date.now()) {
+  return STEP_MS - (nowMs % STEP_MS) + 250;
+}

@@ -119,26 +119,42 @@ export async function generateTotpCode(secret, timeMs = Date.now()) {
   return hotp(base32Decode(secret), counter, DEFAULT_TOTP_DIGITS);
 }
 
-export async function verifyTotp(secret, code, window = 1) {
+// Returns the time-step counter the code matched, or null. The caller must
+// accept it only if it is greater than users.totp_last_step and then record it
+// with a conditional write: RFC 6238 section 5.2 forbids accepting an OTP twice
+// (#1333). Walks the full +/- window with no early exit so a match's position
+// doesn't leak; if more than one offset matches, the highest step wins.
+export async function verifyTotpStep(secret, code, window = 1) {
   const normalized = normalizeCode(code);
 
   if (!secret || !normalized) {
-    return false;
+    return null;
   }
 
   const secretBytes = base32Decode(secret);
   const counter = Math.floor(Date.now() / 1000 / DEFAULT_TOTP_STEP_SECONDS);
   const span = Math.max(0, window);
 
-  let matched = false;
-  // Walk the full ± window without early-exit so a match's step index doesn't leak.
+  let matchedStep = null;
   for (let offset = -span; offset <= span; offset += 1) {
-    const candidate = await hotp(secretBytes, counter + offset, DEFAULT_TOTP_DIGITS);
-    if (constantTimeEqual(candidate, normalized)) {
-      matched = true;
+    const step = counter + offset;
+    const candidate = await hotp(secretBytes, step, DEFAULT_TOTP_DIGITS);
+    if (constantTimeEqual(candidate, normalized) && (matchedStep === null || step > matchedStep)) {
+      matchedStep = step;
     }
   }
-  return matched;
+  return matchedStep;
+}
+
+// True when `step` is a match that has not been accepted before. `lastStep` is
+// users.totp_last_step (NULL = nothing accepted yet).
+export function totpStepIsFresh(step, lastStep) {
+  return step !== null && step !== undefined && (lastStep === null || lastStep === undefined || step > lastStep);
+}
+
+// Boolean form, for callers that only need "is this a valid code right now".
+export async function verifyTotp(secret, code, window = 1) {
+  return (await verifyTotpStep(secret, code, window)) !== null;
 }
 
 export function generateBackupCodes(count = DEFAULT_BACKUP_CODE_COUNT) {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createTestEnv } from "../../../test-utils";
 import { generateTotpCode } from "../../../../utils/totp.js";
 import { AUTH_ATTEMPT_TYPES } from "../../../../utils/authAttempts.js";
@@ -23,7 +23,15 @@ function adoptSessionFrom(response, headers) {
   headers.Authorization = `Bearer ${sessionId}`;
 }
 
+// A TOTP code is accepted once per time step (#1333), so a test that uses the
+// factor twice must let a step pass between the uses.
+const advanceOneTotpStep = () => vi.setSystemTime(Date.now() + 30_000);
+
 describe("admin mfa settings", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("returns status and setup flow toggles setupPending", async () => {
     const { env, headers, rawDb } = createTestEnv({ role: "admin", mfaEnrolled: false });
 
@@ -107,6 +115,7 @@ describe("admin mfa settings", () => {
   // A viewer: 2FA stays optional below editor, so a viewer may still turn it
   // off. Admins and editors cannot (#1253, covered below).
   it("regenerates backup codes and disables MFA", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
     const { env, headers, rawDb } = createTestEnv({ role: "viewer" });
     const setupReq = new Request("https://example.test/api/admin/mfa/setup", {
       method: "POST",
@@ -128,6 +137,7 @@ describe("admin mfa settings", () => {
     const enableRes = await mfaEnableHandler.onRequestPost({ request: enableReq, env });
     adoptSessionFrom(enableRes, headers);
 
+    advanceOneTotpStep();
     const regenCode = await generateTotpCode(setupPayload.secret);
     const regenReq = new Request("https://example.test/api/admin/mfa/backup-codes", {
       method: "POST",
@@ -142,6 +152,7 @@ describe("admin mfa settings", () => {
     const regenPayload = await regenRes.json();
     expect(regenPayload.backupCodes?.length).toBeGreaterThan(0);
 
+    advanceOneTotpStep();
     const disableCode = await generateTotpCode(setupPayload.secret);
     const disableReq = new Request("https://example.test/api/admin/mfa/disable", {
       method: "POST",
@@ -270,6 +281,7 @@ describe("admin mfa settings", () => {
   });
 
   it("regenerating backup codes does not write an old secret back after a reset", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
     const { env, headers, rawDb } = createTestEnv({ role: "admin", mfaEnrolled: false });
     const setupRes = await mfaSetupHandler.onRequestPost({
       request: new Request("https://example.test/api/admin/mfa/setup", {
@@ -290,6 +302,7 @@ describe("admin mfa settings", () => {
     });
     expect(enableRes.status).toBe(200);
     adoptSessionFrom(enableRes, headers);
+    advanceOneTotpStep();
 
     const prepare = env.DB.prepare.bind(env.DB);
     let interleaved = false;

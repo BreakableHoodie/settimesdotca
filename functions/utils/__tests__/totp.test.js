@@ -3,6 +3,8 @@ import {
   generateTotpSecret,
   generateTotpCode,
   verifyTotp,
+  verifyTotpStep,
+  totpStepIsFresh,
   generateBackupCodes,
   hashBackupCode,
   verifyBackupCode,
@@ -201,6 +203,35 @@ describe("totp utilities", () => {
       // code has already been consumed and removed from the persisted set.
       const secondAttempt = await verifyBackupCode(codes[0], firstAttempt.remaining);
       expect(secondAttempt.valid).toBe(false);
+    });
+  });
+
+  describe("verifyTotpStep (#1333)", () => {
+    const T0 = Date.UTC(2026, 9, 17, 12, 0, 0); // a multiple of 30 s
+    const step = Math.floor(T0 / 30_000);
+
+    it("returns the matched time-step counter, and null for a wrong code", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        vi.setSystemTime(T0);
+        const secret = generateTotpSecret();
+        expect(await verifyTotpStep(secret, await generateTotpCode(secret, T0))).toBe(step);
+        expect(await verifyTotpStep(secret, await generateTotpCode(secret, T0 - 30_000))).toBe(step - 1);
+        expect(await verifyTotpStep(secret, await generateTotpCode(secret, T0 + 30_000))).toBe(step + 1);
+        expect(await verifyTotpStep(secret, await generateTotpCode(secret, T0 + 90_000))).toBeNull();
+        expect(await verifyTotpStep(secret, "")).toBeNull();
+        expect(await verifyTotpStep("", "123456")).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("totpStepIsFresh accepts only a step strictly after the last accepted one", () => {
+      expect(totpStepIsFresh(10, null)).toBe(true);
+      expect(totpStepIsFresh(10, 9)).toBe(true);
+      expect(totpStepIsFresh(10, 10)).toBe(false);
+      expect(totpStepIsFresh(10, 11)).toBe(false);
+      expect(totpStepIsFresh(null, null)).toBe(false);
     });
   });
 });

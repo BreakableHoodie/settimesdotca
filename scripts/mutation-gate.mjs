@@ -750,8 +750,8 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'RBAC Roles' — the invite claim does not re-check expiry; datetime('now') is not stable across a batch, so an invite expiring between INSERT and claim would leave a 201 signup with its invite reusable (#1252 review)",
     file: "functions/api/admin/auth/signup.js",
-    find: "WHERE code = ? AND used_by_user_id IS NULL\n",
-    replace: "WHERE code = ? AND used_by_user_id IS NULL AND expires_at > datetime('now')\n",
+    find: "WHERE code = ? AND used_by_user_id IS NULL AND used_at IS NULL\n",
+    replace: "WHERE code = ? AND used_by_user_id IS NULL AND used_at IS NULL AND expires_at > datetime('now')\n",
     tests: ["functions/api/admin/auth/__tests__/signup.test.js"],
   },
   {

@@ -250,4 +250,43 @@ describe('AdminPanel 2FA enrolment', () => {
     act(() => authSubscribers.forEach(subscriber => subscriber.onMfaSetupRequired?.()))
     expect(await screen.findByText('MFA enrolment required')).toBeInTheDocument()
   })
+
+  // #1320: every admin route answers 403 until enrolment, so loading the panel
+  // behind the modal only raised a toast repeating what the modal says.
+  it('loads no panel data and mounts no tab while the session requires enrolment', async () => {
+    render(
+      <AdminPanel currentUser={{ role: 'editor', mfaEnrolmentRequired: true, mfaEnabled: false }} onLogout={vi.fn()} />
+    )
+    expect(await screen.findByText('MFA enrolment required')).toBeInTheDocument()
+    expect(eventsApi.getAll).not.toHaveBeenCalled()
+    expect(screen.queryByText(/Events tab/)).toBeNull()
+    expect(screen.queryByText('Loading admin panel...')).toBeNull()
+  })
+
+  it('raises no error toast when the server is the one that reports enrolment is required', async () => {
+    authSubscribers.length = 0
+    eventsApi.getAll.mockImplementation(async () => {
+      // The real client notifies the gate, then throws to the caller.
+      authSubscribers.forEach(subscriber => subscriber.onMfaSetupRequired?.())
+      throw Object.assign(new Error('Set up two-factor authentication to continue.'), { status: 403 })
+    })
+    render(<AdminPanel currentUser={{ role: 'editor' }} onLogout={vi.fn()} />)
+
+    expect(await screen.findByText('MFA enrolment required')).toBeInTheDocument()
+    await waitFor(() => expect(eventsApi.getAll).toHaveBeenCalledTimes(1))
+    expect(screen.queryByText(/Failed to load events/)).toBeNull()
+    expect(screen.queryByText(/Events tab/)).toBeNull()
+  })
+
+  it('hides already-loaded event data once the server reports enrolment is required', async () => {
+    authSubscribers.length = 0
+    render(<AdminPanel currentUser={{ role: 'editor' }} onLogout={vi.fn()} />)
+    expect(await screen.findByRole('option', { name: 'Published Event (Published)' })).toBeInTheDocument()
+
+    act(() => authSubscribers.forEach(subscriber => subscriber.onMfaSetupRequired?.()))
+
+    expect(await screen.findByText('MFA enrolment required')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Filter:')).toBeNull()
+    expect(screen.queryByRole('option', { name: /Published Event/ })).toBeNull()
+  })
 })

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react'
 import { eventsApi, subscribeAdminAuthState } from '../utils/adminApi'
 import UserSettings from './UserSettings'
 import PlatformSettings from './PlatformSettings'
@@ -101,11 +101,29 @@ export default function AdminPanel({ currentUser, onLogout }) {
   // Admins and editors must enrol in 2FA first (#1253). Known from the
   // session user, and also learned from any 403 MFA_SETUP_REQUIRED.
   const [mfaGateHit, setMfaGateHit] = useState(false)
-  const mustEnrolMfa = Boolean(currentUser?.mfaEnrolmentRequired && !currentUser?.mfaEnabled) || mfaGateHit
+  const enrolmentRequiredBySession = Boolean(currentUser?.mfaEnrolmentRequired && !currentUser?.mfaEnabled)
+  const mustEnrolMfa = enrolmentRequiredBySession || mfaGateHit
+  // While enrolment is required every admin route answers 403, and the modal
+  // already says why (#1320). A ref, not state: the 403 notifies the gate
+  // synchronously, just before the refused caller's catch raises its toast.
+  const mustEnrolMfaRef = useRef(mustEnrolMfa)
+  useEffect(() => {
+    mustEnrolMfaRef.current = mustEnrolMfa
+  }, [mustEnrolMfa])
 
-  useEffect(() => subscribeAdminAuthState({ onMfaSetupRequired: () => setMfaGateHit(true) }), [])
+  useEffect(
+    () =>
+      subscribeAdminAuthState({
+        onMfaSetupRequired: () => {
+          mustEnrolMfaRef.current = true
+          setMfaGateHit(true)
+        },
+      }),
+    []
+  )
 
   const showToast = useCallback((message, type = 'success') => {
+    if (type === 'error' && mustEnrolMfaRef.current) return
     setToast({ message, type })
     setTimeout(() => setToast(null), 5000)
   }, [])
@@ -131,10 +149,12 @@ export default function AdminPanel({ currentUser, onLogout }) {
     }
   }, [onLogout, showToast])
 
-  // Load events on mount
+  // Load events on mount, unless the session already says every request would
+  // be refused until 2FA is set up; enrolling reloads the page (#1320).
   useEffect(() => {
+    if (enrolmentRequiredBySession) return
     loadEvents()
-  }, [loadEvents])
+  }, [loadEvents, enrolmentRequiredBySession])
 
   const isAdmin = currentUser?.role === 'admin'
   // Explicit roles, never "not a viewer": an unknown role must get no write
@@ -247,7 +267,12 @@ export default function AdminPanel({ currentUser, onLogout }) {
     setShowWizard(false)
   }
 
-  const selectedEvent = events.find(e => e.id === selectedEventId)
+  // Behind the enrolment modal the panel shows no event data, even when the
+  // server only reports enrolment after events have loaded (#1320). Filtered
+  // here rather than cleared from state, so the stored selection survives the
+  // reload that follows enrolment.
+  const visibleEvents = mustEnrolMfa ? [] : events
+  const selectedEvent = visibleEvents.find(e => e.id === selectedEventId)
 
   // Dynamic Tabs Configuration. Memoized because the effect below depends on
   // `tabs`: rebuilt inline it is a fresh array every render, so the effect
@@ -322,7 +347,7 @@ export default function AdminPanel({ currentUser, onLogout }) {
               </h1>
 
               {/* Event Selector */}
-              {events.length > 0 && (
+              {visibleEvents.length > 0 && (
                 <div className="flex items-center gap-2">
                   <label htmlFor="event-selector" className="text-white/70 text-sm">
                     Filter:
@@ -337,7 +362,7 @@ export default function AdminPanel({ currentUser, onLogout }) {
                     className="min-h-[44px] px-3 py-1.5 rounded bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-hidden text-sm"
                   >
                     <option value="">All Venues/Bands (Global View)</option>
-                    {events.map(event => (
+                    {visibleEvents.map(event => (
                       <option key={event.id} value={event.id}>
                         {/* Three states, not two (#799): the old boolean
                             collapsed archived into "(Draft)", mislabelling
@@ -443,7 +468,7 @@ export default function AdminPanel({ currentUser, onLogout }) {
           tabs={tabs}
         />
 
-        {loading ? (
+        {mustEnrolMfa ? null : loading ? (
           <div className="flex items-center justify-center py-12">
             <Loading size="lg" text="Loading admin panel..." />
           </div>

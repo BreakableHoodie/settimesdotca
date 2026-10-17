@@ -277,4 +277,16 @@ describe('AdminPanel 2FA enrolment', () => {
     expect(screen.queryByText(/Failed to load events/)).toBeNull()
     expect(screen.queryByText(/Events tab/)).toBeNull()
   })
+
+  it('hides already-loaded event data once the server reports enrolment is required', async () => {
+    authSubscribers.length = 0
+    render(<AdminPanel currentUser={{ role: 'editor' }} onLogout={vi.fn()} />)
+    expect(await screen.findByRole('option', { name: 'Published Event (Published)' })).toBeInTheDocument()
+
+    act(() => authSubscribers.forEach(subscriber => subscriber.onMfaSetupRequired?.()))
+
+    expect(await screen.findByText('MFA enrolment required')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Filter:')).toBeNull()
+    expect(screen.queryByRole('option', { name: /Published Event/ })).toBeNull()
+  })
 })

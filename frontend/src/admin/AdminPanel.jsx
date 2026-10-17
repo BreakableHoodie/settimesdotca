@@ -267,7 +267,12 @@ export default function AdminPanel({ currentUser, onLogout }) {
     setShowWizard(false)
   }
 
-  const selectedEvent = events.find(e => e.id === selectedEventId)
+  // Behind the enrolment modal the panel shows no event data, even when the
+  // server only reports enrolment after events have loaded (#1320). Filtered
+  // here rather than cleared from state, so the stored selection survives the
+  // reload that follows enrolment.
+  const visibleEvents = mustEnrolMfa ? [] : events
+  const selectedEvent = visibleEvents.find(e => e.id === selectedEventId)
 
   // Dynamic Tabs Configuration. Memoized because the effect below depends on
   // `tabs`: rebuilt inline it is a fresh array every render, so the effect
@@ -342,7 +347,7 @@ export default function AdminPanel({ currentUser, onLogout }) {
               </h1>
 
               {/* Event Selector */}
-              {events.length > 0 && (
+              {visibleEvents.length > 0 && (
                 <div className="flex items-center gap-2">
                   <label htmlFor="event-selector" className="text-white/70 text-sm">
                     Filter:
@@ -357,7 +362,7 @@ export default function AdminPanel({ currentUser, onLogout }) {
                     className="min-h-[44px] px-3 py-1.5 rounded bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-hidden text-sm"
                   >
                     <option value="">All Venues/Bands (Global View)</option>
-                    {events.map(event => (
+                    {visibleEvents.map(event => (
                       <option key={event.id} value={event.id}>
                         {/* Three states, not two (#799): the old boolean
                             collapsed archived into "(Draft)", mislabelling

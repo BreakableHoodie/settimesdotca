@@ -41,7 +41,7 @@ None with a reason, never delete the line.
 - [ ] Manual smoke: <!-- what you actually exercised, and where -->
 
 <!--
-`make gate` = format -> format-check -> lint-all -> test -> build.
+`make gate` = format -> format-check -> lint-all -> check-citations -> test -> build.
 To debug ONE failing stage, run just that stage rather than the whole gate:
   make format-check                      formatting
   make lint                              ESLint (functions/ + scripts/)

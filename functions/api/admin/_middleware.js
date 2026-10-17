@@ -10,7 +10,7 @@ import { createRequestLogger, logger } from "../../utils/logger.js";
 import { auditLogStatement } from "../../utils/auditLogStatement.js";
 import { API_KEY_PREFIX, DISPLAY_PREFIX_LENGTH, verifyApiKey } from "../../utils/apiKeys.js";
 import { apiKeyRateLimitKey, checkRateLimitByKey, rateLimitResponse } from "../../utils/rateLimit.js";
-import { routePath } from "../../utils/routePath.js";
+import { routePath, trimTrailingSlashes } from "../../utils/routePath.js";
 
 export { auditLogStatement } from "../../utils/auditLogStatement.js";
 
@@ -53,6 +53,87 @@ const KEY_FORBIDDEN_PREFIXES = [
 // Keys may read users and API keys, but may not create or change identities.
 // Invite codes are forbidden entirely: GET exposes plaintext codes that can mint accounts.
 const KEY_READ_ONLY_PREFIXES = ["/api/admin/users", "/api/admin/api-keys"];
+
+// Every spelling of the request path the two lists above are checked against (#1327).
+// routePath() alone missed `%69nvite-codes`, `//invite-codes` and `bands%2f..%2finvite-codes`
+// in production; only the router kept them from a handler. So a key is refused if ANY
+// form matches: the raw path lowercased, and at every decode depth the path NFKC-folded,
+// lowercased, split on "/" and backslash, with empty and "." segments dropped, both before
+// and after resolving "..". Resolution is done by hand, not by new URL(), whose parser
+// would truncate at a decoded "?" or "#". Lowercasing comes AFTER decoding because routes
+// match case-insensitively, so `%49nvite-codes` is `Invite-codes`. Encoded band names
+// (`AC%2FDC`, `100%25`, `Who%3F`) stay allowed because no form of them matches a listed
+// prefix. Returns null, which the caller refuses, when the path is malformed on the first
+// decode or still decoding after MAX_DECODE_ROUNDS: neither can be proven not to name a
+// forbidden route.
+const MAX_DECODE_ROUNDS = 4;
+
+// Both splitting rules, because a router may treat a decoded backslash as a separator or
+// as an ordinary character, and ".." pops a different number of segments under each.
+const SEGMENT_SPLITTERS = [/\//, /[/\\]/];
+
+function resolveDots(segments) {
+  const resolved = [];
+  for (const segment of segments) {
+    if (segment === "..") resolved.pop();
+    else resolved.push(segment);
+  }
+  return `/${resolved.join("/")}`;
+}
+
+function segmentForms(path) {
+  // NFKC folds compatibility characters a case-insensitive matcher could treat as
+  // ASCII ("\u017f" long s -> "s") before lowercasing.
+  const folded = path.normalize("NFKC").toLowerCase();
+  return SEGMENT_SPLITTERS.flatMap((splitter) => {
+    const segments = folded.split(splitter).filter((segment) => segment !== "" && segment !== ".");
+    return [`/${segments.join("/")}`, resolveDots(segments)];
+  });
+}
+
+function keyPathForms(rawPathname) {
+  // Forms are built at EVERY decode depth, not only the last: a router that decodes
+  // fewer times than we do resolves ".." over different segments (Cass, #1327 review:
+  // x%252f..%2f..%2finvite-codes resolves to /api/invite-codes fully decoded, but to
+  // /api/admin/invite-codes after one decode). `chains` model a router that resolves
+  // ".." between decodes, one per splitting rule.
+  const forms = [trimTrailingSlashes(rawPathname.toLowerCase()), ...segmentForms(rawPathname)];
+  let decoded = rawPathname;
+  const chains = SEGMENT_SPLITTERS.map(() => rawPathname);
+  for (let round = 0; ; round++) {
+    let next;
+    try {
+      next = decodeURIComponent(decoded);
+    } catch {
+      // Only the FIRST decode proves the request malformed. A later failure is a
+      // literal "%" the first pass produced ("100%25" -> "100%"), so stop there.
+      if (round === 0) return null;
+      break;
+    }
+    if (next === decoded) break;
+    if (round === MAX_DECODE_ROUNDS - 1) return null;
+    decoded = next;
+    forms.push(...segmentForms(decoded));
+    SEGMENT_SPLITTERS.forEach((splitter, i) => {
+      try {
+        chains[i] = resolveDots(
+          decodeURIComponent(chains[i])
+            .normalize("NFKC")
+            .toLowerCase()
+            .split(splitter)
+            .filter((segment) => segment !== "" && segment !== "."),
+        );
+        forms.push(chains[i]);
+      } catch {
+        // The chain hit a literal "%"; the full-decode forms above still cover this depth.
+      }
+    });
+  }
+  return forms;
+}
+
+const matchesPrefix = (forms, prefixes, exact = false) =>
+  forms.some((form) => prefixes.some((p) => form.startsWith(exact ? `${p}/` : p) || (exact && form === p)));
 
 function normalizeUser(user) {
   if (!user) return null;
@@ -343,7 +424,8 @@ export async function onRequest(context) {
     // the path, not of any particular key, so a valid key and a forged one are refused
     // identically. It also costs zero D1 round-trips, which is the right posture for a
     // path an attacker can hammer for free.
-    if (KEY_FORBIDDEN_PREFIXES.some((prefix) => path.startsWith(prefix))) {
+    const keyPaths = keyPathForms(rawPathname);
+    if (!keyPaths || matchesPrefix([path, ...keyPaths], KEY_FORBIDDEN_PREFIXES)) {
       log.warn("API key blocked from account self-service route", {
         keyPrefix: bearerValue.slice(0, DISPLAY_PREFIX_LENGTH),
         path: rawPathname,
@@ -359,10 +441,7 @@ export async function onRequest(context) {
       );
     }
 
-    if (
-      KEY_READ_ONLY_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`)) &&
-      !["GET", "HEAD"].includes(request.method)
-    ) {
+    if (matchesPrefix([path, ...keyPaths], KEY_READ_ONLY_PREFIXES, true) && !["GET", "HEAD"].includes(request.method)) {
       log.warn("API key blocked from identity-management mutation", {
         keyPrefix: bearerValue.slice(0, DISPLAY_PREFIX_LENGTH),
         path: rawPathname,

@@ -433,6 +433,78 @@ describe("API key authentication path (#744 part 3)", () => {
 
       expect(response.status).toBe(200);
     });
+
+    // #1327: each of these slipped past a startsWith on the lowercased path in
+    // production (measured 2026-10-16). Only the router stood between them and a handler.
+    const NON_CANONICAL = [
+      ["/api/admin/%69nvite-codes", "GET"],
+      ["/api/admin/%2569nvite-codes", "GET"],
+      ["/api/admin//invite-codes", "GET"],
+      ["/api/admin/bands%2f..%2finvite-codes", "GET"],
+      ["/api/admin/bands/%2e%2e/invite-codes", "GET"],
+      ["/api/admin/%6dfa/setup", "POST"],
+      ["/api/admin/%75sers", "POST"],
+      ["/api/admin//users/5", "PATCH"],
+      ["/api/admin/bands%2f..%2fapi-keys", "POST"],
+      ["/api/admin/%zz/users", "GET"],
+      // Cass review: an escape decoding to UPPERCASE, since routes match case-insensitively.
+      ["/api/admin/%49nvite-codes", "GET"],
+      ["/api/admin/%55sers", "POST"],
+      ["/api/admin/%4dFA/setup", "POST"],
+      // A decoded backslash is a separator; a decoded ? or # must not truncate the path.
+      ["/api/admin/%5cinvite-codes", "GET"],
+      ["/api/admin/%3f%2f..%2finvite-codes", "GET"],
+      ["/api/admin/%23%2f..%2fusers", "POST"],
+      // Still decoding after the round cap: refused rather than trusted.
+      ["/api/admin/%25252569nvite-codes", "GET"],
+      // ".." resolved at every decode depth: a router decoding once sees /api/admin/invite-codes.
+      ["/api/admin/x%252f..%2f..%2finvite-codes", "GET"],
+      ["/api/admin/x%252f..%2f..%2fusers", "POST"],
+      // Unicode compatibility forms that case-fold to ASCII (U+017F long s, U+212A Kelvin sign).
+      ["/api/admin/u%C5%BFers", "POST"],
+      ["/api/admin/api-%E2%84%AAeys", "POST"],
+      // A router that keeps a decoded backslash as an ordinary character pops fewer segments.
+      ["/api/admin/x%5c..%2f..%2finvite-codes", "GET"],
+      ["/api/admin/x%5c..%2f..%2fusers", "POST"],
+      ["/api/admin/%5c%2f../invite-codes", "GET"],
+      // A router that resolves ".." between decodes.
+      ["/api/admin/%252f/..%2f%252f/invite-codes", "GET"],
+      // Resolving between decodes AND splitting on a decoded backslash.
+      ["/api/admin/%252f/..%2f%255c/invite-codes", "GET"],
+      ["/api/admin/%252f/..%2f%255c/users", "POST"],
+    ];
+
+    it.each(NON_CANONICAL)("refuses the non-canonical spelling %s (%s)", async (path, method) => {
+      const { env, rawDb } = createTestEnv({ role: "admin" });
+      const key = await seedKey(rawDb, { role: "admin" });
+
+      const reached = vi.fn(async () => new Response("ok", { status: 200 }));
+      const { response } = await runMiddleware(
+        env,
+        keyRequest(key.plaintext, { method, url: `https://example.test${path}` }),
+        reached,
+      );
+
+      expect(response.status).toBe(403);
+      expect((await response.json()).code).toBe("KEY_NOT_PERMITTED");
+      expect(reached).not.toHaveBeenCalled();
+    });
+
+    it("still lets an encoded band name through, slash included", async () => {
+      const { env, rawDb } = createTestEnv({ role: "admin" });
+      const key = await seedKey(rawDb, { role: "admin" });
+
+      for (const name of ["AC%2FDC", "Kepi%20Ghoulie", "100%25%20Real", "Who%3F", "Users%20Of%20Sound"]) {
+        const reached = vi.fn(async () => new Response("ok", { status: 200 }));
+        const { response } = await runMiddleware(
+          env,
+          keyRequest(key.plaintext, { url: `https://example.test/api/admin/bands/stats/${name}` }),
+          reached,
+        );
+        expect(response.status, name).toBe(200);
+        expect(reached, name).toHaveBeenCalled();
+      }
+    });
   });
 
   describe("identity-management mutations are refused", () => {

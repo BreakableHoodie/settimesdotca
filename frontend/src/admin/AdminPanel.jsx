@@ -91,6 +91,7 @@ export default function AdminPanel({ currentUser, onLogout }) {
   const [activeTab, setActiveTab] = useState(() => getStoredAdminTab())
   const [selectedEventId, setSelectedEventId] = useState(() => getStoredSelectedEventId())
   const [events, setEvents] = useState([])
+  const [eventsLoadError, setEventsLoadError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState(null)
   const [wizardDraft, setWizardDraft] = useState(() => getStoredWizardDraft())
@@ -115,6 +116,7 @@ export default function AdminPanel({ currentUser, onLogout }) {
       const result = await eventsApi.getAll()
       const nextEvents = result.events || []
       setEvents(nextEvents)
+      setEventsLoadError(false)
       setSelectedEventId(prev => (prev && nextEvents.some(event => event.id === prev) ? prev : null))
     } catch (err) {
       if (import.meta.env.DEV) console.error('Load events error:', err, 'Status:', err.status, 'Message:', err.message)
@@ -122,6 +124,7 @@ export default function AdminPanel({ currentUser, onLogout }) {
         onLogout()
         return
       }
+      setEventsLoadError(true)
       showToast('Failed to load events: ' + err.message, 'error')
     } finally {
       setLoading(false)
@@ -456,6 +459,7 @@ export default function AdminPanel({ currentUser, onLogout }) {
               <EventsTab
                 events={events}
                 onEventsChange={loadEvents}
+                loadError={eventsLoadError}
                 showToast={showToast}
                 selectedEventId={selectedEventId}
                 selectedEvent={selectedEvent}

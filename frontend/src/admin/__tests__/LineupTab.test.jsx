@@ -2,6 +2,7 @@ import React from 'react'
 import { render, screen, within, fireEvent, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import LineupTab from '../LineupTab'
+import LoadError from '../components/LoadError'
 import { bandsApi, eventsApi, venuesApi } from '../../utils/adminApi'
 
 // LineupTab owns the show-day controls (cancel, announce, resend, conflict
@@ -88,8 +89,12 @@ vi.mock('../components/ScheduleGrid', () => {
 })
 
 vi.mock('../components/ArtistPicker', () => ({
-  default: ({ onSelect, onCancel }) => (
+  default: ({ onSelect, onCancel, artists, loadError, onRetry }) => (
     <div data-testid="artist-picker">
+      {loadError && <LoadError what="the roster" onRetry={onRetry} />}
+      {artists.map(a => (
+        <span key={a.id}>{a.name}</span>
+      ))}
       <button onClick={() => onSelect(null, 'New Band')}>Pick new band</button>
       <button onClick={onCancel}>Cancel picker</button>
     </div>
@@ -248,9 +253,124 @@ describe('LineupTab — loading failure', () => {
     bandsApi.getByEvent.mockRejectedValueOnce(new Error('network down'))
     render(<LineupTab selectedEventId={37} selectedEvent={makeEvent()} events={[makeEvent()]} showToast={showToast} />)
     await waitFor(() => expect(showToast).toHaveBeenCalledWith('Failed to load schedule: network down', 'error'))
-    // The list must render its own empty state, not a blank screen, once the
-    // failed load settles `loading` back to false.
+    // A failed load must NOT read as "nothing scheduled yet" (#1323): that
+    // invites the admin to rebuild a lineup that is merely unreachable.
+    expect(await screen.findByText("Couldn't load the lineup.")).toBeInTheDocument()
+    expect(screen.queryByText('No performances scheduled yet.')).toBeNull()
+  })
+
+  it('Retry refetches and, once it resolves, renders the lineup in place of the error', async () => {
+    bandsApi.getByEvent.mockReset()
+    bandsApi.getByEvent.mockRejectedValueOnce(new Error('network down'))
+    bandsApi.getByEvent.mockResolvedValueOnce({ bands: [makeBand({ name: 'Recovered Act' })] })
+    render(<LineupTab selectedEventId={37} selectedEvent={makeEvent()} events={[makeEvent()]} showToast={showToast} />)
+    const alert = await screen.findByRole('alert')
+    expect(bandsApi.getByEvent).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(within(alert).getByRole('button', { name: 'Retry' }))
+
+    await waitFor(() => expect(bandsApi.getByEvent).toHaveBeenCalledTimes(2))
+    const table = await screen.findByRole('table')
+    expect(within(table).getByText('Recovered Act')).toBeInTheDocument()
+    expect(screen.queryByText("Couldn't load the lineup.")).toBeNull()
+  })
+
+  it('a genuinely empty lineup still shows the empty state, not the error', async () => {
+    await renderLineup({ bands: [] })
     expect(await screen.findByText('No performances scheduled yet.')).toBeInTheDocument()
+    expect(screen.queryByText("Couldn't load the lineup.")).toBeNull()
+  })
+})
+
+describe('LineupTab — load failure across events and races (#1323)', () => {
+  const renderFor = event => (
+    <LineupTab selectedEventId={event.id} selectedEvent={event} events={[event]} showToast={showToast} />
+  )
+
+  it("does not render the previous event's lineup when the new event's load fails", async () => {
+    const eventA = makeEvent({ id: 37 })
+    const eventB = makeEvent({ id: 38 })
+    bandsApi.getByEvent.mockReset()
+    bandsApi.getByEvent.mockResolvedValueOnce({ bands: [makeBand({ name: 'Event37 Act' })] })
+    const { rerender } = render(renderFor(eventA))
+    const table = await screen.findByRole('table')
+    expect(within(table).getByText('Event37 Act')).toBeInTheDocument()
+
+    bandsApi.getByEvent.mockRejectedValueOnce(new Error('network down'))
+    rerender(renderFor(eventB))
+
+    const alert = await screen.findByRole('alert')
+    expect(within(alert).getByText("Couldn't load the lineup.")).toBeInTheDocument()
+    expect(screen.queryByText('Event37 Act')).toBeNull()
+  })
+
+  it("a slow response for the previous event cannot overwrite the new event's lineup", async () => {
+    const eventA = makeEvent({ id: 37 })
+    const eventB = makeEvent({ id: 38 })
+    let resolveA
+    bandsApi.getByEvent.mockReset()
+    bandsApi.getByEvent.mockImplementationOnce(() => new Promise(res => (resolveA = res)))
+    bandsApi.getByEvent.mockResolvedValueOnce({ bands: [makeBand({ id: 2, name: 'Event38 Act' })] })
+    const { rerender } = render(renderFor(eventA))
+    await waitFor(() => expect(bandsApi.getByEvent).toHaveBeenCalledTimes(1))
+    rerender(renderFor(eventB))
+    const table = await screen.findByRole('table')
+    expect(within(table).getByText('Event38 Act')).toBeInTheDocument()
+
+    resolveA({ bands: [makeBand({ id: 1, name: 'Event37 Act' })] })
+    await new Promise(res => setTimeout(res, 20))
+
+    expect(screen.queryByText('Event37 Act')).toBeNull()
+    expect(within(screen.getByRole('table')).getByText('Event38 Act')).toBeInTheDocument()
+  })
+
+  // A save still in flight for event A holds A's loadData. Its reload would
+  // take the newest request id, so request order alone let it replace B.
+  it("a save that finishes after switching events does not reload the previous event's lineup", async () => {
+    const eventA = makeEvent({ id: 37 })
+    const eventB = makeEvent({ id: 38 })
+    let finishSaveA
+    eventsApi.updateSchedule.mockReset()
+    eventsApi.updateSchedule.mockImplementationOnce(() => new Promise(res => (finishSaveA = res)))
+    bandsApi.getByEvent.mockReset()
+    bandsApi.getByEvent.mockImplementation(id => Promise.resolve({ bands: [makeBand({ id, name: `Event${id} Act` })] }))
+    const { rerender } = render(renderFor(eventA))
+    fireEvent.click(await screen.findByRole('button', { name: /Schedule/i }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Trigger schedule save' }))
+    await waitFor(() => expect(eventsApi.updateSchedule).toHaveBeenCalledTimes(1))
+
+    rerender(renderFor(eventB))
+    const table = await screen.findByRole('table')
+    expect(within(table).getByText('Event38 Act')).toBeInTheDocument()
+    const loadsBefore = bandsApi.getByEvent.mock.calls.length
+
+    finishSaveA({ success: true })
+    await new Promise(res => setTimeout(res, 20))
+
+    expect(bandsApi.getByEvent.mock.calls.slice(loadsBefore)).toEqual([])
+    expect(screen.queryByText('Event37 Act')).toBeNull()
+    expect(within(screen.getByRole('table')).getByText('Event38 Act')).toBeInTheDocument()
+  })
+})
+
+describe('LineupTab — roster load failure reaches the picker (#1323)', () => {
+  it('shows the roster error in the picker; Retry refetches and the roster renders', async () => {
+    bandsApi.getAll.mockReset()
+    bandsApi.getAll.mockRejectedValueOnce(new Error('network down'))
+    bandsApi.getAll.mockResolvedValueOnce({ bands: [{ id: 9, name: 'Roster Act', is_active: 1 }] })
+    await renderLineup({ bands: [] })
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add to Lineup' }))
+    const picker = await screen.findByTestId('artist-picker')
+    const alert = await within(picker).findByRole('alert')
+    expect(within(alert).getByText("Couldn't load the roster.")).toBeInTheDocument()
+    expect(bandsApi.getAll).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(within(alert).getByRole('button', { name: 'Retry' }))
+
+    await waitFor(() => expect(bandsApi.getAll).toHaveBeenCalledTimes(2))
+    expect(await within(picker).findByText('Roster Act')).toBeInTheDocument()
+    expect(within(picker).queryByRole('alert')).toBeNull()
   })
 })
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Key, Pencil, Plus, ShieldOff, Trash, UserCheck, UserX } from 'lucide-react'
+import LoadError from './components/LoadError'
 import RoleBadge from './components/RoleBadge'
 import UserFormModal from './components/UserFormModal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
@@ -17,6 +18,7 @@ function SortIcon({ col, sortConfig }) {
 export default function UserManagement({ showToast }) {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [selectedUser, setSelectedUser] = useState(null)
   const [showResetModal, setShowResetModal] = useState(false)
   const [showUserModal, setShowUserModal] = useState(false)
@@ -55,8 +57,10 @@ export default function UserManagement({ showToast }) {
     try {
       const data = await usersApi.getAll()
       setUsers(data.users)
+      setLoadError(false)
     } catch (error) {
       console.error('Failed to fetch users:', error)
+      setLoadError(true)
       showToast('Failed to fetch users', 'error')
     } finally {
       setLoading(false)
@@ -260,214 +264,224 @@ export default function UserManagement({ showToast }) {
       </div>
 
       <div className="bg-white/10 backdrop-blur-lg rounded-lg border border-white/20 overflow-hidden">
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-white/5">
-              <tr>
-                <th
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:text-white"
-                  onClick={() => handleSort('name')}
-                >
-                  User <SortIcon col="name" sortConfig={sortConfig} />
-                </th>
-                <th
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:text-white"
-                  onClick={() => handleSort('role')}
-                >
-                  Role <SortIcon col="role" sortConfig={sortConfig} />
-                </th>
-                <th
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:text-white"
-                  onClick={() => handleSort('status')}
-                >
-                  Status <SortIcon col="status" sortConfig={sortConfig} />
-                </th>
-                <th
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:text-white"
-                  onClick={() => handleSort('last_login')}
-                >
-                  Last Login <SortIcon col="last_login" sortConfig={sortConfig} />
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/10">
+        {loadError && users.length === 0 ? (
+          <LoadError what="users" onRetry={fetchUsers} />
+        ) : (
+          <>
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-white/5">
+                  <tr>
+                    <th
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:text-white"
+                      onClick={() => handleSort('name')}
+                    >
+                      User <SortIcon col="name" sortConfig={sortConfig} />
+                    </th>
+                    <th
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:text-white"
+                      onClick={() => handleSort('role')}
+                    >
+                      Role <SortIcon col="role" sortConfig={sortConfig} />
+                    </th>
+                    <th
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:text-white"
+                      onClick={() => handleSort('status')}
+                    >
+                      Status <SortIcon col="status" sortConfig={sortConfig} />
+                    </th>
+                    <th
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:text-white"
+                      onClick={() => handleSort('last_login')}
+                    >
+                      Last Login <SortIcon col="last_login" sortConfig={sortConfig} />
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/10">
+                  {filteredUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" className="px-6 py-8 text-center text-gray-300">
+                        {users.length === 0
+                          ? 'No users found. Click "Invite User" to add one.'
+                          : 'No users match your filters.'}
+                      </td>
+                    </tr>
+                  ) : (
+                    sortedUsers.map(user => (
+                      <tr key={user.id} className="hover:bg-white/5">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div>
+                            <div className="text-sm font-medium text-white">{resolveDisplayName(user)}</div>
+                            <div className="text-sm text-gray-300">{user.email}</div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <RoleBadge role={user.role} />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              user.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                            }`}
+                          >
+                            {user.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                          {user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right">
+                          <div className="flex justify-end space-x-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingUser(user)
+                                setShowUserModal(true)
+                              }}
+                              className="text-blue-400 hover:text-blue-300 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
+                              aria-label={`Edit ${user.email}`}
+                              disabled={actionLoading}
+                            >
+                              <Pencil size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedUser(user)
+                                setShowResetModal(true)
+                              }}
+                              className="text-accent-400 hover:text-accent-400/80 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
+                              aria-label={`Reset password for ${user.email}`}
+                              disabled={actionLoading}
+                            >
+                              <Key size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPendingMfaReset(user)}
+                              className="text-accent-400 hover:text-accent-400/80 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
+                              aria-label={`Reset two-factor authentication for ${user.email}`}
+                              disabled={actionLoading}
+                            >
+                              <ShieldOff size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPendingToggle(user)}
+                              className={`transition ${
+                                user.isActive
+                                  ? 'text-yellow-400 hover:text-yellow-300'
+                                  : 'text-green-400 hover:text-green-300'
+                              } min-h-[44px] min-w-[44px] flex items-center justify-center`}
+                              aria-label={`${user.isActive ? 'Deactivate' : 'Activate'} ${user.email}`}
+                              disabled={actionLoading}
+                            >
+                              {user.isActive ? <UserX size={14} /> : <UserCheck size={14} />}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPendingDelete(user)}
+                              className="text-red-400 hover:text-red-300 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
+                              aria-label={`Delete ${user.email}`}
+                              disabled={actionLoading}
+                            >
+                              <Trash size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="md:hidden divide-y divide-white/10">
               {filteredUsers.length === 0 ? (
-                <tr>
-                  <td colSpan="5" className="px-6 py-8 text-center text-gray-300">
-                    {users.length === 0
-                      ? 'No users found. Click "Invite User" to add one.'
-                      : 'No users match your filters.'}
-                  </td>
-                </tr>
+                <div className="px-6 py-8 text-center text-gray-300">
+                  {users.length === 0
+                    ? 'No users found. Tap "Invite User" to add one.'
+                    : 'No users match your filters.'}
+                </div>
               ) : (
                 sortedUsers.map(user => (
-                  <tr key={user.id} className="hover:bg-white/5">
-                    <td className="px-6 py-4 whitespace-nowrap">
+                  <div key={user.id} className="p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="text-sm font-medium text-white">{resolveDisplayName(user)}</div>
                         <div className="text-sm text-gray-300">{user.email}</div>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
                       <RoleBadge role={user.role} />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          user.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
+                    </div>
+                    <div className="flex flex-wrap gap-3 text-sm text-gray-300">
+                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-white/10 text-white">
                         {user.isActive ? 'Active' : 'Inactive'}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                      {user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right">
-                      <div className="flex justify-end space-x-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingUser(user)
-                            setShowUserModal(true)
-                          }}
-                          className="text-blue-400 hover:text-blue-300 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
-                          aria-label={`Edit ${user.email}`}
-                          disabled={actionLoading}
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedUser(user)
-                            setShowResetModal(true)
-                          }}
-                          className="text-accent-400 hover:text-accent-400/80 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
-                          aria-label={`Reset password for ${user.email}`}
-                          disabled={actionLoading}
-                        >
-                          <Key size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setPendingMfaReset(user)}
-                          className="text-accent-400 hover:text-accent-400/80 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
-                          aria-label={`Reset two-factor authentication for ${user.email}`}
-                          disabled={actionLoading}
-                        >
-                          <ShieldOff size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setPendingToggle(user)}
-                          className={`transition ${
-                            user.isActive
-                              ? 'text-yellow-400 hover:text-yellow-300'
-                              : 'text-green-400 hover:text-green-300'
-                          } min-h-[44px] min-w-[44px] flex items-center justify-center`}
-                          aria-label={`${user.isActive ? 'Deactivate' : 'Activate'} ${user.email}`}
-                          disabled={actionLoading}
-                        >
-                          {user.isActive ? <UserX size={14} /> : <UserCheck size={14} />}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setPendingDelete(user)}
-                          className="text-red-400 hover:text-red-300 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
-                          aria-label={`Delete ${user.email}`}
-                          disabled={actionLoading}
-                        >
-                          <Trash size={14} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                      <span>
+                        Last Login: {user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never'}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingUser(user)
+                          setShowUserModal(true)
+                        }}
+                        className="px-4 py-2 min-h-[44px] bg-amber-700 hover:bg-amber-800 text-white rounded text-sm"
+                        disabled={actionLoading}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedUser(user)
+                          setShowResetModal(true)
+                        }}
+                        className="px-4 py-2 min-h-[44px] bg-accent-500/80 hover:bg-accent-500 text-bg-navy rounded text-sm"
+                        disabled={actionLoading}
+                      >
+                        Reset Password
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPendingMfaReset(user)}
+                        className="px-4 py-2 min-h-[44px] bg-accent-500/80 hover:bg-accent-500 text-bg-navy rounded text-sm"
+                        disabled={actionLoading}
+                      >
+                        Reset 2FA
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPendingToggle(user)}
+                        className={`px-4 py-2 min-h-[44px] rounded text-sm ${
+                          user.isActive
+                            ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
+                            : 'bg-green-600 hover:bg-green-700 text-white'
+                        }`}
+                        disabled={actionLoading}
+                      >
+                        {user.isActive ? 'Deactivate' : 'Activate'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPendingDelete(user)}
+                        className="px-4 py-2 min-h-[44px] bg-red-600 hover:bg-red-700 text-white rounded text-sm"
+                        disabled={actionLoading}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
                 ))
               )}
-            </tbody>
-          </table>
-        </div>
-        <div className="md:hidden divide-y divide-white/10">
-          {filteredUsers.length === 0 ? (
-            <div className="px-6 py-8 text-center text-gray-300">
-              {users.length === 0 ? 'No users found. Tap "Invite User" to add one.' : 'No users match your filters.'}
             </div>
-          ) : (
-            sortedUsers.map(user => (
-              <div key={user.id} className="p-4 space-y-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-medium text-white">{resolveDisplayName(user)}</div>
-                    <div className="text-sm text-gray-300">{user.email}</div>
-                  </div>
-                  <RoleBadge role={user.role} />
-                </div>
-                <div className="flex flex-wrap gap-3 text-sm text-gray-300">
-                  <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-white/10 text-white">
-                    {user.isActive ? 'Active' : 'Inactive'}
-                  </span>
-                  <span>Last Login: {user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never'}</span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingUser(user)
-                      setShowUserModal(true)
-                    }}
-                    className="px-4 py-2 min-h-[44px] bg-amber-700 hover:bg-amber-800 text-white rounded text-sm"
-                    disabled={actionLoading}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedUser(user)
-                      setShowResetModal(true)
-                    }}
-                    className="px-4 py-2 min-h-[44px] bg-accent-500/80 hover:bg-accent-500 text-bg-navy rounded text-sm"
-                    disabled={actionLoading}
-                  >
-                    Reset Password
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPendingMfaReset(user)}
-                    className="px-4 py-2 min-h-[44px] bg-accent-500/80 hover:bg-accent-500 text-bg-navy rounded text-sm"
-                    disabled={actionLoading}
-                  >
-                    Reset 2FA
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPendingToggle(user)}
-                    className={`px-4 py-2 min-h-[44px] rounded text-sm ${
-                      user.isActive
-                        ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
-                        : 'bg-green-600 hover:bg-green-700 text-white'
-                    }`}
-                    disabled={actionLoading}
-                  >
-                    {user.isActive ? 'Deactivate' : 'Activate'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPendingDelete(user)}
-                    className="px-4 py-2 min-h-[44px] bg-red-600 hover:bg-red-700 text-white rounded text-sm"
-                    disabled={actionLoading}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+          </>
+        )}
       </div>
 
       {/* User Form Modal — mounted only while open, so closing DISCARDS its state

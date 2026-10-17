@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Eye, EyeOff, Ban, RotateCcw } from 'lucide-react'
 import { bandsApi, eventsApi, venuesApi } from '../utils/adminApi'
 import AnnouncementPlanningPanel from './components/AnnouncementPlanningPanel'
@@ -7,6 +7,7 @@ import BulkActionBar from './components/BulkActionBar'
 import BulkPreviewModal from './components/BulkPreviewModal'
 import BulkBandImport from './components/BulkBandImport'
 import ArtistPicker from './components/ArtistPicker'
+import LoadError from './components/LoadError'
 import ScheduleGrid from './components/ScheduleGrid'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { parseOrigin } from '../utils/parseOrigin'
@@ -54,6 +55,8 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
   const [venues, setVenues] = useState([])
   const [loading, setLoading] = useState(true)
   const [rosterLoading, setRosterLoading] = useState(false)
+  const [loadError, setLoadError] = useState(false)
+  const [rosterError, setRosterError] = useState(false)
   const [announcementPlanning, setAnnouncementPlanning] = useState([]) // #556 engagement signals
 
   // Modes: 'list', 'picker', 'form', 'import', 'schedule'
@@ -110,15 +113,37 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
   const [bulkApplying, setBulkApplying] = useState(false)
   const [confirmDialog, setConfirmDialog] = useState({ open: false, message: '', onConfirm: () => {} })
 
+  // Latest-wins guard: a slow response for a previous event (or an earlier
+  // reload) must not overwrite newer state.
+  const loadReqRef = useRef(0)
+  // Request order alone does not protect event identity: a handler that
+  // awaited a write for event A still holds A's loadData, and its reload would
+  // take the newest request id and replace B's lineup. Every load checks the
+  // event is still the selected one, before it takes an id and before it
+  // applies its response.
+  const currentEventRef = useRef(selectedEventId)
+  useEffect(() => {
+    currentEventRef.current = selectedEventId
+  }, [selectedEventId])
+
   const loadData = useCallback(async () => {
+    // A stale call must not take a request id: that would orphan the current
+    // event's in-flight load and leave it loading forever.
+    if (selectedEventId !== currentEventRef.current) return true
+    const reqId = ++loadReqRef.current
+    const isStale = () => reqId !== loadReqRef.current || selectedEventId !== currentEventRef.current
     try {
       setLoading(true)
       const [venuesRes, bandsRes] = await Promise.all([venuesApi.getAll(), bandsApi.getByEvent(selectedEventId)])
 
+      if (isStale()) return true
       setVenues(venuesRes.venues || [])
       setBands(bandsRes.bands || [])
+      setLoadError(false)
       return true
     } catch (err) {
+      if (isStale()) return false
+      setLoadError(true)
       showToast('Failed to load schedule: ' + err.message, 'error')
       // Returns a boolean rather than rethrowing: every existing caller
       // ignores the result and must keep working unchanged. Only the schedule
@@ -127,7 +152,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
       // did not take" when in fact it did.
       return false
     } finally {
-      setLoading(false)
+      if (reqId === loadReqRef.current) setLoading(false)
     }
   }, [selectedEventId, showToast])
 
@@ -137,7 +162,9 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
       setRosterLoading(true)
       const allBandsRes = await bandsApi.getAll()
       setAllBands(allBandsRes.bands || [])
+      setRosterError(false)
     } catch (err) {
+      setRosterError(true)
       showToast('Failed to load roster: ' + err.message, 'error')
     } finally {
       setRosterLoading(false)
@@ -198,6 +225,11 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
     // Day filter values are event-specific dates — a stale one from the
     // previous event would match no rows in the new one (#588).
     setDayFilter('all')
+    // The previous event's rows must not render under the new one if its load
+    // fails (edits are keyed by performance id and would hit the wrong sets).
+    setBands([])
+    setVenues([])
+    setLoadError(false)
   }, [selectedEventId])
 
   const handleInputChange = e => {
@@ -651,6 +683,8 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
           onBulkSelect={handleBulkSelect}
           onCancel={() => setViewMode('list')}
           loading={rosterLoading}
+          loadError={rosterError}
+          onRetry={loadRoster}
           venues={venues}
         />
       )}
@@ -804,6 +838,8 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
           <div className="bg-bg-purple rounded-lg border border-accent-500/20 overflow-hidden">
             {loading ? (
               <div className="p-8 text-center text-accent-400">Loading lineup...</div>
+            ) : loadError && bands.length === 0 ? (
+              <LoadError what="the lineup" onRetry={loadData} />
             ) : filteredBands.length === 0 ? (
               <div className="p-8 text-center text-white/50">
                 {bands.length === 0 ? 'No performances scheduled yet.' : 'No performances match your filters.'}

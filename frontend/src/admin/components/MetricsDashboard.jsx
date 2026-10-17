@@ -1,16 +1,20 @@
 import { useState, useEffect, useCallback } from 'react'
 import { eventsApi } from '../../utils/adminApi'
+import LoadError from './LoadError'
 
 export default function MetricsDashboard({ eventId }) {
   const [metrics, setMetrics] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
 
   const loadMetrics = useCallback(async () => {
     try {
       const data = await eventsApi.getMetrics(eventId)
       setMetrics(data.metrics)
+      setLoadError(false)
     } catch (error) {
       console.error('Failed to load metrics:', error)
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -21,6 +25,7 @@ export default function MetricsDashboard({ eventId }) {
   }, [loadMetrics])
 
   if (loading) return <div className="text-white">Loading metrics...</div>
+  if (loadError || !metrics) return <LoadError what="metrics" onRetry={loadMetrics} />
 
   return (
     <div className="space-y-4">

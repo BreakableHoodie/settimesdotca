@@ -21,6 +21,7 @@ import {
 } from '../utils/eventLifecycle'
 import { safeExternalHref } from '../utils/urlSafety'
 import { AFTER_MIDNIGHT_THRESHOLD_HOUR } from '../utils/festivalDays'
+import LoadError from './components/LoadError'
 
 const isEventLockedAsArchived = event => event?.status === 'archived' || isEventArchived(event?.date)
 const getAdminEventState = event => (event?.status === 'archived' ? 'archived' : getEventState(event?.date))
@@ -440,6 +441,7 @@ const EventCard = memo(function EventCard({
 export default function EventsTab({
   events,
   onEventsChange,
+  loadError = false,
   showToast,
   selectedEventId,
   selectedEvent,
@@ -1233,7 +1235,9 @@ export default function EventsTab({
 
       {/* Events List */}
       <div className="bg-bg-purple rounded-lg border border-accent-500/20 overflow-hidden">
-        {filteredEvents.length === 0 ? (
+        {loadError && events.length === 0 ? (
+          <LoadError what="events" onRetry={onEventsChange} />
+        ) : filteredEvents.length === 0 ? (
           <div className="p-8 text-center text-white/50">
             {events.length === 0
               ? 'No events yet. Create your first event to get started!'

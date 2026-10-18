@@ -26,7 +26,8 @@
 // ungated shape, not proof that no sixth endpoint can exist.
 
 import { describe, expect, it } from "vitest";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -62,12 +63,20 @@ function routePathFor(file) {
   return `/api/admin/${rel}`;
 }
 
-function forbiddenPrefixes() {
+function middlewareList(name) {
   const source = readFileSync(MIDDLEWARE, "utf8");
-  const block = source.match(/const KEY_FORBIDDEN_PREFIXES = \[([\s\S]*?)\];/);
-  expect(block, "KEY_FORBIDDEN_PREFIXES must exist in _middleware.js").not.toBeNull();
-  return [...block[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+  const block = source.match(new RegExp(`const ${name} = \\[([\\s\\S]*?)\\];`));
+  expect(block, `${name} must exist in _middleware.js`).not.toBeNull();
+  // Strip comments first: the denylist carries prose that contains quoted words.
+  const code = block[1].replace(/\/\/.*$/gm, "");
+  return [...code.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
 }
+
+const forbiddenPrefixes = () => middlewareList("KEY_FORBIDDEN_PREFIXES");
+const readOnlyPrefixes = () => middlewareList("KEY_READ_ONLY_PREFIXES");
+
+// The middleware matches whole path segments: an entry covers itself and its children.
+const covers = (prefix, route) => route === prefix || route.startsWith(`${prefix}/`);
 
 // Reachable by a key and acting only on data it was given explicitly (params, body),
 // never on the caller's own account. Each entry is a decision that must be argued, not
@@ -88,7 +97,7 @@ describe("API keys cannot reach account self-service endpoints", () => {
     const unprotected = routes
       .filter((file) => !readFileSync(file, "utf8").includes("checkPermission"))
       .map(routePathFor)
-      .filter((route) => !prefixes.some((prefix) => route.startsWith(prefix)))
+      .filter((route) => !prefixes.some((prefix) => covers(prefix, route)))
       .filter((route) => !(route in REVIEWED_UNGATED_ROUTES));
 
     expect(
@@ -111,19 +120,120 @@ describe("API keys cannot reach account self-service endpoints", () => {
       "/api/admin/sessions/revoke-all",
       "/api/admin/trusted-devices",
       "/api/admin/auth/login",
+      "/api/admin/maintenance/retention",
+      "/api/admin/maintenance/cleanup-sessions",
+      "/api/admin/audit-log",
     ]) {
       expect(
-        prefixes.some((prefix) => route.startsWith(prefix)),
+        prefixes.some((prefix) => covers(prefix, route)),
         `${route} must be denied to API keys`,
       ).toBe(true);
     }
+  });
+
+  // The behavioural half (#1331, from #1263): by what a route DOES rather than what it is
+  // called. A dispatchable route whose source writes an account or credential table can
+  // create, promote or keep alive a principal, so a key must never reach it. This is the
+  // check that catches the MFA shape the textual assertion above cannot see.
+  describe("every route that writes an account or credential table is key-denied", () => {
+    // auth_attempts and auth_audit are rate-limit and telemetry ledgers, not credentials.
+    const PRINCIPAL_WRITE =
+      /\b(?:INSERT\s+(?:OR\s+\w+\s+)?INTO|UPDATE|DELETE\s+FROM|REPLACE\s+INTO)\s+(?:users|invite_codes|api_keys|lucia_sessions|sessions|trusted_devices|mfa_challenges|password_reset_tokens|email_otp_codes|webauthn_credentials)\b/i;
+
+    // The route's own source plus every relative module it imports, ONE hop: a write made
+    // inside an imported helper is the same write. cleanup-sessions reaches lucia_sessions
+    // only through runRetentionCleanup in retention.js, and a file-only scan never saw it.
+    // _middleware.js is skipped: every route imports it and it writes lucia_sessions and
+    // api_keys for its own bookkeeping, which would flag the whole tree.
+    function sourcesOf(file, text = readFileSync(file, "utf8")) {
+      const deps = [...text.matchAll(/from\s+["'](\.{1,2}\/[^"']+)["']/g)]
+        .map((m) => join(dirname(file), m[1]))
+        .filter((dep) => !dep.endsWith("_middleware.js"))
+        .map((dep) => readFileSync(dep, "utf8"));
+      return [text, ...deps];
+    }
+    const writesPrincipalTable = (file, text) => sourcesOf(file, text).some((src) => PRINCIPAL_WRITE.test(src));
+
+    // For a route under KEY_READ_ONLY_PREFIXES the middleware refuses every method but GET
+    // and HEAD, so only the read handler is key-reachable. A generic onRequest serves all
+    // methods and is judged whole.
+    function readHandlerText(text) {
+      if (/export\s+(async\s+)?function\s+onRequest\s*\(/.test(text)) return text;
+      const start = text.search(/export\s+(async\s+)?function\s+onRequest(Get|Head)\b/);
+      if (start === -1) return "";
+      const rest = text.slice(start + 1);
+      const next = rest.search(/\nexport\s/);
+      return text.slice(start, next === -1 ? undefined : start + 1 + next);
+    }
+
+    function keyReachableWriters(files, forbidden, readOnly) {
+      return files
+        .filter((file) => {
+          const route = routePathFor(file);
+          if (forbidden.some((prefix) => covers(prefix, route))) return false;
+          const text = readFileSync(file, "utf8");
+          if (readOnly.some((prefix) => covers(prefix, route))) {
+            // Judge the GET handler's own text, then the file's imports (conservative).
+            const handler = readHandlerText(text);
+            return handler !== "" && writesPrincipalTable(file, handler);
+          }
+          return writesPrincipalTable(file, text);
+        })
+        .map(routePathFor);
+    }
+
+    it("the scan still finds what it hunts (self-check)", () => {
+      // With NO denylist the scan must flag the refused families, including the one
+      // reachable only through the import hop. Otherwise it reports all-clear forever.
+      const flagged = keyReachableWriters(routes, [], []);
+      expect(flagged).toEqual(
+        expect.arrayContaining([
+          "/api/admin/users",
+          "/api/admin/invite-codes",
+          "/api/admin/api-keys",
+          "/api/admin/maintenance/cleanup-sessions",
+        ]),
+      );
+    });
+
+    it("flags a synthetic unprotected writer, own source and one import hop", () => {
+      const dir = mkdtempSync(join(tmpdir(), "key-scan-"));
+      try {
+        const helper = join(dir, "helper.js");
+        writeFileSync(helper, 'export const x = "DELETE FROM lucia_sessions WHERE 1";\n');
+        const direct = join(dir, "direct.js");
+        writeFileSync(
+          direct,
+          'export async function onRequestPost(c){ c.env.DB.prepare("update users set role = ?"); }\n',
+        );
+        const hopped = join(dir, "hopped.js");
+        writeFileSync(hopped, 'import { x } from "./helper.js";\nexport async function onRequestPost(){ return x; }\n');
+        const clean = join(dir, "clean.js");
+        writeFileSync(clean, 'export async function onRequestGet(c){ c.env.DB.prepare("SELECT * FROM users"); }\n');
+        expect(writesPrincipalTable(direct)).toBe(true);
+        expect(writesPrincipalTable(hopped)).toBe(true);
+        expect(writesPrincipalTable(clean)).toBe(false);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it("no key-reachable route writes an account or credential table", () => {
+      const reachable = keyReachableWriters(routes, prefixes, readOnlyPrefixes());
+      expect(
+        reachable,
+        "These admin routes write an account or credential table and an API key can reach " +
+          "them. Add the family to KEY_FORBIDDEN_PREFIXES (or KEY_READ_ONLY_PREFIXES if only " +
+          "its mutations write) in _middleware.js.",
+      ).toEqual([]);
+    });
   });
 
   it("has no dead denylist entries", () => {
     const routes_ = routes.map(routePathFor);
     for (const prefix of prefixes) {
       expect(
-        routes_.some((route) => route.startsWith(prefix)),
+        routes_.some((route) => covers(prefix, route)),
         `KEY_FORBIDDEN_PREFIXES contains "${prefix}", which matches no admin route`,
       ).toBe(true);
     }

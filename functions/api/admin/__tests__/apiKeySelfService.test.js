@@ -16,13 +16,17 @@
 //
 // KEY_FORBIDDEN_PREFIXES closes it. This file keeps it closed.
 //
-// SCOPE, stated honestly: assertion 1 catches an admin route with NO checkPermission
-// call that a key can reach -- the shape of /sessions, /trusted-devices and /me, and
-// the one a new endpoint is most likely to have. It does NOT catch a route that gates
-// at "viewer" and then acts on data.user.userId as self, which is the MFA shape:
-// nothing textual separates that from a viewer-gated route acting on params.id. The
-// denylist covers the MFA family by name, and a new self-service family outside these
-// prefixes would still need a human to notice. Treat this as a backstop against the
+// WHAT IS GUARDED, stated honestly: (a) an admin route with no checkPermission call that a
+// key can reach, and (b) a key-reachable route whose source writes an account or credential
+// table (the behavioural scan below). A gated route that only READS the caller's own data,
+// for example `SELECT ... FROM auth_attempts WHERE user_id = ?` bound to user.userId, is
+// neither, and still needs a human to notice. Assertion 1 alone catches an admin route
+// with NO checkPermission call that a key can reach -- the shape of /sessions,
+// /trusted-devices and /me, and the one a new endpoint is most likely to have. It cannot
+// tell a route that gates at "viewer" and acts on data.user.userId as self (the MFA shape)
+// from a viewer-gated route acting on params.id; the scan covers that only when the route
+// WRITES a credential table. Treat this as a backstop, not proof that no sixth endpoint
+// can exist.
 // ungated shape, not proof that no sixth endpoint can exist.
 
 import { describe, expect, it } from "vitest";
@@ -40,6 +44,11 @@ const MIDDLEWARE = join(ADMIN_DIR, "_middleware.js");
 // runRetentionCleanup, a helper shared by the manual endpoint and the cron. Counting it
 // as an unprotected route is a false positive, and a guard that cries wolf gets an
 // exemption entry instead of a fix.
+// Every way a module can export a Pages handler: a function declaration, a const/let/var,
+// or a re-export with an alias (`export { x as onRequestPost }`).
+const ROUTE_EXPORT =
+  /export\s+(?:async\s+)?function\s+onRequest|export\s+(?:const|let|var)\s+onRequest|export\s*\{[^}]*\bas\s+onRequest|export\s*\{[^}]*\bonRequest/;
+
 function collectRouteFiles(dir) {
   return readdirSync(dir).flatMap((entry) => {
     const full = join(dir, entry);
@@ -49,7 +58,7 @@ function collectRouteFiles(dir) {
     if (!entry.endsWith(".js") || entry === "_middleware.js") {
       return [];
     }
-    return /export\s+(async\s+)?function\s+onRequest/.test(readFileSync(full, "utf8")) ? [full] : [];
+    return ROUTE_EXPORT.test(readFileSync(full, "utf8")) ? [full] : [];
   });
 }
 
@@ -137,50 +146,72 @@ describe("API keys cannot reach account self-service endpoints", () => {
   // check that catches the MFA shape the textual assertion above cannot see.
   describe("every route that writes an account or credential table is key-denied", () => {
     // auth_attempts and auth_audit are rate-limit and telemetry ledgers, not credentials.
+    // An optional quote may precede the table name ("users", `users`).
     const PRINCIPAL_WRITE =
-      /\b(?:INSERT\s+(?:OR\s+\w+\s+)?INTO|UPDATE|DELETE\s+FROM|REPLACE\s+INTO)\s+(?:users|invite_codes|api_keys|lucia_sessions|sessions|trusted_devices|mfa_challenges|password_reset_tokens|email_otp_codes|webauthn_credentials)\b/i;
+      /\b(?:INSERT\s+(?:OR\s+\w+\s+)?INTO|UPDATE|DELETE\s+FROM|REPLACE\s+INTO)\s+["`]?(?:users|invite_codes|api_keys|lucia_sessions|sessions|trusted_devices|mfa_challenges|password_reset_tokens|email_otp_codes|webauthn_credentials)\b/i;
+    // A table name built at runtime cannot be matched against the list: a human decides.
+    // Judged on the route's own reachable source only: shared helpers such as
+    // auditLogStatement.js build an identifier-validated name for every caller.
+    const DYNAMIC_TABLE = /\b(?:INTO|UPDATE|FROM)\s+["`]?\$\{/i;
+    const IMPORT_RE = /import\s+([\s\S]*?)\s+from\s+["'](\.{1,2}\/[^"']+)["'];?/g;
 
-    // The route's own source plus every relative module it imports, ONE hop: a write made
-    // inside an imported helper is the same write. cleanup-sessions reaches lucia_sessions
-    // only through runRetentionCleanup in retention.js, and a file-only scan never saw it.
-    // _middleware.js is skipped: every route imports it and it writes lucia_sessions and
-    // api_keys for its own bookkeeping, which would flag the whole tree.
-    function sourcesOf(file, text = readFileSync(file, "utf8")) {
-      const deps = [...text.matchAll(/from\s+["'](\.{1,2}\/[^"']+)["']/g)]
-        .map((m) => join(dirname(file), m[1]))
+    // The file split into top-level declarations (prettier keeps them at column 0), each
+    // tagged with the handler name it exports, if any.
+    function declarations(text) {
+      return text.split(/\n(?=(?:export\s+)?(?:async\s+function|function|const|let|var|class)\s)/).map((chunk) => ({
+        chunk,
+        handler: chunk.match(/^export\s+(?:async\s+function|function|const|let|var)\s+(onRequest\w*)/)?.[1] ?? null,
+      }));
+    }
+
+    // The source a key can reach. `methods` is null for "every method" or a list of handler
+    // names the key may reach (a generic onRequest always counts). Other handlers are
+    // sliced out, but everything else in the WHOLE file stays: same-file helpers wherever
+    // they are defined, and the imports those helpers use. An aliased re-export
+    // (`export { x as onRequestPost }`) cannot be sliced, so the file is judged whole.
+    function reachableSources(file, text, methods = null) {
+      const aliased = /export\s*\{[^}]*\bonRequest/.test(text);
+      const kept = declarations(text)
+        .filter(
+          ({ handler }) => aliased || !methods || !handler || handler === "onRequest" || methods.includes(handler),
+        )
+        .map(({ chunk }) => chunk)
+        .join("\n");
+      const body = kept.replace(IMPORT_RE, "");
+      // Imports ONE hop, only those whose bindings the reachable code actually uses.
+      // _middleware.js is skipped: every route imports it and it writes lucia_sessions and
+      // api_keys for its own bookkeeping, which would flag the whole tree.
+      const deps = [...text.matchAll(IMPORT_RE)]
+        .filter(([, clause]) =>
+          (clause.match(/[A-Za-z_$][\w$]*/g) ?? []).some((n) => new RegExp(`\\b${n}\\b`).test(body)),
+        )
+        .map(([, , spec]) => join(dirname(file), spec))
         .filter((dep) => !dep.endsWith("_middleware.js"))
         .map((dep) => readFileSync(dep, "utf8"));
-      return [text, ...deps];
+      return [body, ...deps];
     }
-    const writesPrincipalTable = (file, text) => sourcesOf(file, text).some((src) => PRINCIPAL_WRITE.test(src));
+    const writesPrincipalTable = (file, text = readFileSync(file, "utf8"), methods = null) =>
+      reachableSources(file, text, methods).some((src) => PRINCIPAL_WRITE.test(src));
+    const buildsTableName = (file, text = readFileSync(file, "utf8"), methods = null) =>
+      DYNAMIC_TABLE.test(reachableSources(file, text, methods)[0]);
 
     // For a route under KEY_READ_ONLY_PREFIXES the middleware refuses every method but GET
-    // and HEAD, so only the read handler is key-reachable. A generic onRequest serves all
-    // methods and is judged whole.
-    function readHandlerText(text) {
-      if (/export\s+(async\s+)?function\s+onRequest\s*\(/.test(text)) return text;
-      const start = text.search(/export\s+(async\s+)?function\s+onRequest(Get|Head)\b/);
-      if (start === -1) return "";
-      const rest = text.slice(start + 1);
-      const next = rest.search(/\nexport\s/);
-      return text.slice(start, next === -1 ? undefined : start + 1 + next);
-    }
+    // and HEAD, so only those handlers (and a generic onRequest) are key-reachable.
+    const READ_METHODS = ["onRequestGet", "onRequestHead"];
 
-    function keyReachableWriters(files, forbidden, readOnly) {
+    function keyReachable(files, forbidden, readOnly, judge) {
       return files
         .filter((file) => {
           const route = routePathFor(file);
           if (forbidden.some((prefix) => covers(prefix, route))) return false;
-          const text = readFileSync(file, "utf8");
-          if (readOnly.some((prefix) => covers(prefix, route))) {
-            // Judge the GET handler's own text, then the file's imports (conservative).
-            const handler = readHandlerText(text);
-            return handler !== "" && writesPrincipalTable(file, handler);
-          }
-          return writesPrincipalTable(file, text);
+          return judge(file, readOnly.some((prefix) => covers(prefix, route)) ? READ_METHODS : null);
         })
         .map(routePathFor);
     }
+    const keyReachableWriters = (files, forbidden, readOnly) =>
+      keyReachable(files, forbidden, readOnly, (file, methods) => writesPrincipalTable(file, undefined, methods));
+    const keyReachableDynamic = (files, forbidden, readOnly) =>
+      keyReachable(files, forbidden, readOnly, (file, methods) => buildsTableName(file, undefined, methods));
 
     it("the scan still finds what it hunts (self-check)", () => {
       // With NO denylist the scan must flag the refused families, including the one
@@ -199,23 +230,96 @@ describe("API keys cannot reach account self-service endpoints", () => {
     it("flags a synthetic unprotected writer, own source and one import hop", () => {
       const dir = mkdtempSync(join(tmpdir(), "key-scan-"));
       try {
-        const helper = join(dir, "helper.js");
-        writeFileSync(helper, 'export const x = "DELETE FROM lucia_sessions WHERE 1";\n');
-        const direct = join(dir, "direct.js");
-        writeFileSync(
-          direct,
+        const write = (name, body) => {
+          const file = join(dir, name);
+          writeFileSync(file, body);
+          return file;
+        };
+        write("helper.js", 'export const x = "DELETE FROM lucia_sessions WHERE 1";\n');
+        const direct = write(
+          "direct.js",
           'export async function onRequestPost(c){ c.env.DB.prepare("update users set role = ?"); }\n',
         );
-        const hopped = join(dir, "hopped.js");
-        writeFileSync(hopped, 'import { x } from "./helper.js";\nexport async function onRequestPost(){ return x; }\n');
-        const clean = join(dir, "clean.js");
-        writeFileSync(clean, 'export async function onRequestGet(c){ c.env.DB.prepare("SELECT * FROM users"); }\n');
+        const hopped = write(
+          "hopped.js",
+          'import { x } from "./helper.js";\nexport async function onRequestPost(){ return x; }\n',
+        );
+        const clean = write(
+          "clean.js",
+          'export async function onRequestGet(c){ c.env.DB.prepare("SELECT * FROM users"); }\n',
+        );
         expect(writesPrincipalTable(direct)).toBe(true);
         expect(writesPrincipalTable(hopped)).toBe(true);
         expect(writesPrincipalTable(clean)).toBe(false);
+
+        // A read-only family's GET handler that writes through an import is flagged,
+        // even though the import sits ABOVE the handler slice...
+        const getHop = write(
+          "getHop.js",
+          'import { x } from "./helper.js";\nexport async function onRequestGet(){ return x; }\n',
+        );
+        expect(writesPrincipalTable(getHop, undefined, READ_METHODS)).toBe(true);
+        // ...and a same-file helper defined above it counts too.
+        const getHelper = write(
+          "getHelper.js",
+          'async function purge(db){ await db.prepare("DELETE FROM lucia_sessions"); }\nexport async function onRequestGet({env}){ await purge(env.DB); }\n',
+        );
+        expect(writesPrincipalTable(getHelper, undefined, READ_METHODS)).toBe(true);
+        // Only the HEAD handler writes: HEAD is as key-reachable as GET on a read-only family.
+        const headOnly = write(
+          "headOnly.js",
+          'import { x } from "./helper.js";\nexport async function onRequestGet(){ return 1; }\nexport async function onRequestHead(){ return x; }\n',
+        );
+        expect(writesPrincipalTable(headOnly, undefined, READ_METHODS)).toBe(true);
+        // A POST-only write in the same file is not reachable by a key.
+        const postOnly = write(
+          "postOnly.js",
+          'import { x } from "./helper.js";\nexport async function onRequestGet(){ return 1; }\nexport async function onRequestPost(){ return x; }\n',
+        );
+        expect(writesPrincipalTable(postOnly, undefined, READ_METHODS)).toBe(false);
+        expect(writesPrincipalTable(postOnly)).toBe(true);
       } finally {
         rmSync(dir, { recursive: true, force: true });
       }
+    });
+
+    it("detects quoted table names and every handler export shape; flags interpolated names", () => {
+      const dir = mkdtempSync(join(tmpdir(), "key-scan-"));
+      try {
+        const write = (name, body) => {
+          const file = join(dir, name);
+          writeFileSync(file, body);
+          return file;
+        };
+        const quoted = write(
+          "q.js",
+          'export const onRequestPost = async (c) => c.env.DB.prepare(`UPDATE "users" SET role = ?`);\n',
+        );
+        expect(ROUTE_EXPORT.test(readFileSync(quoted, "utf8"))).toBe(true);
+        expect(writesPrincipalTable(quoted)).toBe(true);
+        const backtick = write("b.js", "const q = 'DELETE FROM `lucia_sessions`';\nexport { q as onRequestPost };\n");
+        expect(ROUTE_EXPORT.test(readFileSync(backtick, "utf8"))).toBe(true);
+        expect(writesPrincipalTable(backtick)).toBe(true);
+        expect(writesPrincipalTable(backtick, undefined, READ_METHODS)).toBe(true);
+        const dynamic = write(
+          "d.js",
+          "export async function onRequestPost(c){ c.env.DB.prepare(`UPDATE ${c.params.t} SET a = 1`); }\n",
+        );
+        expect(writesPrincipalTable(dynamic)).toBe(false);
+        expect(buildsTableName(dynamic)).toBe(true);
+        expect(buildsTableName(quoted)).toBe(false);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it("no key-reachable route builds a table name at runtime", () => {
+      expect(
+        keyReachableDynamic(routes, prefixes, readOnlyPrefixes()),
+        "These key-reachable routes interpolate a table name into SQL, so the scan cannot tell " +
+          "whether it is an account or credential table. Review each by hand: use a literal name, " +
+          "or deny the family to API keys.",
+      ).toEqual([]);
     });
 
     it("no key-reachable route writes an account or credential table", () => {

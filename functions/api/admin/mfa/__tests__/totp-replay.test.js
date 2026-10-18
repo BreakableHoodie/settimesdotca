@@ -66,10 +66,14 @@ function seedChallenge(rawDb, userId = 1) {
   const mfaToken = crypto.randomUUID();
   rawDb
     .prepare(
+      // SQLite's own clock, in its own format: verify.js compares against
+      // datetime('now'), which the faked JS Date does not move. A JS-computed
+      // ISO value here was a time bomb: frozen at 2026-10-17 with a 'T'
+      // separator, it read as unexpired all that day and failed from midnight.
       `INSERT INTO mfa_challenges (token, user_id, ip_address, user_agent, expires_at)
-       VALUES (?, ?, '127.0.0.1', 'test-agent', ?)`,
+       VALUES (?, ?, '127.0.0.1', 'test-agent', datetime('now', '+5 minutes'))`,
     )
-    .run(mfaToken, userId, new Date(Date.now() + 5 * 60 * 1000).toISOString());
+    .run(mfaToken, userId);
   return mfaToken;
 }
 

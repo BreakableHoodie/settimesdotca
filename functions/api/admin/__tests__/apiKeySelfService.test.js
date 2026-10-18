@@ -74,10 +74,14 @@ function routePathFor(file) {
 
 function middlewareList(name) {
   const source = readFileSync(MIDDLEWARE, "utf8");
-  const block = source.match(new RegExp(`const ${name} = \\[([\\s\\S]*?)\\];`));
-  expect(block, `${name} must exist in _middleware.js`).not.toBeNull();
+  // Plain string search, not a RegExp built from `name` (Semgrep detect-non-literal-regexp).
+  const opener = `const ${name} = [`;
+  const start = source.indexOf(opener);
+  const end = start === -1 ? -1 : source.indexOf("];", start);
+  expect(start, `${name} must exist in _middleware.js`).not.toBe(-1);
+  expect(end, `${name} must be a closed array literal`).not.toBe(-1);
   // Strip comments first: the denylist carries prose that contains quoted words.
-  const code = block[1].replace(/\/\/.*$/gm, "");
+  const code = source.slice(start + opener.length, end).replace(/\/\/.*$/gm, "");
   return [...code.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
 }
 
@@ -154,6 +158,7 @@ describe("API keys cannot reach account self-service endpoints", () => {
     // auditLogStatement.js build an identifier-validated name for every caller.
     const DYNAMIC_TABLE = /\b(?:INTO|UPDATE|FROM)\s+["`]?\$\{/i;
     const IMPORT_RE = /import\s+([\s\S]*?)\s+from\s+["'](\.{1,2}\/[^"']+)["'];?/g;
+    const REEXPORT_RE = /export\s*\{([^}]*)\}\s*from\s+["'](\.{1,2}\/[^"']+)["']/g;
 
     // The file split into top-level declarations (prettier keeps them at column 0), each
     // tagged with the handler name it exports, if any.
@@ -181,14 +186,20 @@ describe("API keys cannot reach account self-service endpoints", () => {
       // Imports ONE hop, only those whose bindings the reachable code actually uses.
       // _middleware.js is skipped: every route imports it and it writes lucia_sessions and
       // api_keys for its own bookkeeping, which would flag the whole tree.
+      // Identifiers the reachable code uses, as a set: no RegExp built from a name, which
+      // also means a `$` in an identifier cannot act as an anchor.
+      const used = new Set(body.match(/[A-Za-z_$][\w$]*/g) ?? []);
       const deps = [...text.matchAll(IMPORT_RE)]
-        .filter(([, clause]) =>
-          (clause.match(/[A-Za-z_$][\w$]*/g) ?? []).some((n) => new RegExp(`\\b${n}\\b`).test(body)),
-        )
+        .filter(([, clause]) => (clause.match(/[A-Za-z_$][\w$]*/g) ?? []).some((n) => used.has(n)))
         .map(([, , spec]) => join(dirname(file), spec))
         .filter((dep) => !dep.endsWith("_middleware.js"))
         .map((dep) => readFileSync(dep, "utf8"));
-      return [body, ...deps];
+      // A route that re-exports its handler from another module (`export { onRequestPost }
+      // from "../users.js"`) runs THAT module's code, so its source is reachable too.
+      const reexported = [...text.matchAll(REEXPORT_RE)]
+        .filter(([, clause]) => /\bonRequest/.test(clause))
+        .map(([, , spec]) => readFileSync(join(dirname(file), spec), "utf8"));
+      return [body, ...deps, ...reexported];
     }
     const writesPrincipalTable = (file, text = readFileSync(file, "utf8"), methods = null) =>
       reachableSources(file, text, methods).some((src) => PRINCIPAL_WRITE.test(src));
@@ -251,6 +262,10 @@ describe("API keys cannot reach account self-service endpoints", () => {
         expect(writesPrincipalTable(direct)).toBe(true);
         expect(writesPrincipalTable(hopped)).toBe(true);
         expect(writesPrincipalTable(clean)).toBe(false);
+        // A route file that only re-exports a writing handler from a sibling module.
+        write("target.js", 'export async function onRequestPost(c){ c.env.DB.prepare("DELETE FROM api_keys"); }\n');
+        const reexport = write("reexport.js", 'export { onRequestPost } from "./target.js";\n');
+        expect(writesPrincipalTable(reexport)).toBe(true);
 
         // A read-only family's GET handler that writes through an import is flagged,
         // even though the import sits ABOVE the handler slice...

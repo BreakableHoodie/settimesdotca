@@ -1,0 +1,11 @@
+-- Re-enrolment with proof of the current factor (#1318).
+--
+-- totp_pending_secret holds the encrypted secret of a NEW authenticator app
+-- while totp_enabled = 1. It is written only by mfa/setup after the caller
+-- proves the CURRENT factor, and it is promoted to totp_secret only by
+-- mfa/enable once a code from the new app is confirmed. Nothing else reads it:
+-- login, step-up, disable and backup-code regeneration verify against
+-- totp_secret alone, so a pending secret can never authenticate anything.
+-- Every path that clears or replaces the factor (disable, admin reset, a
+-- first-time setup) sets it back to NULL.
+ALTER TABLE users ADD COLUMN totp_pending_secret TEXT;

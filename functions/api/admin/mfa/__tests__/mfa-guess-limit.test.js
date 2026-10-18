@@ -7,6 +7,7 @@ import { createTestEnv } from "../../../test-utils.js";
 import { generateTotpCode } from "../../../../utils/totp.js";
 import * as backupHandler from "../backup-codes.js";
 import * as disableHandler from "../disable.js";
+import * as setupHandler from "../setup.js";
 
 const SECRET = "JBSWY3DPEHPK3PXP";
 
@@ -14,6 +15,8 @@ const SECRET = "JBSWY3DPEHPK3PXP";
 const ENDPOINTS = [
   { name: "backup-codes", handler: backupHandler, type: "mfa_backup_codes" },
   { name: "disable", handler: disableHandler, type: "mfa_disable" },
+  // Setup only guesses when 2FA is already on: it is then a re-enrolment (#1318).
+  { name: "setup", handler: setupHandler, type: "mfa_reenrol" },
 ];
 
 const call = (handler, env, headers, code, ip) =>

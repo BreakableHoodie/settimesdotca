@@ -184,3 +184,60 @@ export function buildActivationEmail({ activationUrl, recipientName }) {
     }),
   };
 }
+
+function formatEventTime(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/Toronto",
+    timeZoneName: "short",
+  });
+}
+
+// Security notice sent after two-factor authentication is turned on, or moved
+// to a new authenticator app (#1318). It carries no secret, no code and no
+// link: a password-only attacker who enrols first leaves the owner this email
+// as the only signal, so it must be readable and must not itself be actionable.
+export function buildMfaEnabledEmail({ recipientName, enabledAt, ipAddress, isReEnrolment = false }) {
+  const headline = isReEnrolment
+    ? "Two-factor authentication was moved to a new authenticator app on your SetTimes account"
+    : "Two-factor authentication was turned on for your SetTimes account";
+  const when = formatEventTime(enabledAt);
+  const greeting = recipientName ? `Hi ${recipientName},` : "Hi,";
+  const warning = "If this wasn't you, contact an admin immediately. They can reset your two-factor authentication.";
+
+  const bodyHtml = `
+    ${when ? `<p style="margin:0 0 12px;">When: ${escapeHtml(when)}</p>` : ""}
+    ${ipAddress ? `<p style="margin:0 0 12px;">From IP address: ${escapeHtml(ipAddress)}</p>` : ""}
+    <p style="margin:0;"><strong>${escapeHtml(warning)}</strong></p>
+  `;
+
+  return {
+    subject: isReEnrolment
+      ? "Your SetTimes two-factor authentication moved to a new app"
+      : "Two-factor authentication was turned on for your SetTimes account",
+    text: [
+      greeting,
+      "",
+      `${headline}.`,
+      when ? `When: ${when}` : null,
+      ipAddress ? `From IP address: ${ipAddress}` : null,
+      "",
+      warning,
+    ]
+      .filter((line) => line !== null)
+      .join("\n"),
+    html: renderEmail({
+      title: isReEnrolment ? "Two-factor authentication moved" : "Two-factor authentication turned on",
+      preheader: headline,
+      intro: `${greeting} ${headline}.`,
+      bodyHtml,
+      footerNote: "This is a security notice from SetTimes.",
+    }),
+  };
+}

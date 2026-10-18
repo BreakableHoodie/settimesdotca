@@ -1,6 +1,10 @@
 // MFA enable endpoint
 // POST /api/admin/mfa/enable
 // Body: { code: string }
+//
+// Also finishes a RE-ENROLMENT (#1318): with 2FA on and a pending secret from
+// mfa/setup, the code is checked against the PENDING secret and, on success,
+// promoted to totp_secret. With 2FA on and nothing pending it stays refused.
 
 import { checkPermission, auditLog } from "../_middleware.js";
 import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../utils/authAttempts.js";
@@ -16,6 +20,7 @@ import { getClientIP, parseJsonObjectBody } from "../../../utils/request.js";
 import { revokeAllTrustedDevices } from "../../../utils/trustedDevice.js";
 import { initializeLucia } from "../../../utils/auth.js";
 import { generateCSRFToken, setCSRFCookie } from "../../../utils/csrf.js";
+import { dispatchNotice, notifyMfaEnabled } from "../../../utils/mfaNotice.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -50,7 +55,9 @@ export async function onRequestPost(context) {
     );
   }
 
-  const user = await DB.prepare("SELECT email, totp_secret, totp_enabled, totp_last_step FROM users WHERE id = ?")
+  const user = await DB.prepare(
+    "SELECT email, name, totp_secret, totp_pending_secret, totp_enabled, totp_last_step FROM users WHERE id = ?",
+  )
     .bind(userId)
     .first();
 
@@ -67,7 +74,9 @@ export async function onRequestPost(context) {
     );
   }
 
-  if (Number(user.totp_enabled) === 1) {
+  // Enabled with no pending secret: nothing to confirm.
+  const reenrolling = Number(user.totp_enabled) === 1 && Boolean(user.totp_pending_secret);
+  if (Number(user.totp_enabled) === 1 && !reenrolling) {
     return new Response(
       JSON.stringify({
         error: "Conflict",
@@ -80,7 +89,10 @@ export async function onRequestPost(context) {
     );
   }
 
-  if (!user.totp_secret) {
+  // The secret the submitted code is checked against: the PENDING one while
+  // re-enrolling, never the live one (the old app is not what is being confirmed).
+  const candidateSecret = reenrolling ? user.totp_pending_secret : user.totp_secret;
+  if (!candidateSecret) {
     return new Response(
       JSON.stringify({
         error: "Bad request",
@@ -114,7 +126,7 @@ export async function onRequestPost(context) {
 
   let totpSecretState;
   try {
-    totpSecretState = await loadTotpSecret(user.totp_secret, env);
+    totpSecretState = await loadTotpSecret(candidateSecret, env);
   } catch (error) {
     console.error("[MFA Enable] Failed to decrypt TOTP secret:", error?.message || error);
     return new Response(
@@ -130,7 +142,9 @@ export async function onRequestPost(context) {
   }
 
   const matchedStep = await verifyTotpStep(totpSecretState?.secret, code);
-  const valid = totpStepIsFresh(matchedStep, user.totp_last_step);
+  // A new secret has its own history: the live secret's last step says nothing
+  // about it, so a re-enrolment checks freshness against none.
+  const valid = totpStepIsFresh(matchedStep, reenrolling ? null : user.totp_last_step);
   if (matchedStep !== null && !valid) {
     await writeAuthAttempt(DB, {
       attemptType: AUTH_ATTEMPT_TYPES.mfaEnable,
@@ -178,15 +192,33 @@ export async function onRequestPost(context) {
   // `AND totp_secret = ?` binds enrolment to the secret the code was checked
   // against: a second setup that replaced it, or an admin reset that cleared
   // it, must not be overwritten by this request's stale read.
-  const enrolledSecret = totpSecretState?.shouldPersist ? totpSecretState.encryptedSecret : user.totp_secret;
-  const written = await DB.prepare(
-    `UPDATE users
-     SET totp_enabled = 1, backup_codes = ?, totp_secret = ?, totp_last_step = ?
-     WHERE id = ? AND totp_enabled = 0 AND totp_secret = ?
-       AND (totp_last_step IS NULL OR totp_last_step < ?)`,
-  )
-    .bind(JSON.stringify(hashedCodes), enrolledSecret, matchedStep, userId, user.totp_secret, matchedStep)
-    .run();
+  const enrolledSecret = totpSecretState?.shouldPersist ? totpSecretState.encryptedSecret : candidateSecret;
+  // Re-enrolment promotes the pending secret in ONE write bound to both the
+  // live secret and the pending one as read: a reset, a disable, a second
+  // setup or a parallel confirm of the same code matches nothing (409).
+  const written = reenrolling
+    ? await DB.prepare(
+        `UPDATE users
+         SET totp_secret = ?, totp_pending_secret = NULL, backup_codes = ?, totp_last_step = ?
+         WHERE id = ? AND totp_enabled = 1 AND totp_secret IS ? AND totp_pending_secret = ?`,
+      )
+        .bind(
+          enrolledSecret,
+          JSON.stringify(hashedCodes),
+          matchedStep,
+          userId,
+          user.totp_secret ?? null,
+          user.totp_pending_secret,
+        )
+        .run()
+    : await DB.prepare(
+        `UPDATE users
+         SET totp_enabled = 1, totp_pending_secret = NULL, backup_codes = ?, totp_secret = ?, totp_last_step = ?
+         WHERE id = ? AND totp_enabled = 0 AND totp_secret = ?
+           AND (totp_last_step IS NULL OR totp_last_step < ?)`,
+      )
+        .bind(JSON.stringify(hashedCodes), enrolledSecret, matchedStep, userId, user.totp_secret, matchedStep)
+        .run();
 
   if (written?.meta?.changes === 0) {
     return mfaSetupChangedResponse();
@@ -230,7 +262,20 @@ export async function onRequestPost(context) {
     userId,
   });
 
-  await auditLog(env, userId, "mfa.enabled", "user", userId, { email: user.email }, ipAddress);
+  await auditLog(env, userId, "mfa.enabled", "user", userId, { email: user.email, reenrolled: reenrolling }, ipAddress);
+
+  // Tell the account owner (#1318): a password-only attacker who enrols first
+  // is otherwise invisible. Strictly after the commit and never awaited into
+  // the response: a send failure is logged inside and changes nothing.
+  await dispatchNotice(
+    context,
+    notifyMfaEnabled(env, {
+      to: user.email,
+      recipientName: user.name,
+      ipAddress,
+      isReEnrolment: reenrolling,
+    }),
+  );
 
   return new Response(
     JSON.stringify({

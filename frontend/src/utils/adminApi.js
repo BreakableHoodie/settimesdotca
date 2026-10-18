@@ -457,11 +457,14 @@ export const mfaApi = {
     return handleResponse(response)
   },
 
-  async setup() {
+  // First-time setup takes no code. While 2FA is already on, a current
+  // authenticator or backup code is required to start moving to a new app (#1318).
+  async setup(code) {
     const response = await fetchWithCSRFRetry(`${API_BASE}/mfa/setup`, {
       method: 'POST',
       headers: getHeaders(),
       credentials: 'include',
+      ...(code ? { body: JSON.stringify({ code }) } : {}),
     })
     return handleResponse(response)
   },

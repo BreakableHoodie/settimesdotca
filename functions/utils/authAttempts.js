@@ -14,10 +14,16 @@ export const AUTH_ATTEMPT_TYPES = Object.freeze({
   mfaDisable: "mfa_disable",
   mfaBackupCodes: "mfa_backup_codes",
   mfaStepUp: "mfa_step_up",
+  mfaReenrol: "mfa_reenrol",
 });
 
 export function mfaGuessAttemptTypes() {
-  return [AUTH_ATTEMPT_TYPES.mfaStepUp, AUTH_ATTEMPT_TYPES.mfaBackupCodes, AUTH_ATTEMPT_TYPES.mfaDisable];
+  return [
+    AUTH_ATTEMPT_TYPES.mfaStepUp,
+    AUTH_ATTEMPT_TYPES.mfaBackupCodes,
+    AUTH_ATTEMPT_TYPES.mfaDisable,
+    AUTH_ATTEMPT_TYPES.mfaReenrol,
+  ];
 }
 
 function getRateLimitQuery(scope, typeCount = 1) {

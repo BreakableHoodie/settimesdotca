@@ -196,8 +196,23 @@ describe("API keys cannot reach account self-service endpoints", () => {
         .map((dep) => readFileSync(dep, "utf8"));
       // A route that re-exports its handler from another module (`export { onRequestPost }
       // from "../users.js"`) runs THAT module's code, so its source is reachable too.
+      // The method filter applies here too: a read-only family's re-exported POST is not
+      // key-reachable, and a guard that cries wolf gets an exemption instead of a fix.
+      const exportedName = (part) =>
+        part
+          .trim()
+          .split(/\s+as\s+/)
+          .pop()
+          .trim();
       const reexported = [...text.matchAll(REEXPORT_RE)]
-        .filter(([, clause]) => /\bonRequest/.test(clause))
+        .filter(([, clause]) =>
+          clause
+            .split(",")
+            .map(exportedName)
+            .some(
+              (name) => name.startsWith("onRequest") && (!methods || name === "onRequest" || methods.includes(name)),
+            ),
+        )
         .map(([, , spec]) => readFileSync(join(dirname(file), spec), "utf8"));
       return [body, ...deps, ...reexported];
     }
@@ -266,6 +281,10 @@ describe("API keys cannot reach account self-service endpoints", () => {
         write("target.js", 'export async function onRequestPost(c){ c.env.DB.prepare("DELETE FROM api_keys"); }\n');
         const reexport = write("reexport.js", 'export { onRequestPost } from "./target.js";\n');
         expect(writesPrincipalTable(reexport)).toBe(true);
+        // ...but on a read-only family only the re-exported READ handlers count.
+        expect(writesPrincipalTable(reexport, undefined, READ_METHODS)).toBe(false);
+        const reexportGet = write("reexportGet.js", 'export { onRequestPost as onRequestGet } from "./target.js";\n');
+        expect(writesPrincipalTable(reexportGet, undefined, READ_METHODS)).toBe(true);
 
         // A read-only family's GET handler that writes through an import is flagged,
         // even though the import sits ABOVE the handler slice...

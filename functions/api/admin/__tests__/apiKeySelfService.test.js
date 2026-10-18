@@ -198,22 +198,25 @@ describe("API keys cannot reach account self-service endpoints", () => {
       // from "../users.js"`) runs THAT module's code, so its source is reachable too.
       // The method filter applies here too: a read-only family's re-exported POST is not
       // key-reachable, and a guard that cries wolf gets an exemption instead of a fix.
-      const exportedName = (part) =>
-        part
-          .trim()
-          .split(/\s+as\s+/)
-          .pop()
-          .trim();
-      const reexported = [...text.matchAll(REEXPORT_RE)]
-        .filter(([, clause]) =>
-          clause
-            .split(",")
-            .map(exportedName)
-            .some(
-              (name) => name.startsWith("onRequest") && (!methods || name === "onRequest" || methods.includes(name)),
-            ),
-        )
-        .map(([, , spec]) => readFileSync(join(dirname(file), spec), "utf8"));
+      // Each re-exported part is `local` or `local as exported`; `exported` decides whether a
+      // key reaches it, `local` names the handler in the target module. Only that handler
+      // (plus the target's helpers and the imports they use) is scanned, by the same
+      // slicing, so a target's unreachable onRequestPost does not cry wolf.
+      const reachableParts = (clause) =>
+        clause
+          .split(",")
+          .map((part) => part.trim().split(/\s+as\s+/))
+          .map(([local, exported = local]) => ({ local: local.trim(), exported: exported.trim() }))
+          .filter(
+            ({ exported }) =>
+              exported.startsWith("onRequest") && (!methods || exported === "onRequest" || methods.includes(exported)),
+          );
+      const reexported = [...text.matchAll(REEXPORT_RE)].flatMap(([, clause, spec]) => {
+        const locals = reachableParts(clause).map(({ local }) => local);
+        if (locals.length === 0) return [];
+        const target = join(dirname(file), spec);
+        return reachableSources(target, readFileSync(target, "utf8"), locals.includes("onRequest") ? null : locals);
+      });
       return [body, ...deps, ...reexported];
     }
     const writesPrincipalTable = (file, text = readFileSync(file, "utf8"), methods = null) =>
@@ -285,6 +288,20 @@ describe("API keys cannot reach account self-service endpoints", () => {
         expect(writesPrincipalTable(reexport, undefined, READ_METHODS)).toBe(false);
         const reexportGet = write("reexportGet.js", 'export { onRequestPost as onRequestGet } from "./target.js";\n');
         expect(writesPrincipalTable(reexportGet, undefined, READ_METHODS)).toBe(true);
+        // A read handler re-exported from a module whose only writer is its POST: the GET a
+        // key reaches is clean, so the route is not flagged...
+        write(
+          "mixed.js",
+          'export async function onRequestGet(c){ c.env.DB.prepare("SELECT * FROM users"); }\nexport async function onRequestPost(c){ c.env.DB.prepare("DELETE FROM users"); }\n',
+        );
+        const mixedGet = write("mixedGet.js", 'export { onRequestGet } from "./mixed.js";\n');
+        expect(writesPrincipalTable(mixedGet, undefined, READ_METHODS)).toBe(false);
+        // ...while re-exporting that POST as the GET is.
+        const mixedPostAsGet = write(
+          "mixedPostAsGet.js",
+          'export { onRequestPost as onRequestGet } from "./mixed.js";\n',
+        );
+        expect(writesPrincipalTable(mixedPostAsGet, undefined, READ_METHODS)).toBe(true);
 
         // A read-only family's GET handler that writes through an import is flagged,
         // even though the import sits ABOVE the handler slice...

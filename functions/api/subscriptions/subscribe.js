@@ -10,6 +10,7 @@ import { getPublicBaseUrl } from "../../utils/publicUrl.js";
 import { parseJsonObjectBody } from "../../utils/request.js";
 import { CONSENT_VERSION, pendingConfirmationLiveSql } from "../../utils/consent.js";
 import { isDevRequest } from "../../utils/auth.js";
+import { allowEmailToRecipient, logRecipientSuppression } from "../../utils/recipientEmailCap.js";
 
 const FREQUENCY_OPTIONS = new Set(["daily", "weekly", "monthly"]);
 const MAX_EMAIL_LENGTH = 320;
@@ -135,6 +136,13 @@ export async function onRequestPost(context) {
         }
 
         if (current) {
+          // Per-recipient cap (#1337): over it, no email and the ordinary success answer.
+          if (!(await recipientMayBeEmailed(env, email))) {
+            return new Response(JSON.stringify({ message: "Verification email sent. Please check your inbox." }), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
           // Re-send verification email
           const emailResult = await sendVerificationEmail(env, email, current.verification_token);
 
@@ -163,6 +171,16 @@ export async function onRequestPost(context) {
       }
     }
 
+    // Per-recipient cap (#1337), checked BEFORE the insert so a capped request writes
+    // nothing: no pending row whose token was never mailed. Over the cap: no email, and
+    // the ordinary "created" answer.
+    if (!(await recipientMayBeEmailed(env, email))) {
+      return new Response(JSON.stringify({ message: "Subscription created. Please check your email to verify." }), {
+        status: 201,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
     // Create subscription
     const consentIp = request.headers.get("CF-Connecting-IP") ?? null;
     try {
@@ -184,8 +202,20 @@ export async function onRequestPost(context) {
       throw insertError;
     }
 
-    // Send verification email
-    const emailResult = await sendVerificationEmail(env, email, verificationToken);
+    // Send verification email. A send that fails leaves a pending row nobody can confirm
+    // (its token was never mailed), and a live one would stall this address's re-requests,
+    // so drop it by its own token. "not_configured" is dev, where the link is echoed instead.
+    let emailResult;
+    try {
+      emailResult = await sendVerificationEmail(env, email, verificationToken);
+    } catch (sendError) {
+      await dropUnmailedSubscription(env, verificationToken);
+      throw sendError;
+    }
+    if (!emailResult.delivered && emailResult.reason !== "not_configured") {
+      console.warn("[Subscribe] Verification email not delivered:", emailResult.reason);
+      await dropUnmailedSubscription(env, verificationToken);
+    }
 
     if (!emailResult.delivered && emailResult.reason === "not_configured") {
       return subscriptionResponse(
@@ -242,5 +272,24 @@ async function sendVerificationEmail(env, email, token) {
   } else {
     console.warn("[Subscribe] Email not configured; verification email was not sent.");
     return { delivered: false, reason: "not_configured", verifyUrl };
+  }
+}
+
+// Whether an email may go to this address under the per-recipient cap (#1337). Only asked
+// when an email would actually be sent, so unconfigured/dev environments are unaffected.
+async function recipientMayBeEmailed(env, email) {
+  if (!isEmailConfigured(env)) return true;
+  const cap = await allowEmailToRecipient(env.DB, email);
+  if (!cap.allowed) logRecipientSuppression("Subscribe", cap);
+  return cap.allowed;
+}
+
+async function dropUnmailedSubscription(env, verificationToken) {
+  try {
+    await env.DB.prepare("DELETE FROM email_subscriptions WHERE verification_token = ? AND verified = 0")
+      .bind(verificationToken)
+      .run();
+  } catch (err) {
+    console.error("[Subscribe] Failed to drop unmailed pending subscription; re-requests only re-send:", err);
   }
 }

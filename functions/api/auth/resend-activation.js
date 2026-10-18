@@ -4,6 +4,7 @@ import { buildActivationEmail } from "../../utils/emailTemplates.js";
 import { getPublicBaseUrl } from "../../utils/publicUrl.js";
 import { toSqliteDateTime } from "../../utils/authAttempts.js";
 import { parseJsonObjectBody } from "../../utils/request.js";
+import { allowEmailToRecipient, logRecipientSuppression } from "../../utils/recipientEmailCap.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -68,6 +69,17 @@ export async function onRequestPost(context) {
 
     if (user.activated_at) {
       return genericResponse;
+    }
+
+    // Per-recipient cap (#1337), checked BEFORE the token is rotated: rotating it while
+    // suppressing the email would kill the link the person already holds and mail
+    // nothing in its place. Over the cap: change nothing, send nothing, same response.
+    if (isEmailConfigured(env)) {
+      const cap = await allowEmailToRecipient(DB, email);
+      if (!cap.allowed) {
+        logRecipientSuppression("ResendActivation", cap);
+        return genericResponse;
+      }
     }
 
     const activationToken = crypto.randomUUID() + crypto.randomUUID().replace(/-/g, "");

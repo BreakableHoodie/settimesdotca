@@ -710,6 +710,13 @@ Follow, subscriber, and single-band digest mail carries RFC 8058 one-click unsub
 
 Bot protection on the public email-input endpoints (follow, subscribe) goes through `verifyTurnstile()` in `functions/utils/turnstile.js`, which **fails closed in production**: if `TURNSTILE_SECRET_KEY` is unset it allows only local-dev requests and rejects everything else (mirrors `CSRF_SECRET`). The secret **must** be configured in the production Pages project.
 
+### Public senders cap emails per recipient (#1337)
+
+Follow, follow-batch, subscribe and resend-activation share ONE allowance per address: 5 emails per 24 h (`functions/utils/recipientEmailCap.js`), whatever IPs the requests come from. A batch is one email. The `rate_limits` key is `email-recipient:` plus a SHA-256 of the trimmed, lowercased address; the raw address is never stored or logged (logs carry 8 hex chars). The cap is checked **before the write** (follow, batch, subscribe) or before the token rotates (resend-activation), so a capped request inserts nothing. A pre-read keeps a no-op request from spending the allowance. Over the cap the response is identical to success. It fails closed, and `allowEmailToRecipient` returns `reason: "capped"` (warn) or `"counter_unavailable"` (error), because a D1 outage must not be logged as abuse protection working.
+**A failed provider send drops that request's own pending row** (by its token or batch token), or re-requests no-op for 7 days.
+**Retention:** `retention.js` prunes `rate_limits` at 30 min but keeps `email-recipient:` keys 25 h; otherwise the cap resets itself. The prune runs daily, so the published bounds are worst cases: about 25 h for per-IP counters and about 2 days (25 h + one daily interval) for recipient keys. Change the cadence or the window, and update `PrivacyPage.jsx` in the same PR. A new public sender that emails a caller-supplied address must call `allowEmailToRecipient`.
+**Exempt, deliberately:** invite signup (`admin/auth/signup.js`) sends an activation email uncapped. It needs a valid single-use invite code, so it is not an open door like the four above.
+
 ### Proof of consent is recorded at confirmation (#1289)
 
 Band follows and email subscriptions store `confirmed_at` and the `consent_version` that identifies the wording shown when the request was made; legacy rows remain NULL because their wording and confirmation time were not recorded. Bump `CONSENT_VERSION` whenever the follow/subscribe form wording or confirmation email wording changes. Confirmation writes use SQLite's `datetime('now')` and must never overwrite an existing confirmed timestamp.

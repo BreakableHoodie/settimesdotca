@@ -11,6 +11,7 @@ export class MockD1Database {
       performances: [],
     };
     this.idCounter = 1;
+    this.rateLimitCounts = new Map();
   }
 
   _isPendingConfirmationLive(createdAt) {
@@ -25,6 +26,15 @@ export class MockD1Database {
       bind: (...params) => ({
         all: async () => this._executeSelect(query, params),
         run: async () => this._executeWrite(query, params),
+        // Only the rate_limits upsert-RETURNING (the per-recipient email cap, #1337) is read
+        // through first(); it counts calls per key like the real fixed-window counter.
+        first: async () => {
+          if (!query.toLowerCase().includes("rate_limits")) return null;
+          const [key, now] = params;
+          const count = (this.rateLimitCounts.get(key) ?? 0) + 1;
+          this.rateLimitCounts.set(key, count);
+          return { count, window_start: now };
+        },
       }),
     };
   }
@@ -449,5 +459,6 @@ export class MockD1Database {
       performances: [],
     };
     this.idCounter = 1;
+    this.rateLimitCounts = new Map();
   }
 }

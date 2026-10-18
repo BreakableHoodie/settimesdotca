@@ -118,9 +118,39 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'API keys' — the key denylist is checked against every normalised spelling of the path, so %69nvite-codes, //users and bands%2f..%2fapi-keys are refused, not left to the router (#1327)",
     file: "functions/api/admin/_middleware.js",
-    find: "    if (!keyPaths || matchesPrefix([path, ...keyPaths], KEY_FORBIDDEN_PREFIXES)) {",
-    replace: "    if (matchesPrefix([path], KEY_FORBIDDEN_PREFIXES)) {",
+    find: "    if (!keyPaths || matchesPrefix([path, ...keyPaths], KEY_FORBIDDEN_PREFIXES, true)) {",
+    replace: "    if (matchesPrefix([path], KEY_FORBIDDEN_PREFIXES, true)) {",
     tests: ["functions/api/admin/__tests__/api-key-auth.test.js"],
+  },
+  {
+    id: "api-key-maintenance-denied",
+    invariant:
+      "CLAUDE.md 'API keys (#744)', request path — /api/admin/maintenance/ (retention and session cleanups) is session-only at every key role (#1331)",
+    file: "functions/api/admin/_middleware.js",
+    find: '  "/api/admin/maintenance",',
+    replace: "",
+    tests: [
+      "functions/api/admin/__tests__/api-key-auth.test.js",
+      "functions/api/admin/__tests__/apiKeySelfService.test.js",
+    ],
+  },
+  {
+    id: "api-key-audit-log-denied",
+    invariant:
+      "CLAUDE.md 'API keys (#744)', request path — /api/admin/audit-log (every user's IP, api_key.request rows) is session-only at every key role (#1331)",
+    file: "functions/api/admin/_middleware.js",
+    find: '  "/api/admin/audit-log",',
+    replace: "",
+    tests: ["functions/api/admin/__tests__/api-key-auth.test.js"],
+  },
+  {
+    id: "api-key-reachability-scan-users-read-only",
+    invariant:
+      "CLAUDE.md 'API keys (#744)', request path — the behavioural scan fails when a route that writes an account or credential table is key-reachable (#1331); here /api-keys loses its mutation refusal",
+    file: "functions/api/admin/_middleware.js",
+    find: 'const KEY_READ_ONLY_PREFIXES = ["/api/admin/users", "/api/admin/api-keys"];',
+    replace: 'const KEY_READ_ONLY_PREFIXES = ["/api/admin/users"];',
+    tests: ["functions/api/admin/__tests__/apiKeySelfService.test.js"],
   },
   {
     id: "schedule-builds-hash-session",

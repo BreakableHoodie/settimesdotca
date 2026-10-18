@@ -36,19 +36,26 @@ const LAST_USED_THROTTLE_MS = 5 * 60 * 1000;
 // (no role check at all), and revoke their trusted devices. The role hierarchy is
 // the wrong axis: NO key role belongs here, including one minted `admin`.
 //
-// Matched with startsWith, so the slash-less entries also cover their children
-// (/sessions and /sessions/revoke-all). Enforced by apiKeySelfService.test.js,
+// Matched on whole path segments (matchesPrefix with exact = true): an entry covers itself
+// and its children (/sessions and /sessions/revoke-all) but not a sibling that merely
+// shares the spelling, so /audit-log does not swallow a future /audit-logger. Entries
+// carry no trailing slash. Enforced by apiKeySelfService.test.js,
 // which fails when an admin route with no checkPermission call is not covered here.
 //
 // /api/admin/me is deliberately NOT listed: it is a read that returns the identity
 // the key holder already obtained from the admin who minted the key, and a machine
 // client discovering its own role is a legitimate use. A decision, not an omission.
 const KEY_FORBIDDEN_PREFIXES = [
-  "/api/admin/auth/",
-  "/api/admin/mfa/",
+  "/api/admin/auth",
+  "/api/admin/mfa",
   "/api/admin/sessions",
   "/api/admin/trusted-devices",
   "/api/admin/invite-codes",
+  // Human admin actions (#1331). maintenance/ runs the retention and session cleanups
+  // (it reaches lucia_sessions, trusted_devices and password_reset_tokens); audit-log
+  // reads every user's IP and the api_key.request rows. No key role needs either.
+  "/api/admin/maintenance",
+  "/api/admin/audit-log",
 ];
 
 // Keys may read users and API keys, but may not create or change identities.
@@ -459,7 +466,7 @@ export async function onRequest(context) {
     // identically. It also costs zero D1 round-trips, which is the right posture for a
     // path an attacker can hammer for free.
     const keyPaths = keyPathForms(rawPathname);
-    if (!keyPaths || matchesPrefix([path, ...keyPaths], KEY_FORBIDDEN_PREFIXES)) {
+    if (!keyPaths || matchesPrefix([path, ...keyPaths], KEY_FORBIDDEN_PREFIXES, true)) {
       log.warn("API key blocked from account self-service route", {
         keyPrefix: bearerValue.slice(0, DISPLAY_PREFIX_LENGTH),
         path: rawPathname,

@@ -390,6 +390,10 @@ describe("API key authentication path (#744 part 3)", () => {
       ["/api/admin/sessions/revoke-all", "POST"],
       ["/api/admin/trusted-devices", "GET"],
       ["/api/admin/auth/login", "POST"],
+      // Human admin actions (#1331): cleanups and the audit log, GET and mutating alike.
+      ["/api/admin/maintenance/retention", "POST"],
+      ["/api/admin/maintenance/cleanup-sessions", "POST"],
+      ["/api/admin/audit-log", "GET"],
     ];
 
     it.each(SELF_SERVICE)("%s (%s) returns 403 KEY_NOT_PERMITTED", async (path, method) => {
@@ -408,6 +412,61 @@ describe("API key authentication path (#744 part 3)", () => {
       expect(response.status).toBe(403);
       expect((await response.json()).code).toBe("KEY_NOT_PERMITTED");
       expect(reached).not.toHaveBeenCalled();
+    });
+
+    // A key of EVERY role is refused: the role hierarchy is the wrong axis (#1331).
+    const MAINTENANCE_AUDIT = [
+      ["/api/admin/maintenance/retention", "POST"],
+      ["/api/admin/maintenance/cleanup-sessions", "POST"],
+      ["/api/admin/audit-log", "GET"],
+    ];
+    const ROLE_CASES = ["viewer", "editor", "admin"].flatMap((role) =>
+      MAINTENANCE_AUDIT.map(([path, method]) => [role, path, method]),
+    );
+
+    it.each(ROLE_CASES)("a %s key gets 403 KEY_NOT_PERMITTED on %s (%s)", async (role, path, method) => {
+      const { env, rawDb } = createTestEnv({ role: "admin" });
+      const key = await seedKey(rawDb, { role });
+
+      const reached = vi.fn(async () => new Response("ok", { status: 200 }));
+      const { response } = await runMiddleware(
+        env,
+        keyRequest(key.plaintext, { method, url: `https://example.test${path}` }),
+        reached,
+      );
+
+      expect(response.status).toBe(403);
+      expect((await response.json()).code).toBe("KEY_NOT_PERMITTED");
+      expect(reached).not.toHaveBeenCalled();
+    });
+
+    it("an admin session still reaches the audit log and maintenance routes", async () => {
+      const { env, headers } = createTestEnv({ role: "admin" });
+      const sessionId = headers.Authorization.replace("Bearer ", "");
+
+      for (const path of ["/api/admin/audit-log", "/api/admin/maintenance/retention"]) {
+        const reached = vi.fn(async () => new Response("ok", { status: 200 }));
+        const response = await onRequest({
+          request: new Request(`https://example.test${path}`, { headers: { Cookie: `session_token=${sessionId}` } }),
+          env,
+          data: {},
+          next: async () => reached(),
+        });
+        expect(response.status, path).toBe(200);
+        expect(reached, path).toHaveBeenCalled();
+      }
+    });
+
+    it("the audit-log entry is segment-bounded: a sibling that shares the spelling is not swept in", async () => {
+      const { env, rawDb } = createTestEnv({ role: "admin" });
+      const key = await seedKey(rawDb, { role: "admin" });
+
+      const { response } = await runMiddleware(
+        env,
+        keyRequest(key.plaintext, { url: "https://example.test/api/admin/audit-logger" }),
+        okNext,
+      );
+      expect(response.status).toBe(200);
     });
 
     it("refuses before verifying the key, so an invalid key gets the same answer", async () => {
@@ -473,6 +532,23 @@ describe("API key authentication path (#744 part 3)", () => {
       // Resolving between decodes AND splitting on a decoded backslash.
       ["/api/admin/%252f/..%2f%255c/invite-codes", "GET"],
       ["/api/admin/%252f/..%2f%255c/users", "POST"],
+      // maintenance and audit-log (#1331): case, encoding, backslash, dot segments.
+      ["/api/admin/MAINTENANCE/retention", "POST"],
+      ["/api/admin/%4daintenance/cleanup-sessions", "POST"],
+      ["/api/admin/maintenance%5cretention", "POST"],
+      ["/api/admin//maintenance//retention", "POST"],
+      ["/api/admin/bands%2f..%2fmaintenance/retention", "POST"],
+      ["/api/admin/bands/%2e%2e/maintenance/cleanup-sessions", "POST"],
+      ["/api/admin/x%252f..%2f..%2fmaintenance/retention", "POST"],
+      ["/api/admin/maintenance/", "POST"],
+      ["/api/admin/AUDIT-LOG", "GET"],
+      ["/api/admin/%61udit-log", "GET"],
+      ["/api/admin/audit-log/", "GET"],
+      ["/api/admin//audit-log", "GET"],
+      ["/api/admin/bands%2f..%2faudit-log", "GET"],
+      ["/api/admin/bands/%2e%2e/audit-log", "GET"],
+      ["/api/admin/%5caudit-log", "GET"],
+      ["/api/admin/x%252f..%2f..%2faudit-log", "GET"],
     ];
 
     it.each(NON_CANONICAL)("refuses the non-canonical spelling %s (%s)", async (path, method) => {

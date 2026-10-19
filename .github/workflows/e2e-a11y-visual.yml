@@ -54,7 +54,7 @@ jobs:
 
             - name: Upload generated linux snapshots
               if: env.SNAPSHOTS_MISSING == 'true'
-              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
               with:
                   name: linux-snapshots
                   path: e2e/visual-regression.spec.js-snapshots/*-linux.png
@@ -86,7 +86,7 @@ jobs:
               run: node scripts/scrub-e2e-artifacts.mjs test-results playwright-report
 
             - name: Upload Playwright failure artifacts
-              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
               if: failure() && steps.scrub.outcome == 'success'
               with:
                   name: playwright-failures-a11y-visual

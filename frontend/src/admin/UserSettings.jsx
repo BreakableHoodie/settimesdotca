@@ -107,7 +107,11 @@ export default function UserSettings({ user, onOpenMfa }) {
           Devices you marked as trusted skip the MFA step for 30 days. Revoke any device you no longer recognise.
         </p>
 
-        {devicesError && <p className="text-red-400 text-sm mb-4">{devicesError}</p>}
+        {devicesError && (
+          <p role="alert" className="text-red-400 text-sm mb-4">
+            {devicesError}
+          </p>
+        )}
 
         {devicesLoading ? (
           <p className="text-text-tertiary text-sm">Loading devices…</p>

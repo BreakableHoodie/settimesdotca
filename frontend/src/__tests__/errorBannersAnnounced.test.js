@@ -7,13 +7,17 @@ import { describe, expect, it } from 'vitest'
 // carries it). The login 2FA step rendered "This code was just used" in a bare
 // <div>, so screen readers never heard it (WCAG 4.1.3), and the E2E retry that
 // waits for that alert (e2e/utils/session.js) could never fire. A sweep then
-// found three more bare banners. This scan keeps a fifth from appearing.
+// found three more bare banners, and widening it to any *Error name found a
+// fifth (UserSettings' devicesError). This scan keeps another from appearing.
 const SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
-// `{error && <div ...>` or `{error && (\n <div ...>` whose opening tag lacks
-// role="alert". Specifically alert: role="status" is polite, and the E2E retry
-// in e2e/utils/session.js waits for an alert.
-export const BARE_ERROR_BANNER = /\{\s*error\s*&&\s*\(?\s*<(div|p|span)\b(?![^>]*\brole="alert")[^>]*>/g
+// `{error && <div ...>`, `{devicesError && (\n <p ...>` and the like (any
+// identifier ending in error/Error) whose opening tag lacks role="alert".
+// Specifically alert: role="status" is polite, and the E2E retry in
+// e2e/utils/session.js waits for an alert. Known limit: the role lookahead
+// stops at the first `>`, so an attribute containing one (an arrow function)
+// before the role reads as bare. That fails loudly, never silently.
+const BARE_ERROR_BANNER = /\{\s*\w*[eE]rror\s*&&\s*\(?\s*<(div|p|span)\b(?![^>]*\brole="alert")[^>]*>/g
 
 function sourceFiles(dir) {
   return readdirSync(dir).flatMap(name => {
@@ -30,9 +34,11 @@ describe('error banners are announced', () => {
     const bareMultiline = '{error && (\n  <div className="x">\n    <p>{error}</p>\n  </div>\n)}'
     const announced = '{error && (\n  <div role="alert" className="x">{error}</div>\n)}'
     const politeOnly = '{error && <div role="status" className="x">{error}</div>}'
+    const otherName = '{devicesError && <p className="text-red-400">{devicesError}</p>}'
     expect(bare.match(BARE_ERROR_BANNER)).toHaveLength(1)
     expect(bareMultiline.match(BARE_ERROR_BANNER)).toHaveLength(1)
     expect(politeOnly.match(BARE_ERROR_BANNER)).toHaveLength(1)
+    expect(otherName.match(BARE_ERROR_BANNER)).toHaveLength(1)
     expect(announced.match(BARE_ERROR_BANNER)).toBeNull()
   })
 

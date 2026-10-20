@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import '@testing-library/jest-dom'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import MfaSettingsModal from '../MfaSettingsModal'
 import { mfaApi } from '../../../utils/adminApi'
 
@@ -43,5 +43,102 @@ describe('MfaSettingsModal required mode', () => {
     fireEvent.change(input, { target: { value: '000000' } })
     fireEvent.click(screen.getByRole('button', { name: 'Disable MFA' }))
     expect(await screen.findByText('Invalid authentication code')).toBeInTheDocument()
+  })
+})
+
+// #1318: an enrolled user moves to a new authenticator app themselves. Queries
+// are scoped to the dialog so a collision with page content cannot satisfy them.
+describe('MfaSettingsModal: move to a new authenticator app', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mfaApi.status.mockResolvedValue({ totpEnabled: true })
+  })
+
+  const openDialog = async () => {
+    render(<MfaSettingsModal isOpen canDisable={false} onClose={vi.fn()} />)
+    const dialog = await screen.findByRole('dialog')
+    await within(dialog).findByRole('button', { name: 'Move to a new authenticator app' })
+    return within(dialog)
+  }
+
+  it('asks for the current code, then the new QR, then the new app code, and shows new backup codes once', async () => {
+    mfaApi.setup.mockResolvedValue({ secret: 'NEWSECRET', otpauthUrl: 'otpauth://totp/x?secret=NEWSECRET' })
+    mfaApi.enable.mockResolvedValue({ success: true, backupCodes: ['AAAAA-11111', 'BBBBB-22222'] })
+    const dialog = await openDialog()
+
+    fireEvent.click(dialog.getByRole('button', { name: 'Move to a new authenticator app' }))
+    expect(dialog.getByRole('button', { name: 'Continue' })).toBeDisabled()
+    fireEvent.change(dialog.getByLabelText('Current authenticator or backup code'), { target: { value: '123456' } })
+    fireEvent.click(dialog.getByRole('button', { name: 'Continue' }))
+
+    await waitFor(() => expect(mfaApi.setup).toHaveBeenCalledWith('123456'))
+    expect(await dialog.findByText('NEWSECRET')).toBeInTheDocument()
+    expect(mfaApi.enable).not.toHaveBeenCalled()
+
+    fireEvent.change(dialog.getByLabelText('Code from the new authenticator app'), { target: { value: '654321' } })
+    fireEvent.click(dialog.getByRole('button', { name: 'Confirm new app' }))
+
+    await waitFor(() => expect(mfaApi.enable).toHaveBeenCalledWith('654321'))
+    expect(await dialog.findByText('AAAAA-11111')).toBeInTheDocument()
+    expect(dialog.getByText('BBBBB-22222')).toBeInTheDocument()
+    // Back at the start: the QR for the finished flow is gone.
+    expect(dialog.queryByText('NEWSECRET')).not.toBeInTheDocument()
+    expect(dialog.getByRole('button', { name: 'Move to a new authenticator app' })).toBeInTheDocument()
+  })
+
+  it('shows the server message for a wrong current code and does not advance to the QR', async () => {
+    mfaApi.setup.mockRejectedValue(Object.assign(new Error('Invalid authentication code'), { status: 400 }))
+    const dialog = await openDialog()
+    fireEvent.click(dialog.getByRole('button', { name: 'Move to a new authenticator app' }))
+    fireEvent.change(dialog.getByLabelText('Current authenticator or backup code'), { target: { value: '000000' } })
+    fireEvent.click(dialog.getByRole('button', { name: 'Continue' }))
+
+    expect(await dialog.findByText('Invalid authentication code')).toBeInTheDocument()
+    expect(dialog.queryByLabelText('Code from the new authenticator app')).not.toBeInTheDocument()
+    expect(dialog.getByLabelText('Current authenticator or backup code')).toBeInTheDocument()
+  })
+
+  it('shows the already-used message when the step was spent', async () => {
+    const message = 'This code was just used. Wait for the next code from your authenticator app.'
+    mfaApi.setup.mockRejectedValue(
+      Object.assign(new Error(message), { status: 400, details: { code: 'TOTP_CODE_ALREADY_USED' } })
+    )
+    const dialog = await openDialog()
+    fireEvent.click(dialog.getByRole('button', { name: 'Move to a new authenticator app' }))
+    fireEvent.change(dialog.getByLabelText('Current authenticator or backup code'), { target: { value: '123456' } })
+    fireEvent.click(dialog.getByRole('button', { name: 'Continue' }))
+    expect(await dialog.findByText(message)).toBeInTheDocument()
+  })
+
+  it.each([
+    ['MFA_SETUP_CHANGED', 409, 'Two-factor setup changed while this request was running.'],
+    ['MFA_REENROL_EXPIRED', 400, 'This setup has expired. Start again to get a new QR code.'],
+  ])('starts over when the confirm answers %s', async (code, status, message) => {
+    mfaApi.setup.mockResolvedValue({ secret: 'NEWSECRET', otpauthUrl: 'otpauth://totp/x?secret=NEWSECRET' })
+    mfaApi.enable.mockRejectedValue(Object.assign(new Error(message), { status, details: { code } }))
+    const dialog = await openDialog()
+    fireEvent.click(dialog.getByRole('button', { name: 'Move to a new authenticator app' }))
+    fireEvent.change(dialog.getByLabelText('Current authenticator or backup code'), { target: { value: '123456' } })
+    fireEvent.click(dialog.getByRole('button', { name: 'Continue' }))
+    fireEvent.change(await dialog.findByLabelText('Code from the new authenticator app'), {
+      target: { value: '654321' },
+    })
+    fireEvent.click(dialog.getByRole('button', { name: 'Confirm new app' }))
+
+    expect(await dialog.findByText(message)).toBeInTheDocument()
+    expect(dialog.queryByText('NEWSECRET')).not.toBeInTheDocument()
+    expect(dialog.getByRole('button', { name: 'Move to a new authenticator app' })).toBeInTheDocument()
+  })
+
+  it('Cancel discards the flow without confirming anything', async () => {
+    mfaApi.setup.mockResolvedValue({ secret: 'NEWSECRET', otpauthUrl: 'otpauth://totp/x?secret=NEWSECRET' })
+    const dialog = await openDialog()
+    fireEvent.click(dialog.getByRole('button', { name: 'Move to a new authenticator app' }))
+    fireEvent.change(dialog.getByLabelText('Current authenticator or backup code'), { target: { value: '123456' } })
+    fireEvent.click(dialog.getByRole('button', { name: 'Continue' }))
+    await dialog.findByText('NEWSECRET')
+    fireEvent.click(dialog.getByRole('button', { name: 'Cancel' }))
+    expect(dialog.queryByText('NEWSECRET')).not.toBeInTheDocument()
+    expect(mfaApi.enable).not.toHaveBeenCalled()
   })
 })

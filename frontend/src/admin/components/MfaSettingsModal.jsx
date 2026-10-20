@@ -3,6 +3,8 @@ import { QRCodeSVG } from 'qrcode.react'
 import { mfaApi } from '../../utils/adminApi'
 import { Modal, Button, Alert } from '../../components/ui'
 
+const REENROL_RESTART_CODES = new Set(['MFA_SETUP_CHANGED', 'MFA_REENROL_EXPIRED'])
+
 // `required`: the user's role must have 2FA (#1253). The modal cannot be
 // dismissed until it is enabled; the only ways out are finishing setup
 // (onEnabled) or logging out (onLogout). `canDisable` hides the disable
@@ -22,6 +24,10 @@ export default function MfaSettingsModal({
   const [verificationCode, setVerificationCode] = useState('')
   const [backupCodes, setBackupCodes] = useState(null)
   const [copied, setCopied] = useState(false)
+  // Moving to a new authenticator app while 2FA is on (#1318):
+  // 'idle' -> 'proof' (current code) -> 'confirm' (code from the new app).
+  const [reenrolStage, setReenrolStage] = useState('idle')
+  const [reenrolCode, setReenrolCode] = useState('')
 
   useEffect(() => {
     if (!isOpen) return
@@ -30,6 +36,8 @@ export default function MfaSettingsModal({
     setBackupCodes(null)
     setVerificationCode('')
     setCopied(false)
+    setReenrolStage('idle')
+    setReenrolCode('')
 
     const loadStatus = async () => {
       try {
@@ -70,6 +78,49 @@ export default function MfaSettingsModal({
       setVerificationCode('')
     } catch (err) {
       setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const resetReenrol = () => {
+    setReenrolStage('idle')
+    setReenrolCode('')
+    setSetupData(null)
+  }
+
+  // Step 1: prove the CURRENT factor. The old app keeps working until step 2.
+  const handleReenrolStart = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      setBackupCodes(null)
+      const data = await mfaApi.setup(reenrolCode)
+      setSetupData(data)
+      setReenrolCode('')
+      setReenrolStage('confirm')
+    } catch (err) {
+      setError(err.message)
+      if (err.details?.code === 'MFA_SETUP_CHANGED') resetReenrol()
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Step 2: confirm a code from the NEW app. The server swaps the secrets,
+  // ends every other session, and returns a fresh set of backup codes.
+  const handleReenrolConfirm = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const data = await mfaApi.enable(reenrolCode)
+      setBackupCodes(data.backupCodes || [])
+      resetReenrol()
+      setStatus(await mfaApi.status())
+    } catch (err) {
+      setError(err.message)
+      // The pending app can no longer be confirmed: start over from step 1.
+      if (REENROL_RESTART_CODES.has(err.details?.code)) resetReenrol()
     } finally {
       setLoading(false)
     }
@@ -263,6 +314,101 @@ export default function MfaSettingsModal({
                 <Button onClick={handleRegenerate} variant="primary" size="sm" disabled={loading || !verificationCode}>
                   Regenerate Backup Codes
                 </Button>
+              </div>
+
+              <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-text-primary mb-2">Move to a new authenticator app</h3>
+                {reenrolStage === 'idle' && (
+                  <>
+                    <p className="text-text-secondary text-sm mb-3">
+                      Changing phones? Switch without asking an admin. Your current app keeps working until you confirm
+                      the new one, and your other sessions are signed out when you do.
+                    </p>
+                    <Button onClick={() => setReenrolStage('proof')} variant="secondary" size="sm" disabled={loading}>
+                      Move to a new authenticator app
+                    </Button>
+                  </>
+                )}
+                {reenrolStage === 'proof' && (
+                  <>
+                    <p className="text-text-secondary text-sm mb-3">
+                      Enter a code from your current authenticator app, or an unused backup code.
+                    </p>
+                    <label htmlFor="mfa-reenrol-current" className="sr-only">
+                      Current authenticator or backup code
+                    </label>
+                    <input
+                      id="mfa-reenrol-current"
+                      type="text"
+                      autoComplete="one-time-code"
+                      value={reenrolCode}
+                      onChange={e => setReenrolCode(e.target.value)}
+                      className="w-full px-4 py-3 rounded-lg bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-hidden focus:ring-2 focus:ring-accent-500/20 transition-all mb-3"
+                      placeholder="Current code"
+                      disabled={loading}
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={handleReenrolStart}
+                        variant="primary"
+                        size="sm"
+                        disabled={loading || !reenrolCode}
+                      >
+                        Continue
+                      </Button>
+                      <Button onClick={resetReenrol} variant="secondary" size="sm" disabled={loading}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </>
+                )}
+                {reenrolStage === 'confirm' && setupData && (
+                  <div className="space-y-4">
+                    <div className="flex justify-center">
+                      <div className="bg-white p-3 rounded-lg">
+                        <QRCodeSVG value={setupData.otpauthUrl} size={180} level="M" includeMargin={false} />
+                      </div>
+                    </div>
+                    <p className="text-center text-text-secondary text-sm">
+                      Scan this QR code with your NEW authenticator app, then enter the code it shows.
+                    </p>
+                    <details className="bg-bg-navy/60 border border-white/10 rounded-md">
+                      <summary className="px-3 py-2 text-xs text-text-tertiary cursor-pointer hover:text-text-secondary">
+                        Can&apos;t scan? Enter code manually
+                      </summary>
+                      <div className="px-3 pb-3">
+                        <p className="font-mono text-sm text-text-primary break-all select-all">{setupData.secret}</p>
+                      </div>
+                    </details>
+                    <label htmlFor="mfa-reenrol-new" className="sr-only">
+                      Code from the new authenticator app
+                    </label>
+                    <input
+                      id="mfa-reenrol-new"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      value={reenrolCode}
+                      onChange={e => setReenrolCode(e.target.value)}
+                      className="w-full px-4 py-3 rounded-lg bg-bg-navy text-white border border-white/20 focus:border-accent-500 focus:outline-hidden focus:ring-2 focus:ring-accent-500/20 transition-all"
+                      placeholder="Code from the new app"
+                      disabled={loading}
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={handleReenrolConfirm}
+                        variant="success"
+                        size="sm"
+                        disabled={loading || !reenrolCode}
+                      >
+                        Confirm new app
+                      </Button>
+                      <Button onClick={resetReenrol} variant="secondary" size="sm" disabled={loading}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {canDisable ? (

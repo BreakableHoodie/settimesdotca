@@ -1,6 +1,7 @@
 // The guess-limit flow shared by every authenticated endpoint that takes a
 // second-factor code from a live session (step-up's own copy lives in
-// mfa/step-up.js; backup-codes and disable use this) (#1324).
+// mfa/step-up.js; backup-codes, disable, and re-enrolment setup and its
+// confirmation in mfa/enable use this) (#1324, #1318).
 //
 //   1. record the attempt as a failed `pending` row BEFORE the code is checked,
 //      so parallel guesses count each other;

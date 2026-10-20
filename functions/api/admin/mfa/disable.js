@@ -200,7 +200,7 @@ export async function onRequestPost(context) {
 
   await DB.prepare(
     `UPDATE users
-     SET totp_enabled = 0, totp_secret = NULL, backup_codes = NULL, totp_last_step = NULL
+     SET totp_enabled = 0, totp_secret = NULL, totp_pending_secret = NULL, backup_codes = NULL, totp_last_step = NULL
      WHERE id = ?`,
   )
     .bind(userId)

@@ -1625,10 +1625,28 @@ paths:
     post:
       tags:
         - Admin - MFA
-      summary: Start MFA setup for the current user
+      summary: Start MFA setup, or a move to a new authenticator app
+      description: >-
+        With MFA off, generates a secret; no body is needed. With MFA already
+        on, this starts a re-enrolment and the body must carry a current TOTP
+        code or an unused backup code. The new secret is stored as a pending
+        secret that never authenticates anything: the old authenticator keeps
+        working until mfa/enable confirms a code from the new app. Without a
+        code the answer is 409 with code MFA_CODE_REQUIRED_TO_REENROL. A wrong
+        code is 400 INVALID_MFA_CODE, a code whose time step was already spent
+        is 400 TOTP_CODE_ALREADY_USED, and either counts toward the per-user
+        2FA guess limit (401 STEP_UP_LOCKED ends the session; 429 per IP). 409
+        MFA_SETUP_CHANGED means the factor changed while this request ran
+        (for example an admin reset); nothing was stored.
       security:
         - AdminSessionCookie: []
           CsrfToken: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MfaSetupRequest"
       responses:
         "200":
           description: TOTP secret generated
@@ -1636,10 +1654,29 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MfaSetupResponse"
+        "400":
+          description: >-
+            Wrong current code (INVALID_MFA_CODE) or a code whose time step
+            was already used (TOTP_CODE_ALREADY_USED)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
-          $ref: "#/components/responses/Conflict"
+          description: >-
+            MFA_CODE_REQUIRED_TO_REENROL (MFA is on and no code was sent),
+            MFA_SETUP_CHANGED (the factor changed while the request ran), or
+            MFA already enabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          $ref: "#/components/responses/RateLimited"
         "500":
           $ref: "#/components/responses/ServerError"
 
@@ -1650,9 +1687,18 @@ paths:
       summary: Enable MFA with a TOTP code
       description: >-
         Revokes every existing session and issues a fresh session and CSRF
-        cookie. Answers 409 when MFA is already enabled, or with code
-        MFA_SETUP_CHANGED when a second setup or an admin reset changed the
-        pending secret while this request was running.
+        cookie. Also finishes a re-enrolment: with MFA on and a pending secret
+        from mfa/setup, the code is checked against the pending secret, which
+        then replaces the live one, and a new set of backup codes replaces the
+        old set (returned once). Answers 409 when MFA is already enabled with
+        nothing pending, or with code MFA_SETUP_CHANGED when a second setup or
+        an admin reset changed the factor while this request was running.
+        A 400 with code TOTP_CODE_ALREADY_USED means that time step was spent.
+        A re-enrolment's pending secret is confirmable for 15 minutes; after
+        that the answer is 400 with code MFA_REENROL_EXPIRED and setup must be
+        started again. Re-enrolment confirmations share the per-user 2FA guess
+        limit: past it the session is ended (401 STEP_UP_LOCKED).
+        On success the account owner is emailed a security notice.
       security:
         - AdminSessionCookie: []
           CsrfToken: []
@@ -1769,7 +1815,8 @@ paths:
         out), as on mfa/enable, mfa/disable and mfa/backup-codes. 400
         MFA_NOT_ENABLED when the account has no 2FA; 409 MFA_CHANGED when the
         factor changed during the request. 10 failed attempts per hour per user
-        (across step-up, backup-codes and disable, any IP) end the session: 401
+        (across step-up, backup-codes, disable and re-enrolment setup and
+        confirmation, any IP) end the session: 401
         STEP_UP_LOCKED.
       security:
         - AdminSessionCookie: []
@@ -3738,6 +3785,14 @@ components:
         hasBackupCodes:
           type: boolean
 
+    MfaSetupRequest:
+      type: object
+      description: Required only when MFA is already on (re-enrolment).
+      properties:
+        code:
+          type: string
+          description: A current TOTP code or an unused backup code.
+
     MfaSetupResponse:
       type: object
       properties:
@@ -3745,6 +3800,9 @@ components:
           type: string
         otpauthUrl:
           type: string
+        reenrol:
+          type: boolean
+          description: True when this started a re-enrolment (pending secret).
 
     BackupCodesResponse:
       type: object

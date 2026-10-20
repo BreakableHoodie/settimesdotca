@@ -1008,6 +1008,122 @@ export const MUTATIONS = [
     tests: ["functions/api/admin/mfa/__tests__/mfa-settings.test.js"],
   },
   {
+    id: "mfa-reenrol-login-ignores-pending-secret",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — a pending (re-enrolment) secret never authenticates anything: login keeps verifying against totp_secret, so the old app works until enable swaps them (#1318)",
+    file: "functions/api/admin/auth/mfa/verify.js",
+    find: "             u.totp_secret,\n",
+    replace: "             COALESCE(u.totp_pending_secret, u.totp_secret) AS totp_secret,\n",
+    tests: ["functions/api/admin/mfa/__tests__/mfa-reenrol.test.js"],
+  },
+  {
+    id: "mfa-reenrol-enable-clears-pending",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — confirming the new authenticator app promotes the pending secret and clears it, so it cannot be promoted twice or linger (#1318)",
+    file: "functions/api/admin/mfa/enable.js",
+    find: "         SET totp_secret = ?, totp_pending_secret = NULL, backup_codes = ?, totp_last_step = ?\n",
+    replace: "         SET totp_secret = ?, backup_codes = ?, totp_last_step = ?\n",
+    tests: ["functions/api/admin/mfa/__tests__/mfa-reenrol.test.js"],
+  },
+  {
+    id: "mfa-reenrol-enable-bound-to-pending-secret",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — the swap is bound to the pending secret the code was verified against, so a second setup mid-confirm wins instead of being overwritten (#1318)",
+    file: "functions/api/admin/mfa/enable.js",
+    find: "totp_secret IS ? AND totp_pending_secret = ?`,",
+    replace: "totp_secret IS ? AND ? IS NOT NULL`,",
+    tests: ["functions/api/admin/mfa/__tests__/mfa-reenrol.test.js"],
+  },
+  {
+    id: "mfa-reenrol-setup-requires-code",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — setup while 2FA is on refuses without a code (409 MFA_CODE_REQUIRED_TO_REENROL) and stores nothing (#1318)",
+    file: "functions/api/admin/mfa/setup.js",
+    find: "    if (!code) {",
+    replace: "    if (false) {",
+    tests: ["functions/api/admin/mfa/__tests__/mfa-reenrol.test.js"],
+  },
+  {
+    id: "mfa-reenrol-setup-requires-valid-proof",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — setup while 2FA is on stores a pending secret only after a valid current TOTP or backup code (#1318)",
+    file: "functions/api/admin/mfa/setup.js",
+    find: "    if (matchedStep === null && remainingBackupCodes === null) {",
+    replace: "    if (false) {",
+    tests: ["functions/api/admin/mfa/__tests__/mfa-reenrol.test.js"],
+  },
+  {
+    id: "mfa-reenrol-guesses-share-the-user-limit",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — re-enrolment proof guesses count toward the per-user 2FA guess limit shared with step-up, backup-codes and disable (#1318)",
+    file: "functions/utils/authAttempts.js",
+    find: "    AUTH_ATTEMPT_TYPES.mfaReenrol,\n  ];",
+    replace: "  ];",
+    tests: ["functions/api/admin/mfa/__tests__/mfa-reenrol.test.js"],
+  },
+  {
+    id: "mfa-reenrol-pending-secret-expires",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' \u2014 an abandoned re-enrolment's pending secret is refused after 15 minutes, so a later session holder cannot confirm it (#1318)",
+    file: "functions/api/admin/mfa/enable.js",
+    find: "  if (reenrolling && !pendingSecretIsLive(user.totp_pending_set_at)) {",
+    replace: "  if (false) {",
+    tests: ["functions/api/admin/mfa/__tests__/mfa-reenrol.test.js"],
+  },
+  {
+    id: "mfa-reenrol-confirm-goes-through-guess-gate",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' \u2014 confirming a re-enrolment in mfa/enable guesses through beginMfaGuess, sharing the per-user limit (#1318)",
+    file: "functions/api/admin/mfa/enable.js",
+    find: "  if (reenrolling) {\n    const gate = await beginMfaGuess(DB, {",
+    replace: "  if (false) {\n    const gate = await beginMfaGuess(DB, {",
+    tests: ["functions/api/admin/mfa/__tests__/mfa-reenrol.test.js"],
+  },
+  {
+    id: "mfa-reset-clears-pending-secret",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — an admin 2FA reset clears the pending re-enrolment secret with the factor (#1318)",
+    file: "functions/api/admin/users/[id]/reset-mfa.js",
+    find: "totp_secret = NULL, totp_pending_secret = NULL, backup_codes = NULL",
+    replace: "totp_secret = NULL, backup_codes = NULL",
+    tests: ["functions/api/admin/users/__tests__/reset-mfa.test.js"],
+  },
+  {
+    id: "mfa-disable-clears-pending-secret",
+    invariant: "CLAUDE.md 'RBAC Roles' — disabling 2FA clears the pending re-enrolment secret with the factor (#1318)",
+    file: "functions/api/admin/mfa/disable.js",
+    find: "totp_secret = NULL, totp_pending_secret = NULL, backup_codes = NULL",
+    replace: "totp_secret = NULL, backup_codes = NULL",
+    tests: ["functions/api/admin/mfa/__tests__/mfa-reenrol.test.js"],
+  },
+  {
+    id: "mfa-first-setup-clears-pending-secret",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — a first-time setup overwriting the factor clears any leftover pending secret (#1318)",
+    file: "functions/api/admin/mfa/setup.js",
+    find: "SET totp_secret = ?, totp_pending_secret = NULL, totp_enabled = 0",
+    replace: "SET totp_secret = ?, totp_enabled = 0",
+    tests: ["functions/api/admin/mfa/__tests__/mfa-reenrol.test.js"],
+  },
+  {
+    id: "mfa-enrolment-notice-sent",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — every account owner is emailed when 2FA is turned on, first-time or by re-enrolment (#1318)",
+    file: "functions/utils/mfaNotice.js",
+    find: "  if (!to) {",
+    replace: "  if (true) {",
+    tests: ["functions/api/admin/mfa/__tests__/mfa-reenrol.test.js"],
+  },
+  {
+    id: "mfa-enrolment-notice-failure-never-fails-enable",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' — a failed enrolment notice is logged and never fails or alters the committed enable (#1318)",
+    file: "functions/utils/mfaNotice.js",
+    find: "  })().catch((error) => {",
+    replace: "  })().catch((error) => {\n    throw error;",
+    tests: ["functions/api/admin/mfa/__tests__/mfa-reenrol.test.js"],
+  },
+  {
     id: "step-up-reset-mfa-requires-step-up",
     invariant:
       "CLAUDE.md 'Step-up re-authentication for identity changes' — resetting another user's 2FA needs a recent step-up on this session (#1324)",
@@ -1093,8 +1209,8 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'Step-up re-authentication for identity changes' \u2014 the per-user lockout counts failures across step-up, backup-codes and disable together (#1324)",
     file: "functions/utils/authAttempts.js",
-    find: "  return [AUTH_ATTEMPT_TYPES.mfaStepUp, AUTH_ATTEMPT_TYPES.mfaBackupCodes, AUTH_ATTEMPT_TYPES.mfaDisable];",
-    replace: "  return [AUTH_ATTEMPT_TYPES.mfaStepUp];",
+    find: "    AUTH_ATTEMPT_TYPES.mfaStepUp,\n    AUTH_ATTEMPT_TYPES.mfaBackupCodes,\n    AUTH_ATTEMPT_TYPES.mfaDisable,\n",
+    replace: "    AUTH_ATTEMPT_TYPES.mfaStepUp,\n",
     tests: ["functions/api/admin/mfa/__tests__/step-up.test.js"],
   },
   {

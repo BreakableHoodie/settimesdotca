@@ -44,6 +44,8 @@ const SENSITIVE_KEYS = new Set([
   // Secret variants
   "secret",
   "totp_secret",
+  "totp_pending_secret",
+  "totppendingsecret", // camelCase
   "totpsecret", // camelCase 'totpSecret'
   "client_secret",
   "clientsecret", // camelCase 'clientSecret'

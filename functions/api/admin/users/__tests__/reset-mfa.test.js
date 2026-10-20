@@ -7,7 +7,7 @@ import * as resetMfa from "../[id]/reset-mfa.js";
 function seedFactorState(rawDb, userId) {
   rawDb
     .prepare(
-      "UPDATE users SET totp_enabled = 1, totp_secret = 'enc:test-secret', backup_codes = '[\"x\"]' WHERE id = ?",
+      "UPDATE users SET totp_enabled = 1, totp_secret = 'enc:test-secret', totp_pending_secret = 'enc:pending-secret', backup_codes = '[\"x\"]' WHERE id = ?",
     )
     .run(userId);
   rawDb
@@ -41,9 +41,14 @@ describe("POST /api/admin/users/:id/reset-mfa (#1253)", () => {
     const response = await callReset(env, headers, 2);
     expect(response.status).toBe(200);
 
-    expect(rawDb.prepare("SELECT totp_enabled, totp_secret, backup_codes FROM users WHERE id = 2").get()).toEqual({
+    expect(
+      rawDb
+        .prepare("SELECT totp_enabled, totp_secret, totp_pending_secret, backup_codes FROM users WHERE id = 2")
+        .get(),
+    ).toEqual({
       totp_enabled: 0,
       totp_secret: null,
+      totp_pending_secret: null,
       backup_codes: null,
     });
     expect(rawDb.prepare("SELECT COUNT(*) AS n FROM lucia_sessions WHERE user_id = 2").get().n).toBe(0);

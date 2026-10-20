@@ -1,5 +1,6 @@
-// backup-codes and disable take a TOTP code from a live session, so a stolen
-// session can guess on them. They share step-up's guess limit (#1324): a pending
+// backup-codes, disable and re-enrolment setup (#1318) take a TOTP code from a
+// live session, so a stolen session can guess on them. They share step-up's
+// guess limit (#1324): a pending
 // attempt recorded before verifying, a per-USER limit across every guessing
 // endpoint (no IP) that ends the session, and a per-IP limit.
 import { describe, expect, it } from "vitest";
@@ -7,6 +8,7 @@ import { createTestEnv } from "../../../test-utils.js";
 import { generateTotpCode } from "../../../../utils/totp.js";
 import * as backupHandler from "../backup-codes.js";
 import * as disableHandler from "../disable.js";
+import * as setupHandler from "../setup.js";
 
 const SECRET = "JBSWY3DPEHPK3PXP";
 
@@ -14,6 +16,8 @@ const SECRET = "JBSWY3DPEHPK3PXP";
 const ENDPOINTS = [
   { name: "backup-codes", handler: backupHandler, type: "mfa_backup_codes" },
   { name: "disable", handler: disableHandler, type: "mfa_disable" },
+  // Setup only guesses when 2FA is already on: it is then a re-enrolment (#1318).
+  { name: "setup", handler: setupHandler, type: "mfa_reenrol" },
 ];
 
 const call = (handler, env, headers, code, ip) =>

@@ -217,11 +217,11 @@ describe('service worker fetch routing', () => {
       mode: 'navigate',
     })
 
-    // After the fix this is routed to networkFirstStrategy (api-v5), not
+    // After the fix this is routed to networkFirstStrategy (api-v6), not
     // navigationStrategy, so the static cache must stay empty.
     expect(await globalThis.caches.match('/index.html')).toBeUndefined()
     // The response should be cached under its own URL in the API cache.
-    const apiStore = globalThis.caches._stores.get('api-v5')
+    const apiStore = globalThis.caches._stores.get('api-v6')
     expect(apiStore?.has(`${ORIGIN}/api/feeds/ical`)).toBe(true)
   })
 
@@ -252,6 +252,48 @@ describe('service worker fetch routing', () => {
     })
 
     expect(await globalThis.caches.match('/index.html')).toBeUndefined()
+  })
+
+  // #1349: a tab left open across a deploy asks for a hashed chunk that no
+  // longer exists, and Pages answers 200 text/html (its SPA fallback).
+  const CHUNK = `${ORIGIN}/assets/PrivacyPage-OLD123.js`
+
+  it('does not cache an HTML fallback answered for a missing asset', async () => {
+    globalThis.fetch = vi.fn(async () => makeResponse('SPA-FALLBACK', { contentType: 'text/html; charset=utf-8' }))
+
+    const first = await handleFetch({ url: CHUNK, method: 'GET', mode: 'cors' })
+    expect(first._tag).toBe('SPA-FALLBACK') // passed through, so the import fails and the page reloads
+    expect(allCachedEntries()).toBe(0)
+
+    // Not served cache-first next time either: the network is asked again.
+    await handleFetch({ url: CHUNK, method: 'GET', mode: 'cors' })
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('treats the HTML media type case-insensitively', async () => {
+    globalThis.fetch = vi.fn(async () => makeResponse('SPA-FALLBACK', { contentType: 'Text/HTML; charset=UTF-8' }))
+    await handleFetch({ url: CHUNK, method: 'GET', mode: 'cors' })
+    expect(allCachedEntries()).toBe(0)
+  })
+
+  it('still caches a real asset cache-first (control for the HTML guard)', async () => {
+    globalThis.fetch = vi.fn(async () => makeResponse('JS', { contentType: 'application/javascript' }))
+    await handleFetch({ url: CHUNK, method: 'GET', mode: 'cors' })
+    expect(allCachedEntries()).toBe(1)
+    const again = await handleFetch({ url: CHUNK, method: 'GET', mode: 'cors' })
+    expect(again._tag).toBe('JS')
+  })
+
+  it('a background refresh that gets an HTML fallback keeps the cached asset', async () => {
+    const cache = await globalThis.caches.open('schedule-v6')
+    await cache.put(CHUNK, makeResponse('JS', { contentType: 'application/javascript' }))
+    globalThis.fetch = vi.fn(async () => makeResponse('SPA-FALLBACK', { contentType: 'text/html' }))
+
+    const res = await handleFetch({ url: CHUNK, method: 'GET', mode: 'cors' })
+    expect(res._tag).toBe('JS')
+    await vi.waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(1))
+    await new Promise(resolve => setTimeout(resolve, 0)) // let the refresh settle
+    expect((await cache.match(CHUNK))._tag).toBe('JS')
   })
 
   it('FIFO eviction: oldest entries are evicted first, newest entry is retained', async () => {
@@ -294,6 +336,8 @@ describe('service worker activate', () => {
     await globalThis.caches.open('api-v4')
     await globalThis.caches.open('schedule-v5')
     await globalThis.caches.open('api-v5')
+    await globalThis.caches.open('schedule-v6')
+    await globalThis.caches.open('api-v6')
     await globalThis.caches.open('some-other-cache')
 
     const promises = []
@@ -305,9 +349,12 @@ describe('service worker activate', () => {
     expect(globalThis.caches._stores.has('api-v3')).toBe(false)
     expect(globalThis.caches._stores.has('schedule-v4')).toBe(false)
     expect(globalThis.caches._stores.has('api-v4')).toBe(false)
+    // v5 may hold HTML cached under asset URLs (#1349): it must be purged.
+    expect(globalThis.caches._stores.has('schedule-v5')).toBe(false)
+    expect(globalThis.caches._stores.has('api-v5')).toBe(false)
     // Current-version caches and unrelated cache must survive.
-    expect(globalThis.caches._stores.has('schedule-v5')).toBe(true)
-    expect(globalThis.caches._stores.has('api-v5')).toBe(true)
+    expect(globalThis.caches._stores.has('schedule-v6')).toBe(true)
+    expect(globalThis.caches._stores.has('api-v6')).toBe(true)
     expect(globalThis.caches._stores.has('some-other-cache')).toBe(true)
   })
 })
@@ -322,7 +369,7 @@ describe('service worker install', () => {
     handlers.install({ waitUntil: p => promises.push(p) })
     await Promise.all(promises)
 
-    const store = globalThis.caches._stores.get('schedule-v5')
+    const store = globalThis.caches._stores.get('schedule-v6')
     const keys = [...store.keys()]
 
     // The shell, manifest, and branded offline page — by the 200 URLs Pages

@@ -93,7 +93,18 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_PAGES_API_TOKEN }}
           E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
           E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
-        run: node scripts/reset-e2e-db.mjs
+        # D1's API has failed this reset with a transient internal error (code
+        # 7500, run 38693025927). The reset is idempotent as a whole (drop every
+        # table, rebuild from the schema, seed), so retry the WHOLE reset, a
+        # bounded number of times; the last failure still fails the step (#1321).
+        run: |
+          for attempt in 1 2 3; do
+            if node scripts/reset-e2e-db.mjs; then exit 0; fi
+            echo "::warning::Scratch D1 reset failed (attempt $attempt/3)"
+            if [ "$attempt" -lt 3 ]; then sleep 20; fi
+          done
+          echo "::error::Scratch D1 reset failed 3 times running"
+          exit 1
 
       - name: Deploy preview
         id: deploy
@@ -120,29 +131,18 @@ jobs:
           echo "deployment_id=$id" >> "$GITHUB_OUTPUT"
           echo "Deployed $url ($id)"
 
-      # Ready means FUNCTIONS answer, not that "/" does: "/" is a static file
-      # that returned 200 while the alias still pointed at the previous run's
-      # (deleted) deployment, and login then got an HTML error page (run
-      # 38582049702). Require JSON from a Functions route three times running.
-      - name: Wait for preview Functions
-        run: |
-          ok=0
-          for attempt in $(seq 1 40); do
-            type=$(curl --silent --show-error --max-time 10 --output /dev/null \
-              --write-out '%{http_code} %{content_type}' "$PREVIEW_URL/api/events/timeline" || true)
-            case "$type" in
-              "200 application/json"*) ok=$((ok + 1)) ;;
-              *) ok=0 ;;
-            esac
-            if [ "$ok" -ge 3 ]; then
-              echo "Preview Functions are serving JSON: $PREVIEW_URL"
-              exit 0
-            fi
-            echo "Waiting for preview Functions ($attempt/40): ${type:-no response}"
-            sleep 5
-          done
-          echo "::error::Preview Functions did not serve JSON three times running within 200 seconds: $PREVIEW_URL"
-          exit 1
+      # Ready means the preview serves THIS build, three times running
+      # (scripts/wait-for-preview.mjs, #1340): a Functions route answers JSON,
+      # /admin loads this build's hashed entry script, and this build's hashed
+      # AdminApp chunk is served as JavaScript. Functions alone were not enough:
+      # "/" returned 200 while the alias still pointed at the previous run's
+      # deleted deployment (run 38582049702), and on run 39068387682 /admin
+      # rendered the admin error boundary with Functions already answering.
+      # A missing chunk is NOT a 404 on Pages: the SPA fallback answers 200
+      # text/html, so the check is on content-type, not status.
+      - name: Wait for the preview to serve this build
+        id: ready
+        run: node scripts/wait-for-preview.mjs "$PREVIEW_URL" frontend/dist
 
       # Previews run PRODUCTION rate limits: 5 logins per minute per IP
       # (functions/utils/rateLimit.js). login.spec logs in again, which
@@ -159,8 +159,12 @@ jobs:
           E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
         run: npx playwright test --retries=0 --project=setup --project=chromium e2e/auth.setup.js e2e/user-management.spec.js
 
+      # Runs after a phase-1 TEST failure (success() || failure()), but never
+      # when the reset, deploy or readiness failed: then there is no fresh
+      # deployment to test, and phase 2 only buried the real error under login
+      # failures (#1321).
       - name: "E2E on the edge, phase 2: login"
-        if: success() || failure()
+        if: (success() || failure()) && steps.ready.outcome == 'success'
         env:
           CI: "true"
           PLAYWRIGHT_BASE_URL: ${{ env.PREVIEW_URL }}

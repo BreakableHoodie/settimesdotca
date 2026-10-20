@@ -8,6 +8,7 @@
 
 import { checkPermission, auditLog } from "../_middleware.js";
 import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../utils/authAttempts.js";
+import { beginMfaGuess, settleQuietly } from "../../../utils/mfaGuessGate.js";
 import {
   verifyTotpStep,
   totpStepIsFresh,
@@ -21,6 +22,14 @@ import { revokeAllTrustedDevices } from "../../../utils/trustedDevice.js";
 import { initializeLucia } from "../../../utils/auth.js";
 import { generateCSRFToken, setCSRFCookie } from "../../../utils/csrf.js";
 import { dispatchNotice, notifyMfaEnabled } from "../../../utils/mfaNotice.js";
+
+// How long a re-enrolment's pending secret stays confirmable (#1318 review).
+export const PENDING_SECRET_TTL_SECONDS = 15 * 60;
+
+function pendingSecretIsLive(setAt) {
+  const stamp = Number(setAt);
+  return Number.isFinite(stamp) && stamp > 0 && Date.now() / 1000 - stamp <= PENDING_SECRET_TTL_SECONDS;
+}
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -56,7 +65,7 @@ export async function onRequestPost(context) {
   }
 
   const user = await DB.prepare(
-    "SELECT email, name, totp_secret, totp_pending_secret, totp_enabled, totp_last_step FROM users WHERE id = ?",
+    "SELECT email, name, totp_secret, totp_pending_secret, totp_pending_set_at, totp_enabled, totp_last_step FROM users WHERE id = ?",
   )
     .bind(userId)
     .first();
@@ -105,12 +114,66 @@ export async function onRequestPost(context) {
     );
   }
 
-  const rateCheck = await checkAuthRateLimit(DB, {
-    attemptType: AUTH_ATTEMPT_TYPES.mfaEnable,
-    ipAddress,
-    scope: "user-and-ip",
-    userId,
-  });
+  // An abandoned re-enrolment must not stay confirmable: whoever holds the
+  // session later could otherwise guess codes against it at leisure.
+  if (reenrolling && !pendingSecretIsLive(user.totp_pending_set_at)) {
+    return new Response(
+      JSON.stringify({
+        error: "Bad request",
+        code: "MFA_REENROL_EXPIRED",
+        message: "This setup has expired. Start again to get a new QR code.",
+      }),
+      {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
+
+  // Confirming a re-enrolment guesses a code that, if right, replaces the live
+  // factor and mints backup codes, so it shares the per-user guess limit with
+  // step-up, backup-codes, disable and re-enrolment setup (#1318 review). A
+  // first-time enrolment keeps its own limiter: that session already passes
+  // through setup with full access.
+  let attemptId = null;
+  if (reenrolling) {
+    const gate = await beginMfaGuess(DB, {
+      attemptType: AUTH_ATTEMPT_TYPES.mfaReenrol,
+      email: user.email,
+      userId,
+      ipAddress,
+      userAgent: request.headers.get("User-Agent") || "unknown",
+      sessionId: context.data?.session?.id,
+    });
+    if (gate.response) {
+      return gate.response;
+    }
+    attemptId = gate.attemptId;
+  }
+
+  // Re-enrolment settles the row the gate wrote up front (never a second
+  // row); a first-time enrolment records its attempt here, as it always has.
+  const recordFailure = (failureReason) =>
+    attemptId
+      ? settleQuietly(DB, attemptId, { success: false, failureReason })
+      : writeAuthAttempt(DB, {
+          attemptType: AUTH_ATTEMPT_TYPES.mfaEnable,
+          email: user.email,
+          failureReason,
+          ipAddress,
+          success: false,
+          userAgent: request.headers.get("User-Agent") || "unknown",
+          userId,
+        });
+
+  const rateCheck = reenrolling
+    ? { allowed: true }
+    : await checkAuthRateLimit(DB, {
+        attemptType: AUTH_ATTEMPT_TYPES.mfaEnable,
+        ipAddress,
+        scope: "user-and-ip",
+        userId,
+      });
   if (!rateCheck.allowed) {
     return new Response(
       JSON.stringify({
@@ -129,6 +192,7 @@ export async function onRequestPost(context) {
     totpSecretState = await loadTotpSecret(candidateSecret, env);
   } catch (error) {
     console.error("[MFA Enable] Failed to decrypt TOTP secret:", error?.message || error);
+    if (attemptId) await settleQuietly(DB, attemptId, { success: false, failureReason: "totp_secret_error" });
     return new Response(
       JSON.stringify({
         error: "Server error",
@@ -146,30 +210,14 @@ export async function onRequestPost(context) {
   // about it, so a re-enrolment checks freshness against none.
   const valid = totpStepIsFresh(matchedStep, reenrolling ? null : user.totp_last_step);
   if (matchedStep !== null && !valid) {
-    await writeAuthAttempt(DB, {
-      attemptType: AUTH_ATTEMPT_TYPES.mfaEnable,
-      email: user.email,
-      failureReason: "replayed_code",
-      ipAddress,
-      success: false,
-      userAgent: request.headers.get("User-Agent") || "unknown",
-      userId,
-    });
+    await recordFailure("replayed_code");
     return new Response(JSON.stringify({ error: "Authentication failed", ...TOTP_CODE_ALREADY_USED }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
     });
   }
   if (!valid) {
-    await writeAuthAttempt(DB, {
-      attemptType: AUTH_ATTEMPT_TYPES.mfaEnable,
-      email: user.email,
-      failureReason: "invalid_code",
-      ipAddress,
-      success: false,
-      userAgent: request.headers.get("User-Agent") || "unknown",
-      userId,
-    });
+    await recordFailure("invalid_code");
 
     return new Response(
       JSON.stringify({
@@ -221,8 +269,23 @@ export async function onRequestPost(context) {
         .run();
 
   if (written?.meta?.changes === 0) {
+    if (attemptId) await settleQuietly(DB, attemptId, { success: false, failureReason: "mfa_changed" });
     return mfaSetupChangedResponse();
   }
+
+  // Tell the account owner (#1318): a password-only attacker who enrols first
+  // is otherwise invisible. Queued the moment the factor commits, before any
+  // later step can throw, and never awaited into the response: a send failure
+  // is logged inside and changes nothing.
+  await dispatchNotice(
+    context,
+    notifyMfaEnabled(env, {
+      to: user.email,
+      recipientName: user.name,
+      ipAddress,
+      isReEnrolment: reenrolling,
+    }),
+  );
 
   await revokeAllTrustedDevices(DB, userId);
 
@@ -253,29 +316,26 @@ export async function onRequestPost(context) {
   sessionHeaders.append("Set-Cookie", lucia.createSessionCookie(newSession.id).serialize());
   sessionHeaders.append("Set-Cookie", setCSRFCookie(generateCSRFToken(request, env, newSession.id), request, env));
 
-  await writeAuthAttempt(DB, {
-    attemptType: AUTH_ATTEMPT_TYPES.mfaEnable,
-    email: user.email,
-    ipAddress,
-    success: true,
-    userAgent: request.headers.get("User-Agent") || "unknown",
-    userId,
-  });
+  // The factor is live and the new backup codes exist only in this response:
+  // failing to RECORD the success must never turn it into a 500.
+  if (attemptId) {
+    await settleQuietly(DB, attemptId, { success: true });
+  } else {
+    try {
+      await writeAuthAttempt(DB, {
+        attemptType: AUTH_ATTEMPT_TYPES.mfaEnable,
+        email: user.email,
+        ipAddress,
+        success: true,
+        userAgent: request.headers.get("User-Agent") || "unknown",
+        userId,
+      });
+    } catch (error) {
+      console.error("[MFA Enable] Failed to record successful enrolment:", error?.message || error);
+    }
+  }
 
   await auditLog(env, userId, "mfa.enabled", "user", userId, { email: user.email, reenrolled: reenrolling }, ipAddress);
-
-  // Tell the account owner (#1318): a password-only attacker who enrols first
-  // is otherwise invisible. Strictly after the commit and never awaited into
-  // the response: a send failure is logged inside and changes nothing.
-  await dispatchNotice(
-    context,
-    notifyMfaEnabled(env, {
-      to: user.email,
-      recipientName: user.name,
-      ipAddress,
-      isReEnrolment: reenrolling,
-    }),
-  );
 
   return new Response(
     JSON.stringify({

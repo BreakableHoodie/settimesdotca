@@ -282,6 +282,65 @@ describe("mfa/enable while re-enrolling (#1318)", () => {
     expect(row(rawDb)).toEqual(before);
   });
 
+  it("an abandoned re-enrolment expires: past the window the right code promotes nothing", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const newSecret = await startReenrol(env, headers);
+    const before = row(rawDb);
+    vi.setSystemTime(Date.now() + (enableHandler.PENDING_SECRET_TTL_SECONDS + 1) * 1000);
+    const response = await post(enableHandler, env, headers, { code: await generateTotpCode(newSecret) });
+    expect(response.status).toBe(400);
+    expect((await response.json()).code).toBe("MFA_REENROL_EXPIRED");
+    expect(row(rawDb)).toEqual(before);
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
+  it("is still confirmable just inside the window", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const newSecret = await startReenrol(env, headers);
+    vi.setSystemTime(Date.now() + (enableHandler.PENDING_SECRET_TTL_SECONDS - 30) * 1000);
+    const response = await post(enableHandler, env, headers, { code: await generateTotpCode(newSecret) });
+    expect(response.status).toBe(200);
+    expect(await decryptTotpSecret(row(rawDb).totp_secret, env)).toBe(newSecret);
+  });
+
+  it("a wrong confirmation is recorded as a re-enrolment guess, written before the check", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const newSecret = await startReenrol(env, headers);
+    advanceOneStep();
+    const good = await generateTotpCode(newSecret);
+    const response = await post(enableHandler, env, headers, { code: good === "000000" ? "111111" : "000000" });
+    expect(response.status).toBe(400);
+    expect(
+      rawDb
+        .prepare("SELECT success, failure_reason FROM auth_attempts WHERE attempt_type = ? ORDER BY id")
+        .all(AUTH_ATTEMPT_TYPES.mfaReenrol),
+    ).toEqual([
+      { success: 1, failure_reason: null }, // the setup that started it
+      { success: 0, failure_reason: "invalid_code" },
+    ]);
+    expect(
+      rawDb.prepare("SELECT COUNT(*) AS n FROM auth_attempts WHERE attempt_type = ?").get(AUTH_ATTEMPT_TYPES.mfaEnable)
+        .n,
+    ).toBe(0);
+  });
+
+  it("shares the per-user guess limit: guesses spread across IPs elsewhere lock confirmation out", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    const newSecret = await startReenrol(env, headers);
+    const before = row(rawDb);
+    const insert = rawDb.prepare(
+      "INSERT INTO auth_attempts (user_id, ip_address, attempt_type, success, failure_reason) VALUES (1, ?, ?, 0, 'invalid_code')",
+    );
+    for (let i = 0; i < MFA_GUESS_LIMIT.maxFailures; i += 1) insert.run(`10.0.0.${i}`, AUTH_ATTEMPT_TYPES.mfaStepUp);
+    advanceOneStep();
+    // Even the RIGHT code is refused once the budget is spent.
+    const response = await post(enableHandler, env, headers, { code: await generateTotpCode(newSecret) });
+    expect(response.status).toBe(401);
+    expect((await response.json()).code).toBe("STEP_UP_LOCKED");
+    expect(row(rawDb)).toEqual(before);
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
   it("with 2FA on and nothing pending, enable is still refused", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "admin" });
     const before = row(rawDb);
@@ -416,11 +475,53 @@ describe("the enrolment notice (#1318)", () => {
     expect((await firstEnrol(env, headers)).response.status).toBe(200);
   });
 
-  it("is skipped quietly when email is not configured", async () => {
+  it("is skipped, logged as an error, when email is not configured", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     mockIsEmailConfigured.mockReturnValue(false);
     const { env, headers } = createTestEnv({ role: "admin", mfaEnrolled: false });
     expect((await firstEnrol(env, headers)).response.status).toBe(200);
     expect(mockSendEmail).not.toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringMatching(/notice not sent: email delivery is not configured/),
+    );
+    consoleError.mockRestore();
+  });
+
+  it("is sent even when a step after the commit throws", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "admin", mfaEnrolled: false });
+    const setup = await post(setupHandler, env, headers, {});
+    const { secret } = await setup.json();
+    const prepare = env.DB.prepare.bind(env.DB);
+    env.DB.prepare = (sql) => {
+      if (sql.includes("UPDATE lucia_sessions SET ip_address")) throw new Error("D1 blip");
+      return prepare(sql);
+    };
+    await expect(post(enableHandler, env, headers, { code: await generateTotpCode(secret) })).rejects.toThrow(
+      "D1 blip",
+    );
+    expect(row(rawDb).totp_enabled).toBe(1); // the factor committed
+    expect(mockSendEmail).toHaveBeenCalledTimes(1); // so the owner hears about it
+  });
+
+  it("failing to record the success never fails a committed enable", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { env, rawDb, headers } = createTestEnv({ role: "admin", mfaEnrolled: false });
+    const setup = await post(setupHandler, env, headers, {});
+    const { secret } = await setup.json();
+    const prepare = env.DB.prepare.bind(env.DB);
+    env.DB.prepare = (sql) => {
+      if (sql.includes("INSERT INTO auth_attempts")) throw new Error("D1 blip");
+      return prepare(sql);
+    };
+    const response = await post(enableHandler, env, headers, { code: await generateTotpCode(secret) });
+    expect(response.status).toBe(200);
+    expect((await response.json()).backupCodes.length).toBeGreaterThan(0);
+    expect(row(rawDb).totp_enabled).toBe(1);
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringMatching(/Failed to record successful enrolment/),
+      "D1 blip",
+    );
+    consoleError.mockRestore();
   });
 
   it("is handed to waitUntil when the platform provides it", async () => {

@@ -1062,6 +1062,24 @@ export const MUTATIONS = [
     tests: ["functions/api/admin/mfa/__tests__/mfa-reenrol.test.js"],
   },
   {
+    id: "mfa-reenrol-pending-secret-expires",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' \u2014 an abandoned re-enrolment's pending secret is refused after 15 minutes, so a later session holder cannot confirm it (#1318)",
+    file: "functions/api/admin/mfa/enable.js",
+    find: "  if (reenrolling && !pendingSecretIsLive(user.totp_pending_set_at)) {",
+    replace: "  if (false) {",
+    tests: ["functions/api/admin/mfa/__tests__/mfa-reenrol.test.js"],
+  },
+  {
+    id: "mfa-reenrol-confirm-goes-through-guess-gate",
+    invariant:
+      "CLAUDE.md 'RBAC Roles' \u2014 confirming a re-enrolment in mfa/enable guesses through beginMfaGuess, sharing the per-user limit (#1318)",
+    file: "functions/api/admin/mfa/enable.js",
+    find: "  if (reenrolling) {\n    const gate = await beginMfaGuess(DB, {",
+    replace: "  if (false) {\n    const gate = await beginMfaGuess(DB, {",
+    tests: ["functions/api/admin/mfa/__tests__/mfa-reenrol.test.js"],
+  },
+  {
     id: "mfa-reset-clears-pending-secret",
     invariant:
       "CLAUDE.md 'RBAC Roles' — an admin 2FA reset clears the pending re-enrolment secret with the factor (#1318)",
@@ -1092,7 +1110,7 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'RBAC Roles' — every account owner is emailed when 2FA is turned on, first-time or by re-enrolment (#1318)",
     file: "functions/utils/mfaNotice.js",
-    find: "  if (!to || !isEmailConfigured(env)) {",
+    find: "  if (!to) {",
     replace: "  if (true) {",
     tests: ["functions/api/admin/mfa/__tests__/mfa-reenrol.test.js"],
   },
@@ -1191,8 +1209,8 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'Step-up re-authentication for identity changes' \u2014 the per-user lockout counts failures across step-up, backup-codes and disable together (#1324)",
     file: "functions/utils/authAttempts.js",
-    find: "  return [AUTH_ATTEMPT_TYPES.mfaStepUp, AUTH_ATTEMPT_TYPES.mfaBackupCodes, AUTH_ATTEMPT_TYPES.mfaDisable];",
-    replace: "  return [AUTH_ATTEMPT_TYPES.mfaStepUp];",
+    find: "    AUTH_ATTEMPT_TYPES.mfaStepUp,\n    AUTH_ATTEMPT_TYPES.mfaBackupCodes,\n    AUTH_ATTEMPT_TYPES.mfaDisable,\n",
+    replace: "    AUTH_ATTEMPT_TYPES.mfaStepUp,\n",
     tests: ["functions/api/admin/mfa/__tests__/step-up.test.js"],
   },
   {

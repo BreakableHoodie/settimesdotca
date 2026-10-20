@@ -3,6 +3,8 @@ import { QRCodeSVG } from 'qrcode.react'
 import { mfaApi } from '../../utils/adminApi'
 import { Modal, Button, Alert } from '../../components/ui'
 
+const REENROL_RESTART_CODES = new Set(['MFA_SETUP_CHANGED', 'MFA_REENROL_EXPIRED'])
+
 // `required`: the user's role must have 2FA (#1253). The modal cannot be
 // dismissed until it is enabled; the only ways out are finishing setup
 // (onEnabled) or logging out (onLogout). `canDisable` hides the disable
@@ -117,7 +119,8 @@ export default function MfaSettingsModal({
       setStatus(await mfaApi.status())
     } catch (err) {
       setError(err.message)
-      if (err.details?.code === 'MFA_SETUP_CHANGED') resetReenrol()
+      // The pending app can no longer be confirmed: start over from step 1.
+      if (REENROL_RESTART_CODES.has(err.details?.code)) resetReenrol()
     } finally {
       setLoading(false)
     }

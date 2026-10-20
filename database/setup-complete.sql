@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS users (
   name TEXT,                            -- Optional display name
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   last_login TEXT
-, totp_secret TEXT, totp_enabled INTEGER DEFAULT 0, webauthn_enabled INTEGER DEFAULT 0, email_otp_enabled INTEGER DEFAULT 0, backup_codes TEXT, require_2fa INTEGER DEFAULT 1, is_active INTEGER DEFAULT 1, deactivated_at TEXT, deactivated_by INTEGER REFERENCES users(id), updated_at TEXT DEFAULT (datetime('now')), first_name TEXT, last_name TEXT, activation_token TEXT, activation_token_expires_at TEXT, activated_at TEXT, totp_last_step INTEGER, totp_pending_secret TEXT);
+, totp_secret TEXT, totp_enabled INTEGER DEFAULT 0, webauthn_enabled INTEGER DEFAULT 0, email_otp_enabled INTEGER DEFAULT 0, backup_codes TEXT, require_2fa INTEGER DEFAULT 1, is_active INTEGER DEFAULT 1, deactivated_at TEXT, deactivated_by INTEGER REFERENCES users(id), updated_at TEXT DEFAULT (datetime('now')), first_name TEXT, last_name TEXT, activation_token TEXT, activation_token_expires_at TEXT, activated_at TEXT, totp_last_step INTEGER, totp_pending_secret TEXT, totp_pending_set_at INTEGER);
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 

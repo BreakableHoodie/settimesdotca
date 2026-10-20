@@ -110,14 +110,12 @@ describe('MfaSettingsModal: move to a new authenticator app', () => {
     expect(await dialog.findByText(message)).toBeInTheDocument()
   })
 
-  it('starts over when the setup changed underneath the confirm (MFA_SETUP_CHANGED)', async () => {
+  it.each([
+    ['MFA_SETUP_CHANGED', 409, 'Two-factor setup changed while this request was running.'],
+    ['MFA_REENROL_EXPIRED', 400, 'This setup has expired. Start again to get a new QR code.'],
+  ])('starts over when the confirm answers %s', async (code, status, message) => {
     mfaApi.setup.mockResolvedValue({ secret: 'NEWSECRET', otpauthUrl: 'otpauth://totp/x?secret=NEWSECRET' })
-    mfaApi.enable.mockRejectedValue(
-      Object.assign(new Error('Two-factor setup changed while this request was running.'), {
-        status: 409,
-        details: { code: 'MFA_SETUP_CHANGED' },
-      })
-    )
+    mfaApi.enable.mockRejectedValue(Object.assign(new Error(message), { status, details: { code } }))
     const dialog = await openDialog()
     fireEvent.click(dialog.getByRole('button', { name: 'Move to a new authenticator app' }))
     fireEvent.change(dialog.getByLabelText('Current authenticator or backup code'), { target: { value: '123456' } })
@@ -127,7 +125,7 @@ describe('MfaSettingsModal: move to a new authenticator app', () => {
     })
     fireEvent.click(dialog.getByRole('button', { name: 'Confirm new app' }))
 
-    expect(await dialog.findByText(/changed while this request was running/)).toBeInTheDocument()
+    expect(await dialog.findByText(message)).toBeInTheDocument()
     expect(dialog.queryByText('NEWSECRET')).not.toBeInTheDocument()
     expect(dialog.getByRole('button', { name: 'Move to a new authenticator app' })).toBeInTheDocument()
   })

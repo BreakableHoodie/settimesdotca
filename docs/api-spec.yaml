@@ -1694,6 +1694,10 @@ paths:
         nothing pending, or with code MFA_SETUP_CHANGED when a second setup or
         an admin reset changed the factor while this request was running.
         A 400 with code TOTP_CODE_ALREADY_USED means that time step was spent.
+        A re-enrolment's pending secret is confirmable for 15 minutes; after
+        that the answer is 400 with code MFA_REENROL_EXPIRED and setup must be
+        started again. Re-enrolment confirmations share the per-user 2FA guess
+        limit: past it the session is ended (401 STEP_UP_LOCKED).
         On success the account owner is emailed a security notice.
       security:
         - AdminSessionCookie: []

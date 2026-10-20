@@ -185,13 +185,16 @@ export async function onRequestPost(context) {
   // same statement; a backup code is spent in it. Losing the race (a parallel
   // use of the same code, an admin reset, a disable) writes nothing at all.
   const usedBackupCode = matchedStep === null;
+  // Stamped from the same clock enable compares it against (#1318 review).
+  const pendingSetAt = Math.floor(Date.now() / 1000);
   const written = usedBackupCode
     ? await DB.prepare(
-        `UPDATE users SET totp_pending_secret = ?, backup_codes = ?
+        `UPDATE users SET totp_pending_secret = ?, totp_pending_set_at = ?, backup_codes = ?
          WHERE id = ? AND totp_enabled = 1 AND totp_secret IS ? AND backup_codes IS ?`,
       )
         .bind(
           encryptedSecret,
+          pendingSetAt,
           remainingBackupCodes.length > 0 ? JSON.stringify(remainingBackupCodes) : null,
           userId,
           user.totp_secret ?? null,
@@ -199,11 +202,11 @@ export async function onRequestPost(context) {
         )
         .run()
     : await DB.prepare(
-        `UPDATE users SET totp_pending_secret = ?, totp_last_step = ?
+        `UPDATE users SET totp_pending_secret = ?, totp_pending_set_at = ?, totp_last_step = ?
          WHERE id = ? AND totp_enabled = 1 AND totp_secret IS ?
            AND (totp_last_step IS NULL OR totp_last_step < ?)`,
       )
-        .bind(encryptedSecret, matchedStep, userId, user.totp_secret ?? null, matchedStep)
+        .bind(encryptedSecret, pendingSetAt, matchedStep, userId, user.totp_secret ?? null, matchedStep)
         .run();
 
   if (written?.meta?.changes === 0) {

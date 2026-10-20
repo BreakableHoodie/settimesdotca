@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { randomBytes } from "node:crypto";
+import { verifyPassword } from "../functions/utils/crypto.js";
 import { d1, sqlString } from "./utils/d1";
 
 // The three flows whose token is only ever emailed: password-reset completion,
@@ -15,7 +16,9 @@ test.use({ storageState: { cookies: [], origins: [] } });
 // Cloudflare's always-pass test secret (previews) accepts any token; local dev
 // with the secret unset accepts a dev request.
 const TURNSTILE_TEST_TOKEN = "XXXX.DUMMY.TOKEN.XXXX";
-const unique = () => `${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+// From crypto, not Math.random: one of these goes into a password, and
+// CodeQL (rightly) refuses weak randomness anywhere near a credential.
+const unique = () => `${Date.now()}-${randomBytes(4).toString("hex")}`;
 
 // POST from inside the page: same origin, so the real Origin header is sent.
 const postJson = (page, path, body) =>
@@ -63,6 +66,9 @@ test("a password reset link completes, hashing the new password on the server", 
 
   const [row] = d1(`SELECT used FROM password_reset_tokens WHERE token = ${sqlString(token)}`);
   expect(row?.used, "the token is spent").toBe(1);
+  // A handler can spend the token and answer 200 without writing the hash.
+  const [user] = d1("SELECT password_hash FROM users WHERE email = 'viewer@settimes.ca'");
+  expect(await verifyPassword(newPassword, user?.password_hash), "the new password is what is stored").toBe(true);
 });
 
 test("a follow confirmation link confirms the follow", async ({ page }) => {

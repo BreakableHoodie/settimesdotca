@@ -85,7 +85,13 @@ jobs:
         env:
           # Cloudflare's always-pass TEST site key; pairs with the preview's test secret.
           VITE_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
-        run: npm run build
+        # The marker identifies THIS run's deployment to wait-for-preview.mjs:
+        # Vite hashes alone repeat across deployments of the same frontend
+        # source (a functions-only PR, a re-run). Only this workflow writes it;
+        # production builds never ship it.
+        run: |
+          npm run build
+          echo "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" > dist/edge-e2e-deployment.txt
 
       - name: Reset scratch D1 and seed E2E accounts
         env:
@@ -131,16 +137,19 @@ jobs:
           echo "deployment_id=$id" >> "$GITHUB_OUTPUT"
           echo "Deployed $url ($id)"
 
-      # Ready means the preview serves THIS build, three times running
-      # (scripts/wait-for-preview.mjs, #1340): a Functions route answers JSON,
-      # /admin loads this build's hashed entry script, and this build's hashed
-      # AdminApp chunk is served as JavaScript. Functions alone were not enough:
+      # Ready means the alias serves THIS RUN'S deployment, three times running
+      # (scripts/wait-for-preview.mjs, #1340): it serves this run's
+      # edge-e2e-deployment.txt marker, a Functions route answers JSON, /admin
+      # loads this build's hashed entry, and its hashed AdminApp chunk is served
+      # as JavaScript. Hashes alone repeat across deployments of unchanged
+      # frontend source, so only the marker names the deployment. Functions
+      # alone were not enough:
       # "/" returned 200 while the alias still pointed at the previous run's
       # deleted deployment (run 38582049702), and on run 39068387682 /admin
       # rendered the admin error boundary with Functions already answering.
       # A missing chunk is NOT a 404 on Pages: the SPA fallback answers 200
       # text/html, so the check is on content-type, not status.
-      - name: Wait for the preview to serve this build
+      - name: Wait for the preview to serve this run's deployment
         id: ready
         run: node scripts/wait-for-preview.mjs "$PREVIEW_URL" frontend/dist
 

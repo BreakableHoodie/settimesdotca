@@ -199,9 +199,12 @@ describe("edge-e2e.yml wiring", () => {
     expect(ready).toContain('node scripts/wait-for-preview.mjs "$PREVIEW_URL" frontend/dist');
   });
 
-  it("completes a real invite signup on the edge, the flow the PBKDF2 outage broke (#1292)", () => {
-    const phase1 = step(workflow(), '"E2E on the edge, phase 1: user management and invite signup');
-    expect(phase1).toContain("e2e/invite-signup.spec.js");
+  it("phase 1 runs the critical-flow specs on the edge (#1292)", () => {
+    const phase1 = step(workflow(), '"E2E on the edge, phase 1:');
+    // The PBKDF2 outage flow, schedule sharing, and publish/archive.
+    for (const spec of ["invite-signup", "share-schedule", "event-creation"]) {
+      expect(phase1).toContain(`e2e/${spec}.spec.js`);
+    }
   });
 
   it("runs phase 2 after a phase-1 test failure, but only once readiness succeeded", () => {

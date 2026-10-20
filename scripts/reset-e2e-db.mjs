@@ -17,6 +17,10 @@ export function assertScratchD1Target(name, id) {
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const wrangler = join(root, "frontend/node_modules/.bin/wrangler");
 const schema = join(root, "database/setup-complete.sql");
+// The same venues, events and bands local E2E loads (.github/actions/e2e-env),
+// so a spec that needs a venue behaves the same on the edge (#1292). It writes
+// no accounts and no user foreign keys, so it loads after the users wipe.
+const testData = join(root, "database/seed-test-data.sql");
 
 const runWrangler = (args) =>
   execFileSync(wrangler, ["d1", "execute", SCRATCH_D1_NAME, "--remote", ...args], {
@@ -80,6 +84,7 @@ const resetDatabase = async () => {
 
   runWrangler(["--file", schema]);
   runWrangler(["--command", "DELETE FROM users"]);
+  runWrangler(["--file", testData]);
 
   const tempDirectory = mkdtempSync(join(tmpdir(), "settimes-e2e-seed-"));
   const seedFile = join(tempDirectory, "admin.sql");

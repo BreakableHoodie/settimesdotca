@@ -161,14 +161,16 @@ jobs:
       # --retries=0: each retry is another login against the same budget, and a
       # retry would hide an edge-only flake, which is what this job exists to see.
       # invite-signup.spec.js completes a real signup: hashPassword on the
-      # request path, the flow the PBKDF2 outage broke (#1292).
-      - name: "E2E on the edge, phase 1: user management and invite signup (hashPassword on the edge)"
+      # request path, the flow the PBKDF2 outage broke. share-schedule and
+      # event-creation cover schedule sharing and publish/archive; they use the
+      # venues the reset seeds from database/seed-test-data.sql (#1292).
+      - name: "E2E on the edge, phase 1: user management, invite signup, share, publish"
         env:
           CI: "true"
           PLAYWRIGHT_BASE_URL: ${{ env.PREVIEW_URL }}
           E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
           E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
-        run: npx playwright test --retries=0 --project=setup --project=chromium e2e/auth.setup.js e2e/user-management.spec.js e2e/invite-signup.spec.js
+        run: npx playwright test --retries=0 --project=setup --project=chromium e2e/auth.setup.js e2e/user-management.spec.js e2e/invite-signup.spec.js e2e/share-schedule.spec.js e2e/event-creation.spec.js
 
       # Runs after a phase-1 TEST failure (success() || failure()), but never
       # when the reset, deploy or readiness failed: then there is no fresh

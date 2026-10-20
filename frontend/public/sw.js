@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v5'
+const CACHE_VERSION = 'v6' // v6: purge HTML cached under asset URLs (#1349)
 const STATIC_CACHE = `schedule-${CACHE_VERSION}`
 const API_CACHE = `api-${CACHE_VERSION}`
 
@@ -103,9 +103,19 @@ self.addEventListener('fetch', event => {
   }
 
   // Static assets (hashed JS/CSS/images, manifest): cache-first. These are
-  // content-hashed and immutable, so a cached copy is never stale.
+  // content-hashed and immutable, so a cached copy of the ASSET is never stale;
+  // isCacheableAsset keeps anything else from being cached in its place.
   event.respondWith(cacheFirstStrategy(request))
 })
+
+// A hashed asset that no longer exists (a tab left open across a deploy) comes
+// back from Pages as 200 text/html, its SPA fallback. Cached under the asset's
+// URL, that page would then be served as the script, cache-first, until the
+// cache version changed (#1349). An asset request never legitimately gets HTML.
+function isCacheableAsset(response) {
+  // Media types are case-insensitive (RFC 9110 8.3.1).
+  return response.ok && !(response.headers.get('Content-Type') || '').toLowerCase().startsWith('text/html')
+}
 
 // Network-first navigation strategy. Refreshes the cached shell on success and
 // falls back to it (then the offline page) when the network is unavailable.
@@ -150,7 +160,7 @@ async function cacheFirstStrategy(request) {
   try {
     const response = await fetch(request)
 
-    if (response.ok) {
+    if (isCacheableAsset(response)) {
       const cache = await caches.open(STATIC_CACHE)
       cache.put(request, response.clone())
     }
@@ -209,7 +219,7 @@ async function updateCache(request) {
   try {
     const response = await fetch(request)
 
-    if (response.ok) {
+    if (isCacheableAsset(response)) {
       const cache = await caches.open(STATIC_CACHE)
       await cache.put(request, response)
     }

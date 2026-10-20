@@ -7,6 +7,7 @@ import App from './App.jsx'
 import EventsPage from './pages/EventsPage.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { measurePageLoad } from './utils/performance'
+import { installStaleChunkReload } from './utils/staleChunkReload'
 import './index.css'
 
 // Eager above: only the two primary fan-flow routes — the homepage (`/`,
@@ -62,6 +63,10 @@ function LoadingFallback() {
     </div>
   )
 }
+
+// A tab left open across a deploy reloads itself once when a lazy route's
+// chunk has gone, instead of stranding the fan on an error page (#1349).
+installStaleChunkReload()
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

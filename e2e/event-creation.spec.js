@@ -74,7 +74,7 @@ test.describe("Event Creation", () => {
     expect(nameMissing).toBe(true);
   });
 
-  test("should allow admin to publish an event", async ({ page }) => {
+  test("should allow admin to publish and then archive an event", async ({ page }) => {
     const suffix = uniqueSuffix();
     const eventName = `Published Event ${suffix}`;
     const eventSlug = `published-event-${suffix}`;
@@ -108,6 +108,22 @@ test.describe("Event Creation", () => {
     await publishRow.locator("button", { hasText: /^Publish$/ }).click();
 
     await expect(publishRow.locator("button", { hasText: /^Unpublish$/ })).toBeVisible({ timeout: 15000 });
+
+    // Archive: one of the event status writers, and one-way (CLAUDE.md
+    // "Public event visibility"). Asserted on the API and the stored status,
+    // not just the row disappearing, which a failed request could also cause.
+    page.once("dialog", (dialog) => dialog.accept());
+    const [archived] = await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().endsWith(`/api/admin/events/${createdEvent.id}/archive`) && r.request().method() === "POST",
+        { timeout: 15000 },
+      ),
+      publishRow.locator("button", { hasText: /^Archive$/ }).click(),
+    ]);
+    expect(archived.status(), await archived.text()).toBe(200);
+    await expect(page.locator("table tbody tr", { hasText: eventName })).toHaveCount(0, { timeout: 15000 });
+    const withArchived = await apiGet(page, "/api/admin/events?archived=true");
+    expect(withArchived.events?.find((event) => event.id === createdEvent.id)?.status).toBe("archived");
   });
 
   test("should show error when creating event with past date", async ({ page }) => {

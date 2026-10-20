@@ -96,13 +96,12 @@
     "@babel/core": "7.29.6",
     "@puppeteer/browsers": "3.2.0",
     "basic-ftp": "5.3.1",
-    "esbuild": "0.28.1",
+    "esbuild": "0.28.2",
     "js-yaml": "^4.3.2",
     "ajv": "^6.14.0",
     "body-parser": {
       "qs": "6.16.0"
-    },
-    "sharp": "0.35.5"
+    }
   },
   "engines": {
     "node": "^22.12.0 || ^24.0.0 || >=26.0.0"

@@ -103,14 +103,17 @@ export async function onRequestPost(context) {
     }
     attemptId = gate.attemptId;
 
+    // An unreadable live secret (a key rotation, a corrupt row) is exactly when
+    // moving to a new app is the way out, so a backup code is still tried
+    // before giving up, in the same order as mfa/disable.
+    let totpSecretError = null;
     let totpSecretState = null;
     if (user.totp_secret) {
       try {
         totpSecretState = await loadTotpSecret(user.totp_secret, env);
       } catch (error) {
+        totpSecretError = error;
         console.error("[MFA Setup] Failed to decrypt TOTP secret:", error?.message || error);
-        await settleQuietly(DB, attemptId, { success: false, failureReason: "totp_secret_error" });
-        return json(500, { error: "Server error", message: "Failed to verify MFA code" });
       }
     }
 
@@ -131,6 +134,10 @@ export async function onRequestPost(context) {
       }
     }
 
+    if (matchedStep === null && remainingBackupCodes === null && totpSecretError) {
+      await settleQuietly(DB, attemptId, { success: false, failureReason: "totp_secret_error" });
+      return json(500, { error: "Server error", message: "Failed to verify MFA code" });
+    }
     if (replayedCode) {
       await settleQuietly(DB, attemptId, { success: false, failureReason: "replayed_code" });
       return json(400, { error: "Authentication failed", ...TOTP_CODE_ALREADY_USED });

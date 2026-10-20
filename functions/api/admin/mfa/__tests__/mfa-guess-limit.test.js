@@ -1,5 +1,6 @@
-// backup-codes and disable take a TOTP code from a live session, so a stolen
-// session can guess on them. They share step-up's guess limit (#1324): a pending
+// backup-codes, disable and re-enrolment setup (#1318) take a TOTP code from a
+// live session, so a stolen session can guess on them. They share step-up's
+// guess limit (#1324): a pending
 // attempt recorded before verifying, a per-USER limit across every guessing
 // endpoint (no IP) that ends the session, and a per-IP limit.
 import { describe, expect, it } from "vitest";

@@ -150,6 +150,35 @@ describe("mfa/setup while 2FA is on (#1318)", () => {
     expect(row(rawDb).totp_pending_secret).toBeNull();
   });
 
+  it("with the live secret unreadable, a backup code still starts the move to a new app", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    rawDb
+      .prepare("UPDATE users SET totp_secret = 'enc-v1:bm90LXZhbGlk:bm90LXZhbGlk', backup_codes = ? WHERE id = 1")
+      .run(JSON.stringify([await hashBackupCode("AAAAA-BBBBB")]));
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    const response = await post(setupHandler, env, headers, { code: "AAAAA-BBBBB" });
+    expect(response.status).toBe(200);
+    expect(row(rawDb).totp_pending_secret).toBeTruthy();
+    expect(row(rawDb).backup_codes).toBeNull(); // the only code, spent
+    errors.mockRestore();
+  });
+
+  it("with the live secret unreadable and no valid backup code: 500, recorded, nothing stored", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
+    rawDb.prepare("UPDATE users SET totp_secret = 'enc-v1:bm90LXZhbGlk:bm90LXZhbGlk' WHERE id = 1").run();
+    const before = row(rawDb);
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    const response = await post(setupHandler, env, headers, { code: "123456" });
+    expect(response.status).toBe(500);
+    expect(row(rawDb)).toEqual(before);
+    expect(
+      rawDb
+        .prepare("SELECT success, failure_reason FROM auth_attempts WHERE attempt_type = ?")
+        .all(AUTH_ATTEMPT_TYPES.mfaReenrol),
+    ).toEqual([{ success: 0, failure_reason: "totp_secret_error" }]);
+    errors.mockRestore();
+  });
+
   it("with a wrong code: nothing stored, the miss is recorded, and it counts toward the guess limit", async () => {
     const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
     const good = await generateTotpCode(SECRET);

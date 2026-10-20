@@ -1815,7 +1815,8 @@ paths:
         out), as on mfa/enable, mfa/disable and mfa/backup-codes. 400
         MFA_NOT_ENABLED when the account has no 2FA; 409 MFA_CHANGED when the
         factor changed during the request. 10 failed attempts per hour per user
-        (across step-up, backup-codes and disable, any IP) end the session: 401
+        (across step-up, backup-codes, disable and re-enrolment setup and
+        confirmation, any IP) end the session: 401
         STEP_UP_LOCKED.
       security:
         - AdminSessionCookie: []

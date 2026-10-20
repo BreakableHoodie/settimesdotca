@@ -8,7 +8,8 @@ import { describe, expect, it } from 'vitest'
 // <div>, so screen readers never heard it (WCAG 4.1.3), and the E2E retry that
 // waits for that alert (e2e/utils/session.js) could never fire. A sweep then
 // found three more bare banners, and widening it to any *Error name found a
-// fifth (UserSettings' devicesError). This scan keeps another from appearing.
+// fifth (UserSettings' devicesError) and a sixth (BulkBandImport's error list).
+// This scan keeps another from appearing.
 const SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 // `{error && <div ...>`, `{devicesError && (\n <p ...>` and the like (any
@@ -17,7 +18,12 @@ const SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 // e2e/utils/session.js waits for an alert. Known limit: the role lookahead
 // stops at the first `>`, so an attribute containing one (an arrow function)
 // before the role reads as bare. That fails loudly, never silently.
-const BARE_ERROR_BANNER = /\{\s*\w*[eE]rror\s*&&\s*\(?\s*<(div|p|span)\b(?![^>]*\brole="alert")[^>]*>/g
+// Covers: `{x && <el>}` where x is any *error/*Error identifier, or
+// `*errors.length > 0`, and el is div, p, span, ul or ol. Not covered, by
+// design: banners keyed on other names or conditions (`{failed && ...}`).
+// Those need a human; this guard retires the shapes that have shipped.
+const BARE_ERROR_BANNER =
+  /\{\s*\w*[eE]rrors?(?:\.length\s*>\s*0)?\s*&&\s*\(?\s*<(div|p|span|ul|ol)\b(?![^>]*\brole="alert")[^>]*>/g
 
 function sourceFiles(dir) {
   return readdirSync(dir).flatMap(name => {
@@ -35,10 +41,13 @@ describe('error banners are announced', () => {
     const announced = '{error && (\n  <div role="alert" className="x">{error}</div>\n)}'
     const politeOnly = '{error && <div role="status" className="x">{error}</div>}'
     const otherName = '{devicesError && <p className="text-red-400">{devicesError}</p>}'
+    const errorList =
+      '{errors.length > 0 && (\n  <ul className="text-red-400">\n    {errors.map(e => <li>{e}</li>)}\n  </ul>\n)}'
     expect(bare.match(BARE_ERROR_BANNER)).toHaveLength(1)
     expect(bareMultiline.match(BARE_ERROR_BANNER)).toHaveLength(1)
     expect(politeOnly.match(BARE_ERROR_BANNER)).toHaveLength(1)
     expect(otherName.match(BARE_ERROR_BANNER)).toHaveLength(1)
+    expect(errorList.match(BARE_ERROR_BANNER)).toHaveLength(1)
     expect(announced.match(BARE_ERROR_BANNER)).toBeNull()
   })
 

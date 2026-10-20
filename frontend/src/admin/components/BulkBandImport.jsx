@@ -57,9 +57,13 @@ export default function BulkBandImport({ eventId, onImported }) {
       >
         {busy ? 'Importing…' : 'Import bands'}
       </button>
-      {result && <p className="text-green-400 text-sm">{result}</p>}
+      {result && (
+        <p role="status" className="text-green-400 text-sm">
+          {result}
+        </p>
+      )}
       {errors.length > 0 && (
-        <ul className="text-red-400 text-sm list-disc pl-5 space-y-1">
+        <ul role="alert" className="text-red-400 text-sm list-disc pl-5 space-y-1">
           {errors.map((e, i) => (
             <li key={i}>{e}</li>
           ))}

@@ -158,7 +158,7 @@ export default function SignupPage() {
         ) : (
           <>
             {error && (
-              <div className="bg-red-900/30 border border-red-600 rounded p-3 mb-4">
+              <div role="alert" className="bg-red-900/30 border border-red-600 rounded p-3 mb-4">
                 <p className="text-red-200 text-sm">{error}</p>
               </div>
             )}

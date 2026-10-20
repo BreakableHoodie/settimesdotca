@@ -482,7 +482,9 @@ export default function EventFormModal({
 
           {/* Error Message */}
           {error && (
-            <div className="mb-4 p-3 bg-red-900/50 border border-red-500/50 rounded text-red-200 text-sm">{error}</div>
+            <div role="alert" className="mb-4 p-3 bg-red-900/50 border border-red-500/50 rounded text-red-200 text-sm">
+              {error}
+            </div>
           )}
 
           {/* Form */}

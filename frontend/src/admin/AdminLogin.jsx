@@ -248,7 +248,11 @@ export default function AdminLogin({ onLoginSuccess }) {
               <span className="text-text-secondary text-sm">Remember this device for 30 days</span>
             </label>
 
-            {error && <div className="bg-red-900/50 border border-red-600 text-red-200 p-3 rounded mb-4">{error}</div>}
+            {error && (
+              <div role="alert" className="bg-red-900/50 border border-red-600 text-red-200 p-3 rounded mb-4">
+                {error}
+              </div>
+            )}
 
             <button
               type="submit"

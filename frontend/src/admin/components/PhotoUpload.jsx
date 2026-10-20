@@ -359,7 +359,7 @@ export default function PhotoUpload({
 
       {/* Error message */}
       {error && (
-        <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3">
+        <div role="alert" className="bg-red-500/20 border border-red-500/50 rounded-lg p-3">
           <p className="text-red-200 text-sm">{error}</p>
         </div>
       )}

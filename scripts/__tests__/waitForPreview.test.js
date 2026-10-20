@@ -2,7 +2,7 @@
 // below is a shape that has reached, or could reach, the edge-e2e job: a guard
 // tested only on the success path proves nothing (CLAUDE.md "Verify guards
 // against the failure they guard, not the success").
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -202,7 +202,12 @@ describe("edge-e2e.yml wiring", () => {
   it("phase 1 runs the critical-flow specs on the edge (#1292)", () => {
     const phase1 = step(workflow(), '"E2E on the edge, phase 1:');
     // The PBKDF2 outage flow, schedule sharing, and publish/archive.
+    // Playwright treats file arguments as filters: a renamed spec would match
+    // nothing and the job would run the rest, green, so each must exist too.
     for (const spec of ["invite-signup", "share-schedule", "event-creation"]) {
+      expect(existsSync(new URL(`../../e2e/${spec}.spec.js`, import.meta.url)), `e2e/${spec}.spec.js exists`).toBe(
+        true,
+      );
       expect(phase1).toContain(`e2e/${spec}.spec.js`);
     }
   });

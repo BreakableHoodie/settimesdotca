@@ -14,6 +14,7 @@ vi.mock("../../_middleware.js", () => ({
 }));
 
 import { onRequestDelete, onRequestPost } from "../[id]/venues/[venueId]/delay.js";
+import { onRequestGet as listDelays } from "../[id]/venue-delays.js";
 import { createTestEnv, insertBand, insertEvent, insertVenue } from "../../../test-utils.js";
 
 afterEach(() => vi.useRealTimers());
@@ -314,5 +315,30 @@ describe("DELETE .../venues/:venueId/delay (back on time)", () => {
     const { env, rawDb, event, venue } = setup();
     expect((await call(onRequestDelete, env, { eventId: event.id, venueId: venue.id })).status).toBe(200);
     expect(audits(rawDb, "venue.delay_cleared")).toEqual([]);
+  });
+});
+
+describe("GET .../venue-delays", () => {
+  it("lists every venue with a set at the event, fresh, at 0 when on time", async () => {
+    const { env, rawDb, event, venue, other } = setup();
+    insertBand(rawDb, {
+      name: "Elsewhere",
+      event_id: event.id,
+      venue_id: other.id,
+      start_time: "22:00",
+      end_time: "22:45",
+    });
+    insertVenue(rawDb, { name: "Unused Hall" }); // no sets at this event: not listed
+    await call(onRequestPost, env, { eventId: event.id, venueId: venue.id, minutes: 15 });
+    const res = await listDelays({
+      params: { id: String(event.id) },
+      env,
+      data: { user: { userId: 3, role: "viewer" } },
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).delays).toEqual([
+      { venueId: venue.id, venue: "Blue Room", minutes: 15, updatedAt: expect.any(String) },
+      { venueId: other.id, venue: "Roost", minutes: 0, updatedAt: null },
+    ]);
   });
 });

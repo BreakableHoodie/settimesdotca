@@ -2179,6 +2179,50 @@ paths:
         "500":
           $ref: "#/components/responses/ServerError"
 
+  /api/admin/events/{id}/venue-delays:
+    get:
+      tags:
+        - Admin - Events
+      summary: Running-late state of every venue in the event (#1249)
+      description: >-
+        Every venue with a set at the event and its current cumulative delay
+        (0 when on time). Read fresh for the admin Lineup tab, unlike the
+        60-second-cached /api/schedule. Viewer and above.
+      security:
+        - AdminSessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          description: One entry per venue with a set at the event
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  delays:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        venueId:
+                          type: integer
+                        venue:
+                          type: string
+                        minutes:
+                          type: integer
+                          minimum: 0
+                          maximum: 600
+                        updatedAt:
+                          type: string
+                          nullable: true
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
   /api/admin/events/{id}/venues/{venueId}/delay:
     post:
       tags:

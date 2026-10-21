@@ -190,3 +190,27 @@ export function addLocalDays(ms, days) {
   d.setDate(d.getDate() + days)
   return d.getTime()
 }
+
+// The calendar date in Toronto, the event's time zone, as YYYY-MM-DD,
+// whatever the viewer's own zone is (#1249: a fan in Vancouver must see a
+// Toronto show's running-late banner from Toronto midnight, not their own).
+//
+// Built from formatToParts, never format(): the 'en-CA' locale is NOT a
+// guaranteed YYYY-MM-DD (Firefox has produced month-first dates for it,
+// Mozilla bug 1803515), and these strings are compared lexicographically.
+const TORONTO_DATE_PARTS = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/Toronto',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
+export const torontoDate = now => {
+  const parts = Object.fromEntries(TORONTO_DATE_PARTS.formatToParts(new Date(now)).map(part => [part.type, part.value]))
+  return `${parts.year}-${parts.month}-${parts.day}`
+}
+
+// The DEVICE's local calendar date as YYYY-MM-DD, from the date's own fields
+// (not toLocaleDateString('en-CA'), for the reason above; not toISOString(),
+// which is the UTC day and flips at 8 PM Eastern).
+export const localIsoDate = (date = new Date()) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`

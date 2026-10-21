@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { resolveActiveFestivalDay } from '../utils/festivalDays'
+import { resolveActiveFestivalDay, torontoDate } from '../utils/festivalDays'
 
 /**
  * Sticky day-tab filter state for multi-day events (#542 PR-3): resolves
@@ -37,7 +37,7 @@ export function useFestivalDayFilter(days, { currentTime, startDate = null, endD
   // `?debugTime=`.
   const todayStr = useMemo(() => {
     const date = currentTime instanceof Date ? currentTime : new Date(currentTime)
-    return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('en-CA')
+    return Number.isNaN(date.getTime()) ? '' : torontoDate(date)
   }, [currentTime])
 
   const activeDayNumber = useMemo(() => {

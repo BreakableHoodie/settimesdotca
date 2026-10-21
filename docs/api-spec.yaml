@@ -2558,6 +2558,14 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "415":
+          description: |
+            The stored object is not a recognised image type (code `POSTER_NOT_IMAGE`). It is never served;
+            re-upload the poster to read its colours.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "500":
           $ref: "#/components/responses/ServerError"
 

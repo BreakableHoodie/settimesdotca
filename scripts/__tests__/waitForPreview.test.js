@@ -201,15 +201,21 @@ describe("edge-e2e.yml wiring", () => {
 
   it("phase 1 runs the critical-flow specs on the edge (#1292)", () => {
     const phase1 = step(workflow(), '"E2E on the edge, phase 1:');
-    // The PBKDF2 outage flow, schedule sharing, and publish/archive.
+    // The PBKDF2 outage flow, schedule sharing, publish/archive, and the three
+    // emailed-token flows (password reset, follow confirm, subscribe verify).
     // Playwright treats file arguments as filters: a renamed spec would match
     // nothing and the job would run the rest, green, so each must exist too.
-    for (const spec of ["invite-signup", "share-schedule", "event-creation"]) {
+    for (const spec of ["invite-signup", "share-schedule", "event-creation", "emailed-token-flows"]) {
       expect(existsSync(new URL(`../../e2e/${spec}.spec.js`, import.meta.url)), `e2e/${spec}.spec.js exists`).toBe(
         true,
       );
       expect(phase1).toContain(`e2e/${spec}.spec.js`);
     }
+  });
+
+  it("phase 1 reads emailed tokens from the scratch D1, never a local one", () => {
+    const phase1 = step(workflow(), '"E2E on the edge, phase 1:');
+    expect(phase1).toMatch(/\n {10}E2E_D1_REMOTE: "1"\n/);
   });
 
   it("runs phase 2 after a phase-1 test failure, but only once readiness succeeded", () => {

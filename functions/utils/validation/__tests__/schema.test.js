@@ -72,16 +72,42 @@ function validJsonOfLength(targetLength) {
   return json;
 }
 
+const PALETTE_VARIANT = { ground: "#f7eef0", ink: "#1a1819", accent: "#924d7a", nowFill: "#dce9f2" };
+const PALETTE_JSON = JSON.stringify({
+  v: 1,
+  source: "poster",
+  poster: "https://band-photos.settimes.ca/event-posters/a.jpg",
+  light: PALETTE_VARIANT,
+  dark: PALETTE_VARIANT,
+});
+
+describe("event schema — theme_colors is a poster palette, not any JSON (#1248)", () => {
+  it("refuses valid JSON that is not a version 1 palette", () => {
+    const result = validateEntity({ ...validEventBase, theme_colors: '{"foo":"bar"}' }, VALIDATION_SCHEMAS.event);
+    expect(result.valid).toBe(false);
+    expect(result.errors.theme_colors).toMatch(/version 1 poster palette/);
+  });
+});
+
 describe("event schema — JSON field validators (venue_info, social_links, theme_colors, doors_json)", () => {
   const JSON_FIELDS = [
     { field: "venue_info", label: "Venue info", max: 5000, jsonError: "Venue info must be valid JSON" },
     { field: "social_links", label: "Social links", max: 2000, jsonError: "Social links must be valid JSON" },
-    { field: "theme_colors", label: "Theme colors", max: 1000, jsonError: "Theme colors must be valid JSON" },
+    // theme_colors must also be a poster palette (#1248), so its valid samples
+    // are a palette, padded with JSON whitespace to reach a length.
+    {
+      field: "theme_colors",
+      label: "Theme colors",
+      max: 1000,
+      jsonError: "Theme colors must be valid JSON",
+      // Padded INSIDE the braces: the schema trims surrounding whitespace.
+      validOfLength: (length) => `{${" ".repeat(length - PALETTE_JSON.length)}${PALETTE_JSON.slice(1)}`,
+    },
     { field: "doors_json", label: "Doors times", max: 2000, jsonError: "Doors times must be valid JSON" },
   ];
 
-  it.each(JSON_FIELDS)("$field: a valid JSON object passes", ({ field }) => {
-    const value = '{"foo":"bar"}';
+  it.each(JSON_FIELDS)("$field: a valid JSON object passes", ({ field, validOfLength }) => {
+    const value = validOfLength ? PALETTE_JSON : '{"foo":"bar"}';
     const result = validateEntity({ ...validEventBase, [field]: value }, VALIDATION_SCHEMAS.event);
 
     expect(result.valid).toBe(true);
@@ -96,21 +122,24 @@ describe("event schema — JSON field validators (venue_info, social_links, them
     expect(result.errors[field]).toBe(jsonError);
   });
 
-  it.each(JSON_FIELDS)("$field: a valid-JSON string at exactly max length ($max) is accepted", ({ field, max }) => {
-    const value = validJsonOfLength(max);
-    const result = validateEntity({ ...validEventBase, [field]: value }, VALIDATION_SCHEMAS.event);
+  it.each(JSON_FIELDS)(
+    "$field: a valid-JSON string at exactly max length ($max) is accepted",
+    ({ field, max, validOfLength }) => {
+      const value = (validOfLength ?? validJsonOfLength)(max);
+      const result = validateEntity({ ...validEventBase, [field]: value }, VALIDATION_SCHEMAS.event);
 
-    expect(result.valid).toBe(true);
-    expect(result.errors[field]).toBeUndefined();
-    expect(result.sanitized[field]).toBe(value);
-  });
+      expect(result.valid).toBe(true);
+      expect(result.errors[field]).toBeUndefined();
+      expect(result.sanitized[field]).toBe(value);
+    },
+  );
 
   it.each(JSON_FIELDS)(
     "$field: one character over max ($max + 1) is rejected on length, before JSON is even parsed",
-    ({ field, label, max }) => {
+    ({ field, label, max, validOfLength }) => {
       // Still syntactically valid JSON — proves the length check runs first
       // (schema.js checks min/max before calling `rules.validate`).
-      const value = validJsonOfLength(max + 1);
+      const value = (validOfLength ?? validJsonOfLength)(max + 1);
       const result = validateEntity({ ...validEventBase, [field]: value }, VALIDATION_SCHEMAS.event);
 
       expect(result.valid).toBe(false);

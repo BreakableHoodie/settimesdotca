@@ -43,8 +43,12 @@ vi.mock('../../utils/adminApi', () => ({
 // ambiguous (LineupTab bug vs. BandForm bug) without adding to LineupTab's
 // coverage. Each stub exposes exactly the props a test needs to drive.
 vi.mock('../components/BandForm', () => ({
-  default: ({ formData, onChange, onSubmit, onCancel, conflicts }) => (
+  default: ({ formData, onChange, onSubmit, onCancel, conflicts, onPhotoPersisted }) => (
     <div data-testid="band-form">
+      <span data-testid="form-photo">{formData.photo_url}</span>
+      <button onClick={() => onPhotoPersisted?.('https://band-photos.settimes.ca/band-photos/new.jpg')}>
+        Photo saved to artist
+      </button>
       <input aria-label="venue_id" name="venue_id" value={formData.venue_id} onChange={onChange} />
       <input aria-label="start_time" name="start_time" value={formData.start_time} onChange={onChange} />
       <input aria-label="end_time" name="end_time" value={formData.end_time} onChange={onChange} />
@@ -1114,5 +1118,25 @@ describe('LineupTab — schedule mode', () => {
       expect(showToast).toHaveBeenCalledWith(expect.stringContaining('(and 2 more clashes)'), 'error')
     )
     expect(screen.getByTestId('failed-ids')).toHaveTextContent(/^1,2$/)
+  })
+})
+
+// CodeRabbit #1361: an upload in edit mode is saved to the artist before the
+// form; if the list refresh then FAILS, the reopened form must still not carry
+// the old photo back. The new URL is merged into every row of that artist.
+describe('LineupTab photo saved during an edit', () => {
+  it('keeps the new photo in the rows even when the refresh fails', async () => {
+    const bands = [makeBand({ id: 1, name: 'Headliner', band_profile_id: 7, photo_url: 'https://old.example/a.jpg' })]
+    await renderLineup({ bands })
+    const table = screen.getByRole('table')
+    fireEvent.click(within(rowFor(table, 'Headliner')).getByRole('button', { name: 'Edit' }))
+    bandsApi.getByEvent.mockRejectedValueOnce(new Error('offline'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Photo saved to artist' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel form' }))
+    await waitFor(() => expect(screen.queryByTestId('band-form')).not.toBeInTheDocument())
+    fireEvent.click(within(rowFor(screen.getByRole('table'), 'Headliner')).getByRole('button', { name: 'Edit' }))
+    expect(await screen.findByTestId('form-photo')).toHaveTextContent(
+      'https://band-photos.settimes.ca/band-photos/new.jpg'
+    )
   })
 })

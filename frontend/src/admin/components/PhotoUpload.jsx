@@ -75,6 +75,9 @@ async function downscaleImage(file, maxDimension) {
  * @param {Object} props
  * @param {string} props.currentPhoto - Current photo URL (if exists)
  * @param {Function} props.onPhotoChange - Callback when photo is uploaded/removed
+ * @param {Function} props.onPersisted - Called with the URL when an upload was ALSO saved to its entity
+ *   (an entity id was sent). The parent's list must refresh then: the upload is in the database before
+ *   the form is saved, so a cancelled form would otherwise reopen from stale data and save it back.
  * @param {number} props.bandId - Optional band ID to associate with upload (legacy/default usage)
  * @param {string} props.bandName - Optional band name for display
  * @param {string} props.uploadUrl - Upload endpoint (default: band photos endpoint)
@@ -89,6 +92,7 @@ async function downscaleImage(file, maxDimension) {
 export default function PhotoUpload({
   currentPhoto,
   onPhotoChange,
+  onPersisted,
   bandId = null,
   bandName = '',
   uploadUrl = '/api/admin/bands/photos',
@@ -123,6 +127,15 @@ export default function PhotoUpload({
   }
 
   const [preview, setPreview] = useState(sanitizeImageSrc(currentPhoto))
+  // Follow the parent's photo when IT changes. A form that fills a render
+  // after mounting (EventFormModal) passed '' first, so the existing poster was
+  // never shown and the box read "Drop photo here" over a saved poster (#1248
+  // review). Adjusting state during render is React's pattern for this.
+  const [shownPhoto, setShownPhoto] = useState(currentPhoto)
+  if (currentPhoto !== shownPhoto) {
+    setShownPhoto(currentPhoto)
+    setPreview(sanitizeImageSrc(currentPhoto))
+  }
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState(null)
   const [dragActive, setDragActive] = useState(false)
@@ -205,6 +218,15 @@ export default function PhotoUpload({
       // Update parent component with new photo URL
       if (onPhotoChange) {
         onPhotoChange(data.url)
+      }
+      if (idValue) {
+        // The upload is saved: a failure in the parent's refresh must not be
+        // reported as a failed upload (the catch below would say so).
+        try {
+          onPersisted?.(data.url)
+        } catch (callbackError) {
+          console.error('Photo onPersisted callback failed:', callbackError)
+        }
       }
 
       setPreview(data.url)

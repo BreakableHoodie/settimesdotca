@@ -7,6 +7,7 @@ import { normalizeHttpUrl, safeReflectSocialLinks } from "../utils/validation.js
 import { logger } from "../utils/logger.js";
 import { publicEventStatusSql, publishedEventStatusSql } from "../utils/eventVisibility.js";
 import { eventLocalFestivalToday } from "../utils/eventDay.js";
+import { venueShortName } from "../utils/venueInk.js";
 
 export async function onRequestGet(context) {
   const { request, env } = context;
@@ -91,7 +92,8 @@ export async function onRequestGet(context) {
         v.name as venue,
         v.latitude as venue_lat,
         v.longitude as venue_lng,
-        v.city as venue_city
+        v.city as venue_city,
+        v.ink_color as venue_ink
       FROM performances p
       INNER JOIN band_profiles b ON p.band_profile_id = b.id
       LEFT JOIN venues v ON p.venue_id = v.id
@@ -152,6 +154,9 @@ export async function onRequestGet(context) {
         venue_lat: typeof band.venue_lat === "number" ? band.venue_lat : null,
         venue_lng: typeof band.venue_lng === "number" ? band.venue_lng : null,
         venue_city: band.venue_city ?? null,
+        // Poster-led stamps (#1248): the name a stamp prints, and its ink.
+        venue_short: venueShortName(band.venue),
+        venue_ink: band.venue_ink ?? null,
         // Per-set festival day: a performance carries its own performance_date
         // when the event spans multiple days (epic #543); NULL inherits the
         // event's single date, keeping single-day events byte-identical.

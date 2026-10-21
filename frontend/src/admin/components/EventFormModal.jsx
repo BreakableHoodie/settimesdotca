@@ -8,6 +8,20 @@ import { buildDayOptions, enumerateFestivalDays, isMultiDayEvent } from '../util
 import { formatFestivalDate, localIsoDate } from '../../utils/festivalDays'
 import { parseDoorsJsonToForm, serializeDoorsForm } from '../utils/doorsFormData'
 import { publishWithLineupConfirm } from '../utils/publishWithLineupConfirm'
+import PosterPalette from './PosterPalette'
+import { isValidThemeColours } from '../../utils/posterPalette'
+
+// The stored palette (#1248), or null for anything that is not one: the form
+// then shows no colours, and saving sends null, the house theme.
+function parseThemeColours(stored) {
+  if (!stored) return null
+  try {
+    const parsed = JSON.parse(stored)
+    return isValidThemeColours(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
 
 /**
  * EventFormModal - Modal for creating and editing events
@@ -51,6 +65,16 @@ export default function EventFormModal({
   const isArchivedEvent = event?.status === 'archived'
   const canEditSlug = !isEditing || !isPublished
 
+  // The palette is sent only when it changed in this form (#1248). A stored
+  // value this version cannot read is then kept, not overwritten with null by
+  // an unrelated edit, and an unchanged one is not re-sent.
+  const [themeChanged, setThemeChanged] = useState(false)
+  // The poster likewise: an upload in edit mode is saved at once, so the form
+  // sends poster_url only when it changed here. A form opened from a stale
+  // list (an upload, then Cancel) then cannot write the stale value back.
+  const [posterChanged, setPosterChanged] = useState(false)
+  const [posterBusy, setPosterBusy] = useState(false)
+  const themeUnreadable = Boolean(event?.theme_colors) && parseThemeColours(event.theme_colors) === null
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
@@ -61,6 +85,7 @@ export default function EventFormModal({
     city: '',
     ticket_url: '',
     poster_url: '',
+    theme_colors: null,
     social_website: '',
     social_instagram: '',
     social_facebook: '',
@@ -127,6 +152,7 @@ export default function EventFormModal({
         city: event.city || '',
         ticket_url: event.ticket_url || '',
         poster_url: event.poster_url || '',
+        theme_colors: parseThemeColours(event.theme_colors),
         social_website: socialLinks.website || '',
         social_instagram: socialLinks.instagram || '',
         social_facebook: socialLinks.facebook || '',
@@ -142,6 +168,8 @@ export default function EventFormModal({
       })
       setDoorsForm(parseDoorsJsonToForm(event.doors_json, enumerateFestivalDays(event.date, event.end_date)))
       setSlugEdited(true) // Prevent auto-generation when editing
+      setThemeChanged(false)
+      setPosterChanged(false)
     } else {
       setFormData({
         name: '',
@@ -153,6 +181,7 @@ export default function EventFormModal({
         city: '',
         ticket_url: '',
         poster_url: '',
+        theme_colors: null,
         social_website: '',
         social_instagram: '',
         social_facebook: '',
@@ -351,13 +380,19 @@ export default function EventFormModal({
         description: formData.description,
         city: formData.city,
         ticket_url: formData.ticket_url,
-        poster_url: formData.poster_url,
         social_links: socialLinksPayload,
         doors_json: serializeDoorsForm(doorsForm, currentDays),
         age_restriction: formData.age_restriction || null,
         presented_by: formData.presented_by || null,
         presented_by_url: formData.presented_by_url || null,
         ticket_price: formData.ticket_price === '' ? null : Number(formData.ticket_price),
+      }
+
+      if (posterChanged || !isEditing) {
+        payload.poster_url = formData.poster_url
+      }
+      if (themeChanged || !isEditing) {
+        payload.theme_colors = formData.theme_colors ? JSON.stringify(formData.theme_colors) : null
       }
 
       if (isEditing && formData.status === 'archived') {
@@ -779,7 +814,13 @@ export default function EventFormModal({
             <div>
               <PhotoUpload
                 currentPhoto={formData.poster_url}
-                onPhotoChange={url => setFormData(prev => ({ ...prev, poster_url: url || '' }))}
+                onPhotoChange={url => {
+                  setPosterChanged(true)
+                  setFormData(prev => ({ ...prev, poster_url: url || '' }))
+                }}
+                // Saved to the event already: refresh the list so a cancelled
+                // form reopens with this poster, not the one before it.
+                onPersisted={url => onPartialSave?.({ ...event, poster_url: url })}
                 uploadUrl="/api/admin/events/posters"
                 fieldName="poster"
                 entityIdField="event_id"
@@ -788,6 +829,22 @@ export default function EventFormModal({
                 helpText="Optional — used for social share cards and the event's archive recap. Large images are auto-resized for the web."
                 maxDimension={1600}
               />
+              <PosterPalette
+                key={event?.id ?? 'new'}
+                posterUrl={formData.poster_url}
+                value={formData.theme_colors}
+                onChange={theme => {
+                  setThemeChanged(true)
+                  setFormData(prev => ({ ...prev, theme_colors: theme }))
+                }}
+                onBusyChange={setPosterBusy}
+                autoSuggest={!themeUnreadable || themeChanged}
+              />
+              {themeUnreadable && !themeChanged && (
+                <p className="mt-2 text-xs text-white/60">
+                  This event has saved page colours this version of the admin cannot show. They are kept as they are.
+                </p>
+              )}
             </div>
 
             {/* Social Links */}
@@ -957,8 +1014,8 @@ export default function EventFormModal({
 
             {/* Actions */}
             <div className="flex flex-col sm:flex-row gap-3 pt-4">
-              <Button type="submit" variant="primary" disabled={loading} loading={loading} fullWidth>
-                {isEditing ? 'Update Event' : 'Create Event'}
+              <Button type="submit" variant="primary" disabled={loading || posterBusy} loading={loading} fullWidth>
+                {posterBusy ? 'Waiting for poster colours…' : isEditing ? 'Update Event' : 'Create Event'}
               </Button>
               <Button type="button" variant="secondary" onClick={onClose}>
                 Cancel

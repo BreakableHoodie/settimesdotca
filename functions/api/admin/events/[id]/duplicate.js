@@ -98,7 +98,10 @@ export async function onRequestPost(context) {
     // would fail validateDoorsJson on the next edit anyway (#569). poster_url
     // is excluded for the same "edition-specific" reasoning (#616) — a new
     // edition gets its own poster, not the source event's. Leaving both out
-    // of INSERT defaults the columns to NULL — start clean. ticket_price is
+    // of INSERT defaults the columns to NULL — start clean. theme_colors goes
+    // with the poster (#1248): the palette is read FROM the poster, so a copy
+    // would dress the new edition in last year's colours, and a hand-picked
+    // one would never be replaced by the new poster's. ticket_price is
     // excluded on the same grounds (#1196): each edition sets its own price,
     // and a copied one is published as a stated fact in the JSON-LD offer.
     //
@@ -109,9 +112,9 @@ export async function onRequestPost(context) {
       `INSERT INTO events (
          name, date, slug, status, description, city,
          ticket_url, presented_by, presented_by_url, age_restriction,
-         venue_info, social_links, theme_colors, created_by_user_id
+         venue_info, social_links, created_by_user_id
        )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        RETURNING *`,
     )
       .bind(
@@ -127,7 +130,6 @@ export async function onRequestPost(context) {
         originalEvent.age_restriction || null,
         originalEvent.venue_info || null,
         safeReflectSocialLinksString(originalEvent.social_links || null, ["instagram", "x", "tiktok"]),
-        originalEvent.theme_colors || null,
         currentUser.userId,
       )
       .first();

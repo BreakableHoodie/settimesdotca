@@ -1,7 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createTestEnv, insertVenue, insertBand, insertEvent } from "../../../test-utils";
 import * as venueIdHandler from "../[id].js";
 import * as venuesHandler from "../../venues.js";
+import { STAMP_INKS } from "../../../../utils/venueInk.js";
 
 describe("Admin venues API - CRUD operations", () => {
   it("can create a venue and then list it", async () => {
@@ -94,6 +95,30 @@ describe("Admin venues API - role boundaries", () => {
     const res = await venuesHandler.onRequestPost({ request: post(headers), env });
     expect(res.status).toBe(201);
     expect((await res.json()).venue.name).toBe("Editor Hall");
+  });
+
+  it("a new venue is given the least-used stamp ink (#1248)", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const taken = insertVenue(rawDb, { name: "Already Inked" });
+    rawDb.prepare("UPDATE venues SET ink_color = ? WHERE id = ?").run(STAMP_INKS[0], taken.id);
+    const res = await venuesHandler.onRequestPost({ request: post(headers), env });
+    expect(res.status).toBe(201);
+    expect((await res.json()).venue.ink_color).toBe(STAMP_INKS[1]);
+  });
+
+  it("creates the venue without an ink, and logs, when the ink lookup fails", async () => {
+    const { env, headers } = createTestEnv({ role: "editor" });
+    const realPrepare = env.DB.prepare.bind(env.DB);
+    env.DB.prepare = (sql) => {
+      if (sql.includes("GROUP BY ink_color")) throw new Error("D1 hiccup");
+      return realPrepare(sql);
+    };
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const res = await venuesHandler.onRequestPost({ request: post(headers), env });
+    expect(res.status).toBe(201);
+    expect((await res.json()).venue.ink_color).toBeNull();
+    expect(error).toHaveBeenCalledWith(expect.stringMatching(/stamp ink lookup failed/), expect.any(Object));
+    error.mockRestore();
   });
 
   it("a viewer cannot create a venue", async () => {

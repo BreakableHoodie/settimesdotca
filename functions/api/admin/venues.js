@@ -10,6 +10,7 @@ import {
   normalizePostalCode,
 } from "../../utils/validation.js";
 import { getClientIP, parseJsonObjectBody } from "../../utils/request.js";
+import { inkForNewVenueOrNull } from "../../utils/venueInk.js";
 
 function formatVenueAddress(venue) {
   if (!venue) return "";
@@ -156,7 +157,8 @@ export async function onRequestPost(context) {
       );
     }
 
-    // Create venue
+    // Create venue, with the least-used stamp ink (#1248)
+    const inkColor = await inkForNewVenueOrNull(DB, name);
     const result = await DB.prepare(
       `
       INSERT INTO venues (
@@ -169,9 +171,10 @@ export async function onRequestPost(context) {
         postal_code,
         country,
         phone,
-        contact_email
+        contact_email,
+        ink_color
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING *
     `,
     )
@@ -186,6 +189,7 @@ export async function onRequestPost(context) {
         country || null,
         phone || null,
         contact_email || null,
+        inkColor,
       )
       .first();
 

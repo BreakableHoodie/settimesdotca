@@ -1536,6 +1536,96 @@ export const MUTATIONS = [
     replace: "// attempt not recorded",
     tests: ["functions/api/admin/auth/__tests__/mfa.test.js"],
   },
+  {
+    id: "poster-source-only-event-poster-keys",
+    invariant:
+      "CLAUDE.md 'Poster-led event palettes' \u2014 the same-origin poster read serves only event-posters/ keys on the poster host (#1248)",
+    file: "functions/api/admin/events/posters.js",
+    find: "const POSTER_KEY = /^\\/event-posters\\/[a-z0-9._-]+$/;",
+    replace: "const POSTER_KEY = /^\\/.+$/;",
+    tests: ["functions/api/admin/events/__tests__/posters-source.test.js"],
+  },
+  {
+    id: "poster-source-same-host-only",
+    invariant: "CLAUDE.md 'Poster-led event palettes' \u2014 a URL on any other host never reaches storage (#1248)",
+    file: "functions/api/admin/events/posters.js",
+    find: "  if (posterUrl.origin !== posterHost.origin || posterUrl.search || !POSTER_KEY.test(posterUrl.pathname)) {",
+    replace: "  if (posterUrl.search || !POSTER_KEY.test(posterUrl.pathname)) {",
+    tests: ["functions/api/admin/events/__tests__/posters-source.test.js"],
+  },
+  {
+    id: "theme-colors-shape-checked",
+    invariant:
+      "CLAUDE.md 'Poster-led event palettes' \u2014 theme_colors must be a version 1 palette of #rrggbb colours, never arbitrary JSON (#1248)",
+    file: "functions/utils/themeColors.js",
+    find: "  if (!isValidThemeColors(parsed)) {",
+    replace: "  if (false) {",
+    tests: [
+      "functions/utils/__tests__/themeColors.test.js",
+      "functions/api/admin/events/__tests__/idHandlerCoverage.test.js",
+      "functions/api/admin/events/__tests__/events.test.js",
+    ],
+  },
+  {
+    id: "theme-colors-hex-only",
+    invariant:
+      "CLAUDE.md 'Poster-led event palettes' \u2014 a palette colour is #rrggbb, so nothing else reaches a CSS custom property (#1248)",
+    file: "functions/utils/themeColors.js",
+    find: "const HEX = /^#[0-9a-f]{6}$/i;",
+    replace: "const HEX = /^#/i;",
+    tests: [
+      "functions/utils/__tests__/themeColors.test.js",
+      "functions/api/admin/events/__tests__/idHandlerCoverage.test.js",
+    ],
+  },
+  {
+    id: "venue-ink-least-used",
+    invariant: "CLAUDE.md 'Poster-led event palettes' \u2014 a new venue gets the least-used stamp ink (#1248)",
+    file: "functions/utils/venueInk.js",
+    find: "    if ((uses.get(ink) ?? 0) < (uses.get(best) ?? 0)) best = ink;",
+    replace: "",
+    tests: ["functions/utils/__tests__/venueInk.test.js", "functions/api/admin/venues/__tests__/venues.test.js"],
+  },
+  {
+    id: "theme-colors-stored-reserialised",
+    invariant:
+      "CLAUDE.md 'Poster-led event palettes' \u2014 theme_colors is stored re-serialised from what was checked, so a hidden duplicate key never reaches the row (#1248)",
+    file: "functions/utils/themeColors.js",
+    find: "  return { valid: true, value: JSON.stringify(parsed) };",
+    replace: "  return { valid: true, value: json };",
+    tests: [
+      "functions/utils/__tests__/themeColors.test.js",
+      "functions/api/admin/events/__tests__/idHandlerCoverage.test.js",
+      "functions/api/admin/events/__tests__/events.test.js",
+    ],
+  },
+  {
+    id: "theme-colors-names-its-poster",
+    invariant:
+      "CLAUDE.md 'Poster-led event palettes' \u2014 a palette records the https URL of the poster it was read from (#1248)",
+    file: "functions/utils/themeColors.js",
+    find: "  if (value.v !== 1 || !SOURCES.includes(value.source) || !isHttpsUrl(value.poster)) return false;",
+    replace: "  if (value.v !== 1 || !SOURCES.includes(value.source)) return false;",
+    tests: ["functions/utils/__tests__/themeColors.test.js"],
+  },
+  {
+    id: "venue-ink-wizard-venues",
+    invariant:
+      "CLAUDE.md 'Poster-led event palettes' \u2014 a venue the event wizard creates gets a stamp ink too (#1248)",
+    file: "functions/api/admin/events/wizard.js",
+    find: "        const inkColor = await inkForNewVenueOrNull(DB, v.name);",
+    replace: "        const inkColor = null;",
+    tests: ["functions/api/admin/events/__tests__/wizard.test.js"],
+  },
+  {
+    id: "venue-ink-lookup-never-blocks-creation",
+    invariant:
+      "CLAUDE.md 'Poster-led event palettes' \u2014 a failed ink lookup creates the venue without one; it never blocks creation (#1248)",
+    file: "functions/utils/venueInk.js",
+    find: "    return await pickInkForNewVenue(DB);",
+    replace: "    return pickInkForNewVenue(DB);",
+    tests: ["functions/api/admin/venues/__tests__/venues.test.js"],
+  },
 ];
 
 // ============================================================================

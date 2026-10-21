@@ -2524,6 +2524,50 @@ paths:
           $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/ServerError"
+    get:
+      tags:
+        - Admin - Events
+      summary: Read a stored poster's bytes, same origin
+      description: |
+        The poster host sends no CORS headers, so the admin's browser cannot
+        read a poster's pixels to suggest an event palette (#1248). This
+        returns the same R2 object from this origin. Editor or above. `url`
+        must be an `event-posters/<key>` URL on the poster host, with no
+        nested path and no query; anything else is 400 without touching
+        storage. Only a stored image type is served.
+      security:
+        - AdminSessionCookie: []
+      parameters:
+        - name: url
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uri
+      responses:
+        "200":
+          description: The poster image
+          content:
+            image/jpeg: {}
+            image/png: {}
+            image/webp: {}
+            image/gif: {}
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "415":
+          description: |
+            The stored object is not a recognised image type (code `POSTER_NOT_IMAGE`). It is never served;
+            re-upload the poster to read its colours.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          $ref: "#/components/responses/ServerError"
 
   /api/admin/events/{id}/reveal-mode:
     post:
@@ -4041,6 +4085,15 @@ components:
         venue:
           type: string
           nullable: true
+        venue_short:
+          type: string
+          nullable: true
+          description: The venue name without a trailing parenthetical, as printed on the venue stamp (#1248).
+        venue_ink:
+          type: string
+          nullable: true
+          pattern: "^#[0-9a-f]{6}$"
+          description: The venue's fixed stamp ink (#1248); null when the venue has none.
         date:
           type: string
         startTime:
@@ -4076,6 +4129,7 @@ components:
         theme_colors:
           type: string
           nullable: true
+          description: The event's poster palette (#1248) as stored JSON, or null for the house theme.
         venue_info:
           type: string
           nullable: true
@@ -4484,9 +4538,13 @@ components:
             - $ref: "#/components/schemas/GenericRecord"
         theme_colors:
           nullable: true
-          oneOf:
-            - type: string
-            - $ref: "#/components/schemas/GenericRecord"
+          description: |
+            A version 1 poster palette (#1248), as a JSON-encoded string (create validates a string; PATCH also accepts an object):
+            `{"v":1,"source":"poster"|"manual","poster":"<https url>","light":{"ground","ink","accent","nowFill"},"dark":{...}}`,
+            every colour `#rrggbb`; `poster` is the https URL (at most 500 characters) the colours were read from.
+            `{"v":1,"source":"none","poster":"<https url>"}` records the house theme chosen for that poster.
+            Any other shape is 400. `null` clears it (house theme).
+          type: string
         doors_json:
           type: string
           nullable: true
@@ -4554,6 +4612,12 @@ components:
             - $ref: "#/components/schemas/GenericRecord"
         theme_colors:
           nullable: true
+          description: |
+            A version 1 poster palette (#1248), as a JSON string or object:
+            `{"v":1,"source":"poster"|"manual","poster":"<https url>","light":{"ground","ink","accent","nowFill"},"dark":{...}}`,
+            every colour `#rrggbb`; `poster` is the https URL (at most 500 characters) the colours were read from.
+            `{"v":1,"source":"none","poster":"<https url>"}` records the house theme chosen for that poster.
+            Any other shape is 400. `null` clears it (house theme).
           oneOf:
             - type: string
             - $ref: "#/components/schemas/GenericRecord"

@@ -25,7 +25,10 @@ CREATE TABLE IF NOT EXISTS venues (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL UNIQUE,             -- Venue name, e.g., "Room 47"
   address TEXT                           -- Optional venue address
-, created_by_user_id INTEGER REFERENCES users(id), updated_by_user_id INTEGER REFERENCES users(id), updated_at TEXT DEFAULT (datetime('now')), website TEXT, instagram TEXT, facebook TEXT, created_at TEXT DEFAULT (datetime('now')), address_line1 TEXT, address_line2 TEXT, region TEXT, postal_code TEXT, country TEXT, phone TEXT, contact_email TEXT, city TEXT, latitude REAL, longitude REAL);
+, created_by_user_id INTEGER REFERENCES users(id), updated_by_user_id INTEGER REFERENCES users(id), updated_at TEXT DEFAULT (datetime('now')), website TEXT, instagram TEXT, facebook TEXT, created_at TEXT DEFAULT (datetime('now')), address_line1 TEXT, address_line2 TEXT, region TEXT, postal_code TEXT, country TEXT, phone TEXT, contact_email TEXT, city TEXT, latitude REAL, longitude REAL, ink_color TEXT CHECK (
+  ink_color IS NULL
+  OR (length(ink_color) = 7 AND ink_color GLOB '#[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]')
+));
 
 CREATE TABLE IF NOT EXISTS band_profiles (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

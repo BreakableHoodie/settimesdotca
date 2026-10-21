@@ -416,6 +416,21 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
     }
   }
 
+  // The photo belongs to the ARTIST, so every row of theirs takes it at once,
+  // before the refresh (which may fail): a reopened form must not carry the
+  // old photo back (CodeRabbit, #1361).
+  const handlePhotoPersisted = useCallback(
+    url => {
+      setBands(prev => {
+        const profileId = prev.find(band => band.id === editingId)?.band_profile_id
+        if (profileId == null) return prev
+        return prev.map(band => (band.band_profile_id === profileId ? { ...band, photo_url: url } : band))
+      })
+      return loadData()
+    },
+    [editingId, loadData]
+  )
+
   const startEdit = band => {
     if (!allBands.length && !rosterLoading) loadRoster()
     setServerConflicts({ overlaps: [], conflicts: [] })
@@ -739,7 +754,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
             dayOptions={dayOptions}
             onChange={handleInputChange}
             onSubmit={handleSubmit}
-            onPhotoPersisted={loadData}
+            onPhotoPersisted={handlePhotoPersisted}
             onCancel={() => {
               setViewMode('list')
               setEditingId(null)

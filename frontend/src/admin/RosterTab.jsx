@@ -163,6 +163,17 @@ export default function RosterTab({ showToast, readOnly = false }) {
     }
   }, [showToast])
 
+  // An upload in edit mode is saved to the artist before the form is. Put the
+  // new URL in the local row at once, then refresh: if the refresh fails, a
+  // reopened form must still not carry the old photo back (CodeRabbit, #1361).
+  const handlePhotoPersisted = useCallback(
+    url => {
+      setBands(prev => prev.map(band => (band.id === editingId ? { ...band, photo_url: url } : band)))
+      return loadBands()
+    },
+    [editingId, loadBands]
+  )
+
   useEffect(() => {
     loadBands()
   }, [loadBands])
@@ -661,7 +672,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
             onChange={handleInputChange}
             onSubmit={editingId ? handleUpdate : handleAdd}
             onCancel={resetForm}
-            onPhotoPersisted={loadBands}
+            onPhotoPersisted={handlePhotoPersisted}
             conflicts={{ overlaps: [], conflicts: [] }}
             originCitySuggestions={originCitySuggestions}
             originRegionSuggestions={originRegionSuggestions}

@@ -24,7 +24,17 @@ function describeError(err) {
 
 export default function RunningLatePanel({ eventId, readOnly = false, showToast, onShifted }) {
   const [delays, setDelays] = useState([])
-  const [pendingVenueId, setPendingVenueId] = useState(null)
+  // Venues with a request in flight. A SET, not one id: tapping B while A is
+  // in flight must not let A's reply re-enable B, or a second tap on B shifts
+  // it twice (the endpoint is deliberately not idempotent).
+  const [pendingVenueIds, setPendingVenueIds] = useState(() => new Set())
+  const markPending = (venueId, pending) =>
+    setPendingVenueIds(current => {
+      const next = new Set(current)
+      if (pending) next.add(venueId)
+      else next.delete(venueId)
+      return next
+    })
   const [custom, setCustom] = useState({})
   // The admin panel switches events without unmounting the lineup, so a reply
   // for event A can land after B is selected. Every await re-checks the event
@@ -51,7 +61,7 @@ export default function RunningLatePanel({ eventId, readOnly = false, showToast,
 
   useEffect(() => {
     setDelays([])
-    setPendingVenueId(null)
+    setPendingVenueIds(new Set())
     setCustom({})
     load()
   }, [load])
@@ -61,7 +71,7 @@ export default function RunningLatePanel({ eventId, readOnly = false, showToast,
 
   const shift = async (row, minutes) => {
     const forEventId = eventId
-    setPendingVenueId(row.venueId)
+    markPending(row.venueId, true)
     try {
       const res = await eventsApi.shiftVenue(forEventId, row.venueId, minutes)
       if (isStale(forEventId)) return
@@ -76,13 +86,13 @@ export default function RunningLatePanel({ eventId, readOnly = false, showToast,
     } catch (err) {
       if (!isStale(forEventId)) showToast?.(describeError(err), 'error')
     } finally {
-      if (!isStale(forEventId)) setPendingVenueId(null)
+      if (!isStale(forEventId)) markPending(row.venueId, false)
     }
   }
 
   const clear = async row => {
     const forEventId = eventId
-    setPendingVenueId(row.venueId)
+    markPending(row.venueId, true)
     try {
       await eventsApi.clearVenueDelay(forEventId, row.venueId)
       if (isStale(forEventId)) return
@@ -91,7 +101,7 @@ export default function RunningLatePanel({ eventId, readOnly = false, showToast,
     } catch (err) {
       if (!isStale(forEventId)) showToast?.(describeError(err), 'error')
     } finally {
-      if (!isStale(forEventId)) setPendingVenueId(null)
+      if (!isStale(forEventId)) markPending(row.venueId, false)
     }
   }
 
@@ -107,7 +117,7 @@ export default function RunningLatePanel({ eventId, readOnly = false, showToast,
       </p>
       <ul className="space-y-3">
         {delays.map(row => {
-          const busy = pendingVenueId === row.venueId
+          const busy = pendingVenueIds.has(row.venueId)
           const customValue = custom[row.venueId] ?? ''
           const customMinutes = Number(customValue)
           const customValid = customValue !== '' && Number.isInteger(customMinutes) && customMinutes !== 0
@@ -127,7 +137,7 @@ export default function RunningLatePanel({ eventId, readOnly = false, showToast,
                       type="button"
                       disabled={busy}
                       onClick={() => shift(row, minutes)}
-                      aria-label={`${row.venue}: running ${minutes} minutes late`}
+                      aria-label={`+${minutes} minutes later: ${row.venue}`}
                       className="min-h-[44px] rounded bg-amber-500/20 px-3 text-sm font-semibold text-amber-200 hover:bg-amber-500/30 disabled:opacity-50"
                     >
                       +{minutes}

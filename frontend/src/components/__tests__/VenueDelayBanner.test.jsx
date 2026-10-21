@@ -12,6 +12,11 @@ describe('VenueDelayBanner (#1249)', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Roost is running about 15 minutes late.')
   })
 
+  it('says "1 minute", not "1 minutes"', () => {
+    render(<VenueDelayBanner delays={[{ venueId: 3, venue: 'Room 47', minutes: 1 }]} />)
+    expect(screen.getByRole('status')).toHaveTextContent('Room 47 is running about 1 minute late.')
+  })
+
   it('renders nothing when no venue is late', () => {
     const { container } = render(<VenueDelayBanner delays={[{ venueId: 1, venue: 'Blue Room', minutes: 0 }]} />)
     expect(container).toBeEmptyDOMElement()
@@ -65,5 +70,26 @@ describe('LiveContextBar shows the banner only while the event is live', () => {
   it('weeks later (archive): not shown', () => {
     renderAt(new Date('2026-09-20T21:00:00'))
     expect(banner()).not.toBeInTheDocument()
+  })
+})
+
+describe('torontoDate: the show runs on Toronto time wherever the fan is', () => {
+  it("is Toronto's date for a viewer in Vancouver", async () => {
+    // The module builds its formatter at import, so it must be imported FRESH
+    // under the viewer's zone: switching TZ around an already-imported helper
+    // proves nothing (a formatter missing timeZone would still pass).
+    const original = process.env.TZ
+    process.env.TZ = 'America/Vancouver'
+    vi.resetModules()
+    try {
+      const { torontoDate: freshTorontoDate } = await import('../../utils/festivalDays')
+      // 00:30 on Aug 7 in Toronto is still 21:30 on Aug 6 in Vancouver.
+      const instant = new Date('2026-08-07T04:30:00Z')
+      expect(new Date(instant).getDate()).toBe(6) // the viewer's own calendar
+      expect(freshTorontoDate(instant)).toBe('2026-08-07')
+    } finally {
+      process.env.TZ = original
+      vi.resetModules()
+    }
   })
 })

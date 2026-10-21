@@ -43,7 +43,7 @@ describe('RunningLatePanel (#1249)', () => {
   it('+15 shifts that venue, shows the new total, and refreshes the lineup', async () => {
     eventsApi.shiftVenue.mockResolvedValue({ delayMinutes: 15, shifted: [{ id: 1 }, { id: 2 }] })
     const { showToast, onShifted } = renderPanel()
-    fireEvent.click(await screen.findByRole('button', { name: 'Blue Room: running 15 minutes late' }))
+    fireEvent.click(await screen.findByRole('button', { name: '+15 minutes later: Blue Room' }))
     await waitFor(() => expect(eventsApi.shiftVenue).toHaveBeenCalledWith(7, 1, 15))
     expect(await screen.findAllByText('running about 15 min late')).toHaveLength(2)
     expect(onShifted).toHaveBeenCalledTimes(1)
@@ -70,7 +70,7 @@ describe('RunningLatePanel (#1249)', () => {
       })
     )
     const { showToast, onShifted } = renderPanel()
-    fireEvent.click(await screen.findByRole('button', { name: 'Blue Room: running 30 minutes late' }))
+    fireEvent.click(await screen.findByRole('button', { name: '+30 minutes later: Blue Room' }))
     await waitFor(() => expect(showToast).toHaveBeenCalledWith(expect.stringMatching(/Dawn Chorus/), 'error'))
     expect(onShifted).not.toHaveBeenCalled()
     expect(screen.getByText('on time')).toBeInTheDocument()
@@ -83,7 +83,7 @@ describe('RunningLatePanel (#1249)', () => {
       })
     )
     const { showToast } = renderPanel()
-    fireEvent.click(await screen.findByRole('button', { name: 'Blue Room: running 10 minutes late' }))
+    fireEvent.click(await screen.findByRole('button', { name: '+10 minutes later: Blue Room' }))
     await waitFor(() =>
       expect(showToast).toHaveBeenCalledWith(
         'Not moved: Next Up would overlap Still Playing. Nothing was changed.',
@@ -124,6 +124,30 @@ describe('RunningLatePanel (#1249)', () => {
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(screen.queryByText('Blue Room')).not.toBeInTheDocument()
     expect(screen.getByText('Event B Hall')).toBeInTheDocument()
+  })
+
+  it("venue A's reply does not re-enable venue B while B's own shift is in flight", async () => {
+    const resolvers = {}
+    eventsApi.shiftVenue.mockImplementation(
+      (eventId, venueId) =>
+        new Promise(resolve => {
+          resolvers[venueId] = resolve
+        })
+    )
+    renderPanel()
+    fireEvent.click(await screen.findByRole('button', { name: '+15 minutes later: Blue Room' }))
+    fireEvent.click(screen.getByRole('button', { name: '+10 minutes later: Roost' }))
+    resolvers[1]({ delayMinutes: 15, shifted: [] }) // A answers first
+    await waitFor(() => expect(screen.getByRole('button', { name: '+15 minutes later: Blue Room' })).toBeEnabled())
+    expect(screen.getByRole('button', { name: '+10 minutes later: Roost' })).toBeDisabled()
+    resolvers[2]({ delayMinutes: 25, shifted: [] })
+    await waitFor(() => expect(screen.getByRole('button', { name: '+10 minutes later: Roost' })).toBeEnabled())
+  })
+
+  it("each preset's accessible name starts with its visible label (WCAG 2.5.3)", async () => {
+    renderPanel()
+    const preset = await screen.findByRole('button', { name: '+30 minutes later: Blue Room' })
+    expect(preset.getAttribute('aria-label').startsWith(preset.textContent)).toBe(true)
   })
 
   it('every control is at least 44 px tall (a mis-tap moves a whole venue)', async () => {

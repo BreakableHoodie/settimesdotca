@@ -17,8 +17,8 @@ export default function VenueDelayBanner({ delays }) {
       <ul className="space-y-0.5">
         {late.map(delay => (
           <li key={delay.venueId ?? delay.venue}>
-            <span className="font-semibold">{delay.venue}</span> is running about {delay.minutes} minutes late. Its
-            times below are updated.
+            <span className="font-semibold">{delay.venue}</span> is running about {delay.minutes}{' '}
+            {delay.minutes === 1 ? 'minute' : 'minutes'} late. Its times below are updated.
           </li>
         ))}
       </ul>

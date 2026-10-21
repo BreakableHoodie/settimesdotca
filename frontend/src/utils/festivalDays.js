@@ -190,3 +190,14 @@ export function addLocalDays(ms, days) {
   d.setDate(d.getDate() + days)
   return d.getTime()
 }
+
+// The calendar date in Toronto, the event's time zone, as YYYY-MM-DD,
+// whatever the viewer's own zone is (#1249: a fan in Vancouver must see a
+// Toronto show's running-late banner from Toronto midnight, not their own).
+const TORONTO_DATE = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Toronto',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
+export const torontoDate = now => TORONTO_DATE.format(new Date(now))

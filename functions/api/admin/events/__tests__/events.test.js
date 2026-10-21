@@ -110,6 +110,31 @@ describe("Event API - handler integration", () => {
     expect(data.event.slug).toBe("integration-event");
   });
 
+  // #1248: create validates theme_colors through the schema, which now checks
+  // the poster palette shape, not merely that it parses.
+  it.each([
+    ["accepts a version 1 palette", true],
+    ["refuses the 0008 legacy shape", false],
+  ])("onRequestPost %s in theme_colors", async (_label, ok) => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+    const now = new Date();
+    const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const variant = { ground: "#f7eef0", ink: "#1a1819", accent: "#924d7a", nowFill: "#dce9f2" };
+    const theme = ok ? { v: 1, source: "poster", light: variant, dark: variant } : { primary: "#123456" };
+    const res = await eventsHandler.onRequestPost({
+      request: new Request("https://example.test/api/admin/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Themed", slug: `themed-${ok}`, date, theme_colors: JSON.stringify(theme) }),
+      }),
+      env,
+    });
+    expect(res.status).toBe(ok ? 201 : 400);
+    const row = rawDb.prepare("SELECT theme_colors FROM events WHERE slug = ?").get(`themed-${ok}`);
+    expect(row?.theme_colors ?? null).toBe(ok ? JSON.stringify(theme) : null);
+  });
+
   // #804: publication has to go through POST .../publish, the only route that
   // asks before putting a lineup-less event in front of the public. A created
   // row has zero performances by construction, so create-as-published is always

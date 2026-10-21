@@ -299,6 +299,17 @@ Three things are load-bearing:
 
 The delay total stays in 0-600 (also a `CHECK`). On the public side a failed banner read degrades to `venue_delays: []`, logged at `error`, and never fails `/api/schedule`. The rules above are in the mutation gate.
 
+### Poster-led event palettes and venue stamp inks (#1248)
+
+An event page takes its colours from the edition's poster. `events.theme_colors` holds `{"v":1,"source":"poster"|"manual","light":{ground,ink,accent,nowFill},"dark":{...}}`, every colour `#rrggbb`. Two validators, one per side of the build boundary, kept in step by tests: `functions/utils/themeColors.js` (create and PATCH refuse anything else, including the unused 0008 `{primary,...}` shape) and `isValidThemeColours` in `frontend/src/utils/posterPalette.js`. Both accept either hex case. `null` is the house theme, and must render cleanly.
+
+- **Extraction is in the admin's browser** (`frontend/src/utils/posterPalette.js`: median-cut, then role mapping), never on Workers. The poster host sends no CORS headers, so a canvas cannot read its pixels: `GET /api/admin/events/posters?url=` (editor) returns the same R2 object same origin. It serves only `event-posters/<key>` on the configured poster host, with no slash in the key and no query, and only a stored image type. It is an R2 read, not a fetch, so the SSRF rule is untouched.
+- **Roles:** a colour that already reads as text on the ground (4.5:1) is the accent; one that does not is demoted to the "on now" fill, under ink, rather than darkened into a colour the poster never used. The dark variant is built from the poster's own ink. Tuned on all 19 production posters, not synthetic swatches.
+- **Contrast is enforced twice:** at extraction, and at render (`readableThemeColours`), so a hand-edited palette can be ugly but never unreadable. Only lightness moves; hue is kept.
+- **Zero maintenance:** a poster changed in the event form is read automatically and its colours saved with the event. The form's baseline is the event's SAVED poster, not the first render's (the form mounts empty and fills a render later), so opening an old edition restyles nothing. Colours set by hand (`source: "manual"`) are never replaced silently.
+
+**Venue inks:** `venues.ink_color` (migration 0076, nullable, `CHECK` lowercase `#rrggbb`) is fixed per venue across editions. `STAMP_INKS` in `functions/utils/venueInk.js` is the palette, and its order is load-bearing: the migration backfills by id **rank** through the same list (a test asserts they match), and a new venue gets the least-used ink. Eight inks dark enough for AA on a light poster ground cannot also be well separated in lightness, so **the stamp always prints the venue's name**; the ink is a secondary cue. `/api/schedule` returns `venue_ink` and `venue_short`, the name without a trailing parenthetical, derived server-side so there is no second name to maintain.
+
 ### Public event visibility is `status`, never `is_published` (#800) — history, guards still live
 
 `events.is_published` was dropped by migration 0059 (#799). Before #799, archiving wrote `is_published = 0`, and on 2026-08-10 archiving the last live event took 13 public read paths dark at once. `functions/utils/eventVisibility.js` is the single home:

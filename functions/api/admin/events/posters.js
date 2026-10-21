@@ -1,6 +1,7 @@
 /**
  * Event Poster Upload API
  * POST /api/admin/events/posters
+ * GET  /api/admin/events/posters?url=<poster public URL>  (poster bytes, same origin)
  *
  * Uploads an event poster image, mirroring functions/api/admin/bands/photos.js
  * (#616 design comment): same magic-byte validation (functions/utils/imageUpload.js),
@@ -162,5 +163,50 @@ export async function onRequestPost(context) {
         headers: { "Content-Type": "application/json" },
       },
     );
+  }
+}
+
+// The poster host serves no CORS headers, so the admin's browser may display a
+// poster but cannot read its pixels to suggest a palette (#1248). This returns
+// the same bytes from the R2 binding, same origin. Only keys under
+// event-posters/ on the configured poster host qualify, and the key may not
+// contain a slash, so the parameter can name nothing else in the bucket. It is
+// an R2 read, never a fetch: no outbound request, so the SSRF rule holds.
+const POSTER_KEY = /^\/event-posters\/[a-z0-9._-]+$/;
+
+export async function onRequestGet(context) {
+  const { request, env } = context;
+  const permCheck = await checkPermission(context, "editor");
+  if (permCheck.error) return permCheck.response;
+
+  const json = (body, status) =>
+    new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+
+  let posterUrl;
+  try {
+    posterUrl = new URL(new URL(request.url).searchParams.get("url") ?? "");
+  } catch {
+    return json({ error: "Bad request", message: "url must be a poster URL" }, 400);
+  }
+  const posterHost = new URL(env.BAND_PHOTOS_PUBLIC_URL || "https://band-photos.settimes.ca");
+  if (posterUrl.origin !== posterHost.origin || posterUrl.search || !POSTER_KEY.test(posterUrl.pathname)) {
+    return json({ error: "Bad request", message: "url must be a poster URL" }, 400);
+  }
+
+  try {
+    const object = await env.BAND_PHOTOS.get(posterUrl.pathname.slice(1));
+    if (!object) return json({ error: "Not found", message: "Poster not found" }, 404);
+    const contentType = object.httpMetadata?.contentType;
+    // Uploads store the magic-byte type; anything else is not served as an image.
+    if (!ALLOWED_IMAGE_TYPES.includes(contentType)) {
+      return json({ error: "Not found", message: "Poster not found" }, 404);
+    }
+    return new Response(object.body, {
+      status: 200,
+      headers: { "Content-Type": contentType, "Cache-Control": "private, max-age=300" },
+    });
+  } catch (error) {
+    console.error("Error reading poster for palette:", error);
+    return json({ error: "Storage error", message: "Could not read the poster" }, 500);
   }
 }

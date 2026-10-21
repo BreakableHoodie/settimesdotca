@@ -10,6 +10,7 @@ import { isValidURL, normalizeHttpUrl } from "./urls.js";
 import { isValidTime, validateDate } from "./datetime.js";
 import { validateId } from "./ids.js";
 import { POSTAL_CODE_REGEX, PHONE_REGEX } from "./contact.js";
+import { validateThemeColorsJson } from "../themeColors.js";
 
 /**
  * Valid event statuses
@@ -447,14 +448,8 @@ export const VALIDATION_SCHEMAS = {
       label: "Theme colors",
       min: FIELD_LIMITS.eventThemeColors.min,
       max: FIELD_LIMITS.eventThemeColors.max,
-      validate: (value) => {
-        try {
-          JSON.parse(value);
-          return { valid: true };
-        } catch {
-          return { valid: false, error: "Theme colors must be valid JSON" };
-        }
-      },
+      // The poster palette shape, not merely JSON (#1248).
+      validate: (value) => validateThemeColorsJson(value),
     },
     // Schema-level check is deliberately shallow (generic JSON parseability,
     // mirroring venue_info/social_links above) — the real semantic check

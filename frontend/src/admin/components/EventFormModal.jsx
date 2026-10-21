@@ -8,6 +8,20 @@ import { buildDayOptions, enumerateFestivalDays, isMultiDayEvent } from '../util
 import { formatFestivalDate, localIsoDate } from '../../utils/festivalDays'
 import { parseDoorsJsonToForm, serializeDoorsForm } from '../utils/doorsFormData'
 import { publishWithLineupConfirm } from '../utils/publishWithLineupConfirm'
+import PosterPalette from './PosterPalette'
+import { isValidThemeColours } from '../../utils/posterPalette'
+
+// The stored palette (#1248), or null for anything that is not one: the form
+// then shows no colours, and saving sends null, the house theme.
+function parseThemeColours(stored) {
+  if (!stored) return null
+  try {
+    const parsed = JSON.parse(stored)
+    return isValidThemeColours(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
 
 /**
  * EventFormModal - Modal for creating and editing events
@@ -61,6 +75,7 @@ export default function EventFormModal({
     city: '',
     ticket_url: '',
     poster_url: '',
+    theme_colors: null,
     social_website: '',
     social_instagram: '',
     social_facebook: '',
@@ -127,6 +142,7 @@ export default function EventFormModal({
         city: event.city || '',
         ticket_url: event.ticket_url || '',
         poster_url: event.poster_url || '',
+        theme_colors: parseThemeColours(event.theme_colors),
         social_website: socialLinks.website || '',
         social_instagram: socialLinks.instagram || '',
         social_facebook: socialLinks.facebook || '',
@@ -153,6 +169,7 @@ export default function EventFormModal({
         city: '',
         ticket_url: '',
         poster_url: '',
+        theme_colors: null,
         social_website: '',
         social_instagram: '',
         social_facebook: '',
@@ -352,6 +369,7 @@ export default function EventFormModal({
         city: formData.city,
         ticket_url: formData.ticket_url,
         poster_url: formData.poster_url,
+        theme_colors: formData.theme_colors ? JSON.stringify(formData.theme_colors) : null,
         social_links: socialLinksPayload,
         doors_json: serializeDoorsForm(doorsForm, currentDays),
         age_restriction: formData.age_restriction || null,
@@ -787,6 +805,13 @@ export default function EventFormModal({
                 label="Event Poster"
                 helpText="Optional — used for social share cards and the event's archive recap. Large images are auto-resized for the web."
                 maxDimension={1600}
+              />
+              <PosterPalette
+                key={event?.id ?? 'new'}
+                originalPosterUrl={event?.poster_url || ''}
+                posterUrl={formData.poster_url}
+                value={formData.theme_colors}
+                onChange={theme => setFormData(prev => ({ ...prev, theme_colors: theme }))}
               />
             </div>
 

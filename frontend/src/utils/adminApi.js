@@ -614,6 +614,19 @@ export const eventsApi = {
     return handleResponse(response)
   },
 
+  // A poster's bytes, same origin (#1248). The poster host sends no CORS
+  // headers, so a canvas cannot read the public URL's pixels; this endpoint
+  // serves the same R2 object so the palette can be extracted in the browser.
+  async getPosterBlob(posterUrl) {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/events/posters?url=${encodeURIComponent(posterUrl)}`, {
+      headers: getHeaders(),
+      credentials: 'include',
+    })
+    const contentType = response.headers.get('content-type') || ''
+    if (response.ok && contentType.startsWith('image/')) return response.blob()
+    return handleResponse(response)
+  },
+
   // Venue running late (#1249). The list is read fresh (the public schedule
   // is cached for 60 s); a shift moves the venue's remaining sets in one
   // atomic batch, and clearing only removes the fan banner.

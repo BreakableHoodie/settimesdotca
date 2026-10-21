@@ -106,3 +106,35 @@ describe('EventFormModal publication routing', () => {
     })
   })
 })
+
+// #1248: the poster palette round-trips through an unrelated save, and a
+// stored value that is not a palette is not written back.
+describe('EventFormModal poster colours', () => {
+  const variant = { ground: '#f7eef0', ink: '#1a1819', accent: '#924d7a', nowFill: '#dce9f2' }
+  const palette = { v: 1, source: 'poster', light: variant, dark: variant }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    eventsApi.update.mockResolvedValue({ event: baseEvent })
+  })
+
+  async function saveUnchanged(event) {
+    renderModal(event)
+    fireEvent.submit(screen.getByRole('button', { name: /update event/i }).closest('form'))
+    await waitFor(() => expect(eventsApi.update).toHaveBeenCalledTimes(1))
+    return eventsApi.update.mock.calls[0][1].theme_colors
+  }
+
+  it('keeps a saved palette when the event is saved for another reason', async () => {
+    const sent = await saveUnchanged({ ...baseEvent, status: 'draft', theme_colors: JSON.stringify(palette) })
+    expect(JSON.parse(sent)).toEqual(palette)
+  })
+
+  it.each([
+    ['no palette', null],
+    ['the 0008 legacy shape', '{"primary":"#123456"}'],
+    ['malformed JSON', '{'],
+  ])('sends null for %s', async (_label, stored) => {
+    expect(await saveUnchanged({ ...baseEvent, status: 'draft', theme_colors: stored })).toBeNull()
+  })
+})

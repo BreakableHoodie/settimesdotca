@@ -20,6 +20,12 @@ const ALLOWLIST = [
     snippet: 'url.pathname.split("/")',
     reason: "getUrlId extracts a segment; invalid casing fails closed with 400",
   },
+  {
+    file: "api/admin/events/posters.js",
+    snippet: "POSTER_KEY.test(posterUrl.pathname)",
+    reason:
+      "the path of a URL on the POSTER HOST, never a route here; the key must be lowercase, so a case variant is refused (#1248)",
+  },
 ];
 
 function sourceFiles(dir) {

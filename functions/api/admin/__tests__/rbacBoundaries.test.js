@@ -65,6 +65,7 @@ const POLICY = {
   "POST /api/admin/events/[id]/venues/[venueId]/delay": "editor",
   "DELETE /api/admin/events/[id]/venues/[venueId]/delay": "editor",
   "POST /api/admin/events/posters": "editor",
+  "GET /api/admin/events/posters": "editor",
   "POST /api/admin/events/wizard": "editor",
   "POST /api/admin/flush-announce-digest": "editor",
   "GET /api/admin/invite-codes": "admin",

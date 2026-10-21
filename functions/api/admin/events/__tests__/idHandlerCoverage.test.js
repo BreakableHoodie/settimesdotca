@@ -504,34 +504,60 @@ describe("PATCH /api/admin/events/:id — guard and validation branches", () => 
     expect(data.message).toBe("Social links must be no more than 2000 characters");
   });
 
-  it("theme_colors as a valid JSON string is accepted verbatim", async () => {
+  // A version 1 poster palette (#1248): the only shape PATCH accepts now.
+  const PALETTE = {
+    v: 1,
+    source: "poster",
+    light: { ground: "#f7eef0", ink: "#1a1819", accent: "#924d7a", nowFill: "#dce9f2" },
+    dark: { ground: "#2a2629", ink: "#f7eef0", accent: "#d9a3c6", nowFill: "#3b4c5a" },
+  };
+
+  it("theme_colors as a valid palette JSON string is accepted verbatim", async () => {
     const { env, rawDb } = createTestEnv({ role: "editor" });
     const ev = insertEvent(rawDb, { name: "E", slug: "patch-theme-colors-string" });
 
     const res = await onRequestPatch({
-      request: patchRequest(ev.id, { theme_colors: '{"primary":"#123456"}' }),
+      request: patchRequest(ev.id, { theme_colors: JSON.stringify(PALETTE) }),
       env,
       data: { user: authedUser("editor", 2) },
     });
 
     expect(res.status).toBe(200);
     const row = rawDb.prepare("SELECT theme_colors FROM events WHERE id = ?").get(ev.id);
-    expect(row.theme_colors).toBe('{"primary":"#123456"}');
+    expect(row.theme_colors).toBe(JSON.stringify(PALETTE));
   });
 
-  it("theme_colors as a plain object is stringified and accepted", async () => {
+  it("theme_colors as a plain palette object is stringified and accepted", async () => {
     const { env, rawDb } = createTestEnv({ role: "editor" });
     const ev = insertEvent(rawDb, { name: "E", slug: "patch-theme-colors-object" });
 
     const res = await onRequestPatch({
-      request: patchRequest(ev.id, { theme_colors: { primary: "#654321" } }),
+      request: patchRequest(ev.id, { theme_colors: PALETTE }),
       env,
       data: { user: authedUser("editor", 2) },
     });
 
     expect(res.status).toBe(200);
     const row = rawDb.prepare("SELECT theme_colors FROM events WHERE id = ?").get(ev.id);
-    expect(JSON.parse(row.theme_colors)).toEqual({ primary: "#654321" });
+    expect(JSON.parse(row.theme_colors)).toEqual(PALETTE);
+  });
+
+  it.each([
+    ["the 0008 legacy shape", { primary: "#654321" }],
+    ["a palette with a CSS-injection colour", { ...PALETTE, light: { ...PALETTE.light, ink: "#000;color:red" } }],
+  ])("theme_colors that is valid JSON but %s is rejected (400) and nothing is written", async (_label, value) => {
+    const { env, rawDb } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, { name: "E", slug: `patch-theme-colors-shape-${_label.length}` });
+
+    const res = await onRequestPatch({
+      request: patchRequest(ev.id, { theme_colors: value }),
+      env,
+      data: { user: authedUser("editor", 2) },
+    });
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).message).toMatch(/version 1 poster palette/);
+    expect(rawDb.prepare("SELECT theme_colors FROM events WHERE id = ?").get(ev.id).theme_colors).toBeNull();
   });
 
   it("theme_colors as an invalid JSON string is rejected (400)", async () => {

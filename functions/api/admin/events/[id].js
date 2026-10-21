@@ -18,6 +18,7 @@ import {
 } from "../../../utils/validation.js";
 import { getClientIP, getUrlId, parseJsonObjectBody, parseOptionalJsonObjectBody } from "../../../utils/request.js";
 import { routePath } from "../../../utils/routePath.js";
+import { validateThemeColorsJson } from "../../../utils/themeColors.js";
 
 function parseJsonField(value, label) {
   if (value === undefined) {
@@ -442,6 +443,15 @@ export async function onRequestPatch(context) {
           }),
           { status: 400, headers: { "Content-Type": "application/json" } },
         );
+      }
+      if (typeof parsed.value === "string") {
+        const shape = validateThemeColorsJson(parsed.value);
+        if (!shape.valid) {
+          return new Response(JSON.stringify({ error: "Validation error", message: shape.error }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
       }
       updates.push("theme_colors = ?");
       params.push(parsed.value ?? null);

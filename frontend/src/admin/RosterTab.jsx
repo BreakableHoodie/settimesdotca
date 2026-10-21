@@ -128,11 +128,16 @@ export default function RosterTab({ showToast, readOnly = false }) {
   })
   const [submitting, setSubmitting] = useState(false)
 
-  // Load all bands
+  // Load all bands. Latest wins: an older load resolving late must not put an
+  // older roster back (say, the photo an edit-mode upload just replaced), and
+  // only the newest load clears the spinner or reports an error (#1361).
+  const rosterLoadRef = useRef(0)
   const loadBands = useCallback(async () => {
+    const requestId = ++rosterLoadRef.current
     try {
       setLoading(true)
       const result = await bandsApi.getAll()
+      if (requestId !== rosterLoadRef.current) return
       // The API returns performances/profiles mixed.
       // We need to deduplicate by ID to get unique profiles.
       // Assuming result.bands contains items with 'id' (performance ID or profile ID?)
@@ -157,9 +162,9 @@ export default function RosterTab({ showToast, readOnly = false }) {
 
       setBands(uniqueBands)
     } catch (err) {
-      showToast('Failed to load roster: ' + err.message, 'error')
+      if (requestId === rosterLoadRef.current) showToast('Failed to load roster: ' + err.message, 'error')
     } finally {
-      setLoading(false)
+      if (requestId === rosterLoadRef.current) setLoading(false)
     }
   }, [showToast])
 

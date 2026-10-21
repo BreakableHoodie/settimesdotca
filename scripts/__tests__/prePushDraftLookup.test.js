@@ -78,6 +78,11 @@ function push({ branch = "feat", lookupSeconds = ANSWER_BUDGET_SECONDS } = {}) {
   const r = spawnSync(process.env.HOOK_SHELL || "/bin/sh", [HOOK, "origin", "git@example:x.git"], {
     input: `refs/heads/${branch} ${SHA} refs/heads/${branch} ${ZERO}\n`,
     encoding: "utf8",
+    // A broken watchdog leaves a stub that never exits; vitest cannot interrupt
+    // a synchronous spawn, so without this a regression HANGS the suite instead
+    // of failing it. Well past every budget the cases use.
+    timeout: 45000,
+    killSignal: "SIGKILL",
     // Only the fake bin and the TOOLS symlinks: "no gh" is the fake bin
     // being empty, whatever the host has installed.
     env: {
@@ -154,7 +159,12 @@ describe("pre-push draft lookup", () => {
   it("still counts an answer that arrives after the budget (the timeout path is live)", () => {
     // The same late "true" that #1358's flake produced, now on purpose: it must
     // count the push. Guards against the fix above hiding the timeout path.
-    fakeGh("sleep 2; echo true");
+    // The stub answers "true" only WHEN the watchdog kills it, so no scheduler
+    // delay can let it answer in time (a plain `sleep 2; echo true` could). Never
+    // killed, it gives a successful late "true" after 30 s, which is what a
+    // broken watchdog would wrongly accept, so that break fails here rather
+    // than hanging, and the stub cannot outlive the test.
+    fakeGh("trap 'echo true; exit 1' TERM; i=0; while [ $i -lt 300 ]; do sleep 0.1; i=$((i + 1)); done; echo true");
     const r = push({ lookupSeconds: HANG_BUDGET_SECONDS });
     expect(logLines()).toHaveLength(1);
     expect(r.stderr).not.toMatch(/not counted/);

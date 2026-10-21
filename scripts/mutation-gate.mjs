@@ -558,6 +558,41 @@ export const MUTATIONS = [
     tests: ["functions/api/admin/users/__tests__/reset-password.test.js"],
   },
   {
+    id: "venue-delay-skips-cancelled-sets",
+    invariant: "CLAUDE.md 'Venue running late' \u2014 a running-late shift never moves a cancelled set (#1249)",
+    file: "functions/utils/venueDelay.js",
+    find: "    if (performance.is_cancelled) continue;",
+    replace: "",
+    tests: ["functions/api/admin/events/__tests__/venue-delay.test.js"],
+  },
+  {
+    id: "venue-delay-skips-started-sets",
+    invariant:
+      "CLAUDE.md 'Venue running late' \u2014 a set that has started on the Toronto festival clock is never moved (#1249)",
+    file: "functions/utils/venueDelay.js",
+    find: "    if (hasStarted(performance, eventDate, now)) continue;",
+    replace: "",
+    tests: ["functions/api/admin/events/__tests__/venue-delay.test.js"],
+  },
+  {
+    id: "venue-delay-refuses-crossing-6am",
+    invariant:
+      "CLAUDE.md 'Venue running late' \u2014 a shift across 06:00 into another festival day is refused, not applied (#1249)",
+    file: "functions/utils/venueDelay.js",
+    find: "    if (!startInDay || !endInDay) {",
+    replace: "    if (false) {",
+    tests: ["functions/api/admin/events/__tests__/venue-delay.test.js"],
+  },
+  {
+    id: "venue-delay-claim-blocks-stacked-shifts",
+    invariant:
+      "CLAUDE.md 'Venue running late' \u2014 set UPDATEs apply only under this request's claim, so simultaneous shifts never stack (#1249)",
+    file: "functions/api/admin/events/[id]/venues/[venueId]/delay.js",
+    find: "           WHERE id = ? AND event_id = ? AND ${CLAIMED_SQL}`,",
+    replace: "           WHERE id = ? AND event_id = ? AND (? OR ? OR ? OR 1)`,",
+    tests: ["functions/api/admin/events/__tests__/venue-delay.test.js"],
+  },
+  {
     id: "invite-list-returns-no-code",
     invariant:
       "CLAUDE.md 'Invite codes are stored hashed' — GET /api/admin/invite-codes projects no `code` column; a stolen admin session must not read an unused invite (#1334)",

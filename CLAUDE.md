@@ -288,6 +288,17 @@ Three things are load-bearing:
   **explicit** `meta.changes === 0` counts as "not applied" — an absent `meta`
   must not turn a committed save into a false "not saved".
 
+### Venue running late — one shift, one batch, never across 06:00 (#1249)
+
+`POST /api/admin/events/:id/venues/:venueId/delay` `{ minutes }` moves every **remaining** set at a venue and adds to the venue's cumulative delay, which the fan page shows as a banner (`event.venue_delays` on `/api/schedule`). `DELETE` is "back on time": it clears the banner and leaves the times as they are. The planning is pure (`functions/utils/venueDelay.js`). Four rules are load-bearing:
+
+- **"Remaining" is the Toronto festival clock.** A set has started once its festival day is past or its start is at or before now in festival minutes (`eventLocalFestivalToday` + `eventLocalClock`). Cancelled sets and sets with no start time are never moved.
+- **Times are compared in festival minutes**, after-midnight counted past 24:00, so 23:50 +15 is 00:05 on the same festival night and `performance_date` is untouched. **A shift that would move a start or end across 06:00, in either direction, is refused** (409 `SHIFT_CROSSES_FESTIVAL_DAY`): it would silently change which festival day the set belongs to.
+- **One batch, claimed by a nonce.** The first statement claims `event_venue_delays` by compare-and-swap on `revision` and stamps this request's `last_shift_id`; every set UPDATE and the audit row apply only `EXISTS(last_shift_id = nonce)`. D1 rolls a batch back on an error, not on an UPDATE that matches nothing, so this, not per-row predicates, is what makes two simultaneous "+15" taps unable to stack: the loser writes nothing (409 `DELAY_CHANGED`). A concurrent archive fails the claim the same way.
+- **Conflicts are checked on the final arrangement** with `detectDraftConflicts`, as #1161 requires; cancelled sets never conflict.
+
+The delay total stays in 0-600 (also a `CHECK`). All four rules are in the mutation gate.
+
 ### Public event visibility is `status`, never `is_published` (#800) — history, guards still live
 
 `events.is_published` was dropped by migration 0059 (#799). Before #799, archiving wrote `is_published = 0`, and on 2026-08-10 archiving the last live event took 13 public read paths dark at once. `functions/utils/eventVisibility.js` is the single home:

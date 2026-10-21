@@ -589,6 +589,17 @@ BEGIN
   SELECT RAISE(ABORT, 'invite_codes.role must be viewer, editor or admin');
 END;
 
+CREATE TABLE IF NOT EXISTS event_venue_delays (
+  event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  venue_id INTEGER NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
+  delay_minutes INTEGER NOT NULL DEFAULT 0 CHECK (delay_minutes BETWEEN 0 AND 600),
+  revision INTEGER NOT NULL DEFAULT 1,
+  last_shift_id TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  PRIMARY KEY (event_id, venue_id)
+);
+
 -- ============================================
 -- TEST ACCOUNTS (passwords set by scripts/setup-local-db.sh)
 -- ============================================

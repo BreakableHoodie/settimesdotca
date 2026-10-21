@@ -2179,6 +2179,128 @@ paths:
         "500":
           $ref: "#/components/responses/ServerError"
 
+  /api/admin/events/{id}/venues/{venueId}/delay:
+    post:
+      tags:
+        - Admin - Events
+      summary: Venue running late — shift its remaining sets (#1249)
+      description: >-
+        Moves every remaining (not yet started on the Toronto festival clock),
+        non-cancelled set at the venue by `minutes`, and adds `minutes` to the
+        venue's cumulative delay, which the fan event page shows as a banner
+        (`event.venue_delays` on /api/schedule). One atomic batch with one
+        audit row (`venue.delay_shifted`); conflicts are checked on the final
+        arrangement. Editor and above.
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - name: venueId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - minutes
+              properties:
+                minutes:
+                  type: integer
+                  minimum: -180
+                  maximum: 180
+                  description: Non-zero. Negative pulls the remaining sets back earlier.
+      responses:
+        "200":
+          description: The remaining sets were shifted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  venueId:
+                    type: integer
+                  delayMinutes:
+                    type: integer
+                    description: The venue's cumulative delay after this shift (0-600)
+                  shifted:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+                        startTime:
+                          type: string
+                        endTime:
+                          type: string
+                          nullable: true
+        "400":
+          description: >-
+            Bad `minutes`, an archived event, a cumulative delay outside 0-600
+            (`DELAY_OUT_OF_RANGE`), or no remaining sets at the venue
+            (`NO_REMAINING_SETS`).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: >-
+            Nothing was written. The shift would move a set across 06:00 into
+            another festival day (`SHIFT_CROSSES_FESTIVAL_DAY`, with `sets`),
+            the final arrangement clashes (`conflicts`), or the venue's delay
+            changed or the event was archived meanwhile (`DELAY_CHANGED`).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    delete:
+      tags:
+        - Admin - Events
+      summary: Venue back on time — clear its running-late banner (#1249)
+      description: >-
+        Sets the venue's delay to 0, so the fan banner disappears. Set times
+        are left exactly as they are. Audited as `venue.delay_cleared`; a no-op
+        when the venue is not running late. Editor and above.
+      security:
+        - AdminSessionCookie: []
+          CsrfToken: []
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - name: venueId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: The banner is cleared
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: The venue's delay changed meanwhile (`DELAY_CHANGED`); nothing was written
+        "500":
+          $ref: "#/components/responses/ServerError"
+
   /api/admin/events/{id}/metrics:
     get:
       tags:

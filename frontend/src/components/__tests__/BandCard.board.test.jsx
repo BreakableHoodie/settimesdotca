@@ -38,7 +38,7 @@ describe('BandCard variant="board"', () => {
     renderBoard({ band: { ...band, venue_short: 'Princess Cafe', venue_ink: 'red;background:url(x)' } })
     const stamp = screen.getByText('Princess Cafe')
     expect(stamp).not.toHaveAttribute('data-venue-ink')
-    expect(stamp.getAttribute('style')).not.toMatch(/background/)
+    expect(stamp.getAttribute('style')).not.toMatch(/background|url/)
   })
 
   it('still marks a cancelled set as cancelled', () => {
@@ -156,6 +156,17 @@ describe('BandCard variant="board"', () => {
   // in production belong to exactly one artist -- so they are presented as
   // facets you could act on rather than as descriptive text, matching the chip
   // the desktop card already uses.
+  it('letters a light ink in near-black, not invisible white', () => {
+    renderBoard({ band: { ...band, venue_short: 'Pale Hall', venue_ink: '#ffffff' } })
+    expect(screen.getByText('Pale Hall')).toHaveStyle({ color: '#111111' })
+  })
+
+  it('a stamp with no ink is self-contained: text-colour fill, ground-colour letters', () => {
+    renderBoard({ band: { ...band, venue_short: 'Inkless', venue_ink: null } })
+    const stamp = screen.getByText('Inkless')
+    expect(stamp).toHaveClass('bg-text-primary', 'text-bg-navy')
+  })
+
   it('shows the genre beside the stamp', () => {
     renderBoard({ band: { ...band, genre: 'Shoegaze, Dream Pop' } })
     expect(screen.getByText('Shoegaze')).toBeInTheDocument()
@@ -183,6 +194,12 @@ describe('BandCard variant="board"', () => {
       renderBoard({ band: timed, currentTime: new Date(at) })
       expect(rowOf()).not.toHaveClass('board-now')
       expect(screen.queryByText(/On now/)).not.toBeInTheDocument()
+    })
+
+    it('promises no end time for an open-ended set', () => {
+      renderBoard({ band: { ...timed, endTime: 'END' }, currentTime: new Date(start + 60000) })
+      expect(screen.getByText('On now')).toBeInTheDocument()
+      expect(screen.queryByText(/until/)).not.toBeInTheDocument()
     })
 
     it('never marks a cancelled set', () => {

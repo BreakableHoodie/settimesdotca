@@ -106,7 +106,8 @@ function BandCard({
               {boardVenue && <VenueStamp venue={band.venue} short={band.venue_short} ink={band.venue_ink} />}
               {onNow ? (
                 <span className="text-[11px] font-semibold leading-normal text-text-primary">
-                  On now, until {formatTime(band.endTime)}
+                  {/* An open-ended set has no clock time to promise. */}
+                  {/^\d{1,2}:\d{2}/.test(band.endTime || '') ? `On now, until ${formatTime(band.endTime)}` : 'On now'}
                 </span>
               ) : (
                 !isCancelled &&

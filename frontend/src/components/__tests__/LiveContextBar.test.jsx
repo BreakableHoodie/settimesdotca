@@ -332,7 +332,9 @@ describe('LiveContextBar', () => {
       expect(mobileSummary, 'the clamped mobile summary should render').toBeTruthy()
       // Every leading field, in its required order: the clamp cuts the tail, so
       // this order is what keeps the consequential facts readable (#1084).
-      expect(mobileSummary.textContent).toMatch(/^19\+ • Doors [^•]+ • Presented by SetTimes • \d+ venues? • \d+ sets?/)
+      expect(mobileSummary.textContent).toMatch(
+        /^19\+\. Doors at [^.]+\. Presented by SetTimes\. \d+ venues?, \d+ sets?\./
+      )
       setViewportWidth(1024)
     })
 

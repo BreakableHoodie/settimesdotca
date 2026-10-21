@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { eventsApi } from '../../utils/adminApi'
 
 // "Venue running late" (#1249): one tap moves every remaining set at a venue
@@ -26,19 +26,33 @@ export default function RunningLatePanel({ eventId, readOnly = false, showToast,
   const [delays, setDelays] = useState([])
   const [pendingVenueId, setPendingVenueId] = useState(null)
   const [custom, setCustom] = useState({})
+  // The admin panel switches events without unmounting the lineup, so a reply
+  // for event A can land after B is selected. Every await re-checks the event
+  // before touching state, as LineupTab's loadData does; otherwise A's venues
+  // would show under B and the next tap would post A's venue ids against B.
+  const currentEventRef = useRef(eventId)
+  // Declared before the load effect, so it runs first on an event switch.
+  useEffect(() => {
+    currentEventRef.current = eventId
+  }, [eventId])
+  const isStale = forEventId => currentEventRef.current !== forEventId
 
   const load = useCallback(async () => {
     if (!eventId) return
     try {
       const res = await eventsApi.getVenueDelays(eventId)
+      if (isStale(eventId)) return
       setDelays(res.delays || [])
     } catch (err) {
+      if (isStale(eventId)) return
       showToast?.(`Could not load running-late status: ${err.message}`, 'error')
     }
   }, [eventId, showToast])
 
   useEffect(() => {
     setDelays([])
+    setPendingVenueId(null)
+    setCustom({})
     load()
   }, [load])
 
@@ -46,9 +60,11 @@ export default function RunningLatePanel({ eventId, readOnly = false, showToast,
     setDelays(current => current.map(row => (row.venueId === venueId ? { ...row, minutes } : row)))
 
   const shift = async (row, minutes) => {
+    const forEventId = eventId
     setPendingVenueId(row.venueId)
     try {
-      const res = await eventsApi.shiftVenue(eventId, row.venueId, minutes)
+      const res = await eventsApi.shiftVenue(forEventId, row.venueId, minutes)
+      if (isStale(forEventId)) return
       setMinutes(row.venueId, res.delayMinutes)
       const moved = res.shifted?.length ?? 0
       showToast?.(
@@ -58,22 +74,24 @@ export default function RunningLatePanel({ eventId, readOnly = false, showToast,
       setCustom(current => ({ ...current, [row.venueId]: '' }))
       await onShifted?.()
     } catch (err) {
-      showToast?.(describeError(err), 'error')
+      if (!isStale(forEventId)) showToast?.(describeError(err), 'error')
     } finally {
-      setPendingVenueId(null)
+      if (!isStale(forEventId)) setPendingVenueId(null)
     }
   }
 
   const clear = async row => {
+    const forEventId = eventId
     setPendingVenueId(row.venueId)
     try {
-      await eventsApi.clearVenueDelay(eventId, row.venueId)
+      await eventsApi.clearVenueDelay(forEventId, row.venueId)
+      if (isStale(forEventId)) return
       setMinutes(row.venueId, 0)
       showToast?.(`${row.venue} is back on time. Set times were left as they are.`, 'success')
     } catch (err) {
-      showToast?.(describeError(err), 'error')
+      if (!isStale(forEventId)) showToast?.(describeError(err), 'error')
     } finally {
-      setPendingVenueId(null)
+      if (!isStale(forEventId)) setPendingVenueId(null)
     }
   }
 
@@ -110,7 +128,7 @@ export default function RunningLatePanel({ eventId, readOnly = false, showToast,
                       disabled={busy}
                       onClick={() => shift(row, minutes)}
                       aria-label={`${row.venue}: running ${minutes} minutes late`}
-                      className="min-h-[40px] rounded bg-amber-500/20 px-3 text-sm font-semibold text-amber-200 hover:bg-amber-500/30 disabled:opacity-50"
+                      className="min-h-[44px] rounded bg-amber-500/20 px-3 text-sm font-semibold text-amber-200 hover:bg-amber-500/30 disabled:opacity-50"
                     >
                       +{minutes}
                     </button>
@@ -128,13 +146,13 @@ export default function RunningLatePanel({ eventId, readOnly = false, showToast,
                     value={customValue}
                     onChange={event => setCustom(current => ({ ...current, [row.venueId]: event.target.value }))}
                     placeholder="± min"
-                    className="min-h-[40px] w-20 rounded border border-white/20 bg-transparent px-2 text-sm text-white"
+                    className="min-h-[44px] w-20 rounded border border-white/20 bg-transparent px-2 text-sm text-white"
                   />
                   <button
                     type="button"
                     disabled={busy || !customValid}
                     onClick={() => shift(row, customMinutes)}
-                    className="min-h-[40px] rounded bg-white/10 px-3 text-sm text-white hover:bg-white/20 disabled:opacity-50"
+                    className="min-h-[44px] rounded bg-white/10 px-3 text-sm text-white hover:bg-white/20 disabled:opacity-50"
                   >
                     Shift
                   </button>
@@ -143,7 +161,7 @@ export default function RunningLatePanel({ eventId, readOnly = false, showToast,
                       type="button"
                       disabled={busy}
                       onClick={() => clear(row)}
-                      className="min-h-[40px] rounded px-3 text-sm text-white/80 underline hover:text-white disabled:opacity-50"
+                      className="min-h-[44px] rounded px-3 text-sm text-white/80 underline hover:text-white disabled:opacity-50"
                     >
                       Back on time
                     </button>

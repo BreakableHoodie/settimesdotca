@@ -108,6 +108,31 @@ describe('RunningLatePanel (#1249)', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 
+  it("switching events mid-load: event A's late reply never lands in event B's panel", async () => {
+    let resolveA
+    eventsApi.getVenueDelays.mockImplementation(eventId =>
+      eventId === 7
+        ? new Promise(resolve => {
+            resolveA = resolve
+          })
+        : Promise.resolve({ delays: [{ venueId: 50, venue: 'Event B Hall', minutes: 0, updatedAt: null }] })
+    )
+    const { rerender } = render(<RunningLatePanel eventId={7} showToast={vi.fn()} onShifted={vi.fn()} />)
+    rerender(<RunningLatePanel eventId={8} showToast={vi.fn()} onShifted={vi.fn()} />)
+    expect(await screen.findByText('Event B Hall')).toBeInTheDocument()
+    resolveA({ delays: DELAYS }) // event A answers last
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(screen.queryByText('Blue Room')).not.toBeInTheDocument()
+    expect(screen.getByText('Event B Hall')).toBeInTheDocument()
+  })
+
+  it('every control is at least 44 px tall (a mis-tap moves a whole venue)', async () => {
+    renderPanel()
+    await screen.findByText('running about 15 min late')
+    const controls = [...screen.getAllByRole('button'), ...screen.getAllByRole('spinbutton')]
+    for (const control of controls) expect(control.className).toMatch(/\bmin-h-\[44px\]/)
+  })
+
   it('renders nothing for an event with no venues', async () => {
     eventsApi.getVenueDelays.mockResolvedValue({ delays: [] })
     renderPanel()

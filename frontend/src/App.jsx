@@ -26,6 +26,8 @@ import RouteDiffSection from './components/RouteDiffSection'
 import { useSharedRouteImport } from './hooks/useSharedRouteImport'
 import { fetchPublicJson } from './utils/publicApi'
 import { venueNamesFrom } from './utils/venueInfo.js'
+import { LIGHT_THEMES, useTheme } from './components/ThemeProvider'
+import { eventPageStyle } from './utils/posterTheme'
 
 const HINT_DISMISSED_KEY = 'scheduleHintDismissed'
 const TIME_FILTERS_STORAGE_KEY = 'timeFiltersByEvent'
@@ -158,6 +160,7 @@ const formatDebugInputValue = dateValue => {
 }
 
 function App() {
+  const { theme } = useTheme()
   const { slug } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const [bands, setBands] = useState(FALLBACK_BANDS)
@@ -780,11 +783,25 @@ function App() {
     )
   }
 
+  // The poster wears the page (#1248): the event's palette, light or dark to
+  // match the fan's theme, as CSS custom properties on this wrapper. Null is
+  // the house theme, untouched.
+  const posterVariables = eventPageStyle(eventData, LIGHT_THEMES.has(theme))
+  const posterStyle = posterVariables && {
+    ...posterVariables,
+    background: 'linear-gradient(180deg, var(--color-bg-navy) 0%, var(--color-bg-purple) 100%)',
+    color: 'var(--color-text-primary)',
+  }
+
   // Breadcrumb navigation
   const breadcrumbs = [{ label: 'Events', href: '/' }, { label: eventData?.name || 'Event Schedule' }]
 
   return (
-    <div className="min-h-screen pb-20">
+    <div
+      className="event-page min-h-screen pb-20"
+      style={posterStyle ?? undefined}
+      data-poster-theme={posterStyle ? '' : undefined}
+    >
       {/* Identity meta (canonical/og:* /twitter:* /description) is SSR-owned for
           this route -- functions/event/[slug].js injects it server-side (and
           emits the richer, spec-valid og:type="website"/twitter:card=

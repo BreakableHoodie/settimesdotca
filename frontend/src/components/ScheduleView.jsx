@@ -8,7 +8,6 @@ import { filterPerformancesByTime } from '../utils/timeFilter'
 import { useFestivalDayFilter } from '../hooks/useFestivalDayFilter'
 import { useIsNarrow } from '../hooks/useIsNarrow'
 import BandCard from './BandCard'
-import { venueCodes } from '../utils/venueCode'
 import { DayDivider, DayTabs } from './ui'
 
 const UNSCHEDULED = Symbol('unscheduled')
@@ -179,7 +178,6 @@ function ScheduleView({
   const upcomingByTime = useMemo(() => groupByTime(upcomingBands), [upcomingBands])
   const pastByTime = useMemo(() => groupByTime(pastBands).reverse(), [pastBands])
 
-  const venueCodeMap = useMemo(() => venueCodes(bands.map(b => b.venue)), [bands])
   // One presentation at a time -- see useIsNarrow for why this is not CSS.
   const isNarrow = useIsNarrow()
 
@@ -542,7 +540,7 @@ function ScheduleView({
                 {nowPlaying.map(band => (
                   <BandCard
                     variant={isNarrow ? 'board' : 'card'}
-                    venueCode={isNarrow ? venueCodeMap.get(band.venue) : undefined}
+                    boardVenue={isNarrow}
                     key={band.id}
                     band={band}
                     isSelected={selectedBandsSet.has(band.id)}
@@ -589,7 +587,7 @@ function ScheduleView({
                         {timeBands.map(band => (
                           <BandCard
                             variant={isNarrow ? 'board' : 'card'}
-                            venueCode={isNarrow ? venueCodeMap.get(band.venue) : undefined}
+                            boardVenue={isNarrow}
                             key={band.id}
                             band={band}
                             isSelected={selectedBandsSet.has(band.id)}
@@ -636,7 +634,7 @@ function ScheduleView({
                         {timeBands.map(band => (
                           <BandCard
                             variant={isNarrow ? 'board' : 'card'}
-                            venueCode={isNarrow ? venueCodeMap.get(band.venue) : undefined}
+                            boardVenue={isNarrow}
                             key={band.id}
                             band={band}
                             isSelected={selectedBandsSet.has(band.id)}

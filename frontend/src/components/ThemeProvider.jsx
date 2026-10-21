@@ -3,6 +3,9 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 export const THEME_KEY = 'settimes-theme'
 export const VALID_THEMES = ['midnight-ember', 'arctic-night', 'daybreak', 'silver-lining']
 export const DEFAULT_THEME = 'midnight-ember'
+// The light themes. A poster-led event page (#1248) shows its palette's light
+// variant for these and its dark variant for the rest.
+export const LIGHT_THEMES = new Set(['daybreak', 'silver-lining'])
 
 const ThemeContext = createContext(null)
 

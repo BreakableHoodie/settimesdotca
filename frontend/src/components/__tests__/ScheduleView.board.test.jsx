@@ -106,13 +106,10 @@ describe('ScheduleView — board rows', () => {
     }
   })
 
-  it('gives every row its venue code', () => {
+  it("gives every row its venue's stamp, by its real name (#1248)", () => {
     renderView({ bands: singleDayBands })
-    // Derived, not stored -- see venueCode.js.
-    // 'Roost' -> ROOS, 'Blue Room' -> BLUE: first four of the first significant
-    // word, deduplicated across the bill. See venueCode.js.
-    expect(screen.getByText('ROOS')).toBeInTheDocument()
-    expect(screen.getByText('BLUE')).toBeInTheDocument()
+    expect(screen.getAllByText('Roost').some(el => el.tagName === 'SPAN')).toBe(true)
+    expect(screen.getAllByText('Blue Room').some(el => el.tagName === 'SPAN')).toBe(true)
   })
 
   // The board REPLACES the card, so the interaction the event page advertises in

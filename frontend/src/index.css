@@ -11,6 +11,23 @@
     U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+/* Archivo, the event page's one family (#1248): a width axis (62-125%) gives
+   condensed band names and wide tabular times from a single file. OFL 1.1,
+   /fonts/archivo-OFL.txt. `optional`, not `swap`: the browser uses it only if
+   it is ready at first paint, so it can never shift layout (Lighthouse CLS is
+   a CI gate); a cached second visit gets it. */
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal;
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  font-display: optional;
+  src: url('/fonts/archivo-latin-wdth.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC,
+    U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 @plugin '@tailwindcss/typography';
 
 @theme {
@@ -794,4 +811,39 @@ body {
   .legal-document section {
     break-inside: avoid;
   }
+}
+
+/* The event page (#1248): one family, Archivo, for everything on it. Display
+   text (band names) is condensed, and data that was monospace (times) is
+   wide and tabular instead. Scoped to the page, so the rest of the site keeps
+   its type. */
+.event-page {
+  --font-sans:
+    'Archivo', system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif;
+  --font-display: 'Archivo', 'Arial Narrow', system-ui, sans-serif;
+  --font-mono: 'Archivo', system-ui, sans-serif;
+  font-family: var(--font-sans);
+}
+
+.event-page .font-display {
+  font-stretch: 72%;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.event-page .font-mono {
+  font-stretch: 112%;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A board row on stage now (#1248): the poster's "on now" fill, or an accent
+   tint on the house theme. Only the ink is guaranteed to read on the fill
+   (posterPalette.js checks ink against nowFill), so every other text token
+   inside the row becomes the ink. "On now" is also written out: the fill is
+   never the only cue. */
+.event-page .board-now {
+  background: var(--color-poster-now, color-mix(in srgb, var(--color-accent-500) 14%, transparent));
+  --color-text-secondary: var(--color-text-primary);
+  --color-text-tertiary: var(--color-text-primary);
+  --color-accent-400: var(--color-text-primary);
 }

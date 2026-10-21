@@ -240,6 +240,14 @@ describe('isValidThemeColours', () => {
     }
   })
 
+  it('accepts the house theme chosen for a poster, and nothing looser', () => {
+    expect(isValidThemeColours({ v: 1, source: 'none', poster: POSTER })).toBe(true)
+    expect(isValidThemeColours({ v: 1, source: 'none' })).toBe(false)
+    expect(isValidThemeColours({ v: 1, source: 'none', poster: 'http://x.test/p.jpg' })).toBe(false)
+    expect(isValidThemeColours({ ...good(), source: 'none' })).toBe(false)
+    expect(readableThemeColours({ v: 1, source: 'none', poster: POSTER })).toBeNull()
+  })
+
   it('rejects non-objects', () => {
     for (const v of [null, undefined, 'x', 3, [], true]) expect(isValidThemeColours(v)).toBe(false)
   })

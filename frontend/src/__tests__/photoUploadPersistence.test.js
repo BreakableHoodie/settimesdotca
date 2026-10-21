@@ -18,12 +18,18 @@ function jsxFiles(dir) {
   })
 }
 
-// Each opening tag of <Name ...>, attributes included (props may span lines).
-// The tag ends at a `>` NOT preceded by `=`: an arrow-function prop
-// (`onPhotoChange={url => ...}`) contains `=>`, and stopping there hid every
-// prop after it (a mutation of this guard survived until this was fixed).
+// Each opening tag, attributes included (props may span lines). The tag ends
+// at a `>` NOT preceded by `=`: an arrow-function prop (`onPhotoChange={url =>
+// ...}`) contains `=>`, and stopping there hid every prop after it (a mutation
+// of this guard survived until this was fixed). Literal patterns, one per tag,
+// rather than a RegExp built from a name.
+const TAG_PATTERNS = {
+  PhotoUpload: /<PhotoUpload\b([\s\S]*?)(?<!=)\/?>/g,
+  BandForm: /<BandForm\b([\s\S]*?)(?<!=)\/?>/g,
+}
+
 function openingTags(source, name) {
-  return [...source.matchAll(new RegExp(`<${name}\\b([\\s\\S]*?)(?<!=)\\/?>`, 'g'))].map(m => m[1])
+  return [...source.matchAll(TAG_PATTERNS[name])].map(m => m[1])
 }
 
 const FILES = jsxFiles(SRC).map(file => ({ file: file.slice(SRC.length + 1), source: readFileSync(file, 'utf8') }))

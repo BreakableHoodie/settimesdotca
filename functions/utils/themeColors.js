@@ -4,6 +4,9 @@
 //     "light": { "ground", "ink", "accent", "nowFill" },
 //     "dark":  { "ground", "ink", "accent", "nowFill" } }
 //
+// or { "v": 1, "source": "none", "poster": "<https url>" }: the house theme,
+// chosen for that poster (and so not re-read from it).
+//
 // `poster` is the poster the colours were read from. A palette describes ONE
 // poster: the admin form re-reads when the event's poster differs from it, and
 // the public page ignores a "poster" palette whose poster is not the event's
@@ -36,6 +39,11 @@ function hasExactKeys(value, keys) {
 }
 
 export function isValidThemeColors(value) {
+  // The house theme CHOSEN for a poster: "Remove colours" stores this, so the
+  // form does not read that poster again and undo the choice.
+  if (value?.source === "none") {
+    return hasExactKeys(value, ["v", "source", "poster"]) && value.v === 1 && isHttpsUrl(value.poster);
+  }
   if (!hasExactKeys(value, ["v", "source", "poster", "light", "dark"])) return false;
   if (value.v !== 1 || !SOURCES.includes(value.source) || !isHttpsUrl(value.poster)) return false;
   return ["light", "dark"].every(

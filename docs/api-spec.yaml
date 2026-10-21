@@ -4532,8 +4532,10 @@ components:
           nullable: true
           description: |
             A version 1 poster palette (#1248), as a JSON string or object:
-            `{"v":1,"source":"poster"|"manual","light":{"ground","ink","accent","nowFill"},"dark":{...}}`,
-            every colour `#rrggbb`. Any other shape is 400. `null` clears it (house theme).
+            `{"v":1,"source":"poster"|"manual","poster":"<https url>","light":{"ground","ink","accent","nowFill"},"dark":{...}}`,
+            every colour `#rrggbb`; `poster` is the https URL (at most 500 characters) the colours were read from.
+            `{"v":1,"source":"none","poster":"<https url>"}` records the house theme chosen for that poster.
+            Any other shape is 400. `null` clears it (house theme).
           oneOf:
             - type: string
             - $ref: "#/components/schemas/GenericRecord"
@@ -4606,8 +4608,10 @@ components:
           nullable: true
           description: |
             A version 1 poster palette (#1248), as a JSON string or object:
-            `{"v":1,"source":"poster"|"manual","light":{"ground","ink","accent","nowFill"},"dark":{...}}`,
-            every colour `#rrggbb`. Any other shape is 400. `null` clears it (house theme).
+            `{"v":1,"source":"poster"|"manual","poster":"<https url>","light":{"ground","ink","accent","nowFill"},"dark":{...}}`,
+            every colour `#rrggbb`; `poster` is the https URL (at most 500 characters) the colours were read from.
+            `{"v":1,"source":"none","poster":"<https url>"}` records the house theme chosen for that poster.
+            Any other shape is 400. `null` clears it (house theme).
           oneOf:
             - type: string
             - $ref: "#/components/schemas/GenericRecord"

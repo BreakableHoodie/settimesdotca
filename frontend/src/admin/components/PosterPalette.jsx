@@ -79,7 +79,9 @@ export default function PosterPalette({ posterUrl, value, onChange, onBusyChange
     // read: it shows as "no colours", and reading would replace it unasked.
     if (!posterUrl || !autoSuggest) return // the form mounts empty and fills a render later
     const current = valueRef.current
-    if (current?.source === 'manual' || current?.poster === posterUrl) return
+    // A choice ("manual" colours, or "none", the house theme) is never undone
+    // by a read, whatever the poster.
+    if (current?.source === 'manual' || current?.source === 'none' || current?.poster === posterUrl) return
     suggest(posterUrl)
     // `suggest` is recreated each render; the poster and the palette's own
     // poster and source are the only triggers. A failed read changes none of
@@ -126,6 +128,8 @@ export default function PosterPalette({ posterUrl, value, onChange, onBusyChange
         </p>
       )}
 
+      {value?.source === 'none' && <p className="text-sm text-white/80">This event uses the site&apos;s own theme.</p>}
+
       {readable && (
         <>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -167,13 +171,15 @@ export default function PosterPalette({ posterUrl, value, onChange, onBusyChange
             onClick={() => suggest(posterUrl)}
             className="min-h-[44px] rounded bg-white/10 px-3 text-sm text-white hover:bg-white/20 disabled:opacity-50"
           >
-            {value ? 'Suggest again from the poster' : 'Suggest colours from the poster'}
+            {readable ? 'Suggest again from the poster' : 'Suggest colours from the poster'}
           </button>
         )}
-        {value && (
+        {readable && (
           <button
             type="button"
-            onClick={() => onChange(null)}
+            // With a poster, the house theme is stored as a CHOICE for it, or the
+            // next render would read the poster and put colours straight back.
+            onClick={() => onChange(posterUrl ? { v: 1, source: 'none', poster: posterUrl } : null)}
             className="min-h-[44px] rounded px-3 text-sm text-white/80 underline hover:text-white"
           >
             Remove colours

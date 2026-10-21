@@ -37,6 +37,20 @@ describe("isValidThemeColors", () => {
   });
 });
 
+describe("the house theme chosen for a poster (#1361 review)", () => {
+  it("is valid with exactly v, source none and an https poster", () => {
+    expect(isValidThemeColors({ v: 1, source: "none", poster: POSTER })).toBe(true);
+  });
+  it.each([
+    ["no poster", { v: 1, source: "none" }],
+    ["an http poster", { v: 1, source: "none", poster: "http://band-photos.settimes.ca/event-posters/a.jpg" }],
+    ["colours as well", { ...valid(), source: "none" }],
+    ["version 2", { v: 2, source: "none", poster: POSTER }],
+  ])("is refused with %s", (_label, value) => {
+    expect(isValidThemeColors(value)).toBe(false);
+  });
+});
+
 describe("validateThemeColorsJson", () => {
   it("names the problem for malformed JSON and for the wrong shape", () => {
     expect(validateThemeColorsJson("{").error).toMatch(/valid JSON/);

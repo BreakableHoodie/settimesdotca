@@ -148,6 +148,10 @@ const isHttpsUrl = value => {
 // Mirrors functions/utils/themeColors.js isValidThemeColors exactly; the two
 // sides cannot share code across the build boundary.
 export function isValidThemeColours(value) {
+  // The house theme chosen for a poster (see functions/utils/themeColors.js).
+  if (value?.source === 'none') {
+    return hasExactKeys(value, ['v', 'source', 'poster']) && value.v === 1 && isHttpsUrl(value.poster)
+  }
   if (!hasExactKeys(value, ['v', 'source', 'poster', 'light', 'dark'])) return false
   if (value.v !== 1 || !['poster', 'manual'].includes(value.source) || !isHttpsUrl(value.poster)) return false
   return ['light', 'dark'].every(
@@ -157,7 +161,8 @@ export function isValidThemeColours(value) {
 
 /** Render-time safety net: returns a copy whose text roles pass contrast again, or null if malformed. */
 export function readableThemeColours(value) {
-  if (!isValidThemeColours(value)) return null
+  // "none" is valid but has no colours: the page uses the house theme.
+  if (!isValidThemeColours(value) || value.source === 'none') return null
   const fix = variant => {
     // Stored hex may be upper-case (both validators accept it); emit lower.
     const [ground, ink, accent, nowFill] = ROLES.map(role => variant[role].toLowerCase())

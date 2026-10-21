@@ -226,10 +226,31 @@ describe('PosterPalette (#1248)', () => {
     expect(accentLine).not.toHaveStyle({ color: '#ffff00' })
   })
 
-  it('removing the colours hands back null, the house theme', () => {
+  // CodeRabbit #1361: with a poster, a bare null was read straight back into
+  // colours by the next render, so the house theme could never be chosen.
+  it('removing the colours stores the house theme as a choice for this poster, and nothing reads it back', async () => {
     const onValue = vi.fn()
     render(<Form initialValue={paletteFor('#924d7a')} onValue={onValue} />)
     fireEvent.click(screen.getByRole('button', { name: 'Remove colours' }))
+    await act(async () => {})
+    expect(onValue.mock.calls).toEqual([[{ v: 1, source: 'none', poster: OLD }]])
+    expect(eventsApi.getPosterBlob).not.toHaveBeenCalled()
+    expect(screen.getByText("This event uses the site's own theme.")).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Remove colours' })).not.toBeInTheDocument()
+  })
+
+  it('without a poster, removing hands back null', () => {
+    const onValue = vi.fn()
+    render(<PosterPalette posterUrl="" value={paletteFor('#924d7a')} onChange={onValue} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Remove colours' }))
     expect(onValue).toHaveBeenCalledWith(null)
+  })
+
+  it('a house-theme choice is not undone by a new poster either', async () => {
+    render(<Form initialValue={{ v: 1, source: 'none', poster: OLD }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'new poster' }))
+    await act(async () => {})
+    expect(eventsApi.getPosterBlob).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Suggest colours from the poster' })).toBeInTheDocument()
   })
 })

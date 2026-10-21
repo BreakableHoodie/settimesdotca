@@ -1,0 +1,117 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import '@testing-library/jest-dom'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import RunningLatePanel from '../RunningLatePanel'
+
+vi.mock('../../../utils/adminApi', () => ({
+  eventsApi: {
+    getVenueDelays: vi.fn(),
+    shiftVenue: vi.fn(),
+    clearVenueDelay: vi.fn(),
+  },
+}))
+
+import { eventsApi } from '../../../utils/adminApi'
+
+const DELAYS = [
+  { venueId: 1, venue: 'Blue Room', minutes: 0, updatedAt: null },
+  { venueId: 2, venue: 'Roost', minutes: 15, updatedAt: '2026-10-11 22:00:00' },
+]
+
+const apiError = (message, details) => Object.assign(new Error(message), { details })
+
+function renderPanel(props = {}) {
+  const showToast = vi.fn()
+  const onShifted = vi.fn()
+  render(<RunningLatePanel eventId={7} showToast={showToast} onShifted={onShifted} {...props} />)
+  return { showToast, onShifted }
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  eventsApi.getVenueDelays.mockResolvedValue({ delays: DELAYS })
+})
+
+describe('RunningLatePanel (#1249)', () => {
+  it("lists each venue's current state, read fresh for this event", async () => {
+    renderPanel()
+    expect(await screen.findByText('running about 15 min late')).toBeInTheDocument()
+    expect(screen.getByText('on time')).toBeInTheDocument()
+    expect(eventsApi.getVenueDelays).toHaveBeenCalledWith(7)
+  })
+
+  it('+15 shifts that venue, shows the new total, and refreshes the lineup', async () => {
+    eventsApi.shiftVenue.mockResolvedValue({ delayMinutes: 15, shifted: [{ id: 1 }, { id: 2 }] })
+    const { showToast, onShifted } = renderPanel()
+    fireEvent.click(await screen.findByRole('button', { name: 'Blue Room: running 15 minutes late' }))
+    await waitFor(() => expect(eventsApi.shiftVenue).toHaveBeenCalledWith(7, 1, 15))
+    expect(await screen.findAllByText('running about 15 min late')).toHaveLength(2)
+    expect(onShifted).toHaveBeenCalledTimes(1)
+    expect(showToast).toHaveBeenCalledWith('Blue Room: 2 sets moved later by 15 min.', 'success')
+  })
+
+  it('a custom negative amount pulls the sets back earlier', async () => {
+    eventsApi.shiftVenue.mockResolvedValue({ delayMinutes: 5, shifted: [{ id: 3 }] })
+    const { showToast } = renderPanel()
+    fireEvent.change(await screen.findByLabelText('Roost: custom minutes (negative moves sets earlier)'), {
+      target: { value: '-10' },
+    })
+    fireEvent.click(screen.getAllByRole('button', { name: 'Shift' })[1])
+    await waitFor(() => expect(eventsApi.shiftVenue).toHaveBeenCalledWith(7, 2, -10))
+    expect(showToast).toHaveBeenCalledWith('Roost: 1 set moved earlier by 10 min.', 'success')
+    expect(await screen.findByText('running about 5 min late')).toBeInTheDocument()
+  })
+
+  it('names the sets when a shift is refused for crossing 6 AM, and changes nothing shown', async () => {
+    eventsApi.shiftVenue.mockRejectedValue(
+      apiError('This shift would move a set across 6 AM, into a different festival day.', {
+        code: 'SHIFT_CROSSES_FESTIVAL_DAY',
+        sets: [{ id: 9, name: 'Dawn Chorus', startTime: '05:50' }],
+      })
+    )
+    const { showToast, onShifted } = renderPanel()
+    fireEvent.click(await screen.findByRole('button', { name: 'Blue Room: running 30 minutes late' }))
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith(expect.stringMatching(/Dawn Chorus/), 'error'))
+    expect(onShifted).not.toHaveBeenCalled()
+    expect(screen.getByText('on time')).toBeInTheDocument()
+  })
+
+  it('names the clashing pair when a shift would overlap another set', async () => {
+    eventsApi.shiftVenue.mockRejectedValue(
+      apiError('The shift overlaps another set at this venue.', {
+        conflicts: [{ a: { name: 'Next Up' }, b: { name: 'Still Playing' } }],
+      })
+    )
+    const { showToast } = renderPanel()
+    fireEvent.click(await screen.findByRole('button', { name: 'Blue Room: running 10 minutes late' }))
+    await waitFor(() =>
+      expect(showToast).toHaveBeenCalledWith(
+        'Not moved: Next Up would overlap Still Playing. Nothing was changed.',
+        'error'
+      )
+    )
+  })
+
+  it('"Back on time" clears the banner and says the times were left alone', async () => {
+    eventsApi.clearVenueDelay.mockResolvedValue({ success: true, venueId: 2, delayMinutes: 0 })
+    const { showToast, onShifted } = renderPanel()
+    fireEvent.click(await screen.findByRole('button', { name: 'Back on time' }))
+    await waitFor(() => expect(eventsApi.clearVenueDelay).toHaveBeenCalledWith(7, 2))
+    await waitFor(() => expect(screen.getAllByText('on time')).toHaveLength(2))
+    expect(showToast).toHaveBeenCalledWith('Roost is back on time. Set times were left as they are.', 'success')
+    expect(onShifted).not.toHaveBeenCalled()
+  })
+
+  it('a viewer sees the state but no controls', async () => {
+    renderPanel({ readOnly: true })
+    expect(await screen.findByText('running about 15 min late')).toBeInTheDocument()
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('renders nothing for an event with no venues', async () => {
+    eventsApi.getVenueDelays.mockResolvedValue({ delays: [] })
+    renderPanel()
+    await waitFor(() => expect(eventsApi.getVenueDelays).toHaveBeenCalled())
+    expect(screen.queryByRole('heading', { name: 'Running late?' })).not.toBeInTheDocument()
+  })
+})

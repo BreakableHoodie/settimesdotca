@@ -614,6 +614,36 @@ export const eventsApi = {
     return handleResponse(response)
   },
 
+  // Venue running late (#1249). The list is read fresh (the public schedule
+  // is cached for 60 s); a shift moves the venue's remaining sets in one
+  // atomic batch, and clearing only removes the fan banner.
+  async getVenueDelays(eventId) {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/events/${eventId}/venue-delays`, {
+      headers: getHeaders(),
+      credentials: 'include',
+    })
+    return handleResponse(response)
+  },
+
+  async shiftVenue(eventId, venueId, minutes) {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/events/${eventId}/venues/${venueId}/delay`, {
+      method: 'POST',
+      headers: getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ minutes }),
+    })
+    return handleResponse(response)
+  },
+
+  async clearVenueDelay(eventId, venueId) {
+    const response = await fetchWithCSRFRetry(`${API_BASE}/events/${eventId}/venues/${venueId}/delay`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+      credentials: 'include',
+    })
+    return handleResponse(response)
+  },
+
   async updateSchedule(eventId, changes) {
     const response = await fetchWithCSRFRetry(`${API_BASE}/events/${eventId}/schedule`, {
       method: 'PUT',

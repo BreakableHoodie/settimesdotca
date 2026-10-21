@@ -35,6 +35,7 @@ import {
   updateSelectedIds,
 } from './utils/lineupRoster'
 import { formatFestivalDate } from '../utils/festivalDays'
+import RunningLatePanel from './components/RunningLatePanel'
 import { buildPerformancePayload, parseDuration } from './utils/lineupForm'
 
 function SortIcon({ col, sortConfig }) {
@@ -753,6 +754,15 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
 
       {viewMode === 'list' && (
         <>
+          {/* Venue running late (#1249): the show-night tool for a late room. */}
+          {selectedEvent?.status !== 'archived' && (
+            <RunningLatePanel
+              eventId={selectedEventId}
+              readOnly={readOnly}
+              showToast={showToast}
+              onShifted={loadData}
+            />
+          )}
           {/* Announcement planning (#556): engaged sets not yet announced.
               The panel renders nothing when there's no follower signal. */}
           <AnnouncementPlanningPanel

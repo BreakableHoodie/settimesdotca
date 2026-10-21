@@ -9,6 +9,7 @@ import EventPosterThumbnail from './EventPosterThumbnail'
 import EventSocialLinks from './EventSocialLinks'
 import GhostEasterEgg from './GhostEasterEgg'
 import TimeFilter from './TimeFilter'
+import VenueDelayBanner from './VenueDelayBanner'
 import { parseVenueInfo } from '../utils/venueInfo.js'
 
 function formatCurrentTime(value) {
@@ -135,6 +136,17 @@ function LiveContextBar({
     () => getLifecycleLabel(eventData?.date, currentTime, activeBands, eventData?.doors_json),
     [activeBands, currentTime, eventData?.date, eventData?.doors_json]
   )
+
+  // Running late is a show-day fact (#1249): from the event's local midnight
+  // until it is over. Gating on "Live Tonight" alone hid the commonest case, a
+  // venue running late to START, while the label still reads "Upcoming"
+  // (found in a real-browser check). Ending at Recap/Archive means a banner
+  // left on after the show never lingers. LOCAL-time construction, as above.
+  const showVenueDelays =
+    Boolean(eventData?.date) &&
+    lifecycle.label !== 'Recap' &&
+    lifecycle.label !== 'Archive' &&
+    new Date(currentTime).getTime() >= new Date(eventData.date + 'T00:00:00').getTime()
 
   // Doors time for the event's FIRST date only (#569) — this header isn't
   // per-day, so it always reflects day 1's gates-open time. Later festival
@@ -471,6 +483,10 @@ function LiveContextBar({
             />
           </button>
         </div>
+
+        {/* Running late (#1249): outside the collapsing identity block, so a
+            fan scrolling the lineup still sees it. */}
+        {showVenueDelays && <VenueDelayBanner delays={eventData?.venue_delays} />}
 
         {/* Tabs (Live Lineup / My Route) and the mobile filters toggle are
             deliberately OUTSIDE the `isFiltersOpen` gate below (#665) — they

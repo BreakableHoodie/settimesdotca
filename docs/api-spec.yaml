@@ -2266,7 +2266,39 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Error"
+                type: object
+                properties:
+                  error:
+                    type: string
+                  code:
+                    type: string
+                    enum: [SHIFT_CROSSES_FESTIVAL_DAY, DELAY_CHANGED]
+                    description: Absent on a clash (which carries `conflicts` instead)
+                  message:
+                    type: string
+                  sets:
+                    type: array
+                    description: With SHIFT_CROSSES_FESTIVAL_DAY, the sets that would cross 06:00
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+                          nullable: true
+                        startTime:
+                          type: string
+                  conflicts:
+                    type: array
+                    description: On a clash, each overlapping pair once
+                    items:
+                      type: object
+                      properties:
+                        a:
+                          $ref: "#/components/schemas/GenericRecord"
+                        b:
+                          $ref: "#/components/schemas/GenericRecord"
         "500":
           $ref: "#/components/responses/ServerError"
     delete:
@@ -2289,7 +2321,19 @@ paths:
             type: integer
       responses:
         "200":
-          description: The banner is cleared
+          description: The banner is cleared (also when there was no delay to clear)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  venueId:
+                    type: integer
+                  delayMinutes:
+                    type: integer
+                    enum: [0]
         "400":
           $ref: "#/components/responses/BadRequest"
         "403":

@@ -54,17 +54,21 @@ export default function PosterPalette({ posterUrl, value, onChange, onBusyChange
 
   const suggest = async url => {
     const id = ++request.current
+    // A choice made while this read runs (adjusting a swatch, removing the
+    // colours) changes the value; the choice wins (CodeRabbit, #1361).
+    const startedFrom = valueRef.current
     setStatus('extracting')
     setError('')
     try {
       const blob = await eventsApi.getPosterBlob(url)
       const palette = await extractPaletteFromImage(blob, url)
       if (id !== request.current) return // a newer poster replaced this one
+      if (valueRef.current !== startedFrom) return // the admin chose meanwhile
       if (!palette) throw new Error('The poster has no usable colours.')
       onChange(palette)
       setStatus('idle')
     } catch (err) {
-      if (id !== request.current) return
+      if (id !== request.current || valueRef.current !== startedFrom) return
       console.error('[PosterPalette] could not read colours from the poster', { url, err })
       const kept = valueRef.current
         ? ' The colours below are still the previous ones: suggest again, adjust them, or remove them.'
@@ -97,6 +101,17 @@ export default function PosterPalette({ posterUrl, value, onChange, onBusyChange
     []
   )
 
+  // A choice the admin makes ends any read in flight from the user's point of
+  // view; `suggest` sees the changed value and discards its late result.
+  const choose = next => {
+    setStatus('idle')
+    setError('')
+    onChange(next)
+  }
+
+  const setRole = (variant, role, colour) =>
+    choose({ ...value, source: 'manual', [variant]: { ...value[variant], [role]: colour } })
+
   if (!posterUrl && !value) return null
 
   const readable = value ? readableThemeColours(value) : null
@@ -105,9 +120,6 @@ export default function PosterPalette({ posterUrl, value, onChange, onBusyChange
     VARIANTS.some(([variant]) =>
       Object.keys(ROLE_LABELS).some(role => readable[variant][role] !== value[variant][role].toLowerCase())
     )
-
-  const setRole = (variant, role, colour) =>
-    onChange({ ...value, source: 'manual', [variant]: { ...value[variant], [role]: colour } })
 
   return (
     <fieldset className="mt-3 rounded border border-white/10 p-3">
@@ -179,7 +191,7 @@ export default function PosterPalette({ posterUrl, value, onChange, onBusyChange
             type="button"
             // With a poster, the house theme is stored as a CHOICE for it, or the
             // next render would read the poster and put colours straight back.
-            onClick={() => onChange(posterUrl ? { v: 1, source: 'none', poster: posterUrl } : null)}
+            onClick={() => choose(posterUrl ? { v: 1, source: 'none', poster: posterUrl } : null)}
             className="min-h-[44px] rounded px-3 text-sm text-white/80 underline hover:text-white"
           >
             Remove colours

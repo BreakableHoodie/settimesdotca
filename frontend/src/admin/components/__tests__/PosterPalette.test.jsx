@@ -239,6 +239,35 @@ describe('PosterPalette (#1248)', () => {
     expect(screen.queryByRole('button', { name: 'Remove colours' })).not.toBeInTheDocument()
   })
 
+  // CodeRabbit #1361: a choice made while a read is in flight wins; the late
+  // read must not overwrite it. Removing, and adjusting a swatch, alike.
+  describe('a choice made while a poster is being read', () => {
+    let release
+    beforeEach(() => {
+      eventsApi.getPosterBlob.mockImplementation(
+        () => new Promise(resolve => (release = () => resolve(new globalThis.Blob([NEW]))))
+      )
+    })
+
+    it.each([
+      ['removing the colours', () => fireEvent.click(screen.getByRole('button', { name: 'Remove colours' }))],
+      [
+        'adjusting a swatch',
+        () => fireEvent.change(screen.getByLabelText('Light: Accent'), { target: { value: '#aa0000' } }),
+      ],
+    ])('%s is not overwritten by the late read', async (_label, act_) => {
+      const onValue = vi.fn()
+      render(<Form initialValue={paletteFor('#555555')} onValue={onValue} />)
+      fireEvent.click(screen.getByRole('button', { name: 'new poster' }))
+      await waitFor(() => expect(eventsApi.getPosterBlob).toHaveBeenCalledWith(NEW))
+      act_()
+      const chosen = onValue.mock.calls.at(-1)[0]
+      await act(async () => release())
+      expect(onValue.mock.calls.at(-1)[0]).toEqual(chosen)
+      expect(screen.queryByText(/Reading colours/)).not.toBeInTheDocument()
+    })
+  })
+
   it('without a poster, removing hands back null', () => {
     const onValue = vi.fn()
     render(<PosterPalette posterUrl="" value={paletteFor('#924d7a')} onChange={onValue} />)

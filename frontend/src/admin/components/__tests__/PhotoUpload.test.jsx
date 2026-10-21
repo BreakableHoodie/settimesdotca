@@ -81,6 +81,21 @@ describe('PhotoUpload', () => {
     expect(screen.getByRole('img')).toHaveAttribute('src', 'https://band-photos.settimes.ca/event-posters/a.jpg')
   })
 
+  it("a failure in the parent's refresh is not reported as a failed upload", async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const onPersisted = vi.fn(() => {
+      throw new Error('refresh broke')
+    })
+    render(<PhotoUpload currentPhoto={null} onPhotoChange={vi.fn()} onPersisted={onPersisted} bandId={42} />)
+    selectFile(jpegFile())
+    await waitFor(() => expect(onPersisted).toHaveBeenCalled())
+    await waitFor(() => expect(screen.queryByText(/Uploading/i)).not.toBeInTheDocument())
+    // Not reported as failed, and the preview was not reset to "no photo".
+    expect(screen.queryByText(/refresh broke|Failed to upload/)).not.toBeInTheDocument()
+    expect(screen.getByRole('img')).toBeInTheDocument()
+    expect(error).toHaveBeenCalledWith('Photo onPersisted callback failed:', expect.any(Error))
+  })
+
   it('a failed upload reports no persistence', async () => {
     fetchMock.mockResolvedValue({ ok: false, json: async () => ({ error: 'Too big' }) })
     const onPersisted = vi.fn()

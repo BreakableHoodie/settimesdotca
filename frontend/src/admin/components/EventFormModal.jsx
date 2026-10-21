@@ -838,6 +838,7 @@ export default function EventFormModal({
                   setFormData(prev => ({ ...prev, theme_colors: theme }))
                 }}
                 onBusyChange={setPosterBusy}
+                autoSuggest={!themeUnreadable || themeChanged}
               />
               {themeUnreadable && !themeChanged && (
                 <p className="mt-2 text-xs text-white/60">

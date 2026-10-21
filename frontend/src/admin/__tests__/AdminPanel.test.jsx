@@ -14,14 +14,17 @@ vi.mock('../../utils/adminApi', () => ({
   }),
 }))
 
+// The latest onEventsChange, for driving a refresh while the spinner hides the tab.
+const onEventsChangeRef = { current: null }
 vi.mock('../EventsTab', () => ({
-  default: ({ events, loadError, onEventsChange }) => (
-    <div>
-      Events tab ({events.length}){loadError && <span>Events load error</span>}
-      <button onClick={onEventsChange}>Retry events</button>
-      <button onClick={() => onEventsChange({ background: true })}>Refresh events in background</button>
-    </div>
-  ),
+  default: ({ events, loadError, onEventsChange }) =>
+    (onEventsChangeRef.current = onEventsChange) && (
+      <div>
+        Events tab ({events.length}){loadError && <span>Events load error</span>}
+        <button onClick={onEventsChange}>Retry events</button>
+        <button onClick={() => onEventsChange({ background: true })}>Refresh events in background</button>
+      </div>
+    ),
 }))
 vi.mock('../VenuesTab', () => ({ default: () => <div>Venues tab</div> }))
 vi.mock('../RosterTab', () => ({ default: () => <div>Roster tab</div> }))
@@ -102,6 +105,36 @@ describe('AdminPanel', () => {
     expect(screen.getByText('Events tab (4)')).toBeInTheDocument()
     await act(async () => release({ events: events.slice(0, 2) }))
     expect(await screen.findByText('Events tab (2)')).toBeInTheDocument()
+  })
+
+  it('an older background refresh resolving late cannot put an older list back', async () => {
+    renderPanel()
+    await screen.findByText('Events tab (4)')
+    let releaseOld
+    eventsApi.getAll
+      .mockReturnValueOnce(new Promise(resolve => (releaseOld = resolve)))
+      .mockResolvedValueOnce({ events: events.slice(0, 3) })
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh events in background' })) // older, slow
+    fireEvent.click(screen.getByRole('button', { name: 'Retry events' })) // newer
+    expect(await screen.findByText('Events tab (3)')).toBeInTheDocument()
+    await act(async () => releaseOld({ events: events.slice(0, 1) }))
+    expect(screen.getByText('Events tab (3)')).toBeInTheDocument()
+  })
+
+  it('a foreground reload overtaken by a background one still clears the spinner', async () => {
+    renderPanel()
+    await screen.findByText('Events tab (4)')
+    let releaseForeground
+    eventsApi.getAll
+      .mockReturnValueOnce(new Promise(resolve => (releaseForeground = resolve)))
+      .mockResolvedValueOnce({ events: events.slice(0, 2) })
+    fireEvent.click(screen.getByRole('button', { name: 'Retry events' }))
+    expect(await screen.findByText('Loading admin panel...')).toBeInTheDocument()
+    // The spinner hides the tab, so start the background refresh directly.
+    await act(async () => onEventsChangeRef.current({ background: true }))
+    await act(async () => releaseForeground({ events: events.slice(0, 1) }))
+    expect(await screen.findByText('Events tab (2)')).toBeInTheDocument()
+    expect(screen.queryByText('Loading admin panel...')).not.toBeInTheDocument()
   })
 
   it('a full reload still shows the panel spinner', async () => {

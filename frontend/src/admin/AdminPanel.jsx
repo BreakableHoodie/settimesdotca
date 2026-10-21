@@ -133,11 +133,20 @@ export default function AdminPanel({ currentUser, onLogout }) {
   // unmounts every tab and any open modal with it. A refresh made while a form
   // is still open (a partial save, an upload already saved to the event) must
   // use it, or the form and its message vanish mid-edit.
+  const loadReqRef = useRef(0)
+  const foregroundReqRef = useRef(0)
   const loadEvents = useCallback(
     async ({ background = false } = {}) => {
+      // Latest wins: a background refresh started before a foreground one
+      // must not resolve after it and put the older list back. The spinner is
+      // still cleared by the newest FOREGROUND call even when its data was
+      // superseded, or it would spin forever.
+      const reqId = ++loadReqRef.current
+      const foregroundId = background ? null : ++foregroundReqRef.current
       try {
         if (!background) setLoading(true)
         const result = await eventsApi.getAll()
+        if (reqId !== loadReqRef.current) return
         const nextEvents = result.events || []
         setEvents(nextEvents)
         setEventsLoadError(false)
@@ -149,10 +158,11 @@ export default function AdminPanel({ currentUser, onLogout }) {
           onLogout()
           return
         }
+        if (reqId !== loadReqRef.current) return
         setEventsLoadError(true)
         showToast('Failed to load events: ' + err.message, 'error')
       } finally {
-        if (!background) setLoading(false)
+        if (!background && foregroundId === foregroundReqRef.current) setLoading(false)
       }
     },
     [onLogout, showToast]

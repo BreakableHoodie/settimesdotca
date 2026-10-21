@@ -28,8 +28,9 @@ vi.mock('../PhotoUpload', () => ({
 }))
 // The palette component has its own suite; here only what it reports matters.
 vi.mock('../PosterPalette', () => ({
-  default: ({ onChange, onBusyChange }) => (
+  default: ({ onChange, onBusyChange, autoSuggest }) => (
     <>
+      <span data-testid="auto-suggest">{String(autoSuggest)}</span>
       <button
         type="button"
         onClick={() =>
@@ -179,6 +180,21 @@ describe('EventFormModal poster colours', () => {
     ['a stored value this version cannot read', '{"v":2,"future":true}'],
   ])('an unrelated save does not send theme_colors with %s', async (_label, stored) => {
     expect(await save({ ...baseEvent, status: 'draft', theme_colors: stored })).not.toHaveProperty('theme_colors')
+  })
+
+  it('does not let the palette read the poster over a stored value it cannot read', () => {
+    renderModal({
+      ...baseEvent,
+      status: 'draft',
+      theme_colors: '{"v":2}',
+      poster_url: 'https://band-photos.settimes.ca/event-posters/a.jpg',
+    })
+    expect(screen.getByTestId('auto-suggest')).toHaveTextContent('false')
+  })
+
+  it('lets it read when the stored value is readable or absent', () => {
+    renderModal({ ...baseEvent, status: 'draft', theme_colors: null })
+    expect(screen.getByTestId('auto-suggest')).toHaveTextContent('true')
   })
 
   it('says a stored value it cannot read is kept', () => {

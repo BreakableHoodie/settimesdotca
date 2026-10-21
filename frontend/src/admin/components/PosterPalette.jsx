@@ -36,7 +36,7 @@ function Preview({ colours, label }) {
   )
 }
 
-export default function PosterPalette({ posterUrl, value, onChange, onBusyChange }) {
+export default function PosterPalette({ posterUrl, value, onChange, onBusyChange, autoSuggest = true }) {
   const [status, setStatus] = useState('idle')
   const [error, setError] = useState('')
   const request = useRef(0)
@@ -75,7 +75,9 @@ export default function PosterPalette({ posterUrl, value, onChange, onBusyChange
   }
 
   useEffect(() => {
-    if (!posterUrl) return // the form mounts empty and fills a render later
+    // `autoSuggest` is off when the stored value is one this version cannot
+    // read: it shows as "no colours", and reading would replace it unasked.
+    if (!posterUrl || !autoSuggest) return // the form mounts empty and fills a render later
     const current = valueRef.current
     if (current?.source === 'manual' || current?.poster === posterUrl) return
     suggest(posterUrl)
@@ -83,7 +85,15 @@ export default function PosterPalette({ posterUrl, value, onChange, onBusyChange
     // poster and source are the only triggers. A failed read changes none of
     // them, so it is not retried in a loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [posterUrl, value?.poster, value?.source])
+  }, [posterUrl, value?.poster, value?.source, autoSuggest])
+
+  // A read still in flight when the form closes must not land afterwards.
+  useEffect(
+    () => () => {
+      request.current += 1
+    },
+    []
+  )
 
   if (!posterUrl && !value) return null
 

@@ -219,7 +219,15 @@ export default function PhotoUpload({
       if (onPhotoChange) {
         onPhotoChange(data.url)
       }
-      if (idValue) onPersisted?.(data.url)
+      if (idValue) {
+        // The upload is saved: a failure in the parent's refresh must not be
+        // reported as a failed upload (the catch below would say so).
+        try {
+          onPersisted?.(data.url)
+        } catch (callbackError) {
+          console.error('Photo onPersisted callback failed:', callbackError)
+        }
+      }
 
       setPreview(data.url)
     } catch (err) {

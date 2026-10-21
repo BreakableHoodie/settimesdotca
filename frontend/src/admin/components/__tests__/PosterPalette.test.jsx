@@ -104,6 +104,26 @@ describe('PosterPalette (#1248)', () => {
     expect(screen.getByTestId('palette-preview-dark')).toBeInTheDocument()
   })
 
+  it('reads nothing on its own when told not to (a stored value this version cannot read)', async () => {
+    render(<PosterPalette posterUrl={OLD} value={null} onChange={vi.fn()} autoSuggest={false} />)
+    await act(async () => {})
+    expect(eventsApi.getPosterBlob).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Suggest colours from the poster' })).toBeInTheDocument()
+  })
+
+  it('a read still in flight when the form closes never lands', async () => {
+    let release
+    eventsApi.getPosterBlob.mockImplementation(
+      () => new Promise(resolve => (release = () => resolve(new globalThis.Blob([NEW]))))
+    )
+    const onChange = vi.fn()
+    const { unmount } = render(<PosterPalette posterUrl={NEW} value={null} onChange={onChange} />)
+    await waitFor(() => expect(eventsApi.getPosterBlob).toHaveBeenCalled())
+    unmount()
+    await act(async () => release())
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
   it('never silently replaces colours picked by hand', async () => {
     const onValue = vi.fn()
     render(<Form initialValue={paletteFor('#123456', 'manual')} onValue={onValue} />)

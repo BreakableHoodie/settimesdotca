@@ -4013,6 +4013,26 @@ components:
             Free-text presenting organization, shown as a chip on the event's
             schedule page and used as the JSON-LD organizer when set, replacing
             the default SetTimes organizer (#1063).
+        venue_delays:
+          type: array
+          description: >-
+            Venues running late (#1249), for the fan banner. Only delays above
+            0 are listed; always empty for an archived event, or when the delay
+            read fails (the schedule is served regardless).
+          items:
+            type: object
+            properties:
+              venueId:
+                type: integer
+              venue:
+                type: string
+              minutes:
+                type: integer
+                minimum: 1
+                maximum: 600
+              updatedAt:
+                type: string
+                description: SQLite datetime, "YYYY-MM-DD HH:MM:SS" (UTC)
         presented_by_url:
           type: string
           format: uri

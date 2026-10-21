@@ -105,6 +105,12 @@ describe("planVenueShift", () => {
     expect(crossing).toEqual([expect.objectContaining({ id: 1 })]);
   });
 
+  it("a set that already ends after 06:00 does not block the shift (it crosses nothing new)", () => {
+    const { changes, crossing } = plan([set(1, "05:00", "07:00"), set(2, "22:00", "22:45")], 15);
+    expect(crossing).toEqual([]);
+    expect(changes.find((c) => c.id === 1).to).toEqual({ startTime: "05:15", endTime: "07:15" });
+  });
+
   it("allows an end exactly at 06:00", () => {
     expect(plan([set(1, "05:00", "05:45")], 15).changes[0].to).toEqual({ startTime: "05:15", endTime: "06:00" });
   });

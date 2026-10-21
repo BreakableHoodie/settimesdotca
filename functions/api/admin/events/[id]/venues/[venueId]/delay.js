@@ -58,11 +58,31 @@ async function loadTarget(context) {
 // its revision is still the one read (an absent row reads as -1, so a row a
 // concurrent request just created is not claimed). The event must still be
 // editable, or nothing is claimed at all.
-function claimStatement(env, { eventId, venueId, delay, totalMinutes, nonce, userId }) {
+//
+// With a `snapshot` (a shift), the claim also requires every set at this
+// venue to be EXACTLY as read, and no set added: a per-row edit, a move to or
+// from the venue, or a cancel landing between the read and this batch would
+// otherwise be overwritten past a conflict check that ran on stale rows
+// (Vera and Marlowe, #1249 review). One JSON bind joined with json_each: exact,
+// order-independent, and clear of D1's 100-parameter limit.
+function claimStatement(env, { eventId, venueId, delay, totalMinutes, nonce, userId, snapshot = null }) {
+  const snapshotSql = snapshot
+    ? `AND (SELECT COUNT(*) FROM performances WHERE event_id = ? AND venue_id = ?) = ?
+       AND (SELECT COUNT(*) FROM performances p JOIN json_each(?) j
+              ON p.id = json_extract(j.value, '$.id')
+             AND p.start_time IS json_extract(j.value, '$.start')
+             AND p.end_time IS json_extract(j.value, '$.end')
+             AND p.is_cancelled = json_extract(j.value, '$.cancelled')
+            WHERE p.event_id = ? AND p.venue_id = ?) = ?`
+    : "";
+  const snapshotBinds = snapshot
+    ? [eventId, venueId, snapshot.length, JSON.stringify(snapshot), eventId, venueId, snapshot.length]
+    : [];
   return env.DB.prepare(
     `INSERT INTO event_venue_delays (event_id, venue_id, delay_minutes, revision, last_shift_id, updated_by)
      SELECT ?, ?, ?, 1, ?, ?
      WHERE EXISTS (SELECT 1 FROM events WHERE id = ? AND status IN ('draft', 'published'))
+       ${snapshotSql}
      ON CONFLICT (event_id, venue_id) DO UPDATE SET
        delay_minutes = excluded.delay_minutes,
        revision = event_venue_delays.revision + 1,
@@ -70,7 +90,19 @@ function claimStatement(env, { eventId, venueId, delay, totalMinutes, nonce, use
        updated_at = datetime('now'),
        updated_by = excluded.updated_by
      WHERE event_venue_delays.revision = ?`,
-  ).bind(eventId, venueId, totalMinutes, nonce, userId, eventId, delay ? delay.revision : -1);
+  ).bind(eventId, venueId, totalMinutes, nonce, userId, eventId, ...snapshotBinds, delay ? delay.revision : -1);
+}
+
+// Did THIS request's claim land? Only an explicit 0 from the claim means no
+// (CLAUDE.md: an absent meta must not decide either way); without a count,
+// read the row back and look for this request's nonce.
+async function claimLanded(env, result, { eventId, venueId, nonce }) {
+  const changes = result?.meta?.changes;
+  if (typeof changes === "number") return changes > 0;
+  const row = await env.DB.prepare("SELECT last_shift_id FROM event_venue_delays WHERE event_id = ? AND venue_id = ?")
+    .bind(eventId, venueId)
+    .first();
+  return row?.last_shift_id === nonce;
 }
 
 const changedConcurrently = () =>
@@ -173,13 +205,21 @@ export async function onRequestPost(context) {
 
     const nonce = crypto.randomUUID();
     const userId = permCheck.user.userId;
-    const statements = [claimStatement(env, { eventId, venueId, delay, totalMinutes, nonce, userId })];
+    const snapshot = performances
+      .filter((row) => row.venue_id === venueId)
+      .map((row) => ({
+        id: row.id,
+        start: row.start_time ?? null,
+        end: row.end_time ?? null,
+        cancelled: row.is_cancelled ? 1 : 0,
+      }));
+    const statements = [claimStatement(env, { eventId, venueId, delay, totalMinutes, nonce, userId, snapshot })];
     for (const change of changes) {
       statements.push(
         env.DB.prepare(
           `UPDATE performances SET start_time = ?, end_time = ?
-           WHERE id = ? AND event_id = ? AND ${CLAIMED_SQL}`,
-        ).bind(change.to.startTime, change.to.endTime, change.id, eventId, eventId, venueId, nonce),
+           WHERE id = ? AND event_id = ? AND venue_id = ? AND ${CLAIMED_SQL}`,
+        ).bind(change.to.startTime, change.to.endTime, change.id, eventId, venueId, eventId, venueId, nonce),
       );
     }
     statements.push(
@@ -202,10 +242,10 @@ export async function onRequestPost(context) {
     );
 
     const results = await env.DB.batch(statements);
-    // Only an EXPLICIT 0 means the claim lost (a concurrent shift, or the event
-    // was archived); an absent meta must not turn a committed shift into a
-    // false "not applied" (CLAUDE.md, #1161).
-    if (results[0]?.meta?.changes === 0) return changedConcurrently();
+    // The claim lost: a concurrent shift, a set edited or moved meanwhile, or
+    // the event archived. Every other statement was gated on it, so nothing
+    // was written.
+    if (!(await claimLanded(env, results[0], { eventId, venueId, nonce }))) return changedConcurrently();
 
     return response(
       {
@@ -217,7 +257,13 @@ export async function onRequestPost(context) {
       200,
     );
   } catch (error) {
-    console.error("Error shifting venue schedule:", error);
+    console.error("Error shifting venue schedule:", {
+      eventId: context.params?.id,
+      venueId: context.params?.venueId,
+      minutes,
+      userId: permCheck.user?.userId,
+      error: error?.message || error,
+    });
     return response({ error: "Database error", message: "Failed to shift the venue's sets" }, 500);
   }
 }
@@ -252,10 +298,15 @@ export async function onRequestDelete(context) {
         getClientIP(request),
       ),
     ]);
-    if (results[0]?.meta?.changes === 0) return changedConcurrently();
+    if (!(await claimLanded(env, results[0], { eventId, venueId, nonce }))) return changedConcurrently();
     return response({ success: true, venueId, delayMinutes: 0 }, 200);
   } catch (error) {
-    console.error("Error clearing venue delay:", error);
+    console.error("Error clearing venue delay:", {
+      eventId: context.params?.id,
+      venueId: context.params?.venueId,
+      userId: permCheck.user?.userId,
+      error: error?.message || error,
+    });
     return response({ error: "Database error", message: "Failed to clear the venue's delay" }, 500);
   }
 }

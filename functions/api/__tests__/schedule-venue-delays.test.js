@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createTestEnv, insertEvent, insertVenue, insertBand } from "../test-utils";
 import * as scheduleHandler from "../schedule.js";
 
@@ -43,5 +43,27 @@ describe("GET /api/schedule - venue_delays (#1249)", () => {
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
     seed(rawDb, "vol19-done", "archived");
     expect((await get(env, "vol19-done")).event.venue_delays).toEqual([]);
+  });
+
+  it("a failed banner read degrades to no banner; the schedule itself still serves", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    seed(rawDb, "vol19-hiccup");
+    const prepare = env.DB.prepare.bind(env.DB);
+    env.DB.prepare = (sql) => {
+      if (sql.includes("event_venue_delays")) throw new Error("D1 hiccup");
+      return prepare(sql);
+    };
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    const res = await scheduleHandler.onRequestGet({
+      request: new Request("https://example.test/api/schedule?event=vol19-hiccup"),
+      env,
+    });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.bands.length).toBeGreaterThan(0);
+    expect(data.event.venue_delays).toEqual([]);
+    expect(errors).toHaveBeenCalledWith(expect.stringMatching(/venue delays unavailable/), expect.anything());
+    errors.mockRestore();
   });
 });

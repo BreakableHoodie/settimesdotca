@@ -58,15 +58,21 @@ export function planVenueShift(performances, { venueId, minutes, eventDate, now 
 
     const start = festivalMinutes(performance.start_time);
     const newStart = start + minutes;
+    let end = null;
     let newEnd = null;
     if (performance.end_time) {
-      let end = festivalMinutes(performance.end_time);
+      end = festivalMinutes(performance.end_time);
       if (end <= start) end += DAY_MINUTES;
       newEnd = end + minutes;
     }
-    const startInDay = newStart >= THRESHOLD_MINUTES && newStart < FESTIVAL_DAY_END;
-    const endInDay = newEnd === null || (newEnd > THRESHOLD_MINUTES && newEnd <= FESTIVAL_DAY_END);
-    if (!startInDay || !endInDay) {
+    // Refuse only a shift that MOVES a start or end across 06:00. A set that
+    // already ends after 06:00 (05:00-07:00) is on the far side before and
+    // after, and must not block every shift at its venue (Vera, #1249 review).
+    const startInDay = (fm) => fm >= THRESHOLD_MINUTES && fm < FESTIVAL_DAY_END;
+    const endInDay = (fm) => fm > THRESHOLD_MINUTES && fm <= FESTIVAL_DAY_END;
+    const startCrosses = startInDay(start) !== startInDay(newStart);
+    const endCrosses = end !== null && endInDay(end) !== endInDay(newEnd);
+    if (startCrosses || endCrosses) {
       crossing.push({ id: performance.id, name: performance.name ?? null, startTime: performance.start_time });
       continue;
     }

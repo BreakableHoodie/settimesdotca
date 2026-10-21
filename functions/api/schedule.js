@@ -166,18 +166,28 @@ export async function onRequestGet(context) {
 
     // "Running late" banners (#1249): each venue's cumulative delay, only while
     // it is above zero. An archived event has nothing running late.
-    const delayResult =
-      event.status === "archived"
-        ? { results: [] }
-        : await DB.prepare(
-            `SELECT d.venue_id, v.name AS venue, d.delay_minutes, d.updated_at
-             FROM event_venue_delays d JOIN venues v ON v.id = d.venue_id
-             WHERE d.event_id = ? AND d.delay_minutes > 0
-             ORDER BY v.name`,
-          )
-            .bind(event.id)
-            .all();
-    const venueDelays = (delayResult.results || []).map((row) => ({
+    // A failed banner read must never take down the schedule fans rely on
+    // mid-show: degrade to no banner, loudly (Marlowe, #1249 review).
+    let delayRows = [];
+    if (event.status !== "archived") {
+      try {
+        const delayResult = await DB.prepare(
+          `SELECT d.venue_id, v.name AS venue, d.delay_minutes, d.updated_at
+           FROM event_venue_delays d JOIN venues v ON v.id = d.venue_id
+           WHERE d.event_id = ? AND d.delay_minutes > 0
+           ORDER BY v.name`,
+        )
+          .bind(event.id)
+          .all();
+        delayRows = delayResult.results || [];
+      } catch (error) {
+        console.error("[schedule] venue delays unavailable; serving without banners:", {
+          eventId: event.id,
+          error: error?.message || error,
+        });
+      }
+    }
+    const venueDelays = delayRows.map((row) => ({
       venueId: row.venue_id,
       venue: row.venue,
       minutes: row.delay_minutes,

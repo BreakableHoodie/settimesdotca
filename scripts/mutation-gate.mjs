@@ -579,7 +579,7 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'Venue running late' \u2014 a shift across 06:00 into another festival day is refused, not applied (#1249)",
     file: "functions/utils/venueDelay.js",
-    find: "    if (!startInDay || !endInDay) {",
+    find: "    if (startCrosses || endCrosses) {",
     replace: "    if (false) {",
     tests: ["functions/api/admin/events/__tests__/venue-delay.test.js"],
   },
@@ -588,8 +588,17 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'Venue running late' \u2014 set UPDATEs apply only under this request's claim, so simultaneous shifts never stack (#1249)",
     file: "functions/api/admin/events/[id]/venues/[venueId]/delay.js",
-    find: "           WHERE id = ? AND event_id = ? AND ${CLAIMED_SQL}`,",
-    replace: "           WHERE id = ? AND event_id = ? AND (? OR ? OR ? OR 1)`,",
+    find: "           WHERE id = ? AND event_id = ? AND venue_id = ? AND ${CLAIMED_SQL}`,",
+    replace: "           WHERE id = ? AND event_id = ? AND venue_id = ? AND (? OR ? OR ? OR 1)`,",
+    tests: ["functions/api/admin/events/__tests__/venue-delay.test.js"],
+  },
+  {
+    id: "venue-delay-claim-requires-unchanged-sets",
+    invariant:
+      "CLAUDE.md 'Venue running late' \u2014 the claim requires the venue's sets exactly as read, so a concurrent edit is never overwritten (#1249)",
+    file: "functions/api/admin/events/[id]/venues/[venueId]/delay.js",
+    find: "claimStatement(env, { eventId, venueId, delay, totalMinutes, nonce, userId, snapshot })",
+    replace: "claimStatement(env, { eventId, venueId, delay, totalMinutes, nonce, userId, snapshot: null })",
     tests: ["functions/api/admin/events/__tests__/venue-delay.test.js"],
   },
   {

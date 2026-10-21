@@ -181,6 +181,82 @@ describe("POST .../venues/:venueId/delay", () => {
     expect(audits(rawDb)).toHaveLength(1);
   });
 
+  // A per-row edit, a move between venues, or a cancel landing between this
+  // request's read and its batch: the claim's snapshot no longer matches, so
+  // nothing is written and the other edit survives (#1249 review).
+  const raceThenShift = async (mutate) => {
+    const { env, rawDb, event, venue, other, rows } = setup();
+    const batch = env.DB.batch.bind(env.DB);
+    env.DB.batch = async (statements) => {
+      mutate(rawDb, { event, venue, other, rows });
+      env.DB.batch = batch;
+      return batch(statements);
+    };
+    const res = await call(onRequestPost, env, { eventId: event.id, venueId: venue.id, minutes: 15 });
+    return { res, rawDb, event, venue, other, rows };
+  };
+
+  it("a set edited meanwhile is not overwritten: 409, nothing shifted", async () => {
+    const { res, rawDb, event, venue, rows } = await raceThenShift((db, { rows }) =>
+      db.prepare("UPDATE performances SET start_time = '23:00', end_time = '23:45' WHERE id = ?").run(rows[0].id),
+    );
+    expect(res.status).toBe(409);
+    expect((await res.json()).code).toBe("DELAY_CHANGED");
+    expect(times(rawDb, rows[0].id)).toEqual({ start_time: "23:00", end_time: "23:45" }); // the edit survives
+    expect(times(rawDb, rows[1].id)).toEqual({ start_time: "22:00", end_time: "22:45" });
+    expect(delayRow(rawDb, event.id, venue.id)).toBeUndefined();
+    expect(audits(rawDb)).toEqual([]);
+  });
+
+  it("a set moved to another venue meanwhile is not dragged along or written back: 409", async () => {
+    const { res, rawDb, other, rows } = await raceThenShift((db, { other, rows }) =>
+      db.prepare("UPDATE performances SET venue_id = ? WHERE id = ?").run(other.id, rows[0].id),
+    );
+    expect(res.status).toBe(409);
+    expect(rawDb.prepare("SELECT venue_id, start_time FROM performances WHERE id = ?").get(rows[0].id)).toEqual({
+      venue_id: other.id,
+      start_time: "21:00",
+    });
+  });
+
+  it("a set added to the venue meanwhile, or one cancelled meanwhile, refuses the shift", async () => {
+    const added = await raceThenShift((db, { event, venue }) =>
+      insertBand(db, {
+        name: "Walk-in",
+        event_id: event.id,
+        venue_id: venue.id,
+        start_time: "23:00",
+        end_time: "23:30",
+      }),
+    );
+    expect(added.res.status).toBe(409);
+    const cancelled = await raceThenShift((db, { rows }) =>
+      db.prepare("UPDATE performances SET is_cancelled = 1 WHERE id = ?").run(rows[1].id),
+    );
+    expect(cancelled.res.status).toBe(409);
+    expect(times(cancelled.rawDb, cancelled.rows[0].id)).toEqual({ start_time: "21:00", end_time: "21:45" });
+  });
+
+  it("with no change count from D1, the outcome is read back, not assumed", async () => {
+    // Applied: the nonce is in the row, so this is a success.
+    const ok = setup();
+    const okBatch = ok.env.DB.batch.bind(ok.env.DB);
+    ok.env.DB.batch = async (statements) => (await okBatch(statements)).map(() => ({}));
+    expect(
+      (await call(onRequestPost, ok.env, { eventId: ok.event.id, venueId: ok.venue.id, minutes: 15 })).status,
+    ).toBe(200);
+    // Lost: someone else's nonce is in the row, so this is a 409, not a false success.
+    const lost = setup();
+    await call(onRequestPost, lost.env, { eventId: lost.event.id, venueId: lost.venue.id, minutes: 15 });
+    const lostBatch = lost.env.DB.batch.bind(lost.env.DB);
+    lost.env.DB.batch = async (statements) => {
+      lost.rawDb.prepare("UPDATE event_venue_delays SET revision = revision + 1, last_shift_id = 'other'").run();
+      return (await lostBatch(statements)).map(() => ({}));
+    };
+    const res = await call(onRequestPost, lost.env, { eventId: lost.event.id, venueId: lost.venue.id, minutes: 15 });
+    expect(res.status).toBe(409);
+  });
+
   it("an event archived between the read and the write gets 409 and nothing moves", async () => {
     const { env, rawDb, event, venue, rows } = setup();
     const batch = env.DB.batch.bind(env.DB);

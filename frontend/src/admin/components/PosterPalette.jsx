@@ -5,11 +5,12 @@ import { extractPaletteFromImage, readableThemeColours } from '../../utils/poste
 // Poster-led event colours (#1248). The event page takes its palette from the
 // edition's poster: a light variant, plus a dark one built from the poster's
 // own ink for fans on a dark theme. Zero per-edition maintenance: a palette
-// records the poster it was read from, and the form re-reads automatically
-// whenever the event's poster is not that one: a poster changed here, or one
-// saved earlier whose colours never were (an upload saves the poster at once;
-// the colours save with the form). Colours someone picked by hand ("manual")
-// are never replaced silently; they get a "Suggest again" button instead.
+// records the poster it was read from, and the form reads the poster whenever
+// the event has one and no colours from it: a poster changed here, one saved
+// earlier whose colours never were (an upload saves the poster at once, the
+// colours save with the form), or an edition from before palettes existed.
+// Colours someone picked by hand ("manual") are never replaced silently; they
+// get a "Suggest again" button instead.
 const ROLE_LABELS = { ground: 'Background', ink: 'Text', accent: 'Accent', nowFill: 'On now' }
 const VARIANTS = [
   ['light', 'Light'],
@@ -35,14 +36,9 @@ function Preview({ colours, label }) {
   )
 }
 
-export default function PosterPalette({ originalPosterUrl = '', posterUrl, value, onChange, onBusyChange }) {
+export default function PosterPalette({ posterUrl, value, onChange, onBusyChange }) {
   const [status, setStatus] = useState('idle')
   const [error, setError] = useState('')
-  // The event's saved poster is not "new": opening an old edition and saving
-  // it must not restyle it. Only a poster changed in this form is. The
-  // baseline is the SAVED url, not the first render's: the form mounts empty
-  // and fills from the event a render later.
-  const seenPoster = useRef(originalPosterUrl)
   const request = useRef(0)
   const valueRef = useRef(value)
   useEffect(() => {
@@ -80,18 +76,14 @@ export default function PosterPalette({ originalPosterUrl = '', posterUrl, value
 
   useEffect(() => {
     if (!posterUrl) return // the form mounts empty and fills a render later
-    const changedHere = posterUrl !== seenPoster.current
-    seenPoster.current = posterUrl
     const current = valueRef.current
-    if (current?.source === 'manual') return
-    // Colours from another poster are stale, whoever left them there. With no
-    // colours and the event's own saved poster, nothing is read: opening an
-    // old edition must not restyle it.
-    if (changedHere || (current && current.poster !== posterUrl)) suggest(posterUrl)
-    // `suggest` is recreated each render; the poster and the palette's poster
-    // are the only triggers.
+    if (current?.source === 'manual' || current?.poster === posterUrl) return
+    suggest(posterUrl)
+    // `suggest` is recreated each render; the poster and the palette's own
+    // poster and source are the only triggers. A failed read changes none of
+    // them, so it is not retried in a loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [posterUrl, value?.poster])
+  }, [posterUrl, value?.poster, value?.source])
 
   if (!posterUrl && !value) return null
 

@@ -261,10 +261,11 @@ describe('EventsTab + EventFormModal — partial save when publishing fails (#82
     vi.spyOn(window, 'confirm').mockReturnValue(false)
 
     const showToast = vi.fn()
+    const onEventsChange = vi.fn()
     render(
       <EventsTab
         events={[DRAFT_EVENT_NO_BANDS]}
-        onEventsChange={vi.fn()}
+        onEventsChange={onEventsChange}
         showToast={showToast}
         readOnly={false}
         canArchiveEvents={true}
@@ -277,6 +278,10 @@ describe('EventsTab + EventFormModal — partial save when publishing fails (#82
     // The explanatory message is on screen, which is only possible if the
     // modal stayed open.
     expect(await screen.findByText(/still a draft/i)).toBeInTheDocument()
+    // ...and it stays open in the real panel only if the list refresh runs in
+    // the background: AdminPanel's full reload unmounts the tab and the modal
+    // with it (#1248 review; this stub hid that until then).
+    expect(onEventsChange).toHaveBeenCalledWith({ background: true })
 
     // Never claim success for a publish that did not happen.
     expect(showToast).not.toHaveBeenCalledWith('Event updated successfully!', 'success')
@@ -437,5 +442,21 @@ describe('EventsTab — notify subscribers', () => {
     renderTab([{ ...LINEUP_UP_SCHEDULE_TBA, band_count: 0 }])
 
     expect(screen.queryAllByRole('button', { name: 'Notify' })).toHaveLength(0)
+  })
+})
+
+// #1248 review: rows were memoised on a WHITELIST of event fields, so a list
+// refresh that changed any other field (poster, city, description) left the
+// row's Edit button holding the old event, and the form opened stale. Hidden
+// while every refresh remounted the tab behind a spinner; exposed once a
+// refresh ran in the background.
+describe('EventsTab rows after a list refresh', () => {
+  it('Edit opens the refreshed event, whatever field changed', async () => {
+    const props = { onEventsChange: vi.fn(), showToast: vi.fn(), readOnly: false, canArchiveEvents: true }
+    const { rerender } = render(<EventsTab {...props} events={[{ ...DRAFT_EVENT_NO_BANDS, city: 'Old City' }]} />)
+    rerender(<EventsTab {...props} events={[{ ...DRAFT_EVENT_NO_BANDS, city: 'New City' }]} />)
+    fireEvent.click(screen.getAllByRole('button', { name: 'Edit' })[0])
+    expect(await screen.findByDisplayValue('New City')).toBeInTheDocument()
+    expect(screen.queryByDisplayValue('Old City')).not.toBeInTheDocument()
   })
 })

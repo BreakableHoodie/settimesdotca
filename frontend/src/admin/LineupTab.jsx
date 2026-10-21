@@ -739,6 +739,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
             dayOptions={dayOptions}
             onChange={handleInputChange}
             onSubmit={handleSubmit}
+            onPhotoPersisted={loadData}
             onCancel={() => {
               setViewMode('list')
               setEditingId(null)

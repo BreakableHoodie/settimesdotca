@@ -59,6 +59,38 @@ describe('PhotoUpload', () => {
     expect(formData.get('band_id')).toBe('42')
   })
 
+  // #1248 review: an upload that names its entity is saved at once, so the
+  // parent must refresh; one that does not (a new event) is only in the form.
+  it.each([
+    ['names its entity (edit mode)', { bandId: 42 }, true],
+    ['names no entity (create mode)', {}, false],
+  ])('an upload that %s reports persistence accordingly', async (_label, props, persisted) => {
+    const onPersisted = vi.fn()
+    render(<PhotoUpload currentPhoto={null} onPhotoChange={vi.fn()} onPersisted={onPersisted} {...props} />)
+    selectFile(jpegFile())
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(screen.queryByText(/Uploading/i)).not.toBeInTheDocument())
+    if (persisted) expect(onPersisted).toHaveBeenCalledWith('https://example.test/uploaded.jpg')
+    else expect(onPersisted).not.toHaveBeenCalled()
+  })
+
+  it('shows the photo the parent passes AFTER mounting (a form that fills a render later)', () => {
+    const { rerender } = render(<PhotoUpload currentPhoto="" onPhotoChange={vi.fn()} />)
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+    rerender(<PhotoUpload currentPhoto="https://band-photos.settimes.ca/event-posters/a.jpg" onPhotoChange={vi.fn()} />)
+    expect(screen.getByRole('img')).toHaveAttribute('src', 'https://band-photos.settimes.ca/event-posters/a.jpg')
+  })
+
+  it('a failed upload reports no persistence', async () => {
+    fetchMock.mockResolvedValue({ ok: false, json: async () => ({ error: 'Too big' }) })
+    const onPersisted = vi.fn()
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    render(<PhotoUpload currentPhoto={null} onPhotoChange={vi.fn()} onPersisted={onPersisted} bandId={42} />)
+    selectFile(jpegFile())
+    expect(await screen.findByText('Too big')).toBeInTheDocument()
+    expect(onPersisted).not.toHaveBeenCalled()
+  })
+
   it('poster usage: downscales a large image via canvas before upload (longest edge clamped, JPEG q0.82)', async () => {
     global.createImageBitmap = vi.fn().mockResolvedValue({ width: 3200, height: 2400, close: vi.fn() })
     const drawImage = vi.fn()

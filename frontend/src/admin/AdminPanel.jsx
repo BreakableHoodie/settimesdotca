@@ -129,26 +129,34 @@ export default function AdminPanel({ currentUser, onLogout }) {
     setTimeout(() => setToast(null), 5000)
   }, [])
 
-  const loadEvents = useCallback(async () => {
-    try {
-      setLoading(true)
-      const result = await eventsApi.getAll()
-      const nextEvents = result.events || []
-      setEvents(nextEvents)
-      setEventsLoadError(false)
-      setSelectedEventId(prev => (prev && nextEvents.some(event => event.id === prev) ? prev : null))
-    } catch (err) {
-      if (import.meta.env.DEV) console.error('Load events error:', err, 'Status:', err.status, 'Message:', err.message)
-      if (err.status === 401 || err.message?.includes('Valid session required')) {
-        onLogout()
-        return
+  // `background` refreshes the list without the panel-wide spinner, which
+  // unmounts every tab and any open modal with it. A refresh made while a form
+  // is still open (a partial save, an upload already saved to the event) must
+  // use it, or the form and its message vanish mid-edit.
+  const loadEvents = useCallback(
+    async ({ background = false } = {}) => {
+      try {
+        if (!background) setLoading(true)
+        const result = await eventsApi.getAll()
+        const nextEvents = result.events || []
+        setEvents(nextEvents)
+        setEventsLoadError(false)
+        setSelectedEventId(prev => (prev && nextEvents.some(event => event.id === prev) ? prev : null))
+      } catch (err) {
+        if (import.meta.env.DEV)
+          console.error('Load events error:', err, 'Status:', err.status, 'Message:', err.message)
+        if (err.status === 401 || err.message?.includes('Valid session required')) {
+          onLogout()
+          return
+        }
+        setEventsLoadError(true)
+        showToast('Failed to load events: ' + err.message, 'error')
+      } finally {
+        if (!background) setLoading(false)
       }
-      setEventsLoadError(true)
-      showToast('Failed to load events: ' + err.message, 'error')
-    } finally {
-      setLoading(false)
-    }
-  }, [onLogout, showToast])
+    },
+    [onLogout, showToast]
+  )
 
   // Load events on mount, unless the session already says every request would
   // be refused until 2FA is set up; enrolling reloads the page (#1320).

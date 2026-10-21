@@ -27,6 +27,9 @@ export default function BandForm({
   onChange,
   onSubmit,
   onCancel,
+  // Called when a photo upload in edit mode was saved to the artist at once,
+  // so the parent refreshes before a cancelled form can reopen stale.
+  onPhotoPersisted,
   conflicts = { overlaps: [], conflicts: [] },
   globalView = false,
   selectedProfile = null, // If provided, we are scheduling this specific existing artist
@@ -243,6 +246,7 @@ export default function BandForm({
                   onChange({ target: { name: 'photo_url', value: url } })
                 }}
                 bandId={mode === 'edit' && formData.id ? formData.id : null}
+                onPersisted={onPhotoPersisted}
                 bandName={formData.name}
                 maxDimension={1600}
               />
@@ -710,6 +714,7 @@ BandForm.propTypes = {
   onChange: PropTypes.func.isRequired,
   onSubmit: PropTypes.func.isRequired,
   onCancel: PropTypes.func.isRequired,
+  onPhotoPersisted: PropTypes.func,
   conflicts: PropTypes.shape({
     overlaps: PropTypes.arrayOf(PropTypes.string),
     conflicts: PropTypes.arrayOf(PropTypes.string),

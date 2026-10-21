@@ -19,6 +19,7 @@ vi.mock('../EventsTab', () => ({
     <div>
       Events tab ({events.length}){loadError && <span>Events load error</span>}
       <button onClick={onEventsChange}>Retry events</button>
+      <button onClick={() => onEventsChange({ background: true })}>Refresh events in background</button>
     </div>
   ),
 }))
@@ -88,6 +89,29 @@ afterEach(() => {
 })
 
 describe('AdminPanel', () => {
+  // #1248 review: the full reload swaps the whole panel for a spinner, which
+  // unmounts the events tab and any open modal. A refresh made while a form is
+  // open (a partial save's message, a poster already saved) must not.
+  it('a background refresh keeps the events tab, and any open form, mounted', async () => {
+    renderPanel()
+    await screen.findByText('Events tab (4)')
+    let release
+    eventsApi.getAll.mockReturnValueOnce(new Promise(resolve => (release = resolve)))
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh events in background' }))
+    expect(screen.queryByText('Loading admin panel...')).not.toBeInTheDocument()
+    expect(screen.getByText('Events tab (4)')).toBeInTheDocument()
+    await act(async () => release({ events: events.slice(0, 2) }))
+    expect(await screen.findByText('Events tab (2)')).toBeInTheDocument()
+  })
+
+  it('a full reload still shows the panel spinner', async () => {
+    renderPanel()
+    await screen.findByText('Events tab (4)')
+    eventsApi.getAll.mockReturnValueOnce(new Promise(() => {}))
+    fireEvent.click(screen.getByRole('button', { name: 'Retry events' }))
+    expect(await screen.findByText('Loading admin panel...')).toBeInTheDocument()
+  })
+
   it('mounts the step-up modal: a prompter is registered, and raising it opens the dialog', async () => {
     renderPanel()
     await screen.findByLabelText('Filter:')

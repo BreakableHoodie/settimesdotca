@@ -661,6 +661,7 @@ export default function RosterTab({ showToast, readOnly = false }) {
             onChange={handleInputChange}
             onSubmit={editingId ? handleUpdate : handleAdd}
             onCancel={resetForm}
+            onPhotoPersisted={loadBands}
             conflicts={{ overlaps: [], conflicts: [] }}
             originCitySuggestions={originCitySuggestions}
             originRegionSuggestions={originRegionSuggestions}

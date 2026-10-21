@@ -28,7 +28,9 @@ const paletteFor = (accent, source = 'poster', poster = OLD) => ({
 })
 
 // The form owns the state; this harness plays the form.
-function Form({ original = OLD, initialPoster = OLD, initialValue = null, onValue = () => {}, onBusy = () => {} }) {
+// By default the event's colours already come from its poster, so mounting
+// reads nothing and each case starts from a settled form.
+function Form({ initialPoster = OLD, initialValue = paletteFor('#555555'), onValue = () => {}, onBusy = () => {} }) {
   const [poster, setPoster] = useState(initialPoster)
   const [value, setValue] = useState(initialValue)
   return (
@@ -37,7 +39,6 @@ function Form({ original = OLD, initialPoster = OLD, initialValue = null, onValu
         new poster
       </button>
       <PosterPalette
-        originalPosterUrl={original}
         posterUrl={poster}
         value={value}
         onChange={next => {
@@ -60,25 +61,30 @@ beforeEach(() => {
 })
 
 describe('PosterPalette (#1248)', () => {
-  it('opening an edition with its saved poster reads nothing and changes nothing', async () => {
+  it('an edition with a poster and no colours has them read: an old edition, or an upload whose form was closed', async () => {
+    const onValue = vi.fn()
+    render(<Form initialValue={null} onValue={onValue} />)
+    await waitFor(() => expect(onValue).toHaveBeenCalledWith(paletteFor('#555555', 'poster', OLD)))
+  })
+
+  it('colours that already come from the poster are not read again', async () => {
     const onValue = vi.fn()
     render(<Form onValue={onValue} />)
-    expect(screen.getByRole('button', { name: 'Suggest colours from the poster' })).toBeInTheDocument()
     await act(async () => {})
     expect(eventsApi.getPosterBlob).not.toHaveBeenCalled()
     expect(onValue).not.toHaveBeenCalled()
   })
 
-  it('the form filling in a render after mount is not a "new" poster', async () => {
+  it('the form filling a render after mount reads nothing when its colours match', async () => {
     // EventFormModal mounts with an empty form and loads the event a render later.
     function LateFill() {
-      const [poster, setPoster] = useState('')
+      const [state, setState] = useState({ poster: '', value: null })
       return (
         <>
-          <button type="button" onClick={() => setPoster(OLD)}>
+          <button type="button" onClick={() => setState({ poster: OLD, value: paletteFor('#555555') })}>
             load
           </button>
-          <PosterPalette originalPosterUrl={OLD} posterUrl={poster} value={null} onChange={() => {}} />
+          <PosterPalette posterUrl={state.poster} value={state.value} onChange={() => {}} />
         </>
       )
     }
@@ -118,26 +124,22 @@ describe('PosterPalette (#1248)', () => {
     )
     const onValue = vi.fn()
     render(<Form onValue={onValue} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Suggest colours from the poster' })) // reads OLD, slowly
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest again from the poster' })) // reads OLD, slowly
     fireEvent.click(screen.getByRole('button', { name: 'new poster' })) // reads NEW
     await waitFor(() => expect(onValue).toHaveBeenCalledWith(paletteFor('#924d7a', 'poster', NEW)))
     await act(async () => releaseOld())
     expect(onValue).toHaveBeenCalledTimes(1)
   })
 
-  it('re-reads colours left from ANOTHER poster: an upload saved the poster but the form was closed', async () => {
+  it('re-reads colours left from ANOTHER poster', async () => {
     const onValue = vi.fn()
-    render(
-      <Form original={NEW} initialPoster={NEW} initialValue={paletteFor('#555555', 'poster', OLD)} onValue={onValue} />
-    )
+    render(<Form initialPoster={NEW} initialValue={paletteFor('#555555', 'poster', OLD)} onValue={onValue} />)
     await waitFor(() => expect(onValue).toHaveBeenCalledWith(paletteFor('#924d7a', 'poster', NEW)))
   })
 
   it('leaves hand-picked colours alone even when they came from another poster', async () => {
     const onValue = vi.fn()
-    render(
-      <Form original={NEW} initialPoster={NEW} initialValue={paletteFor('#123456', 'manual', OLD)} onValue={onValue} />
-    )
+    render(<Form initialPoster={NEW} initialValue={paletteFor('#123456', 'manual', OLD)} onValue={onValue} />)
     await act(async () => {})
     expect(eventsApi.getPosterBlob).not.toHaveBeenCalled()
   })

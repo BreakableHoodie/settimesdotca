@@ -13,7 +13,19 @@ vi.mock('../../../utils/adminApi', () => ({
   },
 }))
 vi.mock('../../utils/publishWithLineupConfirm', () => ({ publishWithLineupConfirm: vi.fn() }))
-vi.mock('../PhotoUpload', () => ({ default: () => <div data-testid="photo-upload" /> }))
+vi.mock('../PhotoUpload', () => ({
+  default: ({ onPhotoChange, onPersisted }) => (
+    <button
+      type="button"
+      onClick={() => {
+        onPhotoChange('https://band-photos.settimes.ca/event-posters/new.jpg')
+        onPersisted('https://band-photos.settimes.ca/event-posters/new.jpg')
+      }}
+    >
+      fake: poster uploaded and saved
+    </button>
+  ),
+}))
 // The palette component has its own suite; here only what it reports matters.
 vi.mock('../PosterPalette', () => ({
   default: ({ onChange, onBusyChange }) => (
@@ -192,5 +204,43 @@ describe('EventFormModal poster colours', () => {
     renderModal({ ...baseEvent, status: 'draft' })
     fireEvent.click(screen.getByRole('button', { name: 'fake: reading' }))
     expect(screen.getByRole('button', { name: 'Waiting for poster colours…' })).toBeDisabled()
+  })
+})
+
+// #1248 review, pre-existing data loss: an upload in edit mode is saved at
+// once, but the events list was never told. Cancel, reopen from the stale list,
+// Save: the poster was deleted. Now the list refreshes on the upload, and the
+// form sends poster_url only when it changed in the form.
+describe('EventFormModal poster upload', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    eventsApi.update.mockResolvedValue({ event: baseEvent })
+  })
+
+  it('an unrelated save does not send poster_url, so a stale form cannot clear a saved poster', async () => {
+    renderModal({ ...baseEvent, status: 'draft', poster_url: '' })
+    fireEvent.submit(screen.getByRole('button', { name: /update event/i }).closest('form'))
+    await waitFor(() => expect(eventsApi.update).toHaveBeenCalledTimes(1))
+    expect(eventsApi.update.mock.calls[0][1]).not.toHaveProperty('poster_url')
+  })
+
+  it('an upload saved to the event refreshes the list at once, and a save then sends it', async () => {
+    const onPartialSave = vi.fn()
+    render(
+      <EventFormModal
+        isOpen
+        event={{ ...baseEvent, status: 'draft' }}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+        onPartialSave={onPartialSave}
+      />
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'fake: poster uploaded and saved' }))
+    expect(onPartialSave).toHaveBeenCalledWith(
+      expect.objectContaining({ id: baseEvent.id, poster_url: 'https://band-photos.settimes.ca/event-posters/new.jpg' })
+    )
+    fireEvent.submit(screen.getByRole('button', { name: /update event/i }).closest('form'))
+    await waitFor(() => expect(eventsApi.update).toHaveBeenCalledTimes(1))
+    expect(eventsApi.update.mock.calls[0][1].poster_url).toBe('https://band-photos.settimes.ca/event-posters/new.jpg')
   })
 })

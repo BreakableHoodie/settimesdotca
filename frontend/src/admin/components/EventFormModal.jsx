@@ -69,6 +69,10 @@ export default function EventFormModal({
   // value this version cannot read is then kept, not overwritten with null by
   // an unrelated edit, and an unchanged one is not re-sent.
   const [themeChanged, setThemeChanged] = useState(false)
+  // The poster likewise: an upload in edit mode is saved at once, so the form
+  // sends poster_url only when it changed here. A form opened from a stale
+  // list (an upload, then Cancel) then cannot write the stale value back.
+  const [posterChanged, setPosterChanged] = useState(false)
   const [posterBusy, setPosterBusy] = useState(false)
   const themeUnreadable = Boolean(event?.theme_colors) && parseThemeColours(event.theme_colors) === null
   const [formData, setFormData] = useState({
@@ -165,6 +169,7 @@ export default function EventFormModal({
       setDoorsForm(parseDoorsJsonToForm(event.doors_json, enumerateFestivalDays(event.date, event.end_date)))
       setSlugEdited(true) // Prevent auto-generation when editing
       setThemeChanged(false)
+      setPosterChanged(false)
     } else {
       setFormData({
         name: '',
@@ -375,7 +380,6 @@ export default function EventFormModal({
         description: formData.description,
         city: formData.city,
         ticket_url: formData.ticket_url,
-        poster_url: formData.poster_url,
         social_links: socialLinksPayload,
         doors_json: serializeDoorsForm(doorsForm, currentDays),
         age_restriction: formData.age_restriction || null,
@@ -384,6 +388,9 @@ export default function EventFormModal({
         ticket_price: formData.ticket_price === '' ? null : Number(formData.ticket_price),
       }
 
+      if (posterChanged || !isEditing) {
+        payload.poster_url = formData.poster_url
+      }
       if (themeChanged || !isEditing) {
         payload.theme_colors = formData.theme_colors ? JSON.stringify(formData.theme_colors) : null
       }
@@ -807,7 +814,13 @@ export default function EventFormModal({
             <div>
               <PhotoUpload
                 currentPhoto={formData.poster_url}
-                onPhotoChange={url => setFormData(prev => ({ ...prev, poster_url: url || '' }))}
+                onPhotoChange={url => {
+                  setPosterChanged(true)
+                  setFormData(prev => ({ ...prev, poster_url: url || '' }))
+                }}
+                // Saved to the event already: refresh the list so a cancelled
+                // form reopens with this poster, not the one before it.
+                onPersisted={url => onPartialSave?.({ ...event, poster_url: url })}
                 uploadUrl="/api/admin/events/posters"
                 fieldName="poster"
                 entityIdField="event_id"
@@ -818,7 +831,6 @@ export default function EventFormModal({
               />
               <PosterPalette
                 key={event?.id ?? 'new'}
-                originalPosterUrl={event?.poster_url || ''}
                 posterUrl={formData.poster_url}
                 value={formData.theme_colors}
                 onChange={theme => {

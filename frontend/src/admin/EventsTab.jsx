@@ -195,26 +195,19 @@ const notifyKindFor = event => (Number(event?.scheduled_count) > 0 ? 'schedule_a
 // an event with no lineup has no news yet.
 const canNotifySubscribers = event => event?.status === 'published' && Number(event?.band_count) > 0
 
-const areEventPropsEqual = (prevProps, nextProps) => {
-  const prevEvent = prevProps.event
-  const nextEvent = nextProps.event
-  return (
-    prevEvent.id === nextEvent.id &&
-    prevEvent.name === nextEvent.name &&
-    prevEvent.date === nextEvent.date &&
-    prevEvent.slug === nextEvent.slug &&
-    prevEvent.status === nextEvent.status &&
-    prevEvent.band_count === nextEvent.band_count &&
-    // Without this the row never re-renders when the schedule lands, so the
-    // notify button keeps offering "lineup announced" after set times are up.
-    // This comparator whitelists fields, so a new one that drives UI must be
-    // listed here -- it is not enough to add it to the API projection.
-    prevEvent.scheduled_count === nextEvent.scheduled_count &&
-    prevProps.canArchiveEvents === nextProps.canArchiveEvents &&
-    prevProps.canDeleteEvents === nextProps.canDeleteEvents &&
-    (prevEvent.ticket_url || prevEvent.ticket_link) === (nextEvent.ticket_url || nextEvent.ticket_link)
-  )
-}
+// A row re-renders when its event OBJECT changes, never on a list of fields.
+// The row's Edit button closes over `event`, so a row that skips a render
+// hands the form a stale copy, and saving that form writes the stale values
+// back. A field whitelist did exactly that once a list refresh stopped
+// remounting the tab (#1248): the poster an upload had just saved was missing
+// from the reopened form. Every list fetch builds new objects, so identity is
+// both correct and cheap. Callbacks are ignored on purpose: they are recreated
+// each render and only call stable setters.
+const areEventPropsEqual = (prevProps, nextProps) =>
+  prevProps.event === nextProps.event &&
+  prevProps.readOnly === nextProps.readOnly &&
+  prevProps.canArchiveEvents === nextProps.canArchiveEvents &&
+  prevProps.canDeleteEvents === nextProps.canDeleteEvents
 
 const EventRow = memo(function EventRow({
   event,
@@ -577,9 +570,12 @@ export default function EventsTab({
   // the modal is displaying the explanation of what did and did not happen, and
   // handleEventSaved would both hide it and claim "Event updated successfully!"
   // over a failed publish.
+  // The modal is still open here (a partial save's message, or a poster
+  // upload already saved to the event), so the refresh runs in the background:
+  // the full reload's spinner would unmount the modal and lose the form.
   const handleEventPartiallySaved = _savedEvent => {
     refreshEvents()
-    onEventsChange()
+    onEventsChange({ background: true })
   }
 
   const getPublicEventUrl = event => {

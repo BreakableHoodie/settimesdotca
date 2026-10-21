@@ -41,6 +41,20 @@ export async function pickInkForNewVenue(DB) {
 }
 
 /**
+ * The ink for a new venue, or null if it cannot be chosen. The ink is
+ * cosmetic and the column nullable (an uncoloured stamp), so a failed lookup
+ * is logged and never blocks creating the venue, on show day least of all.
+ */
+export async function inkForNewVenueOrNull(DB, venueName) {
+  try {
+    return await pickInkForNewVenue(DB);
+  } catch (error) {
+    console.error("venue.create: stamp ink lookup failed; creating the venue without one", { venueName, error });
+    return null;
+  }
+}
+
+/**
  * The name a stamp prints: the venue name without a trailing parenthetical
  * qualifier ("Blue Room (Inside Revive Karaoke)" -> "Blue Room"). Derived, not
  * stored, so there is no second name for anyone to keep in step.

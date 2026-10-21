@@ -444,6 +444,7 @@ export async function onRequestPatch(context) {
           { status: 400, headers: { "Content-Type": "application/json" } },
         );
       }
+      let storedThemeColors = null;
       if (typeof parsed.value === "string") {
         const shape = validateThemeColorsJson(parsed.value);
         if (!shape.valid) {
@@ -452,9 +453,11 @@ export async function onRequestPatch(context) {
             headers: { "Content-Type": "application/json" },
           });
         }
+        // The re-serialised palette, never the submitted text (#1248).
+        storedThemeColors = shape.value;
       }
       updates.push("theme_colors = ?");
-      params.push(parsed.value ?? null);
+      params.push(storedThemeColors);
     }
 
     if (doors_json !== undefined) {

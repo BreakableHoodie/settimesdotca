@@ -15,6 +15,7 @@ import {
 } from "../../utils/validation.js";
 import { getClientIP, parseJsonObjectBody } from "../../utils/request.js";
 import { eventLocalToday } from "../../utils/eventDay.js";
+import { validateThemeColorsJson } from "../../utils/themeColors.js";
 
 // GET - List all events (all authenticated users can view)
 export async function onRequestGet(context) {
@@ -298,7 +299,8 @@ export async function onRequestPost(context) {
         normalizeHttpUrl(poster_url),
         sanitizedVenueInfo,
         sanitizedSocialLinks,
-        theme_colors,
+        // Validated by the schema; stored re-serialised, never as submitted (#1248).
+        theme_colors ? validateThemeColorsJson(theme_colors).value : null,
         sanitizedDoorsJson,
         age_restriction,
         presented_by,

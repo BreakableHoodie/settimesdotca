@@ -35,6 +35,25 @@ INSERT OR REPLACE INTO venues (id, name, address, city, website) VALUES
 (19, 'Maxwell''s Concerts', '35 University Ave E', 'Waterloo', 'https://maxwellswaterloo.ca'),
 (20, 'Rum Runners', '178 Dundas St', 'London', 'https://rumrunners.com');
 
+-- Stamp inks (#1248), exactly as migration 0076 backfills them: this file is
+-- loaded after setup-complete.sql, which carries only the schema, so without
+-- this every CI, local and edge-E2E venue would have no ink. The literals must
+-- match STAMP_INKS (functions/utils/__tests__/venueInk.test.js checks both).
+UPDATE venues
+SET ink_color = CASE (
+    (SELECT COUNT(*) FROM venues AS earlier WHERE earlier.id < venues.id) % 8
+  )
+  WHEN 0 THEN '#44505c'
+  WHEN 1 THEN '#1f6b5c'
+  WHEN 2 THEN '#7d5c00'
+  WHEN 3 THEN '#b4432f'
+  WHEN 4 THEN '#6b3f99'
+  WHEN 5 THEN '#2b55a3'
+  WHEN 6 THEN '#9c2f6b'
+  ELSE '#3f6a12'
+END
+WHERE ink_color IS NULL;
+
 -- ============================================
 -- EVENTS (12 monthly events + special events)
 -- ============================================

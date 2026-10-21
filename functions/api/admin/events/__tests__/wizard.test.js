@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createDBEnv, createTestDB, insertEvent } from "../../../test-utils";
 import * as wizardHandler from "../wizard.js";
+import { STAMP_INKS } from "../../../../utils/venueInk.js";
 
 vi.mock("../../_middleware.js", () => ({
   checkPermission: async (context) => {
@@ -138,6 +139,27 @@ describe("POST /api/admin/events/wizard - venue validation", () => {
     // The performance should reference the pre-existing venue, not a new one
     const perf = rawDb.prepare("SELECT * FROM performances WHERE event_id = ?").get(data.event.id);
     expect(perf.venue_id).toBe(existingId);
+  });
+});
+
+// #1248: the wizard is how editions are usually built, so a venue it creates
+// gets a stamp ink like one created on the Venues tab; an existing venue keeps
+// the ink it has.
+describe("POST /api/admin/events/wizard - venue stamp inks", () => {
+  it("gives a venue it creates the least-used ink", async () => {
+    rawDb.prepare("INSERT INTO venues (name, ink_color) VALUES (?, ?)").run("Inked", STAMP_INKS[0]);
+    const res = await wizardHandler.onRequestPost({ request: makeRequest(basePayload()), env });
+    expect(res.status).toBe(201);
+    expect(rawDb.prepare("SELECT ink_color FROM venues WHERE name = 'The Venue'").get().ink_color).toBe(STAMP_INKS[1]);
+  });
+
+  it("leaves an existing venue's ink alone", async () => {
+    rawDb
+      .prepare("INSERT INTO venues (name, address, ink_color) VALUES (?, ?, ?)")
+      .run("The Venue", "123 Main St", "#123456");
+    const res = await wizardHandler.onRequestPost({ request: makeRequest(basePayload()), env });
+    expect(res.status).toBe(201);
+    expect(rawDb.prepare("SELECT ink_color FROM venues WHERE name = 'The Venue'").get().ink_color).toBe("#123456");
   });
 });
 

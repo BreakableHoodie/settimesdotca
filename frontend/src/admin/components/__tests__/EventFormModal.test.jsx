@@ -14,6 +14,33 @@ vi.mock('../../../utils/adminApi', () => ({
 }))
 vi.mock('../../utils/publishWithLineupConfirm', () => ({ publishWithLineupConfirm: vi.fn() }))
 vi.mock('../PhotoUpload', () => ({ default: () => <div data-testid="photo-upload" /> }))
+// The palette component has its own suite; here only what it reports matters.
+vi.mock('../PosterPalette', () => ({
+  default: ({ onChange, onBusyChange }) => (
+    <>
+      <button
+        type="button"
+        onClick={() =>
+          onChange({
+            v: 1,
+            source: 'poster',
+            poster: 'https://band-photos.settimes.ca/event-posters/a.jpg',
+            light: { ground: '#f7eef0', ink: '#1a1819', accent: '#924d7a', nowFill: '#dce9f2' },
+            dark: { ground: '#f7eef0', ink: '#1a1819', accent: '#924d7a', nowFill: '#dce9f2' },
+          })
+        }
+      >
+        fake: colours read
+      </button>
+      <button type="button" onClick={() => onChange(null)}>
+        fake: colours removed
+      </button>
+      <button type="button" onClick={() => onBusyChange(true)}>
+        fake: reading
+      </button>
+    </>
+  ),
+}))
 
 const baseEvent = {
   id: 37,
@@ -107,34 +134,63 @@ describe('EventFormModal publication routing', () => {
   })
 })
 
-// #1248: the poster palette round-trips through an unrelated save, and a
-// stored value that is not a palette is not written back.
+// #1248: the palette is sent only when it changed in the form. An unrelated
+// save leaves the stored value alone, readable or not; Save waits while the
+// poster's colours are being read.
 describe('EventFormModal poster colours', () => {
   const variant = { ground: '#f7eef0', ink: '#1a1819', accent: '#924d7a', nowFill: '#dce9f2' }
-  const palette = { v: 1, source: 'poster', light: variant, dark: variant }
+  const palette = {
+    v: 1,
+    source: 'poster',
+    poster: 'https://band-photos.settimes.ca/event-posters/a.jpg',
+    light: variant,
+    dark: variant,
+  }
 
   beforeEach(() => {
     vi.clearAllMocks()
     eventsApi.update.mockResolvedValue({ event: baseEvent })
+    eventsApi.create.mockResolvedValue({ event: baseEvent })
   })
 
-  async function saveUnchanged(event) {
+  async function save(event, before = () => {}) {
     renderModal(event)
+    before()
     fireEvent.submit(screen.getByRole('button', { name: /update event/i }).closest('form'))
     await waitFor(() => expect(eventsApi.update).toHaveBeenCalledTimes(1))
-    return eventsApi.update.mock.calls[0][1].theme_colors
+    return eventsApi.update.mock.calls[0][1]
   }
 
-  it('keeps a saved palette when the event is saved for another reason', async () => {
-    const sent = await saveUnchanged({ ...baseEvent, status: 'draft', theme_colors: JSON.stringify(palette) })
-    expect(JSON.parse(sent)).toEqual(palette)
+  it.each([
+    ['a saved palette', JSON.stringify(palette)],
+    ['no palette', null],
+    ['a stored value this version cannot read', '{"v":2,"future":true}'],
+  ])('an unrelated save does not send theme_colors with %s', async (_label, stored) => {
+    expect(await save({ ...baseEvent, status: 'draft', theme_colors: stored })).not.toHaveProperty('theme_colors')
   })
 
-  it.each([
-    ['no palette', null],
-    ['the 0008 legacy shape', '{"primary":"#123456"}'],
-    ['malformed JSON', '{'],
-  ])('sends null for %s', async (_label, stored) => {
-    expect(await saveUnchanged({ ...baseEvent, status: 'draft', theme_colors: stored })).toBeNull()
+  it('says a stored value it cannot read is kept', () => {
+    renderModal({ ...baseEvent, status: 'draft', theme_colors: '{"v":2}' })
+    expect(screen.getByText(/cannot show\. They are kept as they are/)).toBeInTheDocument()
+  })
+
+  it('sends the palette once it changed in the form', async () => {
+    const payload = await save({ ...baseEvent, status: 'draft', theme_colors: null }, () =>
+      fireEvent.click(screen.getByRole('button', { name: 'fake: colours read' }))
+    )
+    expect(JSON.parse(payload.theme_colors)).toEqual(palette)
+  })
+
+  it('sends null once the colours are removed', async () => {
+    const payload = await save({ ...baseEvent, status: 'draft', theme_colors: JSON.stringify(palette) }, () =>
+      fireEvent.click(screen.getByRole('button', { name: 'fake: colours removed' }))
+    )
+    expect(payload.theme_colors).toBeNull()
+  })
+
+  it('holds Save while the poster is being read', () => {
+    renderModal({ ...baseEvent, status: 'draft' })
+    fireEvent.click(screen.getByRole('button', { name: 'fake: reading' }))
+    expect(screen.getByRole('button', { name: 'Waiting for poster colours…' })).toBeDisabled()
   })
 })

@@ -1586,6 +1586,46 @@ export const MUTATIONS = [
     replace: "",
     tests: ["functions/utils/__tests__/venueInk.test.js", "functions/api/admin/venues/__tests__/venues.test.js"],
   },
+  {
+    id: "theme-colors-stored-reserialised",
+    invariant:
+      "CLAUDE.md 'Poster-led event palettes' \u2014 theme_colors is stored re-serialised from what was checked, so a hidden duplicate key never reaches the row (#1248)",
+    file: "functions/utils/themeColors.js",
+    find: "  return { valid: true, value: JSON.stringify(parsed) };",
+    replace: "  return { valid: true, value: json };",
+    tests: [
+      "functions/utils/__tests__/themeColors.test.js",
+      "functions/api/admin/events/__tests__/idHandlerCoverage.test.js",
+      "functions/api/admin/events/__tests__/events.test.js",
+    ],
+  },
+  {
+    id: "theme-colors-names-its-poster",
+    invariant:
+      "CLAUDE.md 'Poster-led event palettes' \u2014 a palette records the https URL of the poster it was read from (#1248)",
+    file: "functions/utils/themeColors.js",
+    find: "  if (value.v !== 1 || !SOURCES.includes(value.source) || !isHttpsUrl(value.poster)) return false;",
+    replace: "  if (value.v !== 1 || !SOURCES.includes(value.source)) return false;",
+    tests: ["functions/utils/__tests__/themeColors.test.js"],
+  },
+  {
+    id: "venue-ink-wizard-venues",
+    invariant:
+      "CLAUDE.md 'Poster-led event palettes' \u2014 a venue the event wizard creates gets a stamp ink too (#1248)",
+    file: "functions/api/admin/events/wizard.js",
+    find: "        const inkColor = await inkForNewVenueOrNull(DB, v.name);",
+    replace: "        const inkColor = null;",
+    tests: ["functions/api/admin/events/__tests__/wizard.test.js"],
+  },
+  {
+    id: "venue-ink-lookup-never-blocks-creation",
+    invariant:
+      "CLAUDE.md 'Poster-led event palettes' \u2014 a failed ink lookup creates the venue without one; it never blocks creation (#1248)",
+    file: "functions/utils/venueInk.js",
+    find: "    return await pickInkForNewVenue(DB);",
+    replace: "    return pickInkForNewVenue(DB);",
+    tests: ["functions/api/admin/venues/__tests__/venues.test.js"],
+  },
 ];
 
 // ============================================================================

@@ -73,7 +73,13 @@ function validJsonOfLength(targetLength) {
 }
 
 const PALETTE_VARIANT = { ground: "#f7eef0", ink: "#1a1819", accent: "#924d7a", nowFill: "#dce9f2" };
-const PALETTE_JSON = JSON.stringify({ v: 1, source: "poster", light: PALETTE_VARIANT, dark: PALETTE_VARIANT });
+const PALETTE_JSON = JSON.stringify({
+  v: 1,
+  source: "poster",
+  poster: "https://band-photos.settimes.ca/event-posters/a.jpg",
+  light: PALETTE_VARIANT,
+  dark: PALETTE_VARIANT,
+});
 
 describe("event schema — theme_colors is a poster palette, not any JSON (#1248)", () => {
   it("refuses valid JSON that is not a version 1 palette", () => {

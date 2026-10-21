@@ -1,8 +1,13 @@
 // Poster-led event palettes (#1248): the stored shape of `events.theme_colors`.
 //
-//   { "v": 1, "source": "poster" | "manual",
+//   { "v": 1, "source": "poster" | "manual", "poster": "<https url>",
 //     "light": { "ground", "ink", "accent", "nowFill" },
 //     "dark":  { "ground", "ink", "accent", "nowFill" } }
+//
+// `poster` is the poster the colours were read from. A palette describes ONE
+// poster: the admin form re-reads when the event's poster differs from it, and
+// the public page ignores a "poster" palette whose poster is not the event's
+// current one (a hand-picked "manual" palette applies regardless).
 //
 // Every colour is lowercase-insensitive `#rrggbb`. The frontend's copy of this
 // check is `isValidThemeColours` in frontend/src/utils/posterPalette.js; Pages
@@ -13,6 +18,16 @@
 const HEX = /^#[0-9a-f]{6}$/i;
 const ROLES = ["ground", "ink", "accent", "nowFill"];
 const SOURCES = ["poster", "manual"];
+const MAX_POSTER_URL = 500;
+
+function isHttpsUrl(value) {
+  if (typeof value !== "string" || value.length > MAX_POSTER_URL) return false;
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
 
 function hasExactKeys(value, keys) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
@@ -21,8 +36,8 @@ function hasExactKeys(value, keys) {
 }
 
 export function isValidThemeColors(value) {
-  if (!hasExactKeys(value, ["v", "source", "light", "dark"])) return false;
-  if (value.v !== 1 || !SOURCES.includes(value.source)) return false;
+  if (!hasExactKeys(value, ["v", "source", "poster", "light", "dark"])) return false;
+  if (value.v !== 1 || !SOURCES.includes(value.source) || !isHttpsUrl(value.poster)) return false;
   return ["light", "dark"].every(
     (variant) =>
       hasExactKeys(value[variant], ROLES) &&
@@ -30,7 +45,14 @@ export function isValidThemeColors(value) {
   );
 }
 
-/** A stored JSON string -> { valid } or { valid: false, error }. */
+/**
+ * A submitted JSON string -> { valid, value } or { valid: false, error }.
+ *
+ * Callers store `value`, the palette RE-SERIALISED from what was checked, never
+ * the submitted text: JSON.parse keeps the LAST copy of a repeated key, so
+ * `{"ground":"<anything>","ground":"#000000"}` validates while the raw text
+ * still carries the first copy to whatever reads it with another parser.
+ */
 export function validateThemeColorsJson(json) {
   let parsed;
   try {
@@ -42,8 +64,8 @@ export function validateThemeColorsJson(json) {
     return {
       valid: false,
       error:
-        "Theme colors must be a version 1 poster palette (light and dark: ground, ink, accent, nowFill as #rrggbb)",
+        "Theme colors must be a version 1 poster palette (the poster's https URL; light and dark: ground, ink, accent, nowFill as #rrggbb)",
     };
   }
-  return { valid: true };
+  return { valid: true, value: JSON.stringify(parsed) };
 }

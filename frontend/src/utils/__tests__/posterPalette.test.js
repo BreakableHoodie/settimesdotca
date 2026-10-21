@@ -1,6 +1,15 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AA_TEXT, contrastRatio, toOklch } from '../colour'
-import { isValidThemeColours, mapPaletteRoles, quantize, readableThemeColours } from '../posterPalette'
+
+import {
+  extractPaletteFromImage,
+  isValidThemeColours,
+  mapPaletteRoles,
+  quantize,
+  readableThemeColours,
+} from '../posterPalette'
+
+const POSTER = 'https://band-photos.settimes.ca/event-posters/1-poster.jpg'
 
 const buildPixels = runs => {
   const total = runs.reduce((n, [, count]) => n + count, 0)
@@ -113,7 +122,7 @@ describe('mapPaletteRoles', () => {
 
   for (const [name, swatches] of Object.entries(CASES)) {
     it(`meets the full contrast contract: ${name}`, () => {
-      const result = mapPaletteRoles(swatches)
+      const result = mapPaletteRoles(swatches, POSTER)
       expectContract(result)
       expect(result.v).toBe(1)
       expect(result.source).toBe('poster')
@@ -121,7 +130,7 @@ describe('mapPaletteRoles', () => {
   }
 
   it('does not use the failing cyan as-is for text (Vol 17)', () => {
-    const { light } = mapPaletteRoles(CASES['Vol 17-like'])
+    const { light } = mapPaletteRoles(CASES['Vol 17-like'], POSTER)
     expect(light.accent).not.toBe('#13b6e4')
     expect(contrastRatio('#13b6e4', light.ground)).toBeLessThan(AA_TEXT)
     expect(contrastRatio(light.accent, light.ground)).toBeGreaterThanOrEqual(AA_TEXT)
@@ -131,38 +140,58 @@ describe('mapPaletteRoles', () => {
   // that does not is demoted to the fill, not darkened into a colour the poster
   // never used. Checked on all 19 production posters before it was pinned.
   it('demotes a colour that fails as text to the on-now fill (Vol 17: plum accent, cyan fill)', () => {
-    const { light } = mapPaletteRoles(CASES['Vol 17-like'])
+    const { light } = mapPaletteRoles(CASES['Vol 17-like'], POSTER)
     expect(light.accent).toBe('#6f4d5f')
     expect(light.nowFill).toBe('#13b6e4')
   })
 
+  it('with nothing reading as text, picks the colour needing the LEAST change, not the brightest', () => {
+    // Chromium's 96 px sample of the real Vol 17 poster: no swatch passed, and
+    // "most chromatic" darkened the cyan into a teal the poster never used.
+    const { light } = mapPaletteRoles(
+      [
+        { hex: '#f4e9ed', population: 0.5 },
+        { hex: '#242c3c', population: 0.2 },
+        { hex: '#13b6e4', population: 0.15 },
+        { hex: '#9a6f8e', population: 0.15 },
+      ],
+      POSTER
+    )
+    expect(toOklch(light.accent).h).toBeGreaterThan(300) // the plum's hue, darkened
+    expect(light.nowFill).toBe('#13b6e4')
+  })
+
+  it('records the poster the colours came from', () => {
+    expect(mapPaletteRoles(CASES['Vol 18-like'], POSTER).poster).toBe(POSTER)
+  })
+
   it('keeps the on-now fill visibly different from the ground', () => {
     for (const name of ['Vol 18-like', 'Vol 17-like']) {
-      const { light } = mapPaletteRoles(CASES[name])
+      const { light } = mapPaletteRoles(CASES[name], POSTER)
       expect(contrastRatio(light.nowFill, light.ground)).toBeGreaterThanOrEqual(1.1)
     }
   })
 
   it('uses the light swatch as ground when it is light enough, else a paper tint', () => {
-    expect(mapPaletteRoles(CASES['Vol 18-like']).light.ground).toBe('#f7eef0')
-    const tinted = mapPaletteRoles(CASES['no light swatch']).light.ground
+    expect(mapPaletteRoles(CASES['Vol 18-like'], POSTER).light.ground).toBe('#f7eef0')
+    const tinted = mapPaletteRoles(CASES['no light swatch'], POSTER).light.ground
     expect(toOklch(tinted).C).toBeLessThanOrEqual(0.025)
     expect(toOklch(tinted).L).toBeGreaterThan(0.93)
   })
 
   it('falls back to ink as accent on a monochrome poster', () => {
-    const { light } = mapPaletteRoles(CASES['monochrome grey poster'])
+    const { light } = mapPaletteRoles(CASES['monochrome grey poster'], POSTER)
     expect(light.accent).toBe(light.ink)
   })
 
   it('builds the dark variant from the poster ink', () => {
-    const { dark } = mapPaletteRoles(CASES['Vol 18-like'])
+    const { dark } = mapPaletteRoles(CASES['Vol 18-like'], POSTER)
     expect(contrastRatio(dark.ground, '#000000')).toBeLessThan(2)
   })
 })
 
 describe('isValidThemeColours', () => {
-  const good = () => mapPaletteRoles(CASES['Vol 18-like'])
+  const good = () => mapPaletteRoles(CASES['Vol 18-like'], POSTER)
 
   it('accepts a mapped palette and source "manual"', () => {
     expect(isValidThemeColours(good())).toBe(true)
@@ -199,6 +228,18 @@ describe('isValidThemeColours', () => {
     expect(isValidThemeColours(upper)).toBe(true)
   })
 
+  it('requires the https URL of the poster the colours came from', () => {
+    for (const poster of [
+      undefined,
+      '',
+      'http://x.test/p.jpg',
+      'javascript:alert(1)',
+      `https://x.test/${'a'.repeat(500)}`,
+    ]) {
+      expect(isValidThemeColours({ ...good(), poster })).toBe(false)
+    }
+  })
+
   it('rejects non-objects', () => {
     for (const v of [null, undefined, 'x', 3, [], true]) expect(isValidThemeColours(v)).toBe(false)
   })
@@ -209,6 +250,7 @@ describe('readableThemeColours', () => {
     const edited = {
       v: 1,
       source: 'manual',
+      poster: POSTER,
       light: { ground: '#ffffff', ink: '#222222', accent: '#ffff00', nowFill: '#ffff99' },
       dark: { ground: '#111111', ink: '#222222', accent: '#222233', nowFill: '#000000' },
     }
@@ -220,11 +262,53 @@ describe('readableThemeColours', () => {
   })
 
   it('leaves an already-readable palette unchanged', () => {
-    const palette = mapPaletteRoles(CASES['Vol 17-like'])
+    const palette = mapPaletteRoles(CASES['Vol 17-like'], POSTER)
     expect(readableThemeColours(palette)).toEqual(palette)
   })
 
   it('returns null for garbage', () => {
     for (const v of [null, {}, 'x', { v: 1 }]) expect(readableThemeColours(v)).toBeNull()
+  })
+})
+
+describe('extractPaletteFromImage', () => {
+  // jsdom has no canvas; a fake one returns whatever pixels the case needs.
+  function fakeCanvas(pixels, { noContext = false } = {}) {
+    const ctx = { drawImage: vi.fn(), getImageData: () => ({ data: pixels }) }
+    vi.spyOn(document, 'createElement').mockReturnValue({ getContext: () => (noContext ? null : ctx) })
+  }
+  const bitmap = () => ({ width: 1440, height: 1800, close: vi.fn() })
+  afterEach(() => vi.restoreAllMocks())
+
+  it('reads a real poster and records which one', async () => {
+    fakeCanvas(
+      buildPixels([
+        [[247, 238, 240], 60],
+        [[26, 24, 25], 25],
+        [[146, 77, 122], 15],
+      ])
+    )
+    const result = await extractPaletteFromImage(bitmap(), POSTER)
+    expect(isValidThemeColours(result)).toBe(true)
+    expect(result.poster).toBe(POSTER)
+  })
+
+  it('refuses blank pixels, which is what a browser that blocks canvas reads returns', async () => {
+    fakeCanvas(buildPixels([[[255, 255, 255], 100]]))
+    await expect(extractPaletteFromImage(bitmap(), POSTER)).rejects.toThrow(/blocking image reading/)
+  })
+
+  it('says so when the browser cannot give a canvas context', async () => {
+    fakeCanvas(new Uint8ClampedArray(), { noContext: true })
+    await expect(extractPaletteFromImage(bitmap(), POSTER)).rejects.toThrow(/could not prepare the image/)
+  })
+
+  it('closes a bitmap it created, even when reading fails', async () => {
+    const created = bitmap()
+    globalThis.createImageBitmap = vi.fn().mockResolvedValue(created)
+    fakeCanvas(buildPixels([[[255, 255, 255], 100]]))
+    await expect(extractPaletteFromImage(new globalThis.Blob(['x']), POSTER)).rejects.toThrow()
+    expect(created.close).toHaveBeenCalled()
+    delete globalThis.createImageBitmap
   })
 })

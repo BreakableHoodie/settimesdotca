@@ -60,11 +60,32 @@ describe("GET /api/admin/events/posters", () => {
     expect((await call(env, `${HOST}/event-posters/gone.jpg`)).status).toBe(404);
   });
 
-  test("an object stored with a non-image type is not served", async () => {
+  test("an object stored with a non-image type is refused as 415 and logged, distinct from missing", async () => {
     const { env } = buildEnv({ body: "<svg/>", httpMetadata: { contentType: "image/svg+xml" } });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const res = await call(env, `${HOST}/event-posters/a.svg`);
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(415);
     expect(res.headers.get("Content-Type")).toBe("application/json");
+    expect((await res.json()).code).toBe("POSTER_NOT_IMAGE");
+    expect(warn).toHaveBeenCalledWith(expect.any(String), { key: "event-posters/a.svg", contentType: "image/svg+xml" });
+    warn.mockRestore();
+  });
+
+  test("a refused url says what is accepted", async () => {
+    const { env } = buildEnv();
+    const res = await call(env, "https://evil.example/event-posters/a.jpg");
+    expect((await res.json()).message).toBe("Colours can only be read from a poster uploaded here.");
+  });
+
+  test("a malformed poster host setting is a logged 500, not an unhandled throw", async () => {
+    const { env, get } = buildEnv();
+    env.BAND_PHOTOS_PUBLIC_URL = "not a url";
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const res = await call(env, `${HOST}/event-posters/a.jpg`);
+    expect(res.status).toBe(500);
+    expect(get).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
   });
 
   test("a storage failure is a logged 500, not a crash", async () => {
@@ -73,7 +94,7 @@ describe("GET /api/admin/events/posters", () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     const res = await call(env, `${HOST}/event-posters/a.jpg`);
     expect(res.status).toBe(500);
-    expect(error).toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ key: "event-posters/a.jpg" }));
     error.mockRestore();
   });
 });

@@ -16,18 +16,19 @@ vi.mock('../../../utils/posterPalette', async importOriginal => ({
 import { eventsApi } from '../../../utils/adminApi'
 import { extractPaletteFromImage } from '../../../utils/posterPalette'
 
+const OLD = 'https://band-photos.settimes.ca/event-posters/old.jpg'
+const NEW = 'https://band-photos.settimes.ca/event-posters/new.jpg'
 const variant = (ground, ink, accent, nowFill) => ({ ground, ink, accent, nowFill })
-const paletteFor = (accent, source = 'poster') => ({
+const paletteFor = (accent, source = 'poster', poster = OLD) => ({
   v: 1,
   source,
+  poster,
   light: variant('#f7eef0', '#1a1819', accent, '#dce9f2'),
   dark: variant('#2a2629', '#f7eef0', '#d9a3c6', '#3b4c5a'),
 })
-const OLD = 'https://band-photos.settimes.ca/event-posters/old.jpg'
-const NEW = 'https://band-photos.settimes.ca/event-posters/new.jpg'
 
 // The form owns the state; this harness plays the form.
-function Form({ original = OLD, initialPoster = OLD, initialValue = null, onValue = () => {} }) {
+function Form({ original = OLD, initialPoster = OLD, initialValue = null, onValue = () => {}, onBusy = () => {} }) {
   const [poster, setPoster] = useState(initialPoster)
   const [value, setValue] = useState(initialValue)
   return (
@@ -43,6 +44,7 @@ function Form({ original = OLD, initialPoster = OLD, initialValue = null, onValu
           setValue(next)
           onValue(next)
         }}
+        onBusyChange={onBusy}
       />
     </>
   )
@@ -51,9 +53,10 @@ function Form({ original = OLD, initialPoster = OLD, initialValue = null, onValu
 beforeEach(() => {
   vi.clearAllMocks()
   eventsApi.getPosterBlob.mockImplementation(async url => new globalThis.Blob([url]))
-  extractPaletteFromImage.mockImplementation(async blob =>
-    paletteFor((await blob.text()) === NEW ? '#924d7a' : '#555555')
+  extractPaletteFromImage.mockImplementation(async (blob, url) =>
+    paletteFor((await blob.text()) === NEW ? '#924d7a' : '#555555', 'poster', url)
   )
+  vi.spyOn(console, 'error').mockImplementation(() => {})
 })
 
 describe('PosterPalette (#1248)', () => {
@@ -89,7 +92,7 @@ describe('PosterPalette (#1248)', () => {
     const onValue = vi.fn()
     render(<Form onValue={onValue} />)
     fireEvent.click(screen.getByRole('button', { name: 'new poster' }))
-    await waitFor(() => expect(onValue).toHaveBeenCalledWith(paletteFor('#924d7a')))
+    await waitFor(() => expect(onValue).toHaveBeenCalledWith(paletteFor('#924d7a', 'poster', NEW)))
     expect(eventsApi.getPosterBlob).toHaveBeenCalledWith(NEW)
     expect(screen.getByTestId('palette-preview-light')).toBeInTheDocument()
     expect(screen.getByTestId('palette-preview-dark')).toBeInTheDocument()
@@ -103,7 +106,7 @@ describe('PosterPalette (#1248)', () => {
     expect(eventsApi.getPosterBlob).not.toHaveBeenCalled()
     expect(onValue).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Suggest again from the poster' }))
-    await waitFor(() => expect(onValue).toHaveBeenCalledWith(paletteFor('#924d7a')))
+    await waitFor(() => expect(onValue).toHaveBeenCalledWith(paletteFor('#924d7a', 'poster', NEW)))
   })
 
   it('a slower read of an earlier poster cannot overwrite the newer one', async () => {
@@ -117,9 +120,50 @@ describe('PosterPalette (#1248)', () => {
     render(<Form onValue={onValue} />)
     fireEvent.click(screen.getByRole('button', { name: 'Suggest colours from the poster' })) // reads OLD, slowly
     fireEvent.click(screen.getByRole('button', { name: 'new poster' })) // reads NEW
-    await waitFor(() => expect(onValue).toHaveBeenCalledWith(paletteFor('#924d7a')))
+    await waitFor(() => expect(onValue).toHaveBeenCalledWith(paletteFor('#924d7a', 'poster', NEW)))
     await act(async () => releaseOld())
     expect(onValue).toHaveBeenCalledTimes(1)
+  })
+
+  it('re-reads colours left from ANOTHER poster: an upload saved the poster but the form was closed', async () => {
+    const onValue = vi.fn()
+    render(
+      <Form original={NEW} initialPoster={NEW} initialValue={paletteFor('#555555', 'poster', OLD)} onValue={onValue} />
+    )
+    await waitFor(() => expect(onValue).toHaveBeenCalledWith(paletteFor('#924d7a', 'poster', NEW)))
+  })
+
+  it('leaves hand-picked colours alone even when they came from another poster', async () => {
+    const onValue = vi.fn()
+    render(
+      <Form original={NEW} initialPoster={NEW} initialValue={paletteFor('#123456', 'manual', OLD)} onValue={onValue} />
+    )
+    await act(async () => {})
+    expect(eventsApi.getPosterBlob).not.toHaveBeenCalled()
+  })
+
+  it('tells the form it is busy while reading, so Save can wait', async () => {
+    let release
+    eventsApi.getPosterBlob.mockImplementation(
+      () => new Promise(resolve => (release = () => resolve(new globalThis.Blob([NEW]))))
+    )
+    const onBusy = vi.fn()
+    render(<Form onBusy={onBusy} />)
+    fireEvent.click(screen.getByRole('button', { name: 'new poster' }))
+    await waitFor(() => expect(onBusy).toHaveBeenLastCalledWith(true))
+    await act(async () => release())
+    await waitFor(() => expect(onBusy).toHaveBeenLastCalledWith(false))
+  })
+
+  it('a failed re-read says the colours on screen are still the previous ones, and logs', async () => {
+    eventsApi.getPosterBlob.mockRejectedValue(new Error('Poster not found'))
+    render(<Form initialValue={paletteFor('#555555')} />)
+    fireEvent.click(screen.getByRole('button', { name: 'new poster' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('still the previous ones')
+    expect(console.error).toHaveBeenCalledWith(
+      '[PosterPalette] could not read colours from the poster',
+      expect.objectContaining({ url: NEW })
+    )
   })
 
   it('an unreadable poster says so and leaves the colours alone', async () => {
@@ -150,6 +194,7 @@ describe('PosterPalette (#1248)', () => {
     expect(next.source).toBe('manual')
     expect(next.light.accent).toBe('#aa0000')
     expect(next.dark).toEqual(paletteFor('#924d7a').dark)
+    expect(next.poster).toBe(OLD)
   })
 
   it('previews the readable version and says when it differs from what is stored', () => {

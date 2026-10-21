@@ -121,7 +121,15 @@ describe("Event API - handler integration", () => {
     const now = new Date();
     const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     const variant = { ground: "#f7eef0", ink: "#1a1819", accent: "#924d7a", nowFill: "#dce9f2" };
-    const theme = ok ? { v: 1, source: "poster", light: variant, dark: variant } : { primary: "#123456" };
+    const theme = ok
+      ? {
+          v: 1,
+          source: "poster",
+          poster: "https://band-photos.settimes.ca/event-posters/a.jpg",
+          light: variant,
+          dark: variant,
+        }
+      : { primary: "#123456" };
     const res = await eventsHandler.onRequestPost({
       request: new Request("https://example.test/api/admin/events", {
         method: "POST",
@@ -133,6 +141,34 @@ describe("Event API - handler integration", () => {
     expect(res.status).toBe(ok ? 201 : 400);
     const row = rawDb.prepare("SELECT theme_colors FROM events WHERE slug = ?").get(`themed-${ok}`);
     expect(row?.theme_colors ?? null).toBe(ok ? JSON.stringify(theme) : null);
+  });
+
+  it("onRequestPost stores theme_colors re-serialised, never the submitted text", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+    const now = new Date();
+    const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const variant = { ground: "#f7eef0", ink: "#1a1819", accent: "#924d7a", nowFill: "#dce9f2" };
+    const theme = {
+      v: 1,
+      source: "poster",
+      poster: "https://band-photos.settimes.ca/event-posters/a.jpg",
+      light: variant,
+      dark: variant,
+    };
+    const smuggled = JSON.stringify(theme).replace('"ground":"#f7eef0"', '"ground":"red;}</style>","ground":"#f7eef0"');
+    const res = await eventsHandler.onRequestPost({
+      request: new Request("https://example.test/api/admin/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Dup", slug: "dup-key", date, theme_colors: smuggled }),
+      }),
+      env,
+    });
+    expect(res.status).toBe(201);
+    const stored = rawDb.prepare("SELECT theme_colors FROM events WHERE slug = 'dup-key'").get().theme_colors;
+    expect(stored).not.toMatch(/style/);
+    expect(JSON.parse(stored)).toEqual(theme);
   });
 
   // #804: publication has to go through POST .../publish, the only route that
@@ -1133,6 +1169,38 @@ describe("Event API - handler integration", () => {
 
     const stored = rawDb.prepare("SELECT doors_json FROM events WHERE id = ?").get(data.event.id);
     expect(stored.doors_json).toBeNull();
+  });
+
+  it("duplicate endpoint does NOT copy theme_colors, which belongs to the poster it leaves behind (#1248)", async () => {
+    const rawDb = createTestDB();
+    const env = { DB: createDBEnv(rawDb) };
+    const variant = { ground: "#f7eef0", ink: "#1a1819", accent: "#924d7a", nowFill: "#dce9f2" };
+    const original = insertEvent(rawDb, { name: "Vol 18", slug: "vol18-theme-source", date: "2099-10-11" });
+    rawDb.prepare("UPDATE events SET poster_url = ?, theme_colors = ? WHERE id = ?").run(
+      "https://band-photos.settimes.ca/event-posters/a.jpg",
+      JSON.stringify({
+        v: 1,
+        source: "manual",
+        poster: "https://band-photos.settimes.ca/event-posters/a.jpg",
+        light: variant,
+        dark: variant,
+      }),
+      original.id,
+    );
+
+    const res = await duplicateHandler.onRequestPost({
+      request: new Request(`https://example.test/api/admin/events/${original.id}/duplicate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+        body: JSON.stringify({ name: "Vol 19", date: "2100-02-14", slug: "vol19-theme-copy" }),
+      }),
+      env,
+      params: { id: String(original.id) },
+    });
+    expect(res.status).toBe(201);
+    const { event } = await res.json();
+    const stored = rawDb.prepare("SELECT poster_url, theme_colors FROM events WHERE id = ?").get(event.id);
+    expect(stored).toEqual({ poster_url: null, theme_colors: null });
   });
 
   it("duplicate copies the series-level presenter fields but NOT the edition-specific ticket_price (#1196)", async () => {

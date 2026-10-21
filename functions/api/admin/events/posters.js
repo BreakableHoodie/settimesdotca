@@ -181,32 +181,45 @@ export async function onRequestGet(context) {
 
   const json = (body, status) =>
     new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  const notAPoster = () =>
+    json({ error: "Bad request", message: "Colours can only be read from a poster uploaded here." }, 400);
 
   let posterUrl;
   try {
     posterUrl = new URL(new URL(request.url).searchParams.get("url") ?? "");
   } catch {
-    return json({ error: "Bad request", message: "url must be a poster URL" }, 400);
-  }
-  const posterHost = new URL(env.BAND_PHOTOS_PUBLIC_URL || "https://band-photos.settimes.ca");
-  if (posterUrl.origin !== posterHost.origin || posterUrl.search || !POSTER_KEY.test(posterUrl.pathname)) {
-    return json({ error: "Bad request", message: "url must be a poster URL" }, 400);
+    return notAPoster();
   }
 
+  let key = null;
   try {
-    const object = await env.BAND_PHOTOS.get(posterUrl.pathname.slice(1));
+    const posterHost = new URL(env.BAND_PHOTOS_PUBLIC_URL || "https://band-photos.settimes.ca");
+    if (posterUrl.origin !== posterHost.origin || posterUrl.search || !POSTER_KEY.test(posterUrl.pathname)) {
+      return notAPoster();
+    }
+    key = posterUrl.pathname.slice(1);
+    const object = await env.BAND_PHOTOS.get(key);
     if (!object) return json({ error: "Not found", message: "Poster not found" }, 404);
     const contentType = object.httpMetadata?.contentType;
-    // Uploads store the magic-byte type; anything else is not served as an image.
+    // Uploads store the magic-byte type; an object placed any other way may
+    // not. Never served as an image, and said so distinctly from "missing".
     if (!ALLOWED_IMAGE_TYPES.includes(contentType)) {
-      return json({ error: "Not found", message: "Poster not found" }, 404);
+      console.warn("poster palette: stored object is not a recognised image type", { key, contentType });
+      return json(
+        {
+          error: "Unsupported media type",
+          code: "POSTER_NOT_IMAGE",
+          message: "The stored poster is not a recognised image type. Re-upload it to read its colours.",
+        },
+        415,
+      );
     }
     return new Response(object.body, {
       status: 200,
       headers: { "Content-Type": contentType, "Cache-Control": "private, max-age=300" },
     });
   } catch (error) {
-    console.error("Error reading poster for palette:", error);
+    console.error("Error reading poster for palette:", { key, error });
     return json({ error: "Storage error", message: "Could not read the poster" }, 500);
   }
 }

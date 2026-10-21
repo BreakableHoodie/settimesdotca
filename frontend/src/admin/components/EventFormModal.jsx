@@ -65,6 +65,12 @@ export default function EventFormModal({
   const isArchivedEvent = event?.status === 'archived'
   const canEditSlug = !isEditing || !isPublished
 
+  // The palette is sent only when it changed in this form (#1248). A stored
+  // value this version cannot read is then kept, not overwritten with null by
+  // an unrelated edit, and an unchanged one is not re-sent.
+  const [themeChanged, setThemeChanged] = useState(false)
+  const [posterBusy, setPosterBusy] = useState(false)
+  const themeUnreadable = Boolean(event?.theme_colors) && parseThemeColours(event.theme_colors) === null
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
@@ -158,6 +164,7 @@ export default function EventFormModal({
       })
       setDoorsForm(parseDoorsJsonToForm(event.doors_json, enumerateFestivalDays(event.date, event.end_date)))
       setSlugEdited(true) // Prevent auto-generation when editing
+      setThemeChanged(false)
     } else {
       setFormData({
         name: '',
@@ -369,13 +376,16 @@ export default function EventFormModal({
         city: formData.city,
         ticket_url: formData.ticket_url,
         poster_url: formData.poster_url,
-        theme_colors: formData.theme_colors ? JSON.stringify(formData.theme_colors) : null,
         social_links: socialLinksPayload,
         doors_json: serializeDoorsForm(doorsForm, currentDays),
         age_restriction: formData.age_restriction || null,
         presented_by: formData.presented_by || null,
         presented_by_url: formData.presented_by_url || null,
         ticket_price: formData.ticket_price === '' ? null : Number(formData.ticket_price),
+      }
+
+      if (themeChanged || !isEditing) {
+        payload.theme_colors = formData.theme_colors ? JSON.stringify(formData.theme_colors) : null
       }
 
       if (isEditing && formData.status === 'archived') {
@@ -811,8 +821,17 @@ export default function EventFormModal({
                 originalPosterUrl={event?.poster_url || ''}
                 posterUrl={formData.poster_url}
                 value={formData.theme_colors}
-                onChange={theme => setFormData(prev => ({ ...prev, theme_colors: theme }))}
+                onChange={theme => {
+                  setThemeChanged(true)
+                  setFormData(prev => ({ ...prev, theme_colors: theme }))
+                }}
+                onBusyChange={setPosterBusy}
               />
+              {themeUnreadable && !themeChanged && (
+                <p className="mt-2 text-xs text-white/60">
+                  This event has saved page colours this version of the admin cannot show. They are kept as they are.
+                </p>
+              )}
             </div>
 
             {/* Social Links */}
@@ -982,8 +1001,8 @@ export default function EventFormModal({
 
             {/* Actions */}
             <div className="flex flex-col sm:flex-row gap-3 pt-4">
-              <Button type="submit" variant="primary" disabled={loading} loading={loading} fullWidth>
-                {isEditing ? 'Update Event' : 'Create Event'}
+              <Button type="submit" variant="primary" disabled={loading || posterBusy} loading={loading} fullWidth>
+                {posterBusy ? 'Waiting for poster colours…' : isEditing ? 'Update Event' : 'Create Event'}
               </Button>
               <Button type="button" variant="secondary" onClick={onClose}>
                 Cancel

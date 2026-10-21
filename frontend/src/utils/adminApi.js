@@ -623,7 +623,12 @@ export const eventsApi = {
       credentials: 'include',
     })
     const contentType = response.headers.get('content-type') || ''
-    if (response.ok && contentType.startsWith('image/')) return response.blob()
+    if (response.ok) {
+      if (contentType.startsWith('image/')) return response.blob()
+      // A 200 that is not an image (the SPA fallback if this route ever stops
+      // reaching Functions) must not be read as success or as "try again".
+      throw new Error(`expected an image for this poster, but the server sent ${contentType || 'no content type'}`)
+    }
     return handleResponse(response)
   },
 

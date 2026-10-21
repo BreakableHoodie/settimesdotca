@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createTestEnv, insertVenue, insertBand, insertEvent } from "../../../test-utils";
 import * as venueIdHandler from "../[id].js";
 import * as venuesHandler from "../../venues.js";
@@ -104,6 +104,21 @@ describe("Admin venues API - role boundaries", () => {
     const res = await venuesHandler.onRequestPost({ request: post(headers), env });
     expect(res.status).toBe(201);
     expect((await res.json()).venue.ink_color).toBe(STAMP_INKS[1]);
+  });
+
+  it("creates the venue without an ink, and logs, when the ink lookup fails", async () => {
+    const { env, headers } = createTestEnv({ role: "editor" });
+    const realPrepare = env.DB.prepare.bind(env.DB);
+    env.DB.prepare = (sql) => {
+      if (sql.includes("GROUP BY ink_color")) throw new Error("D1 hiccup");
+      return realPrepare(sql);
+    };
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const res = await venuesHandler.onRequestPost({ request: post(headers), env });
+    expect(res.status).toBe(201);
+    expect((await res.json()).venue.ink_color).toBeNull();
+    expect(error).toHaveBeenCalledWith(expect.stringMatching(/stamp ink lookup failed/), expect.any(Object));
+    error.mockRestore();
   });
 
   it("a viewer cannot create a venue", async () => {

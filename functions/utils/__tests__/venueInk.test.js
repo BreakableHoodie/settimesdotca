@@ -40,6 +40,12 @@ describe("STAMP_INKS", () => {
     const fromMigration = [...BACKFILL.matchAll(/'(#[0-9a-f]{6})'/g)].map((m) => m[1]);
     expect(fromMigration).toEqual([...STAMP_INKS]);
   });
+
+  it("match the test seed's backfill, so CI and E2E venues carry real inks", () => {
+    const seed = readFileSync(resolve(__dirname, "../../../database/seed-test-data.sql"), "utf8");
+    const fromSeed = [...seed.slice(seed.indexOf("UPDATE venues")).matchAll(/'(#[0-9a-f]{6})'/g)].map((m) => m[1]);
+    expect(fromSeed).toEqual([...STAMP_INKS]);
+  });
 });
 
 describe("migration 0076 backfill", () => {

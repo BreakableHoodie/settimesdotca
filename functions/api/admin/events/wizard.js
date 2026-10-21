@@ -21,6 +21,7 @@ import {
 import { getClientIP, parseJsonObjectBody } from "../../../utils/request.js";
 import { buildIntervals, intervalsOverlap } from "../../../utils/timeConflicts.js";
 import { normalizeBandName } from "../../../utils/bandName.js";
+import { inkForNewVenueOrNull } from "../../../utils/venueInk.js";
 
 // Detect scheduling conflicts within the submitted band list (all for a new event).
 function findConflict(bands) {
@@ -201,7 +202,15 @@ export async function onRequestPost(context) {
     // --- Find or create venues (reuses existing venue if name already taken) ---
     const venueIds = [];
     for (const v of sanitizedVenues) {
-      await DB.prepare(`INSERT OR IGNORE INTO venues (name, address) VALUES (?, ?)`).bind(v.name, v.address).run();
+      // A new venue gets its stamp ink here too (#1248): the wizard is how
+      // editions are usually built, so its venues must not stay uncoloured.
+      const existing = await DB.prepare(`SELECT id FROM venues WHERE name = ?`).bind(v.name).first();
+      if (!existing) {
+        const inkColor = await inkForNewVenueOrNull(DB, v.name);
+        await DB.prepare(`INSERT OR IGNORE INTO venues (name, address, ink_color) VALUES (?, ?, ?)`)
+          .bind(v.name, v.address, inkColor)
+          .run();
+      }
       const venue = await DB.prepare(`SELECT id FROM venues WHERE name = ?`).bind(v.name).first();
       venueIds.push(venue.id);
     }

@@ -60,8 +60,12 @@ export function quantize(pixels, { maxColours = 8 } = {}) {
 const chromaOf = hex => toOklch(hex).C
 const lightnessOf = hex => toOklch(hex).L
 
-/** Map swatches to the four theme roles in a light and a dark variant; null when there are none. */
-export function mapPaletteRoles(swatches) {
+/**
+ * Map swatches to the four theme roles in a light and a dark variant; null when
+ * there are none. `poster` is the URL the swatches came from: a palette
+ * describes one poster (see isValidThemeColours).
+ */
+export function mapPaletteRoles(swatches, poster) {
   if (!Array.isArray(swatches) || !swatches.length) return null
   const dominant = swatches.reduce((a, b) => (b.population > a.population ? b : a))
 
@@ -92,7 +96,11 @@ export function mapPaletteRoles(swatches) {
     .filter(s => s.population >= 0.02 && chromaOf(s.hex) >= MIN_ACCENT_CHROMA)
     .sort((a, b) => chromaOf(b.hex) - chromaOf(a.hex))
   const readsAsText = s => contrastRatio(s.hex, ground) >= AA_TEXT
-  const accentSwatch = candidates.find(readsAsText) || candidates[0] || null
+  // None reads as text: take the one CLOSEST to reading (least change), not
+  // the most chromatic, which is usually the brightest and needs the most
+  // darkening (a full-size Vol 17 sampled in Chromium turned its cyan teal).
+  const closestToText = [...candidates].sort((a, b) => contrastRatio(b.hex, ground) - contrastRatio(a.hex, ground))[0]
+  const accentSwatch = candidates.find(readsAsText) || closestToText || null
   const accent = accentSwatch ? ensureContrast(accentSwatch.hex, ground, AA_TEXT) : ink
 
   // nowFill: a background behind ink text
@@ -112,7 +120,13 @@ export function mapPaletteRoles(swatches) {
   const dAccent = ensureContrast(light.accent, dGround, AA_TEXT)
   const dFill = ensureContrast(withLightness(light.nowFill, 0.32), dInk, AA_TEXT)
 
-  return { v: 1, source: 'poster', light, dark: { ground: dGround, ink: dInk, accent: dAccent, nowFill: dFill } }
+  return {
+    v: 1,
+    source: 'poster',
+    poster,
+    light,
+    dark: { ground: dGround, ink: dInk, accent: dAccent, nowFill: dFill },
+  }
 }
 
 const hasExactKeys = (obj, keys) =>
@@ -122,9 +136,20 @@ const hasExactKeys = (obj, keys) =>
   Object.keys(obj).length === keys.length &&
   keys.every(k => Object.hasOwn(obj, k))
 
+const isHttpsUrl = value => {
+  if (typeof value !== 'string' || value.length > 500) return false
+  try {
+    return new URL(value).protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+// Mirrors functions/utils/themeColors.js isValidThemeColors exactly; the two
+// sides cannot share code across the build boundary.
 export function isValidThemeColours(value) {
-  if (!hasExactKeys(value, ['v', 'source', 'light', 'dark'])) return false
-  if (value.v !== 1 || !['poster', 'manual'].includes(value.source)) return false
+  if (!hasExactKeys(value, ['v', 'source', 'poster', 'light', 'dark'])) return false
+  if (value.v !== 1 || !['poster', 'manual'].includes(value.source) || !isHttpsUrl(value.poster)) return false
   return ['light', 'dark'].every(
     k => hasExactKeys(value[k], ROLES) && ROLES.every(r => typeof value[k][r] === 'string' && HEX_RE.test(value[k][r]))
   )
@@ -144,23 +169,40 @@ export function readableThemeColours(value) {
       nowFill: ensureContrast(nowFill, fixedInk, AA_TEXT),
     }
   }
-  return { v: value.v, source: value.source, light: fix(value.light), dark: fix(value.dark) }
+  return { v: value.v, source: value.source, poster: value.poster, light: fix(value.light), dark: fix(value.dark) }
 }
 
-const LONG_SIDE = 96
+// Large enough that the swatches do not depend on how a browser resamples a
+// 1440x1800 poster (96 px gave Chromium and Pillow different accents).
+const LONG_SIDE = 160
+// One colour over this share of the pixels is not a poster: it is what a
+// browser that blocks canvas reads (Firefox resistFingerprinting and the like)
+// hands back instead of throwing.
+const BLANK_SHARE = 0.98
 
-/** Browser only: Blob / ImageBitmap / HTMLImageElement -> theme colours (or null). */
-export async function extractPaletteFromImage(source) {
-  const bitmap = source instanceof globalThis.Blob ? await globalThis.createImageBitmap(source) : source
-  const w = bitmap.width || bitmap.naturalWidth
-  const h = bitmap.height || bitmap.naturalHeight
-  const scale = Math.min(1, LONG_SIDE / Math.max(w, h))
-  const cw = Math.max(1, Math.round(w * scale))
-  const ch = Math.max(1, Math.round(h * scale))
-  const canvas = document.createElement('canvas')
-  canvas.width = cw
-  canvas.height = ch
-  const ctx = canvas.getContext('2d', { willReadFrequently: true })
-  ctx.drawImage(bitmap, 0, 0, cw, ch)
-  return mapPaletteRoles(quantize(ctx.getImageData(0, 0, cw, ch).data))
+/** Browser only: a poster Blob -> its theme colours. Throws when it cannot read real pixels. */
+export async function extractPaletteFromImage(source, poster) {
+  const ownBitmap = source instanceof globalThis.Blob
+  const bitmap = ownBitmap ? await globalThis.createImageBitmap(source) : source
+  try {
+    const w = bitmap.width || bitmap.naturalWidth
+    const h = bitmap.height || bitmap.naturalHeight
+    const scale = Math.min(1, LONG_SIDE / Math.max(w, h))
+    const cw = Math.max(1, Math.round(w * scale))
+    const ch = Math.max(1, Math.round(h * scale))
+    const canvas = document.createElement('canvas')
+    canvas.width = cw
+    canvas.height = ch
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
+    if (!ctx) throw new Error('This browser could not prepare the image for reading.')
+    ctx.imageSmoothingQuality = 'high'
+    ctx.drawImage(bitmap, 0, 0, cw, ch)
+    const swatches = quantize(ctx.getImageData(0, 0, cw, ch).data)
+    if (swatches.length === 0 || swatches[0].population > BLANK_SHARE) {
+      throw new Error("Could not read the poster's pixels (the browser may be blocking image reading).")
+    }
+    return mapPaletteRoles(swatches, poster)
+  } finally {
+    if (ownBitmap) bitmap.close?.()
+  }
 }

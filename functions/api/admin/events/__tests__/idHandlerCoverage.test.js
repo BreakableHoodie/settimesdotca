@@ -508,6 +508,7 @@ describe("PATCH /api/admin/events/:id — guard and validation branches", () => 
   const PALETTE = {
     v: 1,
     source: "poster",
+    poster: "https://band-photos.settimes.ca/event-posters/a.jpg",
     light: { ground: "#f7eef0", ink: "#1a1819", accent: "#924d7a", nowFill: "#dce9f2" },
     dark: { ground: "#2a2629", ink: "#f7eef0", accent: "#d9a3c6", nowFill: "#3b4c5a" },
   };
@@ -540,6 +541,26 @@ describe("PATCH /api/admin/events/:id — guard and validation branches", () => 
     expect(res.status).toBe(200);
     const row = rawDb.prepare("SELECT theme_colors FROM events WHERE id = ?").get(ev.id);
     expect(JSON.parse(row.theme_colors)).toEqual(PALETTE);
+  });
+
+  it("theme_colors is stored re-serialised, so a hidden duplicate key never reaches the row", async () => {
+    const { env, rawDb } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, { name: "E", slug: "patch-theme-colors-dup-key" });
+    const smuggled = JSON.stringify(PALETTE).replace(
+      '"ground":"#f7eef0"',
+      '"ground":"red;}</style><script>alert(1)</script>","ground":"#f7eef0"',
+    );
+
+    const res = await onRequestPatch({
+      request: patchRequest(ev.id, { theme_colors: smuggled }),
+      env,
+      data: { user: authedUser("editor", 2) },
+    });
+
+    expect(res.status).toBe(200);
+    const stored = rawDb.prepare("SELECT theme_colors FROM events WHERE id = ?").get(ev.id).theme_colors;
+    expect(stored).not.toMatch(/script/);
+    expect(JSON.parse(stored)).toEqual(PALETTE);
   });
 
   it.each([

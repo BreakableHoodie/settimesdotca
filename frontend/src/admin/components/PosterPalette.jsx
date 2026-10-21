@@ -4,10 +4,12 @@ import { extractPaletteFromImage, readableThemeColours } from '../../utils/poste
 
 // Poster-led event colours (#1248). The event page takes its palette from the
 // edition's poster: a light variant, plus a dark one built from the poster's
-// own ink for fans on a dark theme. Zero per-edition maintenance: a NEW poster
-// in this form is read automatically and its colours go into the form, saved
-// with the event. Colours someone picked by hand ("manual") are never replaced
-// silently; they get a "Suggest from the poster" button instead.
+// own ink for fans on a dark theme. Zero per-edition maintenance: a palette
+// records the poster it was read from, and the form re-reads automatically
+// whenever the event's poster is not that one: a poster changed here, or one
+// saved earlier whose colours never were (an upload saves the poster at once;
+// the colours save with the form). Colours someone picked by hand ("manual")
+// are never replaced silently; they get a "Suggest again" button instead.
 const ROLE_LABELS = { ground: 'Background', ink: 'Text', accent: 'Accent', nowFill: 'On now' }
 const VARIANTS = [
   ['light', 'Light'],
@@ -33,7 +35,7 @@ function Preview({ colours, label }) {
   )
 }
 
-export default function PosterPalette({ originalPosterUrl = '', posterUrl, value, onChange }) {
+export default function PosterPalette({ originalPosterUrl = '', posterUrl, value, onChange, onBusyChange }) {
   const [status, setStatus] = useState('idle')
   const [error, setError] = useState('')
   // The event's saved poster is not "new": opening an old edition and saving
@@ -47,32 +49,49 @@ export default function PosterPalette({ originalPosterUrl = '', posterUrl, value
     valueRef.current = value
   }, [value])
 
+  // The form holds Save while colours are being read: saving mid-read would
+  // store the new poster with the old colours, and the late result would land
+  // in a form that no longer exists.
+  useEffect(() => {
+    onBusyChange?.(status === 'extracting')
+  }, [status, onBusyChange])
+
   const suggest = async url => {
     const id = ++request.current
     setStatus('extracting')
     setError('')
     try {
       const blob = await eventsApi.getPosterBlob(url)
-      const palette = await extractPaletteFromImage(blob)
+      const palette = await extractPaletteFromImage(blob, url)
       if (id !== request.current) return // a newer poster replaced this one
       if (!palette) throw new Error('The poster has no usable colours.')
       onChange(palette)
       setStatus('idle')
     } catch (err) {
       if (id !== request.current) return
+      console.error('[PosterPalette] could not read colours from the poster', { url, err })
+      const kept = valueRef.current
+        ? ' The colours below are still the previous ones: suggest again, adjust them, or remove them.'
+        : ''
       setStatus('error')
-      setError(`Could not read colours from the poster: ${err.message}`)
+      setError(`Could not read colours from the poster: ${err.message}.${kept}`)
     }
   }
 
   useEffect(() => {
-    if (!posterUrl || posterUrl === seenPoster.current) return
+    if (!posterUrl) return // the form mounts empty and fills a render later
+    const changedHere = posterUrl !== seenPoster.current
     seenPoster.current = posterUrl
-    if (valueRef.current?.source === 'manual') return
-    suggest(posterUrl)
-    // `suggest` is recreated each render; the poster URL is the only trigger.
+    const current = valueRef.current
+    if (current?.source === 'manual') return
+    // Colours from another poster are stale, whoever left them there. With no
+    // colours and the event's own saved poster, nothing is read: opening an
+    // old edition must not restyle it.
+    if (changedHere || (current && current.poster !== posterUrl)) suggest(posterUrl)
+    // `suggest` is recreated each render; the poster and the palette's poster
+    // are the only triggers.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [posterUrl])
+  }, [posterUrl, value?.poster])
 
   if (!posterUrl && !value) return null
 

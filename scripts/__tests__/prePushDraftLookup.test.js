@@ -65,12 +65,24 @@ function seed(n) {
   writeFileSync(join(dir, "coderabbit", "push-log"), Array.from({ length: n }, () => `${now} other\n`).join(""));
 }
 
-function push(branch = "feat") {
+// A gh that ANSWERS gets a budget far beyond any load spike: under a busy
+// machine, spawning the stub alone once took over the old 1 s budget, the hook
+// correctly counted the push, and the "draft" case failed on timing (#1358).
+// Only the hang cases need a short budget, so they ask for one.
+const ANSWER_BUDGET_SECONDS = "30";
+const HANG_BUDGET_SECONDS = "1";
+
+function push({ branch = "feat", lookupSeconds = ANSWER_BUDGET_SECONDS } = {}) {
   const t0 = Date.now();
   // HOOK_SHELL=dash reproduces Ubuntu CI, whose /bin/sh is dash, from a Mac.
   const r = spawnSync(process.env.HOOK_SHELL || "/bin/sh", [HOOK, "origin", "git@example:x.git"], {
     input: `refs/heads/${branch} ${SHA} refs/heads/${branch} ${ZERO}\n`,
     encoding: "utf8",
+    // A broken watchdog leaves a stub that never exits; vitest cannot interrupt
+    // a synchronous spawn, so without this a regression HANGS the suite instead
+    // of failing it. Well past every budget the cases use.
+    timeout: 45000,
+    killSignal: "SIGKILL",
     // Only the fake bin and the TOOLS symlinks: "no gh" is the fake bin
     // being empty, whatever the host has installed.
     env: {
@@ -78,7 +90,7 @@ function push(branch = "feat") {
       HOME: dir,
       XDG_CACHE_HOME: dir,
       TMPDIR: tmp,
-      CODERABBIT_DRAFT_LOOKUP_SECONDS: "1",
+      CODERABBIT_DRAFT_LOOKUP_SECONDS: lookupSeconds,
     },
   });
   return { status: r.status, stderr: r.stderr, ms: Date.now() - t0 };
@@ -124,7 +136,7 @@ describe("pre-push draft lookup", () => {
 
   it("counts the push when gh hangs, and gives up within the bound", () => {
     fakeGh("sleep 30; echo true");
-    const r = push();
+    const r = push({ lookupSeconds: HANG_BUDGET_SECONDS });
     expect(r.status).toBe(0);
     expect(logLines()).toHaveLength(1);
     expect(r.ms).toBeLessThan(5000);
@@ -132,14 +144,30 @@ describe("pre-push draft lookup", () => {
 
   it("still gives up on a gh that IGNORES SIGTERM", () => {
     fakeGh("trap '' TERM; sleep 30; echo true");
-    const r = push();
+    const r = push({ lookupSeconds: HANG_BUDGET_SECONDS });
     expect(logLines()).toHaveLength(1);
     expect(r.ms).toBeLessThan(6000);
   });
 
   it("returns promptly when gh answers fast: the watchdog must not hold the hook open", () => {
     fakeGh("echo true");
-    expect(push().ms).toBeLessThan(900);
+    // With a 30 s budget, a watchdog that held the hook open would take 30 s,
+    // so a loose bound still separates the two and tolerates a busy machine.
+    expect(push().ms).toBeLessThan(10000);
+  });
+
+  it("still counts an answer that arrives after the budget (the timeout path is live)", () => {
+    // The same late "true" that #1358's flake produced, now on purpose: it must
+    // count the push. Guards against the fix above hiding the timeout path.
+    // The stub answers "true" only WHEN the watchdog kills it, so no scheduler
+    // delay can let it answer in time (a plain `sleep 2; echo true` could). Never
+    // killed, it gives a successful late "true" after 30 s, which is what a
+    // broken watchdog would wrongly accept, so that break fails here rather
+    // than hanging, and the stub cannot outlive the test.
+    fakeGh("trap 'echo true; exit 1' TERM; i=0; while [ $i -lt 300 ]; do sleep 0.1; i=$((i + 1)); done; echo true");
+    const r = push({ lookupSeconds: HANG_BUDGET_SECONDS });
+    expect(logLines()).toHaveLength(1);
+    expect(r.stderr).not.toMatch(/not counted/);
   });
 
   it("reads a numeric LIMIT from the hook", () => {

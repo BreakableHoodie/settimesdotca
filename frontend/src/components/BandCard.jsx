@@ -5,6 +5,7 @@ import { buildBandProfileHref } from '../utils/bandProfileLink'
 import { BAND_PHOTO_CROP } from '../utils/bandPhoto'
 import { getTimeDescription, isHappeningNow, isStartingSoon } from '../utils/timeFilter'
 import { formatTime } from '../utils/timeFormat'
+import VenueStamp from './VenueStamp'
 
 function BandCard({
   band,
@@ -19,7 +20,7 @@ function BandCard({
   currentTime,
   dayLabel,
   variant = 'card',
-  venueCode,
+  boardVenue = false,
 }) {
   const handleRemove = e => {
     e.stopPropagation()
@@ -54,12 +55,20 @@ function BandCard({
     .find(Boolean)
 
   if (variant === 'board') {
+    // Strictly on stage now, not isHappeningNow's +/-30 minute window: this
+    // row says "On now, until 9:00 PM", which must not be said of a set that
+    // starts in twenty minutes.
+    const boardNowMs = +currentTime
+    const onNow =
+      !isCancelled && Boolean(band.startMs && band.endMs) && band.startMs <= boardNowMs && boardNowMs < band.endMs
     return (
-      <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-2 border-b border-border px-3 py-3">
+      <div
+        className={`grid grid-cols-[auto_1fr_auto] items-center gap-2 border-b border-border px-3 py-3 ${onNow ? 'board-now' : ''}`}
+      >
         {/* The time group header above supplies this from `sm:` up, where it is
             visible; below `sm:` that header is hidden and the row is the only
             place the time appears. Showing both at one width reads as a bug. */}
-        <span className="w-16 shrink-0 whitespace-nowrap font-mono text-sm font-bold tabular-nums text-text-primary">
+        <span className="w-16 shrink-0 whitespace-nowrap font-mono text-sm font-bold tabular-nums text-accent-400">
           {/* "TBA", never a bare dash. A dash reads as broken data, while this
               state is normal and supported: a lineup can be published before its
               set times are booked. The desktop layout conveys it with a "Time To
@@ -75,11 +84,14 @@ function BandCard({
         </span>
         <span className="min-w-0">
           {bandProfileHref ? (
-            <Link to={bandProfileHref} className="block truncate font-semibold text-text-primary hover:underline">
+            <Link
+              to={bandProfileHref}
+              className="block truncate font-display text-lg leading-tight text-text-primary hover:underline"
+            >
               {isCancelled ? <s>{displayName}</s> : displayName}
             </Link>
           ) : (
-            <span className="block truncate font-semibold text-text-primary">
+            <span className="block truncate font-display text-lg leading-tight text-text-primary">
               {isCancelled ? <s>{displayName}</s> : displayName}
             </span>
           )}
@@ -87,9 +99,23 @@ function BandCard({
               (most tags in production belong to a single artist), so a chip
               reading "a facet others may share" is truer than grey descriptive
               text. The full list stays on the card and the artist page. */}
-          {!isCancelled && firstGenreTag && (
-            <span className="mt-1 inline-block max-w-full truncate rounded-full border border-border bg-surface px-2 py-0.5 text-[11px] leading-normal text-text-secondary">
-              {firstGenreTag}
+          {/* The venue's stamp, then the genre, on one line under the name:
+              the real short name, never a four-letter code (#1248). */}
+          {(boardVenue || onNow || (!isCancelled && firstGenreTag)) && (
+            <span className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+              {boardVenue && <VenueStamp venue={band.venue} short={band.venue_short} ink={band.venue_ink} />}
+              {onNow ? (
+                <span className="text-[11px] font-semibold leading-normal text-text-primary">
+                  On now, until {formatTime(band.endTime)}
+                </span>
+              ) : (
+                !isCancelled &&
+                firstGenreTag && (
+                  <span className="min-w-0 truncate text-[11px] leading-normal text-text-secondary">
+                    {firstGenreTag}
+                  </span>
+                )
+              )}
             </span>
           )}
           {isCancelled && (
@@ -99,17 +125,6 @@ function BandCard({
             </span>
           )}
         </span>
-        {venueCode && (
-          <span
-            title={band.venue}
-            className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] font-bold text-text-secondary"
-          >
-            {/* "PROH" is a visual abbreviation; a screen reader should hear the
-                venue, not four letters. `title` alone is a tooltip, not a name. */}
-            <span aria-hidden="true">{venueCode}</span>
-            <span className="sr-only">{band.venue}</span>
-          </span>
-        )}
         {/* The board row REPLACES the card on mobile, so without this the core
             interaction the page advertises -- "Tap any performer to add them to
             My Route" -- would simply not exist on phones. Same semantics as the
@@ -275,9 +290,9 @@ function BandCard({
             {dayLabel}
           </p>
         )}
-        {showVenue && (
-          <p className={`text-sm font-medium leading-snug ${onAmber ? 'text-bg-navy' : 'text-text-tertiary'}`}>
-            {band.venue}
+        {showVenue && band.venue && (
+          <p className="leading-snug">
+            <VenueStamp venue={band.venue} short={band.venue_short} ink={band.venue_ink} className="text-xs" />
           </p>
         )}
         {/* Inline warning - always visible, no interaction needed */}

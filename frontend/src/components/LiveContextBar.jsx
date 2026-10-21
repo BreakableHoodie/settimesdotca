@@ -279,22 +279,21 @@ function LiveContextBar({
     // reads. Showing up underage to a 19+ show is a wasted trip; the venue and
     // set counts are visible on the page itself a few hundred pixels below.
     // #1084 was this line silently cutting "Presented by ..." every time.
-    const leading = []
-    if (eventData?.age_restriction) leading.push(eventData.age_restriction)
-    if (doorsTime) leading.push(`Doors ${formatTime(doorsTime)}`)
-    if (eventData?.presented_by) leading.push(`Presented by ${eventData.presented_by}`)
-
-    const summaryItems = [
-      ...leading,
-      `${uniqueVenues} ${uniqueVenues === 1 ? 'venue' : 'venues'}`,
-      `${activeBands.length} ${activeBands.length === 1 ? 'set' : 'sets'}`,
-    ]
+    // Plain sentences, not a bullet-joined string (#1248): "19+. Doors at
+    // 6:30 PM. Presented by SetTimes. 4 venues, 15 sets. 3 days away."
+    const sentences = []
+    if (eventData?.age_restriction) sentences.push(`${eventData.age_restriction}.`)
+    if (doorsTime) sentences.push(`Doors at ${formatTime(doorsTime)}.`)
+    if (eventData?.presented_by) sentences.push(`Presented by ${eventData.presented_by}.`)
+    sentences.push(
+      `${uniqueVenues} ${uniqueVenues === 1 ? 'venue' : 'venues'}, ${activeBands.length} ${activeBands.length === 1 ? 'set' : 'sets'}.`
+    )
 
     if (daysUntil !== null) {
-      summaryItems.push(getDaysAwayLabel(daysUntil))
+      sentences.push(`${getDaysAwayLabel(daysUntil)}.`)
     }
 
-    return summaryItems.join(' • ')
+    return sentences.join(' ')
     // eventData in full, NOT the two fields this memo reads. Narrowing the deps
     // is the obvious optimisation and this project rejects it: the React Compiler
     // infers `eventData` and errors with "Inferred less specific property than

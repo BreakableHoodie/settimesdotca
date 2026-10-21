@@ -18,15 +18,27 @@ const band = {
 const renderBoard = (props = {}) =>
   render(
     <MemoryRouter>
-      <BandCard band={band} variant="board" venueCode="PRIN" showVenue currentTime={new Date()} {...props} />
+      <BandCard band={band} variant="board" boardVenue showVenue currentTime={new Date()} {...props} />
     </MemoryRouter>
   )
 
 describe('BandCard variant="board"', () => {
-  it('shows the act, its time and the venue code', () => {
-    renderBoard()
+  it("shows the act and its venue's stamp: the real short name, never a code (#1248)", () => {
+    renderBoard({
+      band: { ...band, venue: 'Princess Cafe (Upstairs)', venue_short: 'Princess Cafe', venue_ink: '#B4432F' },
+    })
     expect(screen.getByText('Dolly Sods')).toBeInTheDocument()
-    expect(screen.getByText('PRIN')).toBeInTheDocument()
+    const stamp = screen.getByText('Princess Cafe')
+    expect(stamp).toHaveAttribute('data-venue-ink', '#b4432f')
+    expect(stamp).toHaveStyle({ backgroundColor: '#b4432f' })
+    expect(stamp).toHaveAttribute('title', 'Princess Cafe (Upstairs)')
+  })
+
+  it('a venue with no ink gets an uncoloured stamp, and nothing reaches CSS that is not a hex colour', () => {
+    renderBoard({ band: { ...band, venue_short: 'Princess Cafe', venue_ink: 'red;background:url(x)' } })
+    const stamp = screen.getByText('Princess Cafe')
+    expect(stamp).not.toHaveAttribute('data-venue-ink')
+    expect(stamp.getAttribute('style')).not.toMatch(/background/)
   })
 
   it('still marks a cancelled set as cancelled', () => {
@@ -34,16 +46,6 @@ describe('BandCard variant="board"', () => {
     // treatment is the one thing that must never differ between presentations.
     renderBoard({ band: { ...band, is_cancelled: 1 } })
     expect(screen.getByText(/cancelled/i)).toBeInTheDocument()
-  })
-
-  it('exposes the venue code to assistive tech as a real venue name', () => {
-    // "PRIN" is a visual abbreviation. A screen reader must hear the VENUE, and a
-    // `title` is a tooltip rather than an accessible name -- the first version of
-    // this test asserted the title and passed while the row still announced four
-    // letters. Assert the name is present and the abbreviation is hidden.
-    renderBoard()
-    expect(screen.getByText('Princess Cafe')).toBeInTheDocument()
-    expect(screen.getByText('PRIN')).toHaveAttribute('aria-hidden', 'true')
   })
 
   // The card was fixed for this in #726 (WCAG 2.5.3): the visible fallback and
@@ -154,11 +156,39 @@ describe('BandCard variant="board"', () => {
   // in production belong to exactly one artist -- so they are presented as
   // facets you could act on rather than as descriptive text, matching the chip
   // the desktop card already uses.
-  it('presents the genre as a tag chip, like the card does', () => {
-    renderBoard({ band: { ...band, genre: 'Shoegaze' } })
-    const chip = screen.getByText('Shoegaze')
-    expect(chip.className).toMatch(/rounded-full/)
-    expect(chip.className).toMatch(/border-border/)
+  it('shows the genre beside the stamp', () => {
+    renderBoard({ band: { ...band, genre: 'Shoegaze, Dream Pop' } })
+    expect(screen.getByText('Shoegaze')).toBeInTheDocument()
+  })
+
+  // #1248: an on-stage row wears the poster's "on now" fill and says so in
+  // words. Strictly start <= now < end: isHappeningNow's +/-30 minute window
+  // would call a set "on now" twenty minutes before it starts.
+  describe('on now', () => {
+    const start = Date.parse('2026-10-11T20:30:00-04:00')
+    const end = Date.parse('2026-10-11T21:15:00-04:00')
+    const timed = { ...band, startMs: start, endMs: end }
+    const rowOf = () => screen.getByText('Dolly Sods').closest('.grid')
+
+    it('marks a set on stage, with the time it ends', () => {
+      renderBoard({ band: timed, currentTime: new Date(start + 10 * 60000) })
+      expect(rowOf()).toHaveClass('board-now')
+      expect(screen.getByText(/On now, until 9:15/)).toBeInTheDocument()
+    })
+
+    it.each([
+      ['twenty minutes before it starts', start - 20 * 60000],
+      ['the moment it ends', end],
+    ])('does not mark it %s', (_label, at) => {
+      renderBoard({ band: timed, currentTime: new Date(at) })
+      expect(rowOf()).not.toHaveClass('board-now')
+      expect(screen.queryByText(/On now/)).not.toBeInTheDocument()
+    })
+
+    it('never marks a cancelled set', () => {
+      renderBoard({ band: { ...timed, is_cancelled: 1 }, currentTime: new Date(start + 60000) })
+      expect(screen.queryByText(/On now/)).not.toBeInTheDocument()
+    })
   })
 
   it('has no axe violations', async () => {

@@ -36,6 +36,19 @@ describe("STAMP_INKS", () => {
     for (const ink of STAMP_INKS) expect(ink).toMatch(/^#[0-9a-f]{6}$/);
   });
 
+  // The event page prints a stamp as WHITE text on the ink, so it reads on any
+  // ground (frontend/src/components/VenueStamp.jsx). A new ink must keep that.
+  it("all carry white text at WCAG AA (4.5:1) or better", () => {
+    const luminance = (hex) => {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+      const lin = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+      return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+    };
+    for (const ink of STAMP_INKS) {
+      expect((1 + 0.05) / (luminance(ink) + 0.05), ink).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
   it("match the migration's backfill list, in order (two homes, kept in step)", () => {
     const fromMigration = [...BACKFILL.matchAll(/'(#[0-9a-f]{6})'/g)].map((m) => m[1]);
     expect(fromMigration).toEqual([...STAMP_INKS]);

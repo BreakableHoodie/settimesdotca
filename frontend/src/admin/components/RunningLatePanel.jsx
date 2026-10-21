@@ -24,15 +24,18 @@ function describeError(err) {
 
 export default function RunningLatePanel({ eventId, readOnly = false, showToast, onShifted }) {
   const [delays, setDelays] = useState([])
-  // Venues with a request in flight. A SET, not one id: tapping B while A is
-  // in flight must not let A's reply re-enable B, or a second tap on B shifts
-  // it twice (the endpoint is deliberately not idempotent).
-  const [pendingVenueIds, setPendingVenueIds] = useState(() => new Set())
-  const markPending = (venueId, pending) =>
-    setPendingVenueIds(current => {
+  // Requests in flight, keyed by EVENT and venue. A set, not one id: tapping
+  // B while A is in flight must not let A's reply re-enable B. Keyed by event
+  // and never reset on an event switch: A -> B -> A while A's shift is still
+  // in flight must not re-enable A's buttons. Either way a second tap would
+  // shift the venue twice (the endpoint is deliberately not idempotent).
+  const [pendingKeys, setPendingKeys] = useState(() => new Set())
+  const pendingKey = (forEventId, venueId) => `${forEventId}:${venueId}`
+  const markPending = (key, pending) =>
+    setPendingKeys(current => {
       const next = new Set(current)
-      if (pending) next.add(venueId)
-      else next.delete(venueId)
+      if (pending) next.add(key)
+      else next.delete(key)
       return next
     })
   const [custom, setCustom] = useState({})
@@ -61,7 +64,6 @@ export default function RunningLatePanel({ eventId, readOnly = false, showToast,
 
   useEffect(() => {
     setDelays([])
-    setPendingVenueIds(new Set())
     setCustom({})
     load()
   }, [load])
@@ -71,7 +73,8 @@ export default function RunningLatePanel({ eventId, readOnly = false, showToast,
 
   const shift = async (row, minutes) => {
     const forEventId = eventId
-    markPending(row.venueId, true)
+    const key = pendingKey(forEventId, row.venueId)
+    markPending(key, true)
     try {
       const res = await eventsApi.shiftVenue(forEventId, row.venueId, minutes)
       if (isStale(forEventId)) return
@@ -86,13 +89,15 @@ export default function RunningLatePanel({ eventId, readOnly = false, showToast,
     } catch (err) {
       if (!isStale(forEventId)) showToast?.(describeError(err), 'error')
     } finally {
-      if (!isStale(forEventId)) markPending(row.venueId, false)
+      // Always, even after an event switch: the key names its own event.
+      markPending(key, false)
     }
   }
 
   const clear = async row => {
     const forEventId = eventId
-    markPending(row.venueId, true)
+    const key = pendingKey(forEventId, row.venueId)
+    markPending(key, true)
     try {
       await eventsApi.clearVenueDelay(forEventId, row.venueId)
       if (isStale(forEventId)) return
@@ -101,7 +106,8 @@ export default function RunningLatePanel({ eventId, readOnly = false, showToast,
     } catch (err) {
       if (!isStale(forEventId)) showToast?.(describeError(err), 'error')
     } finally {
-      if (!isStale(forEventId)) markPending(row.venueId, false)
+      // Always, even after an event switch: the key names its own event.
+      markPending(key, false)
     }
   }
 
@@ -117,7 +123,7 @@ export default function RunningLatePanel({ eventId, readOnly = false, showToast,
       </p>
       <ul className="space-y-3">
         {delays.map(row => {
-          const busy = pendingVenueIds.has(row.venueId)
+          const busy = pendingKeys.has(pendingKey(eventId, row.venueId))
           const customValue = custom[row.venueId] ?? ''
           const customMinutes = Number(customValue)
           const customValid = customValue !== '' && Number.isInteger(customMinutes) && customMinutes !== 0

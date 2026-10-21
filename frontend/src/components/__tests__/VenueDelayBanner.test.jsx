@@ -93,3 +93,39 @@ describe('torontoDate: the show runs on Toronto time wherever the fan is', () =>
     }
   })
 })
+
+describe('torontoDate and localIsoDate always produce YYYY-MM-DD', () => {
+  it("torontoDate ignores the engine's part ORDER (Firefox once emitted month-first en-CA dates)", async () => {
+    vi.resetModules()
+    const realParts = Intl.DateTimeFormat.prototype.formatToParts
+    // Month-first, the ordering a browser produced: only the field values matter.
+    const spy = vi.spyOn(Intl.DateTimeFormat.prototype, 'formatToParts').mockImplementation(function (date) {
+      const parts = realParts.call(this, date)
+      const by = type => parts.find(part => part.type === type)
+      return [by('month'), { type: 'literal', value: '/' }, by('day'), { type: 'literal', value: '/' }, by('year')]
+    })
+    // ...and format() too, so a regression back to `en-CA` + format() reads
+    // the browser's month-first string and fails here, instead of passing on
+    // Node's ISO-shaped output.
+    // `format` is a GETTER returning a bound function, so the getter is stubbed.
+    const formatSpy = vi.spyOn(Intl.DateTimeFormat.prototype, 'format', 'get').mockImplementation(function () {
+      return date =>
+        this.formatToParts(date)
+          .map(part => part.value)
+          .join('')
+    })
+    try {
+      const { torontoDate: fresh } = await import('../../utils/festivalDays')
+      expect(fresh(new Date('2026-08-07T16:00:00Z'))).toBe('2026-08-07')
+    } finally {
+      formatSpy.mockRestore()
+      spy.mockRestore()
+      vi.resetModules()
+    }
+  })
+
+  it("localIsoDate zero-pads and uses the date's own fields", async () => {
+    const { localIsoDate } = await import('../../utils/festivalDays')
+    expect(localIsoDate(new Date(2026, 0, 5, 21, 30))).toBe('2026-01-05')
+  })
+})

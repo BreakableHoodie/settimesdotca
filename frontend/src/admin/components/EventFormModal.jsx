@@ -5,7 +5,7 @@ import { Button } from '../../components/ui'
 import { eventsApi } from '../../utils/adminApi'
 import { FIELD_LIMITS } from '../../utils/validation'
 import { buildDayOptions, enumerateFestivalDays, isMultiDayEvent } from '../utils/dayOptions'
-import { formatFestivalDate } from '../../utils/festivalDays'
+import { formatFestivalDate, localIsoDate } from '../../utils/festivalDays'
 import { parseDoorsJsonToForm, serializeDoorsForm } from '../utils/doorsFormData'
 import { publishWithLineupConfirm } from '../utils/publishWithLineupConfirm'
 
@@ -439,7 +439,7 @@ export default function EventFormModal({
   // Today's date (device-local, YYYY-MM-DD) for the min attribute.
   // Not toISOString(): that is the UTC day, which flips to tomorrow at 8 PM
   // Eastern and blocks the admin from picking today's date in the evening.
-  const today = new Date().toLocaleDateString('en-CA')
+  const today = localIsoDate()
 
   // One doors-time input per festival day; re-derived on every render from
   // the live date/end_date fields so picking a date (or extending/shrinking

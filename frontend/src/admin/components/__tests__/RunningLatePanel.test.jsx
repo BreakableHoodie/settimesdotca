@@ -144,6 +144,30 @@ describe('RunningLatePanel (#1249)', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: '+10 minutes later: Roost' })).toBeEnabled())
   })
 
+  it('switching events and back mid-shift keeps the in-flight venue disabled (no double shift)', async () => {
+    let resolveShift
+    eventsApi.getVenueDelays.mockImplementation(eventId =>
+      Promise.resolve({
+        delays: eventId === 7 ? DELAYS : [{ venueId: 50, venue: 'Event B Hall', minutes: 0, updatedAt: null }],
+      })
+    )
+    eventsApi.shiftVenue.mockImplementation(
+      () =>
+        new Promise(resolve => {
+          resolveShift = resolve
+        })
+    )
+    const props = { showToast: vi.fn(), onShifted: vi.fn() }
+    const { rerender } = render(<RunningLatePanel eventId={7} {...props} />)
+    fireEvent.click(await screen.findByRole('button', { name: '+15 minutes later: Blue Room' }))
+    rerender(<RunningLatePanel eventId={8} {...props} />) // to event B...
+    await screen.findByText('Event B Hall')
+    rerender(<RunningLatePanel eventId={7} {...props} />) // ...and back, before A's shift settles
+    expect(await screen.findByRole('button', { name: '+15 minutes later: Blue Room' })).toBeDisabled()
+    resolveShift({ delayMinutes: 15, shifted: [] })
+    await waitFor(() => expect(screen.getByRole('button', { name: '+15 minutes later: Blue Room' })).toBeEnabled())
+  })
+
   it("each preset's accessible name starts with its visible label (WCAG 2.5.3)", async () => {
     renderPanel()
     const preset = await screen.findByRole('button', { name: '+30 minutes later: Blue Room' })

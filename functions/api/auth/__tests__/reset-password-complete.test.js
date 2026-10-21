@@ -11,6 +11,7 @@ import { describe, expect, test, beforeAll } from "vitest";
 import { createTestEnv, mockUsers } from "../../test-utils.js";
 import { onRequestPost } from "../reset-password-complete.js";
 import { hashPassword, verifyPassword } from "../../../utils/crypto.js";
+import { hashResetToken } from "../../../utils/tokens.js";
 
 const BASE_URL = "https://example.test/api/auth/reset-password";
 
@@ -21,7 +22,7 @@ const WEAK_PASSWORD = "short1!"; // below FIELD_LIMITS.password.min (12)
 
 let oldPasswordHash;
 
-// Compute once for the whole suite to avoid repeating 600k PBKDF2 rounds per test.
+// Compute once for the whole suite to avoid repeating the PBKDF2 rounds per test.
 beforeAll(async () => {
   oldPasswordHash = await hashPassword(OLD_PASSWORD);
 }, 30_000);
@@ -31,7 +32,9 @@ beforeAll(async () => {
  * `created_by` is required (NOT NULL FK) — use admin as the issuer, mirroring
  * reset-password-validate.test.js's insertToken helper for its sibling endpoint.
  */
-function insertToken(rawDb, { userId = mockUsers.editor.id, used = 0, expired = false } = {}) {
+// Stores the token HASHED, as issuance does (#1354), and returns the plaintext
+// a user would hold in their link.
+async function insertToken(rawDb, { userId = mockUsers.editor.id, used = 0, expired = false } = {}) {
   const token = crypto.randomUUID();
   // Use -2 days (not -1 hour) for expired: SQLite datetime() returns UTC but
   // Node.js parses the space-separated string as local time, so a short offset
@@ -42,7 +45,7 @@ function insertToken(rawDb, { userId = mockUsers.editor.id, used = 0, expired = 
       `INSERT INTO password_reset_tokens (user_id, token, created_by, expires_at, used)
        VALUES (?, ?, ?, ${expiresExpr}, ?)`,
     )
-    .run(userId, token, mockUsers.admin.id, used);
+    .run(userId, await hashResetToken(token), mockUsers.admin.id, used);
   return token;
 }
 
@@ -69,7 +72,7 @@ describe("POST /api/auth/reset-password (completion)", () => {
   test("valid unused unexpired token resets the password and clears every session for that user", async () => {
     const { env, rawDb } = createTestEnv();
     rawDb.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(oldPasswordHash, mockUsers.editor.id);
-    const token = insertToken(rawDb);
+    const token = await insertToken(rawDb);
     insertSession(rawDb, mockUsers.editor.id);
     insertSession(rawDb, mockUsers.editor.id);
 
@@ -88,14 +91,16 @@ describe("POST /api/auth/reset-password (completion)", () => {
       .get(mockUsers.editor.id);
     expect(sessions.c).toBe(0);
 
-    const tokenRow = rawDb.prepare("SELECT used FROM password_reset_tokens WHERE token = ?").get(token);
+    const tokenRow = rawDb
+      .prepare("SELECT used FROM password_reset_tokens WHERE token = ?")
+      .get(await hashResetToken(token));
     expect(tokenRow.used).toBe(1);
   }, 15_000);
 
   test("an expired token is rejected and is NOT marked used (a rejected attempt must not burn it)", async () => {
     const { env, rawDb } = createTestEnv();
     rawDb.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(oldPasswordHash, mockUsers.editor.id);
-    const token = insertToken(rawDb, { expired: true });
+    const token = await insertToken(rawDb, { expired: true });
 
     const response = await postReset(env, { token, newPassword: NEW_PASSWORD });
 
@@ -103,7 +108,9 @@ describe("POST /api/auth/reset-password (completion)", () => {
     const body = await response.json();
     expect(body.code).toBe("TOKEN_EXPIRED");
 
-    const tokenRow = rawDb.prepare("SELECT used FROM password_reset_tokens WHERE token = ?").get(token);
+    const tokenRow = rawDb
+      .prepare("SELECT used FROM password_reset_tokens WHERE token = ?")
+      .get(await hashResetToken(token));
     expect(tokenRow.used).toBe(0);
 
     const user = rawDb.prepare("SELECT password_hash FROM users WHERE id = ?").get(mockUsers.editor.id);
@@ -113,7 +120,7 @@ describe("POST /api/auth/reset-password (completion)", () => {
   test("an already-used token is rejected (replay protection)", async () => {
     const { env, rawDb } = createTestEnv();
     rawDb.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(oldPasswordHash, mockUsers.editor.id);
-    const token = insertToken(rawDb, { used: 1 });
+    const token = await insertToken(rawDb, { used: 1 });
 
     const response = await postReset(env, { token, newPassword: NEW_PASSWORD });
 
@@ -128,7 +135,7 @@ describe("POST /api/auth/reset-password (completion)", () => {
 
   test("an unknown token gets the identical response shape as an already-used token — no existence oracle", async () => {
     const { env, rawDb } = createTestEnv();
-    const usedToken = insertToken(rawDb, { used: 1 });
+    const usedToken = await insertToken(rawDb, { used: 1 });
 
     const usedResponse = await postReset(env, { token: usedToken, newPassword: NEW_PASSWORD });
     const unknownResponse = await postReset(env, { token: "never-issued-token", newPassword: NEW_PASSWORD });
@@ -147,7 +154,7 @@ describe("POST /api/auth/reset-password (completion)", () => {
   test("a new password failing validatePassword is rejected with 400 and writes nothing", async () => {
     const { env, rawDb } = createTestEnv();
     rawDb.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(oldPasswordHash, mockUsers.editor.id);
-    const token = insertToken(rawDb);
+    const token = await insertToken(rawDb);
 
     const response = await postReset(env, { token, newPassword: WEAK_PASSWORD });
 
@@ -158,7 +165,9 @@ describe("POST /api/auth/reset-password (completion)", () => {
     const user = rawDb.prepare("SELECT password_hash FROM users WHERE id = ?").get(mockUsers.editor.id);
     expect(user.password_hash).toBe(oldPasswordHash);
 
-    const tokenRow = rawDb.prepare("SELECT used FROM password_reset_tokens WHERE token = ?").get(token);
+    const tokenRow = rawDb
+      .prepare("SELECT used FROM password_reset_tokens WHERE token = ?")
+      .get(await hashResetToken(token));
     expect(tokenRow.used).toBe(0);
   });
 
@@ -176,5 +185,26 @@ describe("POST /api/auth/reset-password (completion)", () => {
     expect(response.status).toBe(400);
     const body = await response.json();
     expect(body.code).toBe("MISSING_FIELDS");
+  });
+});
+
+describe("a stored token value cannot be redeemed (#1354)", () => {
+  test("a token sent as an array is refused, not coerced into the real token", async () => {
+    const { env, rawDb } = createTestEnv();
+    const token = await insertToken(rawDb);
+    const response = await postReset(env, { token: [token], newPassword: NEW_PASSWORD });
+    expect(response.status).toBe(400);
+    const stored = await hashResetToken(token);
+    expect(rawDb.prepare("SELECT used FROM password_reset_tokens WHERE token = ?").get(stored).used).toBe(0);
+  });
+
+  test("submitting the DATABASE value (the hash) is rejected and burns nothing", async () => {
+    const { env, rawDb } = createTestEnv();
+    const token = await insertToken(rawDb);
+    const stored = await hashResetToken(token);
+    const response = await postReset(env, { token: stored, newPassword: NEW_PASSWORD });
+    expect(response.status).toBe(400);
+    expect((await response.json()).code).toBe("TOKEN_INVALID");
+    expect(rawDb.prepare("SELECT used FROM password_reset_tokens WHERE token = ?").get(stored).used).toBe(0);
   });
 });

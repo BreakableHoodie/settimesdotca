@@ -9,6 +9,7 @@ import { getClientIP, parseJsonObjectBody } from "../../utils/request.js";
 import { revokeAllTrustedDevices } from "../../utils/trustedDevice.js";
 import { fromSqliteDateTime } from "../../utils/authAttempts.js";
 import { isDevRequest } from "../../utils/auth.js";
+import { hashResetToken } from "../../utils/tokens.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -64,7 +65,9 @@ export async function onRequestPost(context) {
     }
     const { token, newPassword } = body;
 
-    if (!token || !newPassword) {
+    // Strings only, as validate.js requires: hashResetToken would coerce
+    // ["<token>"] into the token itself and accept it.
+    if (!token || !newPassword || typeof token !== "string") {
       logDebug("missing_fields", { hasToken: Boolean(token) });
       await logFailure("MISSING_FIELDS", { hasToken: Boolean(token) });
       return new Response(
@@ -111,7 +114,8 @@ export async function onRequestPost(context) {
       WHERE prt.token = ? AND prt.used = 0
     `,
     )
-      .bind(token)
+      // Stored hashed (#1354): look up the digest of what was submitted.
+      .bind(await hashResetToken(token))
       .first();
 
     if (!resetToken) {

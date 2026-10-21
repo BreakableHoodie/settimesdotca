@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { createTestEnv, mockUsers } from "../../test-utils.js";
 import { onRequestPost } from "../reset-password/validate.js";
+import { hashResetToken } from "../../../utils/tokens.js";
 
 const BASE_URL = "https://example.test/api/auth/reset-password/validate";
 
@@ -8,7 +9,12 @@ const BASE_URL = "https://example.test/api/auth/reset-password/validate";
  * Inserts a password_reset_token row and returns the token string.
  * `created_by` is required (NOT NULL FK) — use admin as the issuer.
  */
-function insertToken(rawDb, { userId = mockUsers.editor.id, used = 0, expired = false, userInactive = false } = {}) {
+// Stores the token HASHED, as issuance does (#1354), and returns the plaintext
+// a user would hold in their link.
+async function insertToken(
+  rawDb,
+  { userId = mockUsers.editor.id, used = 0, expired = false, userInactive = false } = {},
+) {
   if (userInactive) {
     rawDb.prepare("UPDATE users SET is_active = 0 WHERE id = ?").run(userId);
   }
@@ -23,14 +29,14 @@ function insertToken(rawDb, { userId = mockUsers.editor.id, used = 0, expired = 
       `INSERT INTO password_reset_tokens (user_id, token, created_by, expires_at, used)
        VALUES (?, ?, ?, ${expiresExpr}, ?)`,
     )
-    .run(userId, token, mockUsers.admin.id, used);
+    .run(userId, await hashResetToken(token), mockUsers.admin.id, used);
   return token;
 }
 
 describe("POST /api/auth/reset-password/validate", () => {
   test("returns valid user info for a valid token", async () => {
     const { env, rawDb } = createTestEnv();
-    const token = insertToken(rawDb, { userId: mockUsers.editor.id });
+    const token = await insertToken(rawDb, { userId: mockUsers.editor.id });
 
     const response = await onRequestPost({
       request: new Request(BASE_URL, {
@@ -67,7 +73,7 @@ describe("POST /api/auth/reset-password/validate", () => {
 
   test("returns 400 TOKEN_INVALID for an already-used token", async () => {
     const { env, rawDb } = createTestEnv();
-    const token = insertToken(rawDb, { used: 1 });
+    const token = await insertToken(rawDb, { used: 1 });
 
     const response = await onRequestPost({
       request: new Request(BASE_URL, {
@@ -85,7 +91,7 @@ describe("POST /api/auth/reset-password/validate", () => {
 
   test("returns 400 TOKEN_EXPIRED for an expired token", async () => {
     const { env, rawDb } = createTestEnv();
-    const token = insertToken(rawDb, { expired: true });
+    const token = await insertToken(rawDb, { expired: true });
 
     const response = await onRequestPost({
       request: new Request(BASE_URL, {
@@ -103,7 +109,7 @@ describe("POST /api/auth/reset-password/validate", () => {
 
   test("returns 400 USER_INACTIVE for a token belonging to an inactive user", async () => {
     const { env, rawDb } = createTestEnv();
-    const token = insertToken(rawDb, { userInactive: true });
+    const token = await insertToken(rawDb, { userInactive: true });
 
     const response = await onRequestPost({
       request: new Request(BASE_URL, {

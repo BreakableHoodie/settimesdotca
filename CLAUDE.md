@@ -620,6 +620,12 @@ An invite code is a bearer credential that mints an account, possibly an admin o
 - **"Unused" is `used_by_user_id IS NULL AND used_at IS NULL`.** `used_by_user_id` is `ON DELETE SET NULL`, so deleting the user alone would reopen the invite and let the same link mint another account; `used_at` survives. Every signup open-check (SELECT, EXISTS, claim) carries both.
 - **Revoke is by id**: `DELETE /api/admin/invite-codes/[id]`, because a digest cannot be a URL key. Any new invite writer must call `generateInviteCode()` and return the plaintext once; `invite-codes.test.js` scans both creation routes through GET.
 
+### Password reset tokens are stored hashed (#1354)
+
+The same scheme as invite codes, for the same reason: a reset token sets the account's password, so **the plaintext exists only in the emailed link.** `password_reset_tokens.token` holds `'sha256:' || hex(SHA-256(token))` (`hashResetToken` in `functions/utils/tokens.js`), and both readers, `reset-password-complete.js` and `reset-password/validate.js`, hash what is submitted before the lookup, so the stored value itself is never redeemable. Migration 0074 retired every pre-existing row (`'retired:<id>'`, marked used) instead of converting it: SQLite cannot compute SHA-256, and the tokens live two hours.
+
+The admin issuer (`users/[id]/reset-password.js`) checks `isEmailConfigured` **before any side effect** (#1353): with no way to send the link, it answers 500 having minted nothing and signed nobody out. If the send then fails, it withdraws the token. It does **not** restore the user's sessions: an admin forcing a reset may be answering a compromise, and signing the user out must not depend on the email provider. All five behaviours are in the mutation gate.
+
 ### Time validation is shape AND range — `isValidTime()` is the only home (#1089)
 
 `isValidTime()` in `functions/utils/validation/datetime.js` checks the `HH:MM`

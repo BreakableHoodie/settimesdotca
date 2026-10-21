@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { randomBytes } from "node:crypto";
 import { verifyPassword } from "../functions/utils/crypto.js";
+import { hashResetToken } from "../functions/utils/tokens.js";
 import { d1, sqlString } from "./utils/d1";
 
 // The three flows whose token is only ever emailed: password-reset completion,
@@ -49,9 +50,11 @@ test("a password reset link completes, hashing the new password on the server", 
   // characters, a SQLite-format expiry. Issuance is not what can break on the
   // edge; hashing the new password is (the PBKDF2 outage, CLAUDE.md).
   const token = randomBytes(32).toString("hex");
+  // Stored hashed, as issuance stores it (#1354); the link carries the token.
+  const tokenHash = await hashResetToken(token);
   d1(
     `INSERT INTO password_reset_tokens (user_id, token, created_by, expires_at, reason)
-     SELECT id, ${sqlString(token)}, id, datetime('now', '+30 minutes'), 'e2e' FROM users
+     SELECT id, ${sqlString(tokenHash)}, id, datetime('now', '+30 minutes'), 'e2e' FROM users
      WHERE email = 'viewer@settimes.ca'`,
   );
 
@@ -64,7 +67,7 @@ test("a password reset link completes, hashing the new password on the server", 
   expect(response.status(), await response.text()).toBe(200);
   await expect(page.getByText(/password reset successfully/i)).toBeVisible();
 
-  const [row] = d1(`SELECT used FROM password_reset_tokens WHERE token = ${sqlString(token)}`);
+  const [row] = d1(`SELECT used FROM password_reset_tokens WHERE token = ${sqlString(tokenHash)}`);
   expect(row?.used, "the token is spent").toBe(1);
   // A handler can spend the token and answer 200 without writing the hash.
   const [user] = d1("SELECT password_hash FROM users WHERE email = 'viewer@settimes.ca'");

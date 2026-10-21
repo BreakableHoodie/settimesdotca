@@ -4,7 +4,7 @@
 // Returns: { success: true, resetUrl: string } or error
 
 import { checkPermission, auditLog } from "../../_middleware.js";
-import { generatePasswordResetToken } from "../../../../utils/tokens.js";
+import { generatePasswordResetToken, hashResetToken } from "../../../../utils/tokens.js";
 import { sanitizeString, validateId } from "../../../../utils/validation.js";
 import { getClientIP, parseJsonObjectBody } from "../../../../utils/request.js";
 import { sendEmail, isEmailConfigured } from "../../../../utils/email.js";
@@ -75,18 +75,39 @@ export async function onRequestPost(context) {
       });
     }
 
-    // Generate reset token and persist it
+    // Before ANY side effect (#1353): with no way to send the link, a token
+    // would be a live credential nobody holds, and signing the user out would
+    // leave them with no way back in.
+    if (!isEmailConfigured(env)) {
+      console.error("[ResetPassword] Email not configured");
+      return new Response(
+        JSON.stringify({
+          error: "Email not configured",
+          message: "Email delivery is not configured. Unable to send reset email.",
+        }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    // Generate reset token and persist only its hash (#1354): the plaintext
+    // travels in the emailed link and nowhere else.
     const resetToken = generatePasswordResetToken(userId, user.userId);
+    const tokenHash = await hashResetToken(resetToken.token);
     await DB.prepare(
       `
       INSERT INTO password_reset_tokens (user_id, token, created_by, expires_at, ip_address, reason)
       VALUES (?, ?, ?, ?, ?, ?)
     `,
     )
-      .bind(userId, resetToken.token, user.userId, resetToken.expiresAt, ipAddress, sanitizedReason)
+      .bind(userId, tokenHash, user.userId, resetToken.expiresAt, ipAddress, sanitizedReason)
       .run();
 
-    // Revoke existing sessions to force re-authentication
+    // Revoke existing sessions to force re-authentication. Deliberately kept
+    // even if the email then fails: an admin forcing a reset is often answering
+    // a compromise, and signing the user out must not depend on the provider.
     await DB.prepare(
       `
       DELETE FROM lucia_sessions
@@ -103,19 +124,6 @@ export async function onRequestPost(context) {
     // Cloudflare access logs, stored in browser history, or leaked via Referer.
     const resetUrl = `${baseUrl}/reset-password#token=${resetToken.token}`;
 
-    if (!isEmailConfigured(env)) {
-      console.error("[ResetPassword] Email not configured");
-      return new Response(
-        JSON.stringify({
-          error: "Email not configured",
-          message: "Email delivery is not configured. Unable to send reset email.",
-        }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
     const emailPayload = buildResetPasswordEmail({
       resetUrl,
       recipientName: targetUser.name,
@@ -130,6 +138,30 @@ export async function onRequestPost(context) {
 
     if (!emailResult.delivered) {
       console.error("[ResetPassword] Email delivery failed:", emailResult);
+      // The link never left: withdraw the token rather than leave a credential
+      // nobody was given. A failed cleanup must not mask the delivery error.
+      let tokenWithdrawn = true;
+      try {
+        await DB.prepare("DELETE FROM password_reset_tokens WHERE token = ? AND used = 0").bind(tokenHash).run();
+      } catch (error) {
+        tokenWithdrawn = false;
+        console.error("[ResetPassword] Failed to withdraw undelivered token:", {
+          userId,
+          error: error?.message || error,
+        });
+      }
+      // The user WAS signed out (kept on purpose, above), so this is a security
+      // action that happened, and it needs the same audit row a delivered reset
+      // gets, not just a log line.
+      await auditLog(
+        env,
+        user.userId,
+        "user.password_reset",
+        "user",
+        userId,
+        { reason: sanitizedReason, emailDelivered: false, tokenWithdrawn },
+        ipAddress,
+      );
       return new Response(
         JSON.stringify({
           error: "Email delivery failed",

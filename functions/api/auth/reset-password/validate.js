@@ -9,6 +9,7 @@
 
 import { fromSqliteDateTime } from "../../../utils/authAttempts.js";
 import { parseJsonObjectBody } from "../../../utils/request.js";
+import { hashResetToken } from "../../../utils/tokens.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -40,7 +41,8 @@ export async function onRequestPost(context) {
       WHERE prt.token = ? AND prt.used = 0
     `,
     )
-      .bind(token)
+      // Stored hashed (#1354): look up the digest of what was submitted.
+      .bind(await hashResetToken(token))
       .first();
 
     if (!resetToken) {

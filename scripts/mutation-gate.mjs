@@ -513,6 +513,51 @@ export const MUTATIONS = [
     tests: ["functions/api/admin/api-keys/__tests__/api-keys.test.js"],
   },
   {
+    id: "reset-token-stored-hashed",
+    invariant:
+      "CLAUDE.md 'Password reset tokens are stored hashed' \u2014 the issuer stores the hash, never the token in the emailed link (#1354)",
+    file: "functions/api/admin/users/[id]/reset-password.js",
+    find: ".bind(userId, tokenHash, user.userId",
+    replace: ".bind(userId, resetToken.token, user.userId",
+    tests: ["functions/api/admin/users/__tests__/reset-password.test.js"],
+  },
+  {
+    id: "reset-complete-lookup-binds-hash",
+    invariant:
+      "CLAUDE.md 'Password reset tokens are stored hashed' \u2014 completion hashes the submitted token, so the stored value is never redeemable (#1354)",
+    file: "functions/api/auth/reset-password-complete.js",
+    find: "      .bind(await hashResetToken(token))",
+    replace: "      .bind(token)",
+    tests: ["functions/api/auth/__tests__/reset-password-complete.test.js"],
+  },
+  {
+    id: "reset-validate-lookup-binds-hash",
+    invariant:
+      "CLAUDE.md 'Password reset tokens are stored hashed' \u2014 validation hashes the submitted token before the lookup (#1354)",
+    file: "functions/api/auth/reset-password/validate.js",
+    find: "      .bind(await hashResetToken(token))",
+    replace: "      .bind(token)",
+    tests: ["functions/api/auth/__tests__/reset-password-validate.test.js"],
+  },
+  {
+    id: "reset-issue-checks-email-before-side-effects",
+    invariant:
+      "CLAUDE.md 'Password reset tokens are stored hashed' \u2014 with email unconfigured the issuer mints nothing and signs nobody out (#1353)",
+    file: "functions/api/admin/users/[id]/reset-password.js",
+    find: '    if (!isEmailConfigured(env)) {\n      console.error("[ResetPassword] Email not configured");',
+    replace: '    if (false) {\n      console.error("[ResetPassword] Email not configured");',
+    tests: ["functions/api/admin/users/__tests__/reset-password.test.js"],
+  },
+  {
+    id: "reset-issue-withdraws-undelivered-token",
+    invariant:
+      "CLAUDE.md 'Password reset tokens are stored hashed' \u2014 a token whose email failed is withdrawn, not left live (#1353)",
+    file: "functions/api/admin/users/[id]/reset-password.js",
+    find: '        await DB.prepare("DELETE FROM password_reset_tokens WHERE token = ? AND used = 0").bind(tokenHash).run();',
+    replace: "        void tokenHash;",
+    tests: ["functions/api/admin/users/__tests__/reset-password.test.js"],
+  },
+  {
     id: "invite-list-returns-no-code",
     invariant:
       "CLAUDE.md 'Invite codes are stored hashed' — GET /api/admin/invite-codes projects no `code` column; a stolen admin session must not read an unused invite (#1334)",

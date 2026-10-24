@@ -205,10 +205,10 @@ review-wip: ## AI code review of uncommitted changes — run before committing
 	@out=$$(mktemp); coderabbit review --type uncommitted >"$$out" 2>&1; status=$$?; \
 		grep -aivE '$(CR_NOISE)' "$$out" || true; rm -f "$$out"; exit $$status
 
-await-review: ## Wait until CodeRabbit has reviewed PR=<n>'s HEAD commit; re-requests after a rate-limit cooldown
+await-review: ## Wait until CodeRabbit has reviewed PR=<n>'s HEAD commit; exit 5 on body-only findings (ARGS=--allow-findings to accept)
 	@[ -n "$(PR)" ] || { echo "usage: make await-review PR=<number>"; exit 4; }
 	@command -v gh >/dev/null 2>&1 || { echo "gh CLI not found. Install: brew install gh"; exit 4; }
-	@node scripts/coderabbit-await-review.mjs "$(PR)"
+	@node scripts/coderabbit-await-review.mjs "$(PR)" $(ARGS)
 
 delegate-stats: ## Token usage and cost for delegated (OpenCode) runs on this project
 	@command -v opencode >/dev/null 2>&1 || { \

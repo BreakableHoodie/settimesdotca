@@ -19,11 +19,20 @@
  * 2026-09-24, 13 had a completed review with no review object on the head
  * (a clean review posts only the summary comment).
  *
+ * "Reviewed" is not "clean" either (#1365). Outside-diff and nitpick findings
+ * live only in the review BODY, never as threads, so an unresolved-threads
+ * check cannot see them: #1362 merged with three, one a vacuous test. Once the
+ * head is reviewed, its CodeRabbit review bodies are scanned and any such
+ * finding stops the run with 5. Inline ("actionable") findings are threads,
+ * which the protect-main ruleset already refuses to merge past unresolved, so
+ * they are not counted here: their count in the body never goes down.
+ *
  * Usage
  * -----
  *   node scripts/coderabbit-await-review.mjs <pr-number>          # wait, re-request, wait
  *   node scripts/coderabbit-await-review.mjs <pr-number> --once   # classify now, never act
- *   make await-review PR=<n>
+ *   node scripts/coderabbit-await-review.mjs <pr-number> --allow-findings  # findings declined
+ *   make await-review PR=<n> [ARGS=--allow-findings]
  *
  * Exit codes:
  *   0  the current head commit has a completed CodeRabbit review
@@ -32,6 +41,9 @@
  *   3  CodeRabbit skipped the head (e.g. every file path-filtered) — no review
  *      will come; a human decides whether that is acceptable
  *   4  usage error, draft PR, or `gh` failure
+ *   5  the head IS reviewed, but its review body carries outside-diff or
+ *      nitpick findings: address them, or pass --allow-findings having
+ *      decided not to
  */
 import { execFileSync } from "node:child_process";
 
@@ -99,6 +111,22 @@ export function parseCooldownMs(text) {
   return Math.min(ms + COOLDOWN_SLACK_MS, MAX_COOLDOWN_MS);
 }
 
+/**
+ * Count the findings a CodeRabbit review keeps in its BODY, which no thread
+ * query sees. Wordings observed on this repo: "Outside diff range comments (2)"
+ * and "Nitpick comments: 1" (#1362, #1364). "Duplicate comments (N)" is
+ * CodeRabbit's section for a finding repeated from an earlier review, not yet
+ * seen here; the loose matches accept "(N)" and ": N" for every section.
+ */
+export function countBodyFindings(body) {
+  const text = String(body || "");
+  const count = (label) => {
+    const m = text.match(new RegExp(`${label} comments\\s*(?::\\s*|\\()\\s*(\\d+)`, "i"));
+    return m ? Number(m[1]) : 0;
+  };
+  return { outsideDiff: count("Outside diff range"), nitpicks: count("Nitpick"), duplicates: count("Duplicate") };
+}
+
 function gh(args) {
   return execFileSync("gh", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 }
@@ -143,6 +171,23 @@ export function ghDeps(pr) {
         return classifyStatus(cr) === "in_progress" && Date.now() - Date.parse(cr.updated_at) < STALE_IN_PROGRESS_MS;
       });
     },
+    getHeadReviewFindings(head) {
+      // Every CodeRabbit review OF THIS COMMIT. A review of an earlier commit
+      // says nothing about the head, and an incremental review with nothing to
+      // say posts no review object at all, which correctly counts as clean.
+      const reviews = ghList(`repos/{owner}/{repo}/pulls/${pr}/reviews`).filter(
+        (r) => r.user?.login === "coderabbitai[bot]" && r.commit_id === head,
+      );
+      const total = { outsideDiff: 0, nitpicks: 0, duplicates: 0, url: null };
+      for (const r of reviews) {
+        const c = countBodyFindings(r.body);
+        total.outsideDiff += c.outsideDiff;
+        total.nitpicks += c.nitpicks;
+        total.duplicates += c.duplicates;
+        if (c.outsideDiff + c.nitpicks + c.duplicates > 0) total.url = r.html_url;
+      }
+      return total;
+    },
     requestReview() {
       gh(["pr", "comment", String(pr), "--body", "@coderabbitai review"]);
     },
@@ -165,6 +210,7 @@ export async function awaitReview(deps, opts = {}) {
     timeoutMs = 3 * 3_600_000,
     maxRequests = 6,
     noStatusGraceMs = 30 * 60_000,
+    allowFindings = false,
   } = opts;
   const start = deps.now();
   let pr;
@@ -290,7 +336,21 @@ export async function awaitReview(deps, opts = {}) {
         switchHead(pr.head);
         return undefined;
       }
-      deps.log(`head ${short} reviewed ("${status.description}").`);
+      // Read after the status: on #1364 CodeRabbit's summary comment landed 3 s
+      // BEFORE "Review completed", so the review exists by the time it reads so.
+      const f = deps.getHeadReviewFindings(head);
+      const found = f.outsideDiff + f.nitpicks + f.duplicates;
+      if (found > 0 && !allowFindings) {
+        deps.log(
+          `head ${short} reviewed, with findings outside any thread: ${f.outsideDiff} outside-diff, ` +
+            `${f.nitpicks} nitpick, ${f.duplicates} duplicate${f.url ? ` (${f.url})` : ""}. ` +
+            "Address them, or re-run with --allow-findings once declined.",
+        );
+        return 5;
+      }
+      deps.log(
+        `head ${short} reviewed ("${status.description}")${found > 0 ? `; ${found} body finding(s) allowed` : ""}.`,
+      );
       return 0;
     }
     if (state === "skipped") {
@@ -422,11 +482,14 @@ export async function awaitReview(deps, opts = {}) {
 export async function main(argv) {
   const pr = argv.find((a) => /^\d+$/.test(a));
   if (!pr) {
-    process.stderr.write("usage: coderabbit-await-review.mjs <pr-number> [--once]\n");
+    process.stderr.write("usage: coderabbit-await-review.mjs <pr-number> [--once] [--allow-findings]\n");
     return 4;
   }
   try {
-    return await awaitReview(ghDeps(pr), { once: argv.includes("--once") });
+    return await awaitReview(ghDeps(pr), {
+      once: argv.includes("--once"),
+      allowFindings: argv.includes("--allow-findings"),
+    });
   } catch (err) {
     process.stderr.write(`[await-review #${pr}] gh failed: ${err.stderr || err.message}\n`);
     return 4;

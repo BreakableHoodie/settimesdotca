@@ -9,6 +9,7 @@ import {
   UNKNOWN_SETTLE_MS,
   awaitReview,
   classifyStatus,
+  countBodyFindings,
   parseCooldownMs,
 } from "../coderabbit-await-review.mjs";
 
@@ -33,11 +34,12 @@ function fakeDeps({
   comment = RL_COMMENT,
   commentAt = "1970-01-01T00:00:00Z",
   busy = () => false,
+  findings = () => ({ outsideDiff: 0, nitpicks: 0, duplicates: 0, url: null }),
 }) {
   let t = 0;
   let si = 0;
   let hi = 0;
-  const calls = { requests: 0, sleeps: [], statusShas: [], logs: [] };
+  const calls = { requests: 0, sleeps: [], statusShas: [], findingShas: [], logs: [] };
   return {
     calls,
     getPr: () => {
@@ -52,6 +54,10 @@ function fakeDeps({
     },
     getLatestRateLimitComment: () => (comment === null ? null : { body: comment, at: commentAt }),
     reviewInProgressElsewhere: () => busy(),
+    getHeadReviewFindings: (sha) => {
+      calls.findingShas.push(sha);
+      return findings(sha);
+    },
     requestReview: () => {
       calls.requests += 1;
     },
@@ -399,5 +405,74 @@ describe("awaitReview", () => {
     const code = await awaitReview(deps, { pollMs: 60_000, noStatusGraceMs: 90_000 });
     expect(code).toBe(0);
     expect(deps.calls.requests).toBe(1);
+  });
+});
+
+// Shapes copied from real CodeRabbit review bodies on this repo: #1362's final
+// review (two outside-diff findings and a nitpick, all body-only) and #1364's.
+const BODY_1362 = [
+  "> [!CAUTION]",
+  "> Some comments are outside the diff and can\u2019t be posted inline due to GitHub limitations.",
+  "> **\u26a0\ufe0f Outside diff range comments (2)**",
+  "<summary>\ud83e\uddf9 Nitpick comments: 1</summary><blockquote>",
+].join("\n");
+const BODY_1364 = "<summary>\ud83e\uddf9 Nitpick comments: 1</summary><blockquote>";
+const FOUND = { outsideDiff: 2, nitpicks: 1, duplicates: 0, url: "https://github.com/o/r/pull/1#pullrequestreview-1" };
+
+describe("countBodyFindings: findings no thread query can see (#1365)", () => {
+  it("counts #1362's outside-diff and nitpick findings", () => {
+    expect(countBodyFindings(BODY_1362)).toEqual({ outsideDiff: 2, nitpicks: 1, duplicates: 0 });
+  });
+
+  it("counts a nitpick-only body (#1364)", () => {
+    expect(countBodyFindings(BODY_1364)).toEqual({ outsideDiff: 0, nitpicks: 1, duplicates: 0 });
+  });
+
+  it("accepts both '(N)' and ': N' for every section", () => {
+    expect(countBodyFindings("Nitpick comments (3) / Outside diff range comments: 4 / Duplicate comments (1)")).toEqual(
+      { outsideDiff: 4, nitpicks: 3, duplicates: 1 },
+    );
+  });
+
+  it("reads a clean or empty body as zero, and ignores the inline 'actionable' count", () => {
+    expect(countBodyFindings("Actionable comments posted: 2")).toEqual({ outsideDiff: 0, nitpicks: 0, duplicates: 0 });
+    expect(countBodyFindings(null)).toEqual({ outsideDiff: 0, nitpicks: 0, duplicates: 0 });
+  });
+});
+
+describe("awaitReview: reviewed is not clean (#1365)", () => {
+  it("exits 5, naming the counts and the review, when the head review has body-only findings", async () => {
+    const deps = fakeDeps({ statuses: [COMPLETED], findings: () => FOUND });
+    expect(await awaitReview(deps, { pollMs: 1000 })).toBe(5);
+    expect(deps.calls.logs.at(-1)).toMatch(/2 outside-diff, 1 nitpick/);
+    expect(deps.calls.logs.at(-1)).toContain(FOUND.url);
+  });
+
+  it("--once also refuses a reviewed head with findings", async () => {
+    const deps = fakeDeps({ statuses: [COMPLETED], findings: () => FOUND });
+    expect(await awaitReview(deps, { once: true })).toBe(5);
+  });
+
+  it("--allow-findings accepts them once declined, and says so", async () => {
+    const deps = fakeDeps({ statuses: [COMPLETED], findings: () => FOUND });
+    expect(await awaitReview(deps, { pollMs: 1000, allowFindings: true })).toBe(0);
+    expect(deps.calls.logs.at(-1)).toMatch(/3 body finding\(s\) allowed/);
+  });
+
+  it("exits 0 on a clean review", async () => {
+    const deps = fakeDeps({ statuses: [COMPLETED] });
+    expect(await awaitReview(deps, { pollMs: 1000 })).toBe(0);
+  });
+
+  it("judges the CURRENT head's review, not the one before a push", async () => {
+    // The first status read is of the old head; the review that counts is the
+    // new head's, which is clean even though the old head's had findings.
+    const deps = fakeDeps({
+      statuses: [IN_PROGRESS, COMPLETED],
+      heads: ["aaaaaaaa1", "bbbbbbbb2"],
+      findings: (sha) => (sha === "aaaaaaaa1" ? FOUND : { outsideDiff: 0, nitpicks: 0, duplicates: 0, url: null }),
+    });
+    expect(await awaitReview(deps, { pollMs: 1000 })).toBe(0);
+    expect(deps.calls.findingShas).toEqual(["bbbbbbbb2"]);
   });
 });

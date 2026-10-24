@@ -1,4 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, it, expect } from "vitest";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   COOLDOWN_SLACK_MS,
   DEFAULT_COOLDOWN_MS,
@@ -12,6 +15,7 @@ import {
   classifyStatus,
   confirmsCleanReview,
   countBodyFindings,
+  ghDeps,
   parseCooldownMs,
 } from "../coderabbit-await-review.mjs";
 
@@ -569,5 +573,92 @@ describe("awaitReview: an absent review object needs confirmation", () => {
     expect(deps.calls.logs.at(-1)).toMatch(/no review object or clean-review comment/);
     // Bounded by the settle period, not the three-hour overall timeout.
     expect(deps.calls.sleeps.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(CONFIRM_SETTLE_MS);
+  });
+});
+
+// The REAL getHeadReviewFindings, through a fake `gh` first on PATH (#1367
+// review). The fakeDeps tests above replace this dep wholesale, so its head
+// and author filters, ghList's page joining, and the no-review-object path
+// would otherwise run only against live GitHub.
+describe("ghDeps.getHeadReviewFindings against a stubbed gh", () => {
+  const HEAD_SHA = "3e7522c8c7de4bf0b12b35e682ed03f9cc89ef55";
+  const OLD_SHA = "2e95c3336de5f2611d6702264c6c29cc0e590226";
+  const BOT = { login: "coderabbitai[bot]" };
+  let dir;
+  let savedPath;
+
+  // `fixtures` maps a REST path, placeholders unexpanded as ghList sends it,
+  // to that endpoint's items. The fake prints them as ONE page, the shape
+  // `gh api --paginate --slurp` returns, and logs every argv it receives.
+  function stubGh(fixtures) {
+    writeFileSync(join(dir, "fixtures.json"), JSON.stringify(fixtures));
+    const fake = join(dir, "gh");
+    writeFileSync(
+      fake,
+      `#!/usr/bin/env node
+const fs = require("node:fs");
+const args = process.argv.slice(2);
+fs.appendFileSync(${JSON.stringify(join(dir, "calls.log"))}, JSON.stringify(args) + "\\n");
+const fixtures = JSON.parse(fs.readFileSync(${JSON.stringify(join(dir, "fixtures.json"))}, "utf8"));
+process.stdout.write(JSON.stringify([fixtures[args[1]] ?? []]));
+`,
+    );
+    chmodSync(fake, 0o755);
+  }
+
+  const calls = () =>
+    readFileSync(join(dir, "calls.log"), "utf8")
+      .trim()
+      .split("\n")
+      .map((l) => JSON.parse(l));
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "await-review-gh-"));
+    savedPath = process.env.PATH;
+    process.env.PATH = `${dir}:${savedPath}`;
+  });
+
+  afterEach(() => {
+    process.env.PATH = savedPath;
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("counts body findings only from CodeRabbit's reviews OF THE HEAD", () => {
+    stubGh({
+      "repos/{owner}/{repo}/pulls/7/reviews": [
+        { user: BOT, commit_id: OLD_SHA, body: "Outside diff range comments (5)", html_url: "u-old" },
+        { user: { login: "someone" }, commit_id: HEAD_SHA, body: "Nitpick comments: 9", html_url: "u-human" },
+        { user: BOT, commit_id: HEAD_SHA, body: BODY_1362, html_url: "u-head" },
+      ],
+    });
+    expect(ghDeps(7).getHeadReviewFindings(HEAD_SHA)).toEqual({
+      confirmed: true,
+      outsideDiff: 2,
+      nitpicks: 1,
+      duplicates: 0,
+      other: 0,
+      url: "u-head",
+    });
+    // Read through the paginated, slurped list, never a single page.
+    expect(calls()[0]).toEqual(["api", "repos/{owner}/{repo}/pulls/7/reviews", "--paginate", "--slurp"]);
+  });
+
+  it("confirms a head with no review object through the summary comment that names it", () => {
+    stubGh({
+      "repos/{owner}/{repo}/pulls/7/reviews": [],
+      "repos/{owner}/{repo}/issues/7/comments": [{ user: BOT, body: CLEAN_1364 }],
+    });
+    expect(ghDeps(7).getHeadReviewFindings(HEAD_SHA)).toMatchObject({ confirmed: true, nitpicks: 0, url: null });
+  });
+
+  it("leaves a head unconfirmed when the clean summary names another commit, or is not CodeRabbit's", () => {
+    stubGh({
+      "repos/{owner}/{repo}/pulls/7/reviews": [],
+      "repos/{owner}/{repo}/issues/7/comments": [
+        { user: BOT, body: CLEAN_1364.replace(HEAD_SHA, "f".repeat(40)) },
+        { user: { login: "someone" }, body: CLEAN_1364 },
+      ],
+    });
+    expect(ghDeps(7).getHeadReviewFindings(HEAD_SHA).confirmed).toBe(false);
   });
 });

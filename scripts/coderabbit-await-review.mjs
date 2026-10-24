@@ -41,9 +41,9 @@
  *   3  CodeRabbit skipped the head (e.g. every file path-filtered) — no review
  *      will come; a human decides whether that is acceptable
  *   4  usage error, draft PR, or `gh` failure
- *   5  the head IS reviewed, but its review body carries outside-diff or
- *      nitpick findings: address them, or pass --allow-findings having
- *      decided not to
+ *   5  the head IS reviewed, but its review body carries findings no thread
+ *      shows: outside-diff, nitpick, duplicate, or an unrecognised section.
+ *      Address them, or pass --allow-findings having decided not to
  */
 import { execFileSync } from "node:child_process";
 

@@ -111,7 +111,9 @@ test.describe("Live experience — lifecycle walkthrough at simulated times (#55
     await page.goto(eventPage);
     await expect(page.getByText(`Walkthrough Openers ${suffix}`)).toBeVisible();
     await expect(page.getByText("Upcoming", { exact: true }).first()).toBeVisible();
-    await expect(page.getByText("Doors 4:00 PM").first()).toBeVisible();
+    // The phone's copy: the summary sentence (#1248). The desktop chip's
+    // "Doors 4:00 PM" is in the DOM here too, but hidden at this width.
+    await expect(page.getByText("Doors at 4:00 PM").first()).toBeVisible();
 
     // Build a route for the night (persists in localStorage across reloads) —
     // this arms the NextMove live companion asserted in Phase C.

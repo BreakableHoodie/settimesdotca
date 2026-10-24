@@ -118,6 +118,12 @@ async function fireScroll() {
 }
 
 describe('LiveContextBar', () => {
+  // A test that fails before its own closing setViewportWidth(1024) would
+  // otherwise leave the next test at phone width, failing it too.
+  afterEach(() => {
+    setViewportWidth(1024)
+  })
+
   it('surfaces route, venue, and time controls in the sticky bar', () => {
     const onViewChange = vi.fn()
     const onVenueFilterChange = vi.fn()
@@ -335,6 +341,29 @@ describe('LiveContextBar', () => {
       expect(mobileSummary.textContent).toMatch(
         /^19\+\. Doors at [^.]+\. Presented by SetTimes\. \d+ venues?, \d+ sets?\./
       )
+      setViewportWidth(1024)
+    })
+
+    // Free text: an admin who typed the full stop must not get two.
+    it('does not double the punctuation an admin already typed', () => {
+      setViewportWidth(375)
+      render(
+        <LiveContextBar
+          eventData={{ ...eventData, presented_by: 'SetTimes!', age_restriction: '19+.' }}
+          currentTime={new Date('2026-05-06T19:30:00')}
+          bands={bands}
+          selectedCount={0}
+          view="all"
+          onViewChange={vi.fn()}
+          venueFilter={null}
+          onVenueFilterChange={vi.fn()}
+          timeFilter="all"
+          onTimeFilterChange={vi.fn()}
+        />
+      )
+      const summary = document.querySelector('p.line-clamp-2').textContent
+      expect(summary).toMatch(/^19\+\. .*Presented by SetTimes! /)
+      expect(summary).not.toMatch(/[.!?]\./)
       setViewportWidth(1024)
     })
 

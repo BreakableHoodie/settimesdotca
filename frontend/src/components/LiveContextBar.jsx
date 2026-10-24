@@ -281,10 +281,12 @@ function LiveContextBar({
     // #1084 was this line silently cutting "Presented by ..." every time.
     // Plain sentences, not a bullet-joined string (#1248): "19+. Doors at
     // 6:30 PM. Presented by SetTimes. 4 venues, 15 sets. 3 days away."
+    // Free-text fields: keep a full stop the admin already typed, add one otherwise.
+    const asSentence = text => (/[.!?]$/.test(text.trim()) ? text.trim() : `${text.trim()}.`)
     const sentences = []
-    if (eventData?.age_restriction) sentences.push(`${eventData.age_restriction}.`)
+    if (eventData?.age_restriction) sentences.push(asSentence(eventData.age_restriction))
     if (doorsTime) sentences.push(`Doors at ${formatTime(doorsTime)}.`)
-    if (eventData?.presented_by) sentences.push(`Presented by ${eventData.presented_by}.`)
+    if (eventData?.presented_by) sentences.push(asSentence(`Presented by ${eventData.presented_by}`))
     sentences.push(
       `${uniqueVenues} ${uniqueVenues === 1 ? 'venue' : 'venues'}, ${activeBands.length} ${activeBands.length === 1 ? 'set' : 'sets'}.`
     )

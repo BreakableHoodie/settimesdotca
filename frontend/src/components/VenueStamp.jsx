@@ -43,7 +43,16 @@ export default function VenueStamp({ venue, short, ink, className = '' }) {
         transform: `rotate(${tiltFor(label)}deg)`,
       }}
     >
-      {label}
+      {/* The short name is what fits; a screen reader gets the full one, which
+          `title` alone does not reliably give it. */}
+      {venue && venue !== label ? (
+        <>
+          <span aria-hidden="true">{label}</span>
+          <span className="sr-only">{venue}</span>
+        </>
+      ) : (
+        label
+      )}
     </span>
   )
 }

@@ -155,7 +155,10 @@ export function countBodyFindings(body) {
  */
 export function confirmsCleanReview(body, head) {
   const text = String(body || "");
-  return /No actionable comments were generated/i.test(text) && new RegExp(`\\band\\s+${head}\\b`).test(text);
+  if (!/No actionable comments were generated/i.test(text)) return false;
+  // A literal pattern and a string compare, not a RegExp built from `head`:
+  // only a full 40-hex SHA after "and" can name the reviewed commit.
+  return [...text.matchAll(/\band\s+([0-9a-f]{40})\b/gi)].some(([, sha]) => sha.toLowerCase() === head.toLowerCase());
 }
 
 function gh(args) {

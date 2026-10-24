@@ -1,4 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, it, expect } from "vitest";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   COOLDOWN_SLACK_MS,
   DEFAULT_COOLDOWN_MS,
@@ -7,8 +10,12 @@ import {
   SKIP_SETTLE_MS,
   STALE_IN_PROGRESS_MS,
   UNKNOWN_SETTLE_MS,
+  CONFIRM_SETTLE_MS,
   awaitReview,
   classifyStatus,
+  confirmsCleanReview,
+  countBodyFindings,
+  ghDeps,
   parseCooldownMs,
 } from "../coderabbit-await-review.mjs";
 
@@ -33,11 +40,12 @@ function fakeDeps({
   comment = RL_COMMENT,
   commentAt = "1970-01-01T00:00:00Z",
   busy = () => false,
+  findings = () => ({ confirmed: true, outsideDiff: 0, nitpicks: 0, duplicates: 0, other: 0, url: null }),
 }) {
   let t = 0;
   let si = 0;
   let hi = 0;
-  const calls = { requests: 0, sleeps: [], statusShas: [], logs: [] };
+  const calls = { requests: 0, sleeps: [], statusShas: [], findingShas: [], logs: [] };
   return {
     calls,
     getPr: () => {
@@ -52,6 +60,10 @@ function fakeDeps({
     },
     getLatestRateLimitComment: () => (comment === null ? null : { body: comment, at: commentAt }),
     reviewInProgressElsewhere: () => busy(),
+    getHeadReviewFindings: (sha) => {
+      calls.findingShas.push(sha);
+      return findings(sha);
+    },
     requestReview: () => {
       calls.requests += 1;
     },
@@ -399,5 +411,254 @@ describe("awaitReview", () => {
     const code = await awaitReview(deps, { pollMs: 60_000, noStatusGraceMs: 90_000 });
     expect(code).toBe(0);
     expect(deps.calls.requests).toBe(1);
+  });
+});
+
+// Shapes copied from real CodeRabbit review bodies on this repo: #1362's final
+// review (two outside-diff findings and a nitpick, all body-only) and #1364's.
+const BODY_1362 = [
+  "> [!CAUTION]",
+  "> Some comments are outside the diff and can\u2019t be posted inline due to GitHub limitations.",
+  "> **\u26a0\ufe0f Outside diff range comments (2)**",
+  "<summary>\ud83e\uddf9 Nitpick comments: 1</summary><blockquote>",
+].join("\n");
+const BODY_1364 = "<summary>\ud83e\uddf9 Nitpick comments: 1</summary><blockquote>";
+const FOUND = {
+  confirmed: true,
+  outsideDiff: 2,
+  nitpicks: 1,
+  duplicates: 0,
+  other: 0,
+  url: "https://github.com/o/r/pull/1#pullrequestreview-1",
+};
+
+describe("countBodyFindings: findings no thread query can see (#1365)", () => {
+  it("counts #1362's outside-diff and nitpick findings", () => {
+    expect(countBodyFindings(BODY_1362)).toEqual({ outsideDiff: 2, nitpicks: 1, duplicates: 0, other: 0 });
+  });
+
+  it("counts a nitpick-only body (#1364)", () => {
+    expect(countBodyFindings(BODY_1364)).toEqual({ outsideDiff: 0, nitpicks: 1, duplicates: 0, other: 0 });
+  });
+
+  it("accepts both '(N)' and ': N' for every section", () => {
+    expect(countBodyFindings("Nitpick comments (3) / Outside diff range comments: 4 / Duplicate comments (1)")).toEqual(
+      { outsideDiff: 4, nitpicks: 3, duplicates: 1, other: 0 },
+    );
+  });
+
+  // Fail closed: a section wording CodeRabbit adds later must stop the merge,
+  // not parse as zero (the CLI review's "Minor comments (N)" is one candidate).
+  it("counts an unrecognised section as 'other' rather than zero", () => {
+    expect(countBodyFindings("\ud83d\udfe1 Minor comments (1)")).toEqual({
+      outsideDiff: 0,
+      nitpicks: 0,
+      duplicates: 0,
+      other: 1,
+    });
+  });
+
+  it("does not read prose about comments as a section", () => {
+    expect(countBodyFindings("Some comments are outside the diff and can't be posted inline.")).toEqual({
+      outsideDiff: 0,
+      nitpicks: 0,
+      duplicates: 0,
+      other: 0,
+    });
+  });
+
+  it("reads a clean or empty body as zero, and ignores the inline 'actionable' count", () => {
+    expect(countBodyFindings("Actionable comments posted: 2")).toEqual({
+      outsideDiff: 0,
+      nitpicks: 0,
+      duplicates: 0,
+      other: 0,
+    });
+    expect(countBodyFindings(null)).toEqual({ outsideDiff: 0, nitpicks: 0, duplicates: 0, other: 0 });
+  });
+});
+
+describe("awaitReview: reviewed is not clean (#1365)", () => {
+  it("exits 5, naming the counts and the review, when the head review has body-only findings", async () => {
+    const deps = fakeDeps({ statuses: [COMPLETED], findings: () => FOUND });
+    expect(await awaitReview(deps, { pollMs: 1000 })).toBe(5);
+    expect(deps.calls.logs.at(-1)).toMatch(/2 outside-diff, 1 nitpick/);
+    expect(deps.calls.logs.at(-1)).toContain(FOUND.url);
+  });
+
+  it("exits 5 on findings in an unrecognised section", async () => {
+    const deps = fakeDeps({
+      statuses: [COMPLETED],
+      findings: () => ({ confirmed: true, outsideDiff: 0, nitpicks: 0, duplicates: 0, other: 1, url: null }),
+    });
+    expect(await awaitReview(deps, { pollMs: 1000 })).toBe(5);
+    expect(deps.calls.logs.at(-1)).toMatch(/1 in an unrecognised section/);
+  });
+
+  it("--once also refuses a reviewed head with findings", async () => {
+    const deps = fakeDeps({ statuses: [COMPLETED], findings: () => FOUND });
+    expect(await awaitReview(deps, { once: true })).toBe(5);
+  });
+
+  it("--allow-findings accepts them once declined, and says so", async () => {
+    const deps = fakeDeps({ statuses: [COMPLETED], findings: () => FOUND });
+    expect(await awaitReview(deps, { pollMs: 1000, allowFindings: true })).toBe(0);
+    expect(deps.calls.logs.at(-1)).toMatch(/3 body finding\(s\) allowed/);
+  });
+
+  it("exits 0 on a clean review", async () => {
+    const deps = fakeDeps({ statuses: [COMPLETED] });
+    expect(await awaitReview(deps, { pollMs: 1000 })).toBe(0);
+  });
+
+  it("judges the CURRENT head's review, not the one before a push", async () => {
+    // The first status read is of the old head; the review that counts is the
+    // new head's, which is clean even though the old head's had findings.
+    const deps = fakeDeps({
+      statuses: [IN_PROGRESS, COMPLETED],
+      heads: ["aaaaaaaa1", "bbbbbbbb2"],
+      findings: (sha) =>
+        sha === "aaaaaaaa1"
+          ? FOUND
+          : { confirmed: true, outsideDiff: 0, nitpicks: 0, duplicates: 0, other: 0, url: null },
+    });
+    expect(await awaitReview(deps, { pollMs: 1000 })).toBe(0);
+    expect(deps.calls.findingShas).toEqual(["bbbbbbbb2"]);
+  });
+});
+
+// #1367 review: a completed status with no review object is only clean when
+// CodeRabbit's summary comment confirms it FOR THIS SHA.
+const HEAD = "3e7522c8c7de4bf0b12b35e682ed03f9cc89ef55";
+const CLEAN_1364 =
+  "No actionable comments were generated in the recent review.\n" +
+  "Reviewing files that changed from the base of the PR and between " +
+  `2e95c3336de5f2611d6702264c6c29cc0e590226 and ${HEAD}.`;
+const UNCONFIRMED = { confirmed: false, outsideDiff: 0, nitpicks: 0, duplicates: 0, other: 0, url: null };
+
+describe("confirmsCleanReview", () => {
+  it("accepts #1364's clean summary for the commit it names as reviewed up to", () => {
+    expect(confirmsCleanReview(CLEAN_1364, HEAD)).toBe(true);
+  });
+
+  it("rejects the same summary for any other commit, including the range's base", () => {
+    expect(confirmsCleanReview(CLEAN_1364, "2e95c3336de5f2611d6702264c6c29cc0e590226")).toBe(false);
+    expect(confirmsCleanReview(CLEAN_1364, "ffffffffffffffffffffffffffffffffffffffff")).toBe(false);
+  });
+
+  it("rejects a comment naming the head that does not say the review was clean", () => {
+    expect(confirmsCleanReview(`Reviewing files ... between abc and ${HEAD}.`, HEAD)).toBe(false);
+  });
+});
+
+describe("awaitReview: an absent review object needs confirmation", () => {
+  it("waits while unconfirmed, then succeeds once the confirmation lands", async () => {
+    let n = 0;
+    const deps = fakeDeps({
+      statuses: [COMPLETED],
+      findings: () => (n++ < 2 ? UNCONFIRMED : { ...UNCONFIRMED, confirmed: true }),
+    });
+    expect(await awaitReview(deps, { pollMs: 60_000 })).toBe(0);
+    expect(deps.calls.findingShas).toHaveLength(3);
+  });
+
+  it("--once reports an unconfirmed head as NOT reviewed", async () => {
+    const deps = fakeDeps({ statuses: [COMPLETED], findings: () => UNCONFIRMED });
+    expect(await awaitReview(deps, { once: true })).toBe(2);
+  });
+
+  it("gives up with a reason, not success, when confirmation never comes", async () => {
+    const deps = fakeDeps({ statuses: [COMPLETED], findings: () => UNCONFIRMED });
+    expect(await awaitReview(deps, { pollMs: 60_000 })).toBe(1);
+    expect(deps.calls.logs.at(-1)).toMatch(/no review object or clean-review comment/);
+    // Bounded by the settle period, not the three-hour overall timeout.
+    expect(deps.calls.sleeps.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(CONFIRM_SETTLE_MS);
+  });
+});
+
+// The REAL getHeadReviewFindings, through a fake `gh` first on PATH (#1367
+// review). The fakeDeps tests above replace this dep wholesale, so its head
+// and author filters, ghList's page joining, and the no-review-object path
+// would otherwise run only against live GitHub.
+describe("ghDeps.getHeadReviewFindings against a stubbed gh", () => {
+  const HEAD_SHA = "3e7522c8c7de4bf0b12b35e682ed03f9cc89ef55";
+  const OLD_SHA = "2e95c3336de5f2611d6702264c6c29cc0e590226";
+  const BOT = { login: "coderabbitai[bot]" };
+  let dir;
+  let savedPath;
+
+  // `fixtures` maps a REST path, placeholders unexpanded as ghList sends it,
+  // to that endpoint's items. The fake prints them as ONE page, the shape
+  // `gh api --paginate --slurp` returns, and logs every argv it receives.
+  function stubGh(fixtures) {
+    writeFileSync(join(dir, "fixtures.json"), JSON.stringify(fixtures));
+    const fake = join(dir, "gh");
+    writeFileSync(
+      fake,
+      `#!/usr/bin/env node
+const fs = require("node:fs");
+const args = process.argv.slice(2);
+fs.appendFileSync(${JSON.stringify(join(dir, "calls.log"))}, JSON.stringify(args) + "\\n");
+const fixtures = JSON.parse(fs.readFileSync(${JSON.stringify(join(dir, "fixtures.json"))}, "utf8"));
+process.stdout.write(JSON.stringify([fixtures[args[1]] ?? []]));
+`,
+    );
+    chmodSync(fake, 0o755);
+  }
+
+  const calls = () =>
+    readFileSync(join(dir, "calls.log"), "utf8")
+      .trim()
+      .split("\n")
+      .map((l) => JSON.parse(l));
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "await-review-gh-"));
+    savedPath = process.env.PATH;
+    process.env.PATH = `${dir}:${savedPath}`;
+  });
+
+  afterEach(() => {
+    process.env.PATH = savedPath;
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("counts body findings only from CodeRabbit's reviews OF THE HEAD", () => {
+    stubGh({
+      "repos/{owner}/{repo}/pulls/7/reviews": [
+        { user: BOT, commit_id: OLD_SHA, body: "Outside diff range comments (5)", html_url: "u-old" },
+        { user: { login: "someone" }, commit_id: HEAD_SHA, body: "Nitpick comments: 9", html_url: "u-human" },
+        { user: BOT, commit_id: HEAD_SHA, body: BODY_1362, html_url: "u-head" },
+      ],
+    });
+    expect(ghDeps(7).getHeadReviewFindings(HEAD_SHA)).toEqual({
+      confirmed: true,
+      outsideDiff: 2,
+      nitpicks: 1,
+      duplicates: 0,
+      other: 0,
+      url: "u-head",
+    });
+    // Read through the paginated, slurped list, never a single page.
+    expect(calls()[0]).toEqual(["api", "repos/{owner}/{repo}/pulls/7/reviews", "--paginate", "--slurp"]);
+  });
+
+  it("confirms a head with no review object through the summary comment that names it", () => {
+    stubGh({
+      "repos/{owner}/{repo}/pulls/7/reviews": [],
+      "repos/{owner}/{repo}/issues/7/comments": [{ user: BOT, body: CLEAN_1364 }],
+    });
+    expect(ghDeps(7).getHeadReviewFindings(HEAD_SHA)).toMatchObject({ confirmed: true, nitpicks: 0, url: null });
+  });
+
+  it("leaves a head unconfirmed when the clean summary names another commit, or is not CodeRabbit's", () => {
+    stubGh({
+      "repos/{owner}/{repo}/pulls/7/reviews": [],
+      "repos/{owner}/{repo}/issues/7/comments": [
+        { user: BOT, body: CLEAN_1364.replace(HEAD_SHA, "f".repeat(40)) },
+        { user: { login: "someone" }, body: CLEAN_1364 },
+      ],
+    });
+    expect(ghDeps(7).getHeadReviewFindings(HEAD_SHA).confirmed).toBe(false);
   });
 });

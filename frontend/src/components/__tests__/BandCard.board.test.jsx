@@ -23,21 +23,34 @@ const renderBoard = (props = {}) =>
     </MemoryRouter>
   )
 
+// The stamp element itself: when the short name differs from the full one, the
+// visible label is a child span beside a screen-reader copy of the full name.
+const stampOf = text => screen.getByText(text).closest('span.rounded-sm')
+
 describe('BandCard variant="board"', () => {
   it("shows the act and its venue's stamp: the real short name, never a code (#1248)", () => {
     renderBoard({
       band: { ...band, venue: 'Princess Cafe (Upstairs)', venue_short: 'Princess Cafe', venue_ink: '#B4432F' },
     })
     expect(screen.getByText('Dolly Sods')).toBeInTheDocument()
-    const stamp = screen.getByText('Princess Cafe')
+    const stamp = stampOf('Princess Cafe')
     expect(stamp).toHaveAttribute('data-venue-ink', '#b4432f')
     expect(stamp).toHaveStyle({ backgroundColor: '#b4432f' })
     expect(stamp).toHaveAttribute('title', 'Princess Cafe (Upstairs)')
   })
 
+  // `title` is not a reliable accessible name, so the full name is in the text.
+  it('gives a screen reader the full venue name when the stamp shows the short one', () => {
+    renderBoard({
+      band: { ...band, venue: 'Princess Cafe (Upstairs)', venue_short: 'Princess Cafe', venue_ink: '#B4432F' },
+    })
+    expect(stampOf('Princess Cafe')).toHaveTextContent('Princess Cafe (Upstairs)')
+    expect(screen.getByText('Princess Cafe')).toHaveAttribute('aria-hidden', 'true')
+  })
+
   it('a venue with no ink gets an uncoloured stamp, and nothing reaches CSS that is not a hex colour', () => {
     renderBoard({ band: { ...band, venue_short: 'Princess Cafe', venue_ink: 'red;background:url(x)' } })
-    const stamp = screen.getByText('Princess Cafe')
+    const stamp = stampOf('Princess Cafe')
     expect(stamp).not.toHaveAttribute('data-venue-ink')
     expect(stamp.getAttribute('style')).not.toMatch(/background|url/)
   })
@@ -159,7 +172,7 @@ describe('BandCard variant="board"', () => {
   // the desktop card already uses.
   it('letters a light ink in black, not invisible white', () => {
     renderBoard({ band: { ...band, venue_short: 'Pale Hall', venue_ink: '#ffffff' } })
-    expect(screen.getByText('Pale Hall')).toHaveStyle({ color: '#000000' })
+    expect(stampOf('Pale Hall')).toHaveStyle({ color: '#000000' })
   })
 
   // The column accepts any hex, so the lettering must clear 4.5:1 on every ink,
@@ -169,7 +182,7 @@ describe('BandCard variant="board"', () => {
     'stamp lettering clears 4.5:1 on ink %s',
     ink => {
       renderBoard({ band: { ...band, venue_short: 'Any Hall', venue_ink: ink } })
-      const [r, g, b] = screen.getByText('Any Hall').style.color.match(/\d+/g).map(Number)
+      const [r, g, b] = stampOf('Any Hall').style.color.match(/\d+/g).map(Number)
       const lettering = `#${[r, g, b].map(v => v.toString(16).padStart(2, '0')).join('')}`
       expect(contrastRatio(lettering, ink)).toBeGreaterThanOrEqual(4.5)
     }
@@ -177,7 +190,7 @@ describe('BandCard variant="board"', () => {
 
   it('a stamp with no ink is self-contained: text-colour fill, ground-colour letters', () => {
     renderBoard({ band: { ...band, venue_short: 'Inkless', venue_ink: null } })
-    const stamp = screen.getByText('Inkless')
+    const stamp = stampOf('Inkless')
     expect(stamp).toHaveClass('bg-text-primary', 'text-bg-navy')
   })
 

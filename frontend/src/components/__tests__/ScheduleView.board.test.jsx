@@ -140,13 +140,14 @@ describe('ScheduleView — board rows', () => {
     renderView({ bands: singleDayBands })
 
     const byVenueButton = screen.getByRole('button', { name: /by venue/i })
-    byVenueButton.click()
+    // fireEvent, not .click(): a bare DOM click outside act() never re-rendered,
+    // so the old version of this test asserted on the default view.
+    fireEvent.click(byVenueButton)
 
-    const boardContainer = document.querySelector('.sm\\:hidden')
-    const boardItems = boardContainer ? boardContainer.querySelectorAll('[class*="font-semibold"]') : []
-    const names = Array.from(boardItems).map(el => el.textContent.trim())
-
-    expect(names).not.toContain('Alpha')
-    expect(names).not.toContain('Beta')
+    // One rendering per act: the by-venue cards, with no board row beside them.
+    // (The old query read the venue-filter container, which never held a row.)
+    expect(screen.getAllByText('Alpha')).toHaveLength(1)
+    expect(screen.getAllByText('Beta')).toHaveLength(1)
+    expect(screen.getByRole('group', { name: /^Alpha at / })).toBeInTheDocument()
   })
 })

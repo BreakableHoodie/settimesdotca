@@ -5,6 +5,7 @@ limit. `CLAUDE.md` keeps the rules; this file keeps the incidents, measurements
 and reasoning behind them. Read it before changing the code a section guards.
 
 ## SSR owns identity meta and JSON-LD where it emits either; the client `<Helmet>` owns only what SSR does not emit — never canonical/`og:*`/`twitter:*`/description, and never JSON-LD on a route whose SSR handler already emits it
+
 `<Helmet>` only manages tags it created itself, marked internally with `data-rh`. Neither `index.html`'s baked-in defaults nor a Pages Function's server-injected `<meta>`/`<link>` carry that marker, so Helmet can't tell it already owns the slot — it **appends** a second copy on mount instead of replacing the first. `/artists` first showed this as `index.html`'s homepage `og:url="https://settimes.ca/"` sitting ahead of the page's own client-declared canonical: Google reads `og:url` as a canonicalization hint, prefers the first tag, and overrode our canonical — surfacing in Search Console as **"Duplicate, Google chose different canonical than user."**
 
 The fix has two parts:
@@ -39,6 +40,7 @@ The rejected alternative was marking SSR-injected tags `data-rh="true"` so Helme
 Mocked unit tests prove the handler _builds_ correct HTML; they cannot prove Cloudflare _dispatches_ to it, and a pure string assertion on the SSR response can't prove Helmet doesn't duplicate it after mount. Verify routing changes against a real `npx wrangler pages dev --port 8788` and diff the tag counts per path; `frontend/src/pages/__tests__/ssrIdentityMeta.test.jsx` covers the mount side — it seeds `document.head` with the tags SSR would have injected, mounts the real page component the same way `main.jsx` does (`createRoot`, not `hydrateRoot` — this app is client-rendered, not server-rendered; see that file's header comment), and asserts exactly one `canonical`/`og:url` survives (plus, on `/band/*` and `/venue/*`, exactly one JSON-LD `script` per `@type`).
 
 ## The sitemap is the event-discovery signal — spend it (#1158)
+
 **Until #1159, no page on this site emitted a single crawlable `<a>`.** Verified
 2026-09-10 against production: `/`, `/events`, `/artists`, `/event/*` and
 `/band/*` all returned **zero** anchors in raw HTML, because
@@ -104,3 +106,21 @@ carries a crawlable link _spine_, and `functions/index.js` adds current public
 event links at request time without disturbing homepage meta ownership. The
 sitemap remains the event-specific discovery signal and its priorities are still
 worth this much attention.
+
+## SSR owns identity meta and JSON-LD where it emits either; the client `<Helmet>` owns only what SSR does not emit — never canonical/`og:*`/`twitter:*`/description, and never JSON-LD on a route whose SSR handler already emits it — `CLAUDE.md` text as of 2026-10-24
+
+`<Helmet>` manages only tags it created (`data-rh`), so it **appends** a second copy of any tag that `index.html` or a Pages Function put there. A duplicate `og:url` once overrode our canonical ("Duplicate, Google chose different canonical than user"). Ownership is therefore split by who emits:
+
+- **`serveWithInjectedMeta()`** (`functions/utils/ssrMeta.js`) strips `index.html`'s defaults via `DEFAULT_META_RE` before injecting. Every `og:*`/`twitter:*`/`description` property `index.html` declares must be listed there, or its default becomes a live second copy (`og:site_name`, #784).
+- **On SSR-injected routes the client `<Helmet>` declares no `canonical`, `og:*`, `twitter:*` or `description`**, and no JSON-LD where the SSR handler passes `jsonLd` (`/band/*`, `/venue/*`, #790). It may set `<title>`, but only with the SSR formula verbatim and only once data has loaded (#785); `functions/api/venues/[id].js` exposes `city` so the venue title can reproduce its formula. `ssrIdentityMeta.test.jsx` asserts this, including the fetch-in-flight case; keep that case. It mounts with `createRoot`, not `hydrateRoot`, because the app is client-rendered.
+- **SSR owns what SSR emits; everything else stays client-owned.** Before deleting a tag from a `<Helmet>`, confirm SSR emits an equivalent, or the sweep drops the tag instead of de-duplicating it. `functions/band/[id].js`'s JSON-LD `description` is a separate, untruncated value: do not merge it with the 200-char meta description (most bios exceed it). Where the two disagreed, the complete, spec-valid value won (`og:type="website"`, `twitter:card="summary_large_image"`).
+- Do not mark SSR tags `data-rh` so Helmet adopts them: that relies on the replace behaviour React 19 makes unreliable. Accepted tradeoff: identity meta freezes across in-app navigation; crawlers always fetch fresh.
+- **Every indexable route except `/` has a Pages Function injecting its own meta:** `/event/*`, `/band/*`, `/venue/*`, `/events/*/recap` (D1-backed, `functions/events/[slug]/recap.js`) and the static pages through `STATIC_PAGES` (`functions/utils/staticPageMeta.js`, one 2-line route file each). `/` has `functions/index.js`, which injects event links into the `<noscript>` nav and leaves `<head>` byte-for-byte: `index.html`'s defaults are the homepage's correct meta, and `EventsPage` owns it client-side. Every shell-rewriting handler uses `headersForRewrittenShell()`: policy headers kept, `Content-Type` set, `ETag`/`Last-Modified`/`Content-Length`/`Content-Encoding` dropped.
+- **The handler must server-render the URL people actually link to.** Artist links are slug-built, so `functions/band/[id].js` resolves a slug via `normalizeBandName` and **301**s to `/band/<id>`, query preserved (#983). The `Location` is relative on purpose (canonicals pin the host; redirects preserve it), the public-data gate runs before the lookup (else an existence oracle), and an unresolvable slug renders the shell, not a 404. `functions/venue/[id].js` is safe only because venue links are id-built; a `/venue/<slug>` link builder needs the same redirect.
+- **`/event/:slug` (live) and `/events/:slug/recap` (archive) are different resources.** Anything building an event URL picks the right prefix (#562). Do not unify them (declined, #910).
+- Build every URL from `CANONICAL_HOST`, never `request.url`.
+- **`frontend/public/_routes.json` is the only routes file**, and `exclude` beats `include`. `functions/__tests__/staticPageMeta.test.js` fails if an included path lacks a route file or registry entry. Never recreate a root `/_routes.json`.
+
+Mocked unit tests cannot prove Cloudflare dispatches to a handler. Verify routing changes against `npx wrangler pages dev --port 8788` and diff per-path tag counts.
+
+Search Console evidence, the `/band/<slug>` incident and the rejected alternatives: `docs/field-notes/ssr-identity-meta.md`.

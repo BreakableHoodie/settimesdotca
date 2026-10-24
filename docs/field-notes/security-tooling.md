@@ -5,6 +5,7 @@ limit. `CLAUDE.md` keeps the rules; this file keeps the incidents, measurements
 and reasoning behind them. Read it before changing the code a section guards.
 
 ## The security tooling this repo actually has
+
 **Restored 2026-09-25, when the repo went public again:** `codeql.yml`,
 `secret-scan.yml` (gitleaks) and `dependency-review.yml`, unchanged from their
 last working versions. `protect-main` requires the **"Detect Secrets
@@ -85,3 +86,21 @@ The Snyk PR check covers dependency manifests only. Semgrep was chosen because
 its gate is in git and its Pro ruleset is measured on this repo; Snyk Code would
 spend the Free plan's monthly Code-test allowance on every PR and keep its gate
 in Snyk's dashboard.
+
+## The security tooling this repo actually has — `CLAUDE.md` text as of 2026-10-24
+
+| Concern               | Covered by                                                                                                   |
+| --------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Secrets               | gitleaks (`secret-scan.yml`, required check "Detect Secrets (gitleaks)"); GitGuardian; CodeRabbit's gitleaks |
+| Dependency advisories | Snyk PR check; Dependabot alerts and security updates; `dependency-review.yml`                               |
+| Lockfile tampering    | `scripts/__tests__/lockfileIntegrity.test.js`                                                                |
+| SAST                  | CodeQL (`codeql.yml`); Semgrep (`semgrep.yml`, #1173)                                                        |
+| Review                | CodeRabbit                                                                                                   |
+
+- **If the repo goes private again**, CodeQL, gitleaks and dependency-review fail on the Free plan, which has no Advanced Security. Remove "Detect Secrets (gitleaks)" from the `protect-main` ruleset in the same change that deletes its workflow, or every PR waits on a check that cannot run. A permanently red check is worse than none.
+- **The gitleaks PR check scans every commit in the PR's range**, so a later commit cannot clear a fixture that trips it: rewrite the commit, or add its fingerprint to `.gitleaksignore` with a reason. Name test credentials so gitleaks' `generic-api-key` rule (a secret-like identifier assigned a high-entropy string) does not match.
+- **Semgrep's gate is the `Semgrep / Scan` job.** The Semgrep App's `semgrep-cloud-platform/scan` check passes regardless of findings. On a PR the job is diff-aware and fails on new findings; on push and weekly it reports without failing and uploads SARIF (category `semgrep`). Findings come from the JSON, never the exit code: semgrep can exit 0 with findings, and exit 0 without having run, so never remove the `test -s semgrep.json` guard. Exit 1 means blocking findings and goes on to the count; exit >1 means it could not run and fails the job. It runs under `env -u GITHUB_ACTIONS` (semgrep's own `git fetch` fails without persisted credentials) with `fetch-depth: 0` on the PR's head commit, diffing against `SEMGREP_BASELINE_REF`; `SEMGREP_*` variables restore the metadata. Dependabot and fork PRs skip loudly; any other run without `SEMGREP_APP_TOKEN` fails. Keep the gate in the workflow, not the Rule Board, which lives outside git.
+- **The weekly security digest** (`security-digest.yml`, `scripts/security-digest.mjs`, #1247) keeps one `security-digest` issue. It opens for any alert older than 7 days, a required scanner (`REQUIRED_SCANNERS`: CodeQL, Semgrep) with no analysis in 14 days, or an `npm audit` advisory not in `ACCEPTED_NPM_AUDIT`. A failed read fails the job; only a per-tool `404 "no analysis found"` means "none". Analyses are fetched per tool by name. `ACCEPTED_NPM_AUDIT` holds recorded decisions keyed `lockfile|package|advisory`, never by package alone; the digest lists accepted entries no longer flagged, so the list shrinks.
+- **Snyk Code is deliberately not enabled** (2026-09-22): Semgrep's gate lives in git.
+
+Plan-tier history, the job logs and the Semgrep investigation: `docs/field-notes/security-tooling.md`.

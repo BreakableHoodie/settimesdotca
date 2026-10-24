@@ -9,7 +9,7 @@
 **When the CLI cites a "coding guideline", look it up yourself — it is the one
 claim it structurally cannot substantiate.** The CLI raises guideline findings it
 inherited from the shared model but cannot point at the file, because it never
-loaded `.github/instructions/**`. The PR bot raises the same finding *with* the
+loaded `.github/instructions/**`. The PR bot raises the same finding _with_ the
 citation. Treating the uncited version as unfounded is how you end up reversing
 yourself post-open.
 
@@ -21,7 +21,7 @@ the PR body**. The rule is real — `nodejs-javascript-vitest.instructions.md:16
 simply did not match its wording. The PR bot then raised it with the file and
 line, and the decline had to be publicly retracted.
 
-Two lessons, and the second is the general one: grep the *cited wording*, not a
+Two lessons, and the second is the general one: grep the _cited wording_, not a
 paraphrase of it; and **a clean grep is a hypothesis, not a finding** (the same
 trap as #996). The cheap habit that avoids the whole round trip: when a CLI
 finding says "as per coding guidelines", open the five files in that directory
@@ -32,7 +32,7 @@ that apply to the changed file type before agreeing or disagreeing.
 `make gate` deliberately does **not** include it — `gate` must stay fast and offline-capable; `review` needs the network and takes minutes.
 
 **A green CodeRabbit check does not NECESSARILY mean the diff was reviewed.** When every
-changed file is excluded by a path filter, CodeRabbit posts *"Review skipped"*
+changed file is excluded by a path filter, CodeRabbit posts _"Review skipped"_
 and the status check still reports **pass**. Measured on #1083, a security bump
 whose only change was `package-lock.json`: the badge was green and nothing had
 been read.
@@ -53,13 +53,13 @@ check designed for the class and which passed on #1083 alongside gitleaks and
 GitGuardian. **That workflow no longer exists** (removed 2026-09-16 — see "The
 security tooling this repo actually has"), so the advisory half of the job falls
 to Snyk and Dependabot. Both still work on a private Free-plan repo: the very
-push that made this repo private was answered with *"GitHub found 3
-vulnerabilities on BreakableHoodie/settimesdotca's default branch"*, which is
+push that made this repo private was answered with _"GitHub found 3
+vulnerabilities on BreakableHoodie/settimesdotca's default branch"_, which is
 Dependabot alerting on a private repo — verified, not assumed.
 
 **But be precise about what an advisory check covers, because two different
 threats hide behind one green badge.** It compares the PR's dependency changes
-against advisory databases and fails on a package with a *known* vulnerability at
+against advisory databases and fails on a package with a _known_ vulnerability at
 or above its configured severity. That is the #1083 case exactly, and it is
 genuinely covered.
 
@@ -85,7 +85,7 @@ covered the day it appears.
 
 The practical split: routine generated churn (a Dependabot group bump, a
 transitive patch) is well served by the advisory check and needs no human diff
-read. A lockfile change *not* produced by npm on your own machine deserves one,
+read. A lockfile change _not_ produced by npm on your own machine deserves one,
 whatever the checks say.
 
 This is the same shape as `lint-md` missing from `.PHONY` (make reported "up to
@@ -150,7 +150,7 @@ capacity with `@coderabbitai rate limit`.
 Two tempting signals are both wrong, and the script exists because of that:
 
 - **The CodeRabbit check being green.** CodeRabbit's docs say the rate-limited
-  check *passes* by design so it never blocks a merge. Green is green either way.
+  check _passes_ by design so it never blocks a merge. Green is green either way.
 - **A review object on the head commit.** Of 32 merged PRs checked on
   2026-09-24, 13 had `CodeRabbit: success — Review completed` on the head but
   no review object for it. A clean review posts only the summary comment.
@@ -160,7 +160,7 @@ What works is the `CodeRabbit` **commit status description** on the head SHA:
 (`Review rate limited`) comes from the docs. It had not been seen on this repo
 when the script was written, since billing had absorbed every overage, so the
 match is deliberately loose (`/rate.?limit/i`). Any unrecognised description is
-treated as *not* reviewed. Record the real wording here the first time it
+treated as _not_ reviewed. Record the real wording here the first time it
 appears.
 
 Two more status behaviours, both first seen on #1200 (2026-09-24), both of
@@ -225,9 +225,9 @@ available is reading a footer and updating it.
 
 `make hooks` installs a tracked `pre-push` guard (`.githooks/pre-push`, wired via `core.hooksPath`). It warns at the first review in the window and **blocks at the allowance**, reporting how many minutes until the budget refills. Run it once per clone — hooks are not cloned with the repo.
 
-**The rule for overriding is urgency to land, NOT issue priority.** Priority is the wrong axis: a p1 fixed correctly costs one review, while a p3 botched four times costs four — overage comes from *rework*, not importance, and a "p1 only" rule would license sloppiness exactly where correctness matters most.
+**The rule for overriding is urgency to land, NOT issue priority.** Priority is the wrong axis: a p1 fixed correctly costs one review, while a p3 botched four times costs four — overage comes from _rework_, not importance, and a "p1 only" rule would license sloppiness exactly where correctness matters most.
 
-**Waiting is free.** The window is rolling, so the budget refills on its own. Ask only whether this must land *before it refills*:
+**Waiting is free.** The window is rolling, so the budget refills on its own. Ask only whether this must land _before it refills_:
 
 - show day, a production incident, or someone blocked on you → override
 - everything else → batch the remaining fixes and push once
@@ -238,6 +238,39 @@ CODERABBIT_OVERAGE=1 git push   # emergencies only; then `make await-review PR=<
 
 The hook is POSIX `sh` and makes exactly one optional network call: `gh pr view --json isDraft` per pushed branch, so a push to a **draft** PR is not counted (CodeRabbit never reviews drafts, and CLAUDE.md says to iterate as one). With `LIMIT=2`, counting drafts blocked that workflow on the third push of the hour.
 
-It used to make no network call at all, on the grounds that a hook which fails open when a tool is missing is worse than none. That rule still holds; the lookup respects it by only ever *removing* a push on an explicit `true`. No `gh`, no network, no PR yet, an error, or a lookup slower than 5 s all count the push as before. The bound uses a SIGTERM-then-SIGKILL watchdog, not `timeout` (macOS does not ship it). `scripts/__tests__/prePushDraftLookup.test.js` runs the real hook against a fake `gh` in each of those failure modes; run it with `HOOK_SHELL=dash` to reproduce Ubuntu CI's `/bin/sh`. Two things changed the calculus (2026-09-25): `make await-review` is now the merge gate, so an undercount costs a wait rather than an unreviewed merge, and `LIMIT=2` made the false blocks frequent.
+It used to make no network call at all, on the grounds that a hook which fails open when a tool is missing is worse than none. That rule still holds; the lookup respects it by only ever _removing_ a push on an explicit `true`. No `gh`, no network, no PR yet, an error, or a lookup slower than 5 s all count the push as before. The bound uses a SIGTERM-then-SIGKILL watchdog, not `timeout` (macOS does not ship it). `scripts/__tests__/prePushDraftLookup.test.js` runs the real hook against a fake `gh` in each of those failure modes; run it with `HOOK_SHELL=dash` to reproduce Ubuntu CI's `/bin/sh`. Two things changed the calculus (2026-09-25): `make await-review` is now the merge gate, so an undercount costs a wait rather than an unreviewed merge, and `LIMIT=2` made the false blocks frequent.
 
 `lint-sh` globs `*.sh`, which would have skipped the hook silently, so that target now lists `.githooks/*` explicitly.
+
+## Before opening a PR — AI review gate — `CLAUDE.md` text as of 2026-10-24
+
+```bash
+make review        # CodeRabbit review of this branch vs origin/main
+make review-wip    # same, but for uncommitted working-tree changes
+```
+
+Requires the CodeRabbit CLI (`brew install --cask coderabbit`, then `coderabbit auth login`); both targets fail with an install/auth hint if it is missing.
+
+**Run this before opening the PR, not after.** The same review runs automatically on the PR, so anything it finds post-open costs a fix plus a force-push round trip. Findings it has caught that the local gates did not: assertions that pass on the wrong branch's output, a spy recording statement _preparation_ rather than _execution_, and a SQL guard that stayed inert for legacy rows after a write-side fix.
+
+**`make review` is a strict subset of the PR review, and the gap is structural — not flake.** The CLI does not load `.github/instructions/**`; the PR bot does. That is why `coderabbit review` has a `-c, --config <files...>` flag for "additional instructions" at all. Three findings on 2026-08-19 (#866, #873 ×2) appeared only post-open and every one cited _"As per coding guidelines"_, tracing to rules in that directory — e.g. `nodejs-javascript-vitest.instructions.md`'s "Write tests for all new features and bug fixes". **So a post-open `Minor` is expected, not a sign the pre-PR gate failed.** The CLI _does_ read `.coderabbit.yaml` and the `knowledge_base.learnings` (its output says "Based on learnings"); only the instruction files are missing.
+
+`make gate` deliberately does **not** include it — `gate` must stay fast and offline-capable; `review` needs the network and takes minutes.
+
+Reading CodeRabbit correctly — worked examples in `docs/field-notes/coderabbit.md`:
+
+- **An "as per coding guidelines" finding from `make review` is unsubstantiated by construction** — that invocation passes no `-c`, so it never loads `.github/instructions/**` (a CLI run given `-c` would). Open the applicable instruction files and grep the _cited wording_ before agreeing or declining — a clean grep is a hypothesis (#1048). Passing `-c .github/instructions/*.md` was tried and is **not** adopted.
+- **Green can mean "did not look".** CodeRabbit skips a PR whose every file is path-excluded and still reports pass. For a **lockfile-only** bump, read Snyk and Dependabot instead; `scripts/__tests__/lockfileIntegrity.test.js` guards `resolved` hosts and `integrity` hashes, which no advisory check covers. A lockfile change _not_ produced by npm on your machine deserves a human diff read.
+- **Findings are not all in threads.** "Outside diff range" comments and the collapsed "Nitpick comments" live in each review's **body** — a `reviewThreads` query misses both, and a "Trivial" nitpick was once a vacuous test. Read threads _and_ bodies.
+
+## CodeRabbit has a hard review budget — batch your pushes — `CLAUDE.md` text as of 2026-10-24
+
+**Every push to a PR branch that changes at least one review-eligible file triggers a review** (a push touching only path-excluded files, such as a lockfile, is skipped and uses no allowance). The allowance is **dynamic** (it has read 1, 3, 4 and 5 reviews/hour on Essentials) — read it from a _current_ review footer or comment `@coderabbitai rate limit` on the PR, never from memory or this file. History: `docs/field-notes/coderabbit.md`.
+
+**Usage-based billing was switched OFF on 2026-09-24.** Past the allowance a review is now **rate-limited, not billed** — so the failure changed shape from a bill to an **unreviewed commit**. CodeRabbit posts a rate-limit notice instead of a review, and nothing re-runs it when the window refills. A PR merged in that state ships a head commit no reviewer looked at, while every other check is green. That is the green-means-did-not-look class, and it is worse than the bill was, because nothing surfaces it.
+
+- **Before merging any PR, run `make await-review PR=<n>` and merge only on exit 0.** It watches the `CodeRabbit` commit status on the PR's _current head_, waits out a rate-limit cooldown (parsed from CodeRabbit's comment, else 10 min), posts one `@coderabbitai review`, and keeps watching; a new push resets it. **Slowing down is the intended cost** (owner decision, 2026-09-24): a merge waits for the review, never the reverse. `--once` classifies without acting.
+- **Do not judge "reviewed" by the check being green, or by a review object.** The rate-limited status _passes_ by design, and 13 of 32 merged PRs had a completed review with no review object on the head. Only the status description `Review completed` on the head SHA means a review ran — which is what the script reads (`scripts/coderabbit-await-review.mjs`, header has the evidence).
+- **Concentration is the failure, not volume** — #998 burned 4 reviews in ~25 min on a two-line change. Read your own diff and run the right suite locally, then push once. Iterate as a **draft** PR (`auto_review.drafts: false`, so drafts cost nothing) and `gh pr ready` at the final state.
+- `make hooks` installs `.githooks/pre-push`, which warns at the first review in the window and blocks at `LIMIT` (update it only against a current footer; erring low blocks pushes the budget would allow). POSIX `sh`; its one network call asks `gh` whether each pushed PR is a **draft** and skips counting only on an explicit `true` — every failure (no `gh`, offline, no PR, >5 s) counts the push, so it cannot fail open (`scripts/__tests__/prePushDraftLookup.test.js`). **Its counter is per developer, not per repo** (`~/.cache/coderabbit/push-log`, shared with `wrhn-mcp`'s hook — the two must agree on that path, not on counting rules), because the allowance is — a per-repo log let 3 + 3 pushes across the two repos reach 6 on 2026-09-24, while both hooks still had `LIMIT=5`, with neither noticing.
+- **Override on urgency to land, not issue priority:** show day, a production incident, or someone blocked → `CODERABBIT_OVERAGE=1 git push`. It no longer bills; it accepts a rate-limited review, which `make await-review` then recovers. Everything else: waiting is free, the window refills.

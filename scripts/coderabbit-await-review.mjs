@@ -113,18 +113,32 @@ export function parseCooldownMs(text) {
 
 /**
  * Count the findings a CodeRabbit review keeps in its BODY, which no thread
- * query sees. Wordings observed on this repo: "Outside diff range comments (2)"
- * and "Nitpick comments: 1" (#1362, #1364). "Duplicate comments (N)" is
- * CodeRabbit's section for a finding repeated from an earlier review, not yet
- * seen here; the loose matches accept "(N)" and ": N" for every section.
+ * query sees. Across the last 40 merged PRs (2026-10-24) only two section
+ * wordings appear: "Outside diff range comments (2)" and "Nitpick comments: 1".
+ * "Duplicate comments (N)" is CodeRabbit's section for a finding repeated from
+ * an earlier review, not yet seen here.
+ *
+ * FAILS CLOSED: any OTHER "<label> comments (N)" / ": N" section is counted as
+ * `other`, so a wording CodeRabbit adds later stops the merge for a human to
+ * read, instead of parsing as zero and passing. "Actionable comments posted"
+ * is the one exception: those are inline threads, gated by the ruleset.
  */
 export function countBodyFindings(body) {
-  const text = String(body || "");
-  const count = (label) => {
-    const m = text.match(new RegExp(`${label} comments\\s*(?::\\s*|\\()\\s*(\\d+)`, "i"));
-    return m ? Number(m[1]) : 0;
-  };
-  return { outsideDiff: count("Outside diff range"), nitpicks: count("Nitpick"), duplicates: count("Duplicate") };
+  const found = { outsideDiff: 0, nitpicks: 0, duplicates: 0, other: 0 };
+  const sections = String(body || "").matchAll(/([A-Za-z][A-Za-z ]{0,40}?) comments\s*(?::\s*|\()\s*(\d+)/gi);
+  for (const [, label, n] of sections) {
+    const l = label.toLowerCase();
+    if (l.includes("actionable")) continue;
+    const key = l.includes("outside diff")
+      ? "outsideDiff"
+      : l.includes("nitpick")
+        ? "nitpicks"
+        : l.includes("duplicate")
+          ? "duplicates"
+          : "other";
+    found[key] += Number(n);
+  }
+  return found;
 }
 
 function gh(args) {
@@ -178,13 +192,11 @@ export function ghDeps(pr) {
       const reviews = ghList(`repos/{owner}/{repo}/pulls/${pr}/reviews`).filter(
         (r) => r.user?.login === "coderabbitai[bot]" && r.commit_id === head,
       );
-      const total = { outsideDiff: 0, nitpicks: 0, duplicates: 0, url: null };
+      const total = { outsideDiff: 0, nitpicks: 0, duplicates: 0, other: 0, url: null };
       for (const r of reviews) {
         const c = countBodyFindings(r.body);
-        total.outsideDiff += c.outsideDiff;
-        total.nitpicks += c.nitpicks;
-        total.duplicates += c.duplicates;
-        if (c.outsideDiff + c.nitpicks + c.duplicates > 0) total.url = r.html_url;
+        for (const k of ["outsideDiff", "nitpicks", "duplicates", "other"]) total[k] += c[k];
+        if (c.outsideDiff + c.nitpicks + c.duplicates + c.other > 0) total.url = r.html_url;
       }
       return total;
     },
@@ -339,11 +351,12 @@ export async function awaitReview(deps, opts = {}) {
       // Read after the status: on #1364 CodeRabbit's summary comment landed 3 s
       // BEFORE "Review completed", so the review exists by the time it reads so.
       const f = deps.getHeadReviewFindings(head);
-      const found = f.outsideDiff + f.nitpicks + f.duplicates;
+      const found = f.outsideDiff + f.nitpicks + f.duplicates + f.other;
       if (found > 0 && !allowFindings) {
         deps.log(
           `head ${short} reviewed, with findings outside any thread: ${f.outsideDiff} outside-diff, ` +
-            `${f.nitpicks} nitpick, ${f.duplicates} duplicate${f.url ? ` (${f.url})` : ""}. ` +
+            `${f.nitpicks} nitpick, ${f.duplicates} duplicate, ${f.other} in an unrecognised section` +
+            `${f.url ? ` (${f.url})` : ""}. ` +
             "Address them, or re-run with --allow-findings once declined.",
         );
         return 5;

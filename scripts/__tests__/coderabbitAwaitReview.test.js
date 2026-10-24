@@ -34,7 +34,7 @@ function fakeDeps({
   comment = RL_COMMENT,
   commentAt = "1970-01-01T00:00:00Z",
   busy = () => false,
-  findings = () => ({ outsideDiff: 0, nitpicks: 0, duplicates: 0, url: null }),
+  findings = () => ({ outsideDiff: 0, nitpicks: 0, duplicates: 0, other: 0, url: null }),
 }) {
   let t = 0;
   let si = 0;
@@ -417,26 +417,57 @@ const BODY_1362 = [
   "<summary>\ud83e\uddf9 Nitpick comments: 1</summary><blockquote>",
 ].join("\n");
 const BODY_1364 = "<summary>\ud83e\uddf9 Nitpick comments: 1</summary><blockquote>";
-const FOUND = { outsideDiff: 2, nitpicks: 1, duplicates: 0, url: "https://github.com/o/r/pull/1#pullrequestreview-1" };
+const FOUND = {
+  outsideDiff: 2,
+  nitpicks: 1,
+  duplicates: 0,
+  other: 0,
+  url: "https://github.com/o/r/pull/1#pullrequestreview-1",
+};
 
 describe("countBodyFindings: findings no thread query can see (#1365)", () => {
   it("counts #1362's outside-diff and nitpick findings", () => {
-    expect(countBodyFindings(BODY_1362)).toEqual({ outsideDiff: 2, nitpicks: 1, duplicates: 0 });
+    expect(countBodyFindings(BODY_1362)).toEqual({ outsideDiff: 2, nitpicks: 1, duplicates: 0, other: 0 });
   });
 
   it("counts a nitpick-only body (#1364)", () => {
-    expect(countBodyFindings(BODY_1364)).toEqual({ outsideDiff: 0, nitpicks: 1, duplicates: 0 });
+    expect(countBodyFindings(BODY_1364)).toEqual({ outsideDiff: 0, nitpicks: 1, duplicates: 0, other: 0 });
   });
 
   it("accepts both '(N)' and ': N' for every section", () => {
     expect(countBodyFindings("Nitpick comments (3) / Outside diff range comments: 4 / Duplicate comments (1)")).toEqual(
-      { outsideDiff: 4, nitpicks: 3, duplicates: 1 },
+      { outsideDiff: 4, nitpicks: 3, duplicates: 1, other: 0 },
     );
   });
 
+  // Fail closed: a section wording CodeRabbit adds later must stop the merge,
+  // not parse as zero (the CLI review's "Minor comments (N)" is one candidate).
+  it("counts an unrecognised section as 'other' rather than zero", () => {
+    expect(countBodyFindings("\ud83d\udfe1 Minor comments (1)")).toEqual({
+      outsideDiff: 0,
+      nitpicks: 0,
+      duplicates: 0,
+      other: 1,
+    });
+  });
+
+  it("does not read prose about comments as a section", () => {
+    expect(countBodyFindings("Some comments are outside the diff and can't be posted inline.")).toEqual({
+      outsideDiff: 0,
+      nitpicks: 0,
+      duplicates: 0,
+      other: 0,
+    });
+  });
+
   it("reads a clean or empty body as zero, and ignores the inline 'actionable' count", () => {
-    expect(countBodyFindings("Actionable comments posted: 2")).toEqual({ outsideDiff: 0, nitpicks: 0, duplicates: 0 });
-    expect(countBodyFindings(null)).toEqual({ outsideDiff: 0, nitpicks: 0, duplicates: 0 });
+    expect(countBodyFindings("Actionable comments posted: 2")).toEqual({
+      outsideDiff: 0,
+      nitpicks: 0,
+      duplicates: 0,
+      other: 0,
+    });
+    expect(countBodyFindings(null)).toEqual({ outsideDiff: 0, nitpicks: 0, duplicates: 0, other: 0 });
   });
 });
 
@@ -446,6 +477,15 @@ describe("awaitReview: reviewed is not clean (#1365)", () => {
     expect(await awaitReview(deps, { pollMs: 1000 })).toBe(5);
     expect(deps.calls.logs.at(-1)).toMatch(/2 outside-diff, 1 nitpick/);
     expect(deps.calls.logs.at(-1)).toContain(FOUND.url);
+  });
+
+  it("exits 5 on findings in an unrecognised section", async () => {
+    const deps = fakeDeps({
+      statuses: [COMPLETED],
+      findings: () => ({ outsideDiff: 0, nitpicks: 0, duplicates: 0, other: 1, url: null }),
+    });
+    expect(await awaitReview(deps, { pollMs: 1000 })).toBe(5);
+    expect(deps.calls.logs.at(-1)).toMatch(/1 in an unrecognised section/);
   });
 
   it("--once also refuses a reviewed head with findings", async () => {
@@ -470,7 +510,8 @@ describe("awaitReview: reviewed is not clean (#1365)", () => {
     const deps = fakeDeps({
       statuses: [IN_PROGRESS, COMPLETED],
       heads: ["aaaaaaaa1", "bbbbbbbb2"],
-      findings: (sha) => (sha === "aaaaaaaa1" ? FOUND : { outsideDiff: 0, nitpicks: 0, duplicates: 0, url: null }),
+      findings: (sha) =>
+        sha === "aaaaaaaa1" ? FOUND : { outsideDiff: 0, nitpicks: 0, duplicates: 0, other: 0, url: null },
     });
     expect(await awaitReview(deps, { pollMs: 1000 })).toBe(0);
     expect(deps.calls.findingShas).toEqual(["bbbbbbbb2"]);

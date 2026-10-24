@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { axe, toHaveNoViolations } from 'jest-axe'
 import { describe, expect, it, vi } from 'vitest'
 import BandCard from '../BandCard'
+import { contrastRatio } from '../../utils/colour'
 
 expect.extend(toHaveNoViolations)
 
@@ -156,10 +157,23 @@ describe('BandCard variant="board"', () => {
   // in production belong to exactly one artist -- so they are presented as
   // facets you could act on rather than as descriptive text, matching the chip
   // the desktop card already uses.
-  it('letters a light ink in near-black, not invisible white', () => {
+  it('letters a light ink in black, not invisible white', () => {
     renderBoard({ band: { ...band, venue_short: 'Pale Hall', venue_ink: '#ffffff' } })
-    expect(screen.getByText('Pale Hall')).toHaveStyle({ color: '#111111' })
+    expect(screen.getByText('Pale Hall')).toHaveStyle({ color: '#000000' })
   })
+
+  // The column accepts any hex, so the lettering must clear 4.5:1 on every ink,
+  // including the greys where white just fails (#777777: white 4.48:1, and a
+  // #111111 fallback only 4.22:1).
+  it.each(['#777777', '#767676', '#808080', '#959595', '#ffff00', '#1e3a8a'])(
+    'stamp lettering clears 4.5:1 on ink %s',
+    ink => {
+      renderBoard({ band: { ...band, venue_short: 'Any Hall', venue_ink: ink } })
+      const [r, g, b] = screen.getByText('Any Hall').style.color.match(/\d+/g).map(Number)
+      const lettering = `#${[r, g, b].map(v => v.toString(16).padStart(2, '0')).join('')}`
+      expect(contrastRatio(lettering, ink)).toBeGreaterThanOrEqual(4.5)
+    }
+  )
 
   it('a stamp with no ink is self-contained: text-colour fill, ground-colour letters', () => {
     renderBoard({ band: { ...band, venue_short: 'Inkless', venue_ink: null } })

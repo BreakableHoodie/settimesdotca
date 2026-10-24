@@ -8,7 +8,9 @@ import { contrastRatio } from '../utils/colour'
 
 const HEX = /^#[0-9a-f]{6}$/i
 const WHITE = '#ffffff'
-const NEAR_BLACK = '#111111'
+// Black, not a near-black: whenever white fails 4.5:1 on an ink, pure black
+// clears it (the two always sum past it), while #111111 does not (#777777).
+const BLACK = '#000000'
 // A small fixed tilt per venue, so a column of stamps looks hand-pressed
 // without moving between renders.
 const TILTS = [-1.5, 1, -0.5, 1.5, -1]
@@ -24,8 +26,8 @@ export default function VenueStamp({ venue, short, ink, className = '' }) {
   if (!label) return null
   const inked = typeof ink === 'string' && HEX.test(ink)
   // White on the curated inks (all pass 4.5:1); the column accepts any hex, so
-  // a light ink gets near-black lettering instead of vanishing.
-  const lettering = inked && contrastRatio(WHITE, ink) >= 4.5 ? WHITE : NEAR_BLACK
+  // a light ink gets black lettering instead of vanishing.
+  const lettering = inked && contrastRatio(WHITE, ink) >= 4.5 ? WHITE : BLACK
   return (
     <span
       title={venue && venue !== label ? venue : undefined}

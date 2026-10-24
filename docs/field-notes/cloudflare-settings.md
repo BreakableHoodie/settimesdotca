@@ -5,6 +5,7 @@ limit. `CLAUDE.md` keeps the rules; this file keeps the incidents, measurements
 and reasoning behind them. Read it before changing the code a section guards.
 
 ## Where Cloudflare-facing settings actually live
+
 Most of what follows is **not** in `wrangler.toml` or any other file here — it
 is Cloudflare-side state, silently undoable, with nothing in the repo to hint
 that it mattered. That is why it is written down.
@@ -127,3 +128,25 @@ path + query)`:
   no provider sends them), and `p=reject`, which is the stronger end state but
   should wait until a few weeks of reports confirm both sending paths pass
   cleanly.
+
+## Where Cloudflare-facing settings actually live — `CLAUDE.md` text as of 2026-10-24
+
+Most of this is Cloudflare-side state that can be silently undone, with nothing in the repo to show it mattered. Read the layer column before changing anything:
+
+| layer                    | where you change it                                                                 | items                                                                                        |
+| ------------------------ | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| **Zone settings**        | Cloudflare dashboard / API, zone `settimes.ca` (`77e5bb9ef071b25b9cb65885ed4b38e1`) | Rocket Loader, the `www` → apex redirect rule, SSL mode, minimum TLS                         |
+| **DNS records**          | same zone, DNS tab                                                                  | the DMARC record                                                                             |
+| **Pages project** config | Cloudflare Pages project `settimesdotca`                                            | environment variables                                                                        |
+| **Account** resources    | Cloudflare account                                                                  | D1 databases                                                                                 |
+| **This repository**      | `frontend/public/_headers`                                                          | **HSTS** — listed only because the zone toggle reading "off" is correct and looks like a gap |
+
+- **Preview deployments bind only the scratch D1**, via the `[env.preview]` block in `wrangler.toml` (2026-10-13). Without it, previews inherit production D1 and R2. Never bind a production resource there; `scripts/__tests__/previewBindings.test.js` enforces both halves.
+- **Rocket Loader stays disabled**; strict CSP blocks the scripts it rewrites.
+- **`www` → apex is a zone _dynamic_ 301** (`concat("https://settimes.ca", http.request.uri.path)`, query preserved, #984). A static redirect would send every deep path to `/`. Keep `www` as a Pages custom domain: without it, old links become TLS errors instead of redirects. `/` deliberately emits no raw-HTML canonical, so if `www` ever stops redirecting, the duplicate-host problem returns.
+- **SSL/TLS is Full (strict), minimum TLS 1.2.** A proxied origin with a bad certificate fails closed, on purpose.
+- **HSTS is served from `frontend/public/_headers`**, so the zone's HSTS toggle reading "off" is correct. Do not also enable the zone toggle; check the live header before concluding anything is missing.
+- **DMARC:** `v=DMARC1; p=quarantine; adkim=r; aspf=r; pct=100; rua=mailto:dmarc@settimes.ca`. Alignment stays relaxed because iCloud (human mail) and Resend via SES (application mail, including band-follow confirmations) are both legitimate senders; strict alignment would quarantine confirmations silently. `p=reject` waits until reports show both paths pass. If no reports arrive within a few days, check that the catch-all routes `dmarc@`.
+- Removed 2026-08-29; do not recreate: `dev.settimes.ca` (a dead tunnel), the unused `ADMIN_PASSWORD`/`MASTER_PASSWORD` Pages vars, and the empty `bandcrawl-db` D1. To check whether a D1 is empty, query `sqlite_master`; the API's `num_tables` is wrong.
+
+Before-and-after evidence, the redirect rule and DMARC reasoning: `docs/field-notes/cloudflare-settings.md`.

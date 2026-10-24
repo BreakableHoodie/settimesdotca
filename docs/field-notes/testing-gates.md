@@ -5,6 +5,7 @@ limit. `CLAUDE.md` keeps the rules; this file keeps the incidents, measurements
 and reasoning behind them. Read it before changing the code a section guards.
 
 ## Verify guards against the failure they guard, not the success
+
 **Code whose only job runs when something breaks must be tested broken.** A
 guard, a diagnostic, a timeout, a retry, an error handler — none of it is
 exercised by the happy path, so a green run says nothing about whether it works.
@@ -63,6 +64,7 @@ mutation-testing an assertion (see the vacuous-test class), applied to
 operational code instead of tests.
 
 ## Before every commit — required checklist
+
 **Canonical entry point: `make gate`** — runs the Make targets `format` → `format-check` → `lint-all` → `check-citations` → `test` → `build` (`format-check` wraps the `npm run format:check` script below) for both stacks with real exit codes (see `Makefile`, `AGENTS.md`). Run it before every commit; do not commit if it fails. The npm commands below are per-stack subsets for running part of the gate or debugging a failing step; `validate:openapi` is conditional and not a `make gate` prerequisite.
 
 **`make gate` covers every file type we maintain, not just JavaScript.** Until
@@ -142,6 +144,7 @@ npm test                    # from repo root — runs fine locally, including Ap
 **E2E tests** require a live wrangler dev server and are slow — run them only when changing routes, auth flows, or anything the E2E suite targets. The build check above catches most issues.
 
 ## The mutation gate — documented invariants, proven executable
+
 ```bash
 make mutation-gate      # ~8s; NOT part of `make gate`
 ```
@@ -223,6 +226,7 @@ quality generally. Ten entries is a floor, not a certificate — add one wheneve
 you add or change a test for something this file documents.
 
 ## Hand-rolled mutation runs — check the harness ran, not just its exit code
+
 `make mutation-gate` is the maintained path and has none of this problem. But
 ad-hoc mutation checks — strip a line, run a suite, expect red — are a constant
 habit here, and an exit code alone cannot tell "the test caught the mutation"
@@ -274,6 +278,7 @@ verdict without having looked. Here it failed red rather than green, which is
 lucky — a false red is noticed eventually, a false green never is.
 
 ## The coverage floor — no handler may be entirely untested
+
 ```bash
 make coverage-floor      # runs the coverage suite, then the check
 ```
@@ -320,3 +325,19 @@ well. One test that imports a handler and asserts nothing takes it off this
 list. That is why the mutation gate exists alongside it — this one catches
 "nobody started", that one catches "the test cannot fail". Neither replaces the
 other.
+
+## Edge E2E against a preview (#1292) — `CLAUDE.md` text as of 2026-10-24
+
+Node and local `wrangler` do not enforce the Workers runtime's limits, which is how a PBKDF2 count the edge refuses broke signup for three months with every test green. `.github/workflows/edge-e2e.yml` runs the login and user-management specs against a real Pages **preview** deployment.
+
+- **Data:** previews bind only the scratch D1 `settimes-e2e-db`. `scripts/reset-e2e-db.mjs` rebuilds it from `database/setup-complete.sql` each run, then loads `database/seed-test-data.sql` (the venues, events and bands local E2E uses), so phase 1 can run `share-schedule` and `event-creation` unchanged. It refuses any target other than that exact name and id, deletes the schema file's local test accounts, and seeds the E2E admin plus a `viewer@settimes.ca` whose password is random and discarded.
+- **Drop order:** children are dropped before their parents. D1 ignores `foreign_keys = OFF`, and a child's implicit DELETE fails once its parent is gone.
+- **Plain-text vars live in `wrangler.toml` (`[env.preview.vars]`), never the dashboard.** A deploy with that file replaces the dashboard's plain-text vars and keeps only secrets; the first run lost all three that way. Secrets stay in the dashboard. Production is unaffected only because every production var is a secret.
+- **Production code paths:** previews set `ENVIRONMENT=preview`, which `isDevRequest` treats as production (secure cookies, real CSRF). They use Cloudflare's always-pass Turnstile test keys and no email provider.
+- **Origin:** tests hit the branch alias `edge-e2e.longweekend-bandcrawl.pages.dev`, because the middleware's Origin allowlist needs a stable origin. The preview env's `CORS_ALLOWED_ORIGINS` names exactly that alias.
+- **Rate limits are production's** (5 logins per minute per IP), so the run is two phases with no retries: user management and `invite-signup.spec` on one stored session, then `login.spec` after the window clears.
+- **Emailed tokens are read from D1 (#1292).** `emailed-token-flows.spec` covers password-reset completion, follow confirmation and subscription verification: previews have no email provider, so `e2e/utils/d1.js` reads the token (or seeds a reset token) with `wrangler d1 execute`. Remote mode (`E2E_D1_REMOTE=1`, set only on edge phase 1) can name nothing but the scratch D1, using the reset script's own constant; otherwise it uses the local state. Every confirmation is clicked in a real browser, per "Emailed links never act on a GET".
+- **`invite-signup.spec` is the PBKDF2 canary (#1292).** It completes a real signup, so `hashPassword` runs on the edge's request path and a refusal is a 500 the spec asserts against. It needs the invite code, which the API returns only when email is unconfigured (previews, local E2E). Its invitee context passes an empty `storageState` explicitly: inside Playwright Test, `browser.newContext()` inherits the project's, so the "invitee" would otherwise be the signed-in admin.
+- **Ready means the alias serves THIS RUN'S deployment** (`scripts/wait-for-preview.mjs`, #1340), three times running: it serves the `edge-e2e-deployment.txt` marker the workflow writes into `dist` (`run_id-attempt`), `/api/events/timeline` answers JSON, `/admin` loads the local dist's hashed entry script, and the local dist's hashed `AdminApp` chunk comes back as JavaScript. **Only the marker names the deployment:** Vite hashes come from frontend source, so a functions-only PR or a re-run serves byte-identical names from the previous deployment. Functions alone were not enough: `/` once returned 200 while the alias still pointed at the previous run's deleted deployment, and `/admin` once rendered the admin error boundary while Functions answered. **A missing chunk is not a 404 on Pages:** the SPA fallback answers `200 text/html`, so the chunk check is on content-type. Phase 2 runs after a phase-1 test failure but never when reset, deploy or readiness failed, and the reset retries as a whole (D1 code 7500 has failed it).
+- **Queueing and teardown:** one shared database, so runs queue (`cancel-in-progress: false`). Every run deletes its deployment, and a failed delete fails the job, so stale previews (#1295) cannot pile up.
+- **Not run** for fork or Dependabot PRs, which get no secrets. The job says so; it never passes silently.

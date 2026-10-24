@@ -2,6 +2,8 @@
 
 AI assistant context for this codebase. Captures non-obvious invariants, known gotchas, and conventions that aren't derivable from reading the code.
 
+**This file has a 125,000-character budget** (`scripts/__tests__/claudeMdBudget.test.js`), because Claude Code warns past 150k across all loaded instruction files. Rules live here; incidents, measurements and history go verbatim into `docs/field-notes/`.
+
 ---
 
 ## Proactive Quality Gates
@@ -28,55 +30,11 @@ The `hooks` in `.claude/settings.local.json` automate the mechanical parts (pret
 
 ### The codebase report card — run it on a cadence
 
-`docs/REPORT_CARD_REVIEW.md` grades the whole repo across nine
-categories, fixes what is safe, and re-grades. It is **tracked in this repo on
-purpose**: the original lived outside the working tree, where a fresh clone,
-CI, or a delegated run would never find it — the same failure as the untracked
-`instructions/` tree in #818.
+`docs/REPORT_CARD_REVIEW.md` grades the whole repo across nine categories, fixes what is safe, and re-grades. It is **tracked in git** so a fresh clone, CI or a delegate can find it (#818's failure was an untracked tree), **and listed in `mkdocs.yml`'s `exclude_docs`**, because `docs/*.md` ships to docs.settimes.ca whatever the `nav` says and this file names past security gaps. Keep the exclusion even if the site is retired again, and never "fix" the missing nav entry: the file is meant to be absent from the site, not merely unlinked.
 
-**Tracked in git, and listed in `mkdocs.yml`'s `exclude_docs` block** (owner
-decision, 2026-08-20). Why that block matters has changed; that it matters has
-not. While the docs were published it was load-bearing: `docs/*.md` shipped to
-docs.settimes.ca regardless of the mkdocs `nav`, so `exclude_docs` — not the
-absent nav entry — was the only thing keeping this file off the public site.
+**Cadence: the start of a release cycle or roughly quarterly**, ideally after a season ends and before the next edition's build-out. It is deliberately not a per-PR gate. It catches drift no diff-scoped reviewer can see: a coverage ratchet ten points below actual, an exported constant imported by nothing while five endpoints copied its value, an override pinned inside its own vulnerable range, a security control with zero coverage (all found by the first run, 2026-08-20, #900–#917).
 
-**The site is published again** (restored 2026-09-25, when the repo went
-public). It was retired from 2026-09-16 while the repo was private, because
-GitHub Pages is unavailable to private repos on the Free plan; see
-`.github/workflows/docs-site.yml` for the history and the retirement steps. So
-the exclusion is load-bearing again: `docs/*.md` ships to docs.settimes.ca
-whatever the `nav` says.
-
-Keep it even if the site is ever retired again. It has to be in place _before_
-publishing returns, not after, because this doc names past security gaps. Do not "fix"
-the missing nav entry by adding one either; the file is meant to be absent from
-the site, not merely unlinked in it.
-
-**Cadence: at the start of a release cycle, or roughly quarterly — whichever
-comes first.** It is deliberately not a per-PR gate. It reads the whole tree and
-runs every gate, so it costs real time; CodeRabbit and the trigger-based agents
-above cover the per-change surface. Run it when the question is _"what has
-drifted while we were shipping?"_, not _"is this diff correct?"_.
-
-**Run it after a season ends, before the next edition's build-out starts.** That
-is when accumulated drift is cheapest to fix and least likely to collide with
-event-critical work.
-
-**What it is for, and what it is not.** It catches the class of problem no
-diff-scoped reviewer can see: a coverage ratchet that drifted ten points below
-actual and would have passed a double-digit regression; a two-tier cache module
-whose second tier was exported and imported by nothing while five endpoints
-copy-pasted its value; a dependency override pinned _inside_ its own vulnerable
-range; a security control with zero test coverage because every fixture in ten
-files seeded the passing case. None of those appear in any single diff. All four
-were found by the first run (2026-08-20, #900–#917).
-
-**Its findings are claims until verified.** That first run also produced three
-wrong assertions that reached filed issues — "nothing validates zero-length
-sets" (three of five write paths did), "these components have no tests" (a bad
-`find`), "the roster query is unbounded" (capped at 500) — and three vacuous
-tests of its own. Treat the output as a lead list to check, not a verdict, and
-correct the record on the issue when a lead does not survive contact.
+**Its findings are claims until verified.** That first run also filed three wrong assertions and wrote three vacuous tests. Treat the output as a lead list, and correct the record on the issue when a lead does not survive contact.
 
 ### Sweep for siblings
 
@@ -170,34 +128,21 @@ A third implementer on a separate subscription, via the `opencode-delegate` skil
 
 ## Mission & Scope
 
-settimes.ca is the multi-venue/multi-artist event platform for **Waterloo Region** (Kitchener-Waterloo, ON). The most recent edition, **Long Weekend Band Crawl Vol. 18** (event 37, `lwbc18`, single-day, October 11, 2026), ran and was **archived 2026-10-13**. No edition is published now; the next is expected in February 2027.
+settimes.ca is the multi-venue/multi-artist event platform for **Waterloo Region** (Kitchener-Waterloo, ON). The most recent edition, **Long Weekend Band Crawl Vol. 18** (event 37, `lwbc18`, single-day, October 11, 2026), was **archived 2026-10-13**. No edition is published now; the next is expected in February 2027.
 
-- **Focus:** Waterloo Region. This governs **product language** — marketing copy, meta descriptions, SEO targeting, "where this is for" statements. It is not a censor on fact: the platform has hosted an event outside the region (Buddies Fest 2, Tillsonburg) and those records stay accurate wherever they appear. The specific drift this rule exists to prevent is describing the site as serving Ottawa, which it does not.
-- **Brand:** settimes.ca — no rebranding
-- **Target event:** the next edition (expected February 2027); none is published yet
-- **Both fan-facing and admin tooling are equal priority**
-- **SEO is a priority** (band pages, event pages, local discovery, structured data)
-- **Colour themes:** 4 user-selectable (dark + light presets) via Tailwind v4 CSS custom properties + `data-theme` on `<html>`, persisted in localStorage
-- **Single photo per band** — extends existing `photo_url` / R2 upload flow; no video embeds
+- **Focus:** Waterloo Region governs **product language** (marketing copy, meta descriptions, SEO targeting), not fact: an out-of-region event (Buddies Fest 2, Tillsonburg) stays accurate wherever it appears. Never describe the site as serving Ottawa.
+- **Brand:** settimes.ca, no rebranding. Fan-facing and admin tooling are equal priority. SEO is a priority (band, event and venue pages, structured data).
+- **Colour themes:** 4 user-selectable (see Theming). **Single photo per band** (`photo_url` / R2); no video embeds.
 
-**Shipped editions** (all `status = 'archived'`): Vol. 18 (event 37, 2026-10-11), Vol. 17 (event 21, 2026-08-02, 22 bands across 6 King St N venues — Blue Room, Princess Cafe, Prohibition Warehouse, Revive Karaoke, Room 47, Roost) and Buddies Fest 2 (event 36, 2026-08-07→09, Tillsonburg — the first multi-day production event). Their lineups and venue rosters are live data now, not spec; read them from D1 rather than from this file.
+**Shipped editions** (all `status = 'archived'`): Vol. 18 (event 37), Vol. 17 (event 21) and Buddies Fest 2 (event 36, the first multi-day production event). Read their lineups and venues from D1, not from this file.
 
-**Between seasons is a supported state, not a bug**, and since Vol. 18 was archived on 2026-10-13 we are in it again. Measured against production on 2026-10-13:
+**Between seasons is a supported state, not a bug.** Right now `/api/events/public` and the timeline's `now`/`upcoming` return 0 and the iCal feed has 0 `VEVENT`s, while `/api/stats/public` and `sitemap.xml` stay populated from archived editions. `EventTimeline` has a dedicated empty state for it and auto-expands Past.
 
-| Surface                                         | Now                                    | Why                                            |
-| ----------------------------------------------- | -------------------------------------- | ---------------------------------------------- |
-| `/api/events/public` (defaults `upcoming=true`) | **0**                                  | event-driven; no published future event        |
-| `/api/events/timeline`                          | `now` 0, `upcoming` 0, `past` 10       | same                                           |
-| **iCal feed**                                   | **0** `VEVENT`s                        | performance-driven; no upcoming published sets |
-| `/api/stats/public`, `sitemap.xml`              | populated (298 performances, 286 URLs) | archived editions                              |
+**The iCal zero is the trap once the next edition is published:** a published event whose lineup is not announced yet also yields 0. Ask which layer a surface reads, **event**-driven or **performance**-driven, rather than trusting the number. Before treating any zero as a bug, check both: is an event `published`, **and** does it have performances?
 
-**The iCal zero is the trap once the next edition is published.** From 2026-08-28 until its lineup was announced, Vol. 18 was `published` with zero performances, and the feed's zero read identically to today's while meaning _published event, lineup not yet announced_, not _no published event_. Diagnose the two apart by asking which layer the surface reads — an **event**-driven surface or a **performance**-driven one — rather than by the number.
+Canonical roadmap: `docs/ROADMAP.md`. **Track remaining/deferred work as GitHub issues** (`gh issue create`) and reference them from PRs (`Closes #N`).
 
-`EventTimeline` still has its dedicated between-seasons empty state and auto-expands Past; that path is live again now that Vol. 18 is archived. Before treating any such zero as a bug, check both halves: is an event actually `published`, **and** does it have performances?
-
-Canonical active roadmap: `docs/ROADMAP.md`. Use it for handoffs between Claude, OpenCode, and humans.
-
-**Track remaining/deferred work as GitHub issues** (`gh issue create`) — not just chat threads or ad-hoc lists — so nothing is lost across sessions and contributors. Reference issues from PRs (`Closes #N`).
+Edition details and the measured between-seasons table: `docs/field-notes/project-history.md`.
 
 ---
 
@@ -207,37 +152,13 @@ Canonical active roadmap: `docs/ROADMAP.md`. Use it for handoffs between Claude,
 - **Backend**: Cloudflare Pages Functions (edge serverless, `functions/`)
 - **Database**: Cloudflare D1 (SQLite-compatible), numbered migrations in `migrations/`
 - **Auth**: Direct D1 session manager (`functions/utils/auth.js`), CSRF double-submit, TOTP MFA, trusted devices, RBAC
-- **Storage**: Cloudflare R2 (band photos)
-- **Email**: Postmark/Resend/MailChannels
+- **Storage**: Cloudflare R2 (band photos, posters) · **Email**: Postmark/Resend/MailChannels
 - **Tests**: Vitest (unit, frontend), Playwright (E2E + a11y + visual regression)
-- **CI/CD**: GitHub Actions (16 workflows), Dependabot, Snyk, GitGuardian, CodeRabbit
-  - **Runners are GitHub-hosted again** (2026-09-25, when the repo went public).
-    Every job reads `runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}` except
-    two that pin `ubuntu-latest` on purpose: `zap-baseline.yml` (needs Docker,
-    which self-hosted job containers lack) and `quality.yml`'s **Lighthouse CI**
-    (its 0.90 floor was calibrated on hosted hardware). The repo variable
-    `RUNS_ON` is **deleted**. From 2026-09-23 to
-    2026-09-25, while the repo was private, `RUNS_ON=self-hosted` routed jobs to
-    ephemeral containers on Dre's homelab; setup and failback live in the private
-    `BreakableHoodie/gh-runner` repo.
-    **Never set `RUNS_ON` while this repo is public.** Anyone can open a fork PR
-    here, and a self-hosted runner would execute that code inside the homelab.
-    The runner sync also stops runners for public repos, so a stray `RUNS_ON`
-    would queue every job forever rather than run it.
-    (`codeql.yml`, `secret-scan.yml` and `dependency-review.yml` were removed
-    2026-09-16 when the repo went private and **restored 2026-09-25** when it went
-    public again; `semgrep.yml` was **rebuilt** in #1173 and gates in the job
-    itself — see "The security tooling this repo actually has" under Security
-    Notes)
-  - **Dependabot merges do not deploy on their own** (#1209). Auto-merge uses
-    `GITHUB_TOKEN`, and GitHub starts no push workflows for a push made with it.
-    `deploy-reconcile.yml` runs every 30 minutes and dispatches the production
-    deploy for any `main` HEAD without one (`workflow_dispatch` _is_ allowed
-    from that token). It waits 10 minutes so it cannot race, and cancel, a
-    human merge's own deploy, and it **never re-dispatches after a real
-    failure**, so a broken deploy cannot loop. It also recovers a deploy killed
-    by `cancel-in-progress`. Push-only scans (Semgrep full-tree, CodeQL on push)
-    still do not run for bot merges; the PR runs covered the same content.
+- **CI/CD**: GitHub Actions, Dependabot, Snyk, GitGuardian, CodeRabbit
+  - **Runners are GitHub-hosted.** Jobs read `runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}`, except two that pin `ubuntu-latest` on purpose: `zap-baseline.yml` (needs Docker) and `quality.yml`'s **Lighthouse CI** (its floor was calibrated on hosted hardware). **Never set the `RUNS_ON` repo variable while this repo is public:** any fork PR would execute on Dre's homelab runner (setup in the private `BreakableHoodie/gh-runner` repo), and the runner sync stops runners for public repos, so every job would queue forever.
+  - **Dependabot merges do not deploy on their own** (#1209): GitHub starts no push workflows for a push made with `GITHUB_TOKEN`. `deploy-reconcile.yml` runs every 30 minutes and dispatches the production deploy for any `main` HEAD without one. It waits 10 minutes so it cannot race (and cancel) a human merge's deploy, and **never re-dispatches after a real failure**, so a broken deploy cannot loop. Push-only scans still do not run for bot merges; the PR runs covered the same content.
+
+The private-repo period (2026-09-16 to 09-25) and what it removed and restored: `docs/field-notes/project-history.md`.
 
 ---
 
@@ -435,23 +356,19 @@ Example: `frontend/src/pages/EventRecapPage.jsx` — uses both `<Helmet>` (for o
 
 `BandProfilePage.jsx` was this example until #797 removed its `<meta name="keywords">` — the tag was its `<Helmet>`'s only child, so the wrapper and the `react-helmet-async` import went with it. That page now assigns `document.title` directly and declares no Helmet at all, which is why it no longer illustrates the pairing.
 
-### SSR owns identity meta and JSON-LD where it emits either; the client `<Helmet>` owns only what SSR does not emit — never canonical/`og:*`/`twitter:*`/description, and never JSON-LD on a route whose SSR handler already emits it
+### SSR owns identity meta and JSON-LD where it emits either; the client `<Helmet>` owns only what SSR does not emit
 
-`<Helmet>` manages only tags it created (`data-rh`), so it **appends** a second copy of any tag that `index.html` or a Pages Function put there. A duplicate `og:url` once overrode our canonical ("Duplicate, Google chose different canonical than user"). Ownership is therefore split by who emits:
+`<Helmet>` manages only tags it created (`data-rh`), so it **appends** a second copy of any tag `index.html` or a Pages Function emitted. A duplicate `og:url` once overrode our canonical.
 
-- **`serveWithInjectedMeta()`** (`functions/utils/ssrMeta.js`) strips `index.html`'s defaults via `DEFAULT_META_RE` before injecting. Every `og:*`/`twitter:*`/`description` property `index.html` declares must be listed there, or its default becomes a live second copy (`og:site_name`, #784).
-- **On SSR-injected routes the client `<Helmet>` declares no `canonical`, `og:*`, `twitter:*` or `description`**, and no JSON-LD where the SSR handler passes `jsonLd` (`/band/*`, `/venue/*`, #790). It may set `<title>`, but only with the SSR formula verbatim and only once data has loaded (#785); `functions/api/venues/[id].js` exposes `city` so the venue title can reproduce its formula. `ssrIdentityMeta.test.jsx` asserts this, including the fetch-in-flight case; keep that case. It mounts with `createRoot`, not `hydrateRoot`, because the app is client-rendered.
-- **SSR owns what SSR emits; everything else stays client-owned.** Before deleting a tag from a `<Helmet>`, confirm SSR emits an equivalent, or the sweep drops the tag instead of de-duplicating it. `functions/band/[id].js`'s JSON-LD `description` is a separate, untruncated value: do not merge it with the 200-char meta description (most bios exceed it). Where the two disagreed, the complete, spec-valid value won (`og:type="website"`, `twitter:card="summary_large_image"`).
-- Do not mark SSR tags `data-rh` so Helmet adopts them: that relies on the replace behaviour React 19 makes unreliable. Accepted tradeoff: identity meta freezes across in-app navigation; crawlers always fetch fresh.
-- **Every indexable route except `/` has a Pages Function injecting its own meta:** `/event/*`, `/band/*`, `/venue/*`, `/events/*/recap` (D1-backed, `functions/events/[slug]/recap.js`) and the static pages through `STATIC_PAGES` (`functions/utils/staticPageMeta.js`, one 2-line route file each). `/` has `functions/index.js`, which injects event links into the `<noscript>` nav and leaves `<head>` byte-for-byte: `index.html`'s defaults are the homepage's correct meta, and `EventsPage` owns it client-side. Every shell-rewriting handler uses `headersForRewrittenShell()`: policy headers kept, `Content-Type` set, `ETag`/`Last-Modified`/`Content-Length`/`Content-Encoding` dropped.
-- **The handler must server-render the URL people actually link to.** Artist links are slug-built, so `functions/band/[id].js` resolves a slug via `normalizeBandName` and **301**s to `/band/<id>`, query preserved (#983). The `Location` is relative on purpose (canonicals pin the host; redirects preserve it), the public-data gate runs before the lookup (else an existence oracle), and an unresolvable slug renders the shell, not a 404. `functions/venue/[id].js` is safe only because venue links are id-built; a `/venue/<slug>` link builder needs the same redirect.
-- **`/event/:slug` (live) and `/events/:slug/recap` (archive) are different resources.** Anything building an event URL picks the right prefix (#562). Do not unify them (declined, #910).
-- Build every URL from `CANONICAL_HOST`, never `request.url`.
-- **`frontend/public/_routes.json` is the only routes file**, and `exclude` beats `include`. `functions/__tests__/staticPageMeta.test.js` fails if an included path lacks a route file or registry entry. Never recreate a root `/_routes.json`.
+- **`serveWithInjectedMeta()`** (`functions/utils/ssrMeta.js`) strips `index.html`'s defaults via `DEFAULT_META_RE`; every `og:*`/`twitter:*`/`description` that `index.html` declares must be listed there (`og:site_name`, #784).
+- **On SSR-injected routes the client `<Helmet>` declares no `canonical`, `og:*`, `twitter:*` or `description`**, and no JSON-LD where the handler passes `jsonLd` (`/band/*`, `/venue/*`, #790). It may set `<title>` only with the SSR formula verbatim, once data has loaded (#785); `functions/api/venues/[id].js` exposes `city` for exactly that. `ssrIdentityMeta.test.jsx` asserts this; keep its fetch-in-flight case.
+- Before deleting a tag from a `<Helmet>`, confirm SSR emits an equivalent. `functions/band/[id].js`'s JSON-LD `description` stays separate from the 200-char meta description. Never mark SSR tags `data-rh` for Helmet to adopt.
+- **Every indexable route except `/` has a meta-injecting Pages Function** (`/event/*`, `/band/*`, `/venue/*`, `/events/*/recap`, and static pages through `STATIC_PAGES` in `functions/utils/staticPageMeta.js`). `functions/index.js` leaves `/`'s `<head>` byte-for-byte. Shell rewriters use `headersForRewrittenShell()`.
+- **Server-render the URL people link to:** `functions/band/[id].js` **301**s a slug to `/band/<id>` (relative `Location`, query kept, public-data gate before the lookup, unresolvable slug renders the shell, #983). A `/venue/<slug>` link builder would need the same redirect.
+- `/event/:slug` (live) and `/events/:slug/recap` (archive) are different resources; do not unify them (#910). Build every URL from `CANONICAL_HOST`, never `request.url`.
+- **`frontend/public/_routes.json` is the only routes file** (`exclude` beats `include`); `functions/__tests__/staticPageMeta.test.js` checks it. Never recreate a root `/_routes.json`.
 
-Mocked unit tests cannot prove Cloudflare dispatches to a handler. Verify routing changes against `npx wrangler pages dev --port 8788` and diff per-path tag counts.
-
-Search Console evidence, the `/band/<slug>` incident and the rejected alternatives: `docs/field-notes/ssr-identity-meta.md`.
+Mocked tests cannot prove dispatch: verify routing against `npx wrangler pages dev --port 8788` and diff per-path tag counts. History: `docs/field-notes/ssr-identity-meta.md`.
 
 ---
 
@@ -561,30 +478,36 @@ The privacy policy's 30 days covers the live table. D1 Time Travel can hold earl
 Three roles in ascending order: `viewer` → `editor` → `admin`.
 
 - `viewer`: read-only access to all admin data
-- `editor`: can create/edit bands, events, lineup, **archive** events, use the event wizard, and **create** venues (owner decision 2026-10-10: the person who builds editions is an editor); cannot edit or delete an existing venue (a rename or delete rewrites every past edition held there), delete events, or manage users. `VenuesTab` hides Edit/Delete from non-admins through `canManage`, so the screen never offers a button the server will refuse
-- `admin`: full access including editing or deleting venues, deleting events, user management, API keys, invite codes, audit log, maintenance, and platform settings
+- `editor`: create/edit bands, events and lineup, **archive** events, use the event wizard, and **create** venues (owner decision 2026-10-10: the person who builds editions is an editor); cannot edit or delete an existing venue (that rewrites every past edition held there), delete events, or manage users. `VenuesTab` hides Edit/Delete from non-admins through `canManage`
+- `admin`: full access, including editing or deleting venues, deleting events, users, API keys, invite codes, audit log, maintenance, and platform settings
 
-Enforced via `checkPermission(context, "viewer"|"editor"|"admin")` in `functions/api/admin/_middleware.js`. Every mutating endpoint must call this before touching the database. **Both roles are looked up as own keys** (`Object.hasOwn`): a bare `roleHierarchy[role]` returns an inherited function for `"constructor"` or `"__proto__"`, the comparison is then false, and the request is ALLOWED. That would be a full bypass after one bad write, so the database refuses one too: migration 0069 adds `BEFORE INSERT`/`BEFORE UPDATE OF role` triggers on `users` and `invite_codes` (signup copies the invite's role) that abort on any role outside the three (#1287). **Triggers, not a CHECK:** adding a CHECK means rebuilding `users`, and D1 ignores `PRAGMA foreign_keys = OFF`, so the DROP would cascade-delete every session and fail on `api_keys`' RESTRICT.
+Enforced via `checkPermission(context, "viewer"|"editor"|"admin")` in `functions/api/admin/_middleware.js`; every mutating endpoint calls it before touching the database. **Both roles are looked up as own keys** (`Object.hasOwn`): a bare `roleHierarchy["constructor"]` returns an inherited function, the comparison is false, and the request is ALLOWED. Migration 0069 adds `BEFORE INSERT`/`BEFORE UPDATE OF role` triggers on `users` and `invite_codes` that abort on any role outside the three (#1287) — triggers, not a CHECK, because rebuilding `users` on D1 would cascade-delete every session.
 
-**The route policy is one explicit table:** `POLICY` in `functions/api/admin/__tests__/rbacBoundaries.test.js`. Every admin handler must appear in it (a new route fails the build until someone declares who may call it), the role in the code must equal the table, and every role below each entry is called and must get 403 with no row written. The table is the source of truth on purpose: a guard that read the expected role FROM the code could never catch the code being weakened (the first draft did exactly that and survived the mutation). Changing who may call a route means changing the code AND this table in the same PR. `checkPermissionLiterals.test.js` and `checkPermission`'s fail-closed branch keep a misspelled role literal from silently granting access to everyone.
+**The route policy is one explicit table:** `POLICY` in `functions/api/admin/__tests__/rbacBoundaries.test.js`. Every admin handler must appear in it, the role in the code must equal the table, and every lower role must get 403 with no row written. The table is the source of truth on purpose (a guard reading the role from the code cannot catch the code being weakened); change the code AND the table in the same PR. `checkPermissionLiterals.test.js` and `checkPermission`'s fail-closed branch catch a misspelled role literal.
 
-**Admins and editors must have 2FA; viewers may choose** (owner decision 2026-10-14, #1253). Until an admin or editor enrols, every session-authenticated admin route answers 403 `MFA_SETUP_REQUIRED` except the enrolment set in `functions/utils/mfaPolicy.js` (`/api/admin/me`, `mfa/status`, `mfa/setup`, `mfa/enable`; logout sits under `/auth/`, which never reaches the check). The admin panel opens an undismissable setup modal on that code. The check runs on **both** session paths: the middleware and `checkPermission`'s own `enforceSession` fallback. `mfa/disable` refuses those roles outright (`MFA_REQUIRED_FOR_ROLE`). **Enrolling revokes every existing session** and issues a fresh one: the gate reads the live `totp_enabled`, so a session opened with a phished password before enrolment would otherwise gain full access the moment the owner enrolled. Enrolment is also bound to the secret the code was verified against (`AND totp_secret = ?`), and the row is re-checked once the new session exists, so a second setup or an admin reset that lands mid-request wins and the caller gets 409 `MFA_SETUP_CHANGED`. The same rule binds the other two writers of the factor: backup-code regeneration and the login MFA step write only over the secret and backup-code list they read, so a reset is never undone and two logins cannot restore each other's spent backup codes. A lost authenticator is recovered by another admin through `POST /api/admin/users/:id/reset-mfa` (clears the factor and ends the target's sessions, trusted devices and API keys; refuses the caller's own account). The user flag is `mfaEnrolmentRequired`, deliberately not `mfaRequired`, which the login response already uses for a pending challenge. `createTestEnv` enrols its admin and editor by default, with a real secret; pass `mfaEnrolled: false` to test enrolment or the gate.
+**Admins and editors must have 2FA; viewers may choose** (#1253). Until an admin or editor enrols, every session-authenticated admin route answers 403 `MFA_SETUP_REQUIRED` except the enrolment set in `functions/utils/mfaPolicy.js`; the check runs on **both** session paths (the middleware and `checkPermission`'s `enforceSession` fallback). `mfa/disable` refuses those roles (`MFA_REQUIRED_FOR_ROLE`).
 
-**Moving to a new authenticator app needs no admin (#1318).** `mfa/setup` while 2FA is on answers 409 `MFA_CODE_REQUIRED_TO_REENROL` without a `code`; with a current TOTP code (step claimed, `TOTP_CODE_ALREADY_USED` on a replay) or an unused backup code (spent), it stores the new secret in `users.totp_pending_secret` in ONE conditional write over the factor as read, and the old authenticator keeps working. The proof goes through `beginMfaGuess` with attempt type `mfa_reenrol`, which shares the per-user guess limit. **A pending secret never authenticates anything:** login, step-up, disable and backup codes verify against `totp_secret` alone. `mfa/enable` with a pending secret refuses it once it is older than 15 minutes (400 `MFA_REENROL_EXPIRED`; `users.totp_pending_set_at`, stamped from the same JS clock enable compares against), guesses through the same `beginMfaGuess(mfa_reenrol)` gate, so a stolen session cannot brute-force an abandoned pending secret across IPs, then checks the code against it and swaps it in (one write bound to both the live and pending secrets as read), issues new backup codes, revokes every session and issues a fresh one, exactly as first enrolment does; a lost race is 409 `MFA_SETUP_CHANGED`. Disable, admin `reset-mfa` and a first-time setup all clear the pending secret. **Every enable, first-time or re-enrolment, emails the account owner** (`utils/mfaNotice.js`, `buildMfaEnabledEmail`): queued the moment the factor commits, before any later step can throw, via `waitUntil`; it never fails or alters the response, logs at `error` when it cannot be sent (including email unconfigured), and carries no secret, code or link. Recording the success attempt must never fail a committed enable either. It is the only signal the owner gets if a password-only attacker enrols first.
+- **Enrolling revokes every existing session** and issues a fresh one, so a session opened with a phished password before enrolment never gains access.
+- **Every factor writer binds to what it read:** enrolment to the secret the code was verified against, backup-code regeneration and the login MFA step to the secret and backup-code list they read. A concurrent setup or reset wins (409 `MFA_SETUP_CHANGED`), and two logins cannot restore each other's spent codes.
+- A lost authenticator is recovered by another admin: `POST /api/admin/users/:id/reset-mfa` (clears the factor, sessions, trusted devices and API keys; refuses the caller's own account).
+- The user flag is `mfaEnrolmentRequired`, never `mfaRequired` (the login response's pending challenge). `createTestEnv` enrols admin and editor with a real secret; pass `mfaEnrolled: false` to test enrolment or the gate.
+
+**Moving to a new authenticator needs no admin (#1318).** `mfa/setup` while 2FA is on needs a current TOTP code (step claimed) or an unused backup code (spent), else 409 `MFA_CODE_REQUIRED_TO_REENROL`, and stores the new secret in `users.totp_pending_secret`; the old authenticator keeps working. **A pending secret never authenticates anything.** `mfa/enable` refuses it after 15 minutes (400 `MFA_REENROL_EXPIRED`, `users.totp_pending_set_at`), meters guesses through `beginMfaGuess(mfa_reenrol)`, swaps it in with one write bound to both secrets as read, issues new backup codes, and revokes every session, exactly like first enrolment. Disable, `reset-mfa` and first-time setup clear it. **Every enable emails the account owner** (`utils/mfaNotice.js`): queued via `waitUntil` the moment the factor commits, **before any later step can throw**; it never fails or alters the response, logs at `error` when it cannot send, and carries no secret, code or link. Recording the success attempt must never fail a committed enable either.
+
+Full text and reasoning: `docs/field-notes/mfa-and-step-up.md`.
 
 ### Step-up re-authentication for identity changes (#1324)
 
-Changing who can sign in, or as what, needs a fresh second factor on top of the session. `POST /api/admin/mfa/step-up` takes `{ code }` (a current TOTP code **or** an unused backup code, which is spent) and stamps `lucia_sessions.step_up_at` (INTEGER Unix seconds, migration 0070) on **that session only**, valid for `STEP_UP_WINDOW_SECONDS` (300). Another session of the same user gains nothing, and every new session starts un-stepped-up.
+Changing who can sign in, or as what, needs a fresh second factor on top of the session. `POST /api/admin/mfa/step-up` takes `{ code }` (a current TOTP code or an unused backup code, which is spent) and stamps `lucia_sessions.step_up_at` (INTEGER Unix seconds, migration 0070) on **that session only**, valid for `STEP_UP_WINDOW_SECONDS` (300).
 
-- **The route list is `STEP_UP_POLICY` in `functions/api/admin/__tests__/stepUpBoundaries.test.js`.** Each listed handler calls `requireRecentStepUp(context)` (`functions/utils/stepUp.js`) after `checkPermission` and **before its first write, token or email**. A new mutating `onRequest*` (any export spelling; a bare `onRequest` fails too) under `users`, `invite-codes` or `api-keys` fails the build until it is in the table or in `NOT_STEP_UP` with a reason. A new identity route elsewhere needs a human to add it. The boundary test steps the caller up before the RBAC check, so only the role check can refuse.
-- **Conditional:** `PATCH users/:id` needs it for a role that differs from the stored one, a falsy `isActive`, or a truthy `isActive` on an **inactive** user. `toggle-status` needs it in **both** directions: reactivating restores full access, including the ability to step up. A same-state PATCH skips step-up, so its UPDATE is pinned to the role and `is_active` it read and answers 409 `USER_STATE_CHANGED` if a concurrent change beat it.
-- **A wrong code is 400 `INVALID_MFA_CODE`, never 401** (step-up, enable, disable, backup-codes). `handleResponse` in `adminApi.js` treats every 401 as "session gone" and signs the user out, so a typo would log them out. 401 stays for "no valid session". The login MFA step is exempt: it runs before a session exists.
-- **Guessing is limited per user, no IP in the key:** 10 failed attempts per hour across `mfa_step_up`, `mfa_backup_codes`, `mfa_disable` and `mfa_reenrol` (re-enrolment setup and its confirmation in `mfa/enable`, #1318) (`checkAuthRateLimit` scope `user`). Hitting it **deletes the session** and answers 401 `STEP_UP_LOCKED`, a deliberate sign-out: a session failing the factor repeatedly is the threat step-up exists for. The per-user+IP limit (429) still applies. Step-up, `mfa/backup-codes`, `mfa/disable` and both re-enrolment steps all enforce it (all but step-up through `beginMfaGuess` in `functions/utils/mfaGuessGate.js`; a correct TOTP on backup-codes returns plaintext codes, so it cannot be an unmetered oracle). Each writes its attempt as a failed row **before** verifying and settles it afterwards, never a second row, so parallel guesses count each other; the limits therefore count their own row (`+ 1`). `disable` still refuses admins and editors first.
-- **API keys never step up:** the middleware refuses them under `/api/admin/mfa/`, and the helper returns `STEP_UP_KEY_FORBIDDEN`. It fails closed (no session id, stale or missing stamp: 403 `STEP_UP_REQUIRED`; a read error: 503).
-- **Stamp and backup-code spend commit in one `DB.batch()`** with the same predicate (stamp first), so if either loses both did and nothing is spent (409 `MFA_CHANGED`). Recording the success must never fail a step-up that landed.
-- **One accepted TOTP code per time step per user (#1333, RFC 6238 5.2).** `verifyTotpStep()` returns the matched step counter (highest on a multi-match, full window walked, no early exit) and a code is accepted only if that step is greater than `users.totp_last_step` (NULL = none yet; `totpStepIsFresh`). The step is claimed with a conditional `UPDATE users SET totp_last_step = ? ... AND (totp_last_step IS NULL OR totp_last_step < ?)` plus the caller's factor-binding predicate, **before** the effect (login session, disable, new backup codes; enable folds it into its enrolment UPDATE; step-up puts it in the stamp's own predicate and its batch). A code that matches the secret but whose step is already spent (or whose claim is lost to a parallel request) gets 400 `TOTP_CODE_ALREADY_USED` (login keeps its 401), recorded as `replayed_code` and still counted toward the limits; it never falls through to the backup-code check. The exception is enable, whose lost enrolment `UPDATE` is 409 `MFA_SETUP_CHANGED`. A step-up whose stamp lost while the step is still unspent is a deleted session: 401, `session_gone`, not counted as a guess. Backup codes are untouched: already single-use.
-- **Any path that writes a NEW `totp_secret` sets `totp_last_step = NULL`** (setup, disable, admin `reset-mfa`), or a stale step from the old secret refuses the new authenticator. Re-encrypting the same secret (login, backup-codes, enable) must not reset it. Do not reintroduce a bare `verifyTotp` in a handler: it cannot see the spent step.
-- Tests grant a step-up explicitly with `grantStepUp()`; `createTestEnv` never does, or the guard would be vacuous. The client prompts through `registerStepUpPrompter` (`StepUpModal`), retries once, and throws `STEP_UP_CANCELLED` on cancel. Twenty-five `step-up-*`, `mfa-*` and `rbac-role-check-*` mutation-gate entries pin the above.
+- **The route list is `STEP_UP_POLICY` in `functions/api/admin/__tests__/stepUpBoundaries.test.js`.** Each listed handler calls `requireRecentStepUp(context)` (`functions/utils/stepUp.js`) after `checkPermission` and **before its first write, token or email**. A new mutating `onRequest*` under `users`, `invite-codes` or `api-keys` fails the build until it is in the table or in `NOT_STEP_UP` with a reason; an identity route elsewhere needs a human to add it.
+- **Conditional:** `PATCH users/:id` needs it for a changed role, a falsy `isActive`, or a truthy `isActive` on an inactive user; `toggle-status` in both directions. A same-state PATCH skips it, so its UPDATE is pinned to the role and `is_active` it read (409 `USER_STATE_CHANGED`).
+- **A wrong code is 400 `INVALID_MFA_CODE`, never 401** (step-up, enable, disable, backup-codes): `handleResponse` in `adminApi.js` treats every 401 as "session gone" and signs the user out. The login MFA step is exempt.
+- **Guessing is limited per user, no IP in the key:** 10 failures per hour across `mfa_step_up`, `mfa_backup_codes`, `mfa_disable` and `mfa_reenrol` (all but step-up go through `beginMfaGuess` in `functions/utils/mfaGuessGate.js`). The per-user+IP limit (429) still applies. Hitting it **deletes the session** (401 `STEP_UP_LOCKED`), a deliberate sign-out. Each attempt is written as failed **before** verifying and settled after, so parallel guesses count each other and the limits count their own row (`+ 1`).
+- **API keys never step up** (`STEP_UP_KEY_FORBIDDEN`); the helper fails closed (403 `STEP_UP_REQUIRED`, 503 on a read error).
+- **Stamp and backup-code spend commit in one `DB.batch()`** with the same predicate (409 `MFA_CHANGED`). Recording the success must never fail a step-up that landed.
+- **One accepted TOTP code per time step per user (#1333).** `verifyTotpStep()` returns the matched step (the highest on a multi-match, full window walked, no early exit), which must exceed `users.totp_last_step` (`totpStepIsFresh`); it is claimed by a conditional UPDATE, with the caller's factor-binding predicate, **before** the effect. A spent step is 400 `TOTP_CODE_ALREADY_USED` (login keeps 401), counted toward the limits, and never falls through to the backup-code check. Exceptions: enable's lost enrolment UPDATE is 409 `MFA_SETUP_CHANGED`; a step-up whose stamp lost while the step is unspent is a deleted session (401, `session_gone`, not a guess). **A path writing a NEW `totp_secret` without verifying a code sets `totp_last_step = NULL`** (setup, disable, `reset-mfa`); `mfa/enable` instead records the step it just verified against the secret it installs. Re-encrypting the same secret (login, backup-codes) must not reset it. Never use a bare `verifyTotp` in a handler.
+- Tests grant a step-up explicitly with `grantStepUp()`; `createTestEnv` never does, or the guard would be vacuous. The client prompts through `registerStepUpPrompter` (`StepUpModal`), retries once, and throws `STEP_UP_CANCELLED` on cancel. The `step-up-*`, `mfa-*` and `rbac-role-check-*` mutation-gate entries pin the above.
 
 ---
 
@@ -613,27 +536,20 @@ Three traps here, each of which was live:
 
 `functions/api/admin/_middleware.js`'s `onRequest` orders this deliberately:
 
-1. A request is key-authenticated **iff** it has `Authorization: Bearer <v>` and `v` starts with `API_KEY_PREFIX` (import it; never retype `"st_"`). Under `ALLOW_HEADER_AUTH` (non-production) the same header carries a session id; the prefix separates the two, and session ids (`crypto.randomUUID()`) can never start with `st_`.
-2. A key plus any session cookie gets 400 `AMBIGUOUS_AUTH`, before either is validated. This is defence in depth against privilege confusion.
-3. The key branch returns early and skips CSRF. **That is safe because `Authorization` is not an ambient header**: a browser never attaches it cross-origin without a preflight, which `functions/_middleware.js` grants only to allowlisted origins.
+1. A request is key-authenticated **iff** it has `Authorization: Bearer <v>` and `v` starts with `API_KEY_PREFIX` (import it; never retype `"st_"`). Session ids (`crypto.randomUUID()`) can never start with `st_`.
+2. A key plus any session cookie gets 400 `AMBIGUOUS_AUTH`, before either is validated (defence in depth).
+3. The key branch returns early and skips CSRF. **Safe because `Authorization` is not ambient**: a browser sends it cross-origin only after a preflight, which `functions/_middleware.js` grants only to allowlisted origins.
 
-`context.data.user.role` is **the key's role, never its creator's**, and `context.data.apiKey` carries `{ id, keyPrefix, role }`; endpoints need no changes because `checkPermission` reads `context.data.user`. `context.data.user.userId` is **the creator's**, and that is the sharp edge: an endpoint that reads `userId` as "the human in this browser" acts on the creator's own account. A security review found five such endpoints live (MFA setup and enable, the sessions list, revoke-all, trusted devices). So:
+`context.data.user.role` is **the key's role**; `context.data.user.userId` is **the creator's**. An endpoint reading `userId` as "the human in this browser" acts on the creator's account (a review found five live). So:
 
-- `KEY_FORBIDDEN_PREFIXES` 403s self-service and human-admin families (`KEY_NOT_PERMITTED`) **before** the key is verified, for every key role including `admin`. `/api/admin/me` is deliberately not listed. Entries are matched on whole path segments (an entry covers itself and its children, so `/audit-log` does not swallow a sibling like `/audit-logger`), and carry no trailing slash. Both key prefix checks run against every normalised spelling of the path (`keyPathForms`, #1327), because no single normalisation is known to match the router's: percent-decoding to a fixed point, NFKC folding, `\` as a separator, and `..` resolved at each decode depth. A path still decoding after 4 rounds, or malformed on the first, is refused outright. Add a bypass you find to `NON_CANONICAL` in `api-key-auth.test.js` rather than special-casing it.
-- Keys are read-only on `/api/admin/users` and `/api/admin/api-keys` (mutations refused before key verification), and barred from `/api/admin/invite-codes` entirely, because an invite code mints an account and identity management is a human act. (Its GET no longer returns codes, #1334; the bar stays.)
-- Keys are also barred from `/api/admin/maintenance/` (the retention and session cleanups reach `lucia_sessions`, `trusted_devices` and `password_reset_tokens`) and `/api/admin/audit-log` (every user's IP and the `api_key.request` rows), at every key role (owner decision, #1331; production had 0 active keys). Both are human admin actions.
-- **The behavioural guard**: `apiKeySelfService.test.js` also fails on any dispatchable admin route that is key-reachable (not in `KEY_FORBIDDEN_PREFIXES`, and for `KEY_READ_ONLY_PREFIXES` families judged on their GET and HEAD handlers plus any generic `onRequest`) and whose source, plus one hop of relative imports (those the reachable code uses, plus any module a handler is re-exported from; handler exports may be functions, `const`s or re-exports), writes `users`, `invite_codes`, `api_keys`, `lucia_sessions`, `sessions`, `trusted_devices`, `mfa_challenges`, `password_reset_tokens`, `email_otp_codes` or `webauthn_credentials`, with an optional quote before the table name. A key-reachable route that interpolates a table name (`INTO|UPDATE|FROM ${`) fails the scan for human review. This catches the MFA shape whenever it writes one of those tables. Its self-check asserts the scan still flags `users`, `invite-codes`, `api-keys` and `maintenance/cleanup-sessions` with the denylist removed. `_middleware.js` is skipped as an import (it writes `lucia_sessions` and `api_keys` for its own bookkeeping); the one-hop limit means a write two imports deep is not seen.
-- `revoke-all.js` calls `checkPermission(context, "viewer")` itself. Viewer, so self-service logout works at every role.
-- `apiKeySelfService.test.js` guards two shapes: an admin handler with no `checkPermission` that is neither denylisted nor in `REVIEWED_UNGATED_ROUTES`, and (the behavioural guard above) a key-reachable route that writes a credential table. It does **not** see a gated route that merely READS the caller's own data, for example `SELECT … FROM auth_attempts WHERE user_id = ?` bound to `user.userId`; that, and any family that neither writes those tables nor lacks a gate, still needs a human to notice.
+- `KEY_FORBIDDEN_PREFIXES` 403s self-service and human-admin families (`KEY_NOT_PERMITTED`) **before** key verification, at every key role. Entries match whole path segments, carry no trailing slash, and are checked against every normalised spelling of the path (`keyPathForms`, #1327); a path that will not settle is refused. `/api/admin/me` is deliberately not listed. Add a bypass you find to `NON_CANONICAL` in `api-key-auth.test.js`.
+- Keys are read-only on `/api/admin/users` and `/api/admin/api-keys`, and barred from `/api/admin/invite-codes`, `/api/admin/maintenance/` and `/api/admin/audit-log` at every role (#1331).
+- `apiKeySelfService.test.js` fails on an ungated admin handler not denylisted or in `REVIEWED_UNGATED_ROUTES`, and on a key-reachable route whose source (plus one hop of relative imports) writes a credential table or interpolates a table name. It does **not** see a gated route that merely reads the caller's own data; that still needs a human.
+- `revoke-all.js` calls `checkPermission(context, "viewer")` itself, so self-service logout works at every role.
 
-Related rules:
+Related: `ALLOW_HEADER_AUTH`'s production guard uses `isDevRequest` in both copies (`_middleware.js`, `auth/logout.js`); `csrf.js`'s `getSessionIdentifier` ignores bearer values starting with `API_KEY_PREFIX`; failure logs record only `bearerValue.slice(0, DISPLAY_PREFIX_LENGTH)`; `parseCookies` (`cookies.js`) trims cookie names and keeps values containing `=`.
 
-- `ALLOW_HEADER_AUTH`'s production guard uses `isDevRequest`, never `!== "production"`, in both copies (`_middleware.js`, `auth/logout.js`).
-- `csrf.js`'s `getSessionIdentifier` ignores any bearer value starting with `API_KEY_PREFIX`.
-- Failure logs record only `bearerValue.slice(0, DISPLAY_PREFIX_LENGTH)`.
-- `parseCookies` (`cookies.js`) trims cookie names and keeps values that contain `=`.
-
-The review's findings table and the corrected reasoning: `docs/field-notes/api-keys.md`.
+The review's findings table, the full scan rules and the reasoning: `docs/field-notes/api-keys.md`.
 
 ### Invite codes are stored hashed (#1334)
 
@@ -734,17 +650,17 @@ Band follows are **double opt-in**: `POST /api/bands/:name/follow` creates the r
 
 ### Emailed links never act on a GET (#1291)
 
-Corporate mail scanners fetch email links with GET, so confirmation and unsubscribe links must not mutate state when scanned. GET renders a no-store, noindex page with a button and writes nothing; POST performs the action. Confirmation and unsubscribe POSTs accept the token from the form or the query string, so the unsubscribe routes are ready for RFC 8058 one-click; outgoing mail does not yet send the `List-Unsubscribe` / `List-Unsubscribe-Post` headers that would let a mail client use it. Confirmation URLs are echoed in API responses only for explicitly allowed development requests when email delivery is unconfigured. Confirmation links expire after 7 days; an expired pending request is deleted on re-request and receives a fresh token and consent timestamp.
+Mail scanners fetch links with GET, so confirmation and unsubscribe GETs render a no-store, noindex page with a button and write nothing; the POST acts. Those POSTs accept the token from the form or the query string (RFC 8058 one-click). Confirmation URLs are echoed in API responses only for allowed development requests with email unconfigured. Links expire after 7 days; an expired pending request is deleted on re-request and gets a fresh token and consent timestamp.
 
-**The page's `<meta name="referrer" content="same-origin">` is load-bearing.** `functions/_middleware.js` sends `Referrer-Policy: no-referrer` on every Function response, and under that policy a browser submits the form with `Origin: null`, which the origin allowlist rejects with 403. Every button failed in Chromium; `curl` (no `Origin` at all) passed, and so did every unit test. Verify a change to these pages by clicking the button in a real browser against `wrangler pages dev`, not with `curl`. Do not allowlist `"null"` instead: sandboxed iframes send it too.
+**The page's `<meta name="referrer" content="same-origin">` is load-bearing.** Under the global `Referrer-Policy: no-referrer` a browser posts the form with `Origin: null`, which the origin allowlist rejects. `curl` and every unit test passed while every Chromium button failed, so verify a change by clicking in a real browser against `wrangler pages dev`. Never allowlist `"null"` (sandboxed iframes send it).
 
-**The gate is now guarded by `functions/api/admin/bands/__tests__/announce-double-opt-in.test.js`, and it was previously unguarded.** Until that file existed, deleting `AND verified = 1` from _either_ recipient query left all 1,169 backend tests green: ten announce-related test files seed followers, and every one of them wrote `verified = 1`, so no fixture could ever distinguish a gated query from an ungated one. The suite looked thorough and proved nothing about the property it most needed to prove. The new tests seed an **unverified** follower and assert they are never queued or emailed, one case per call site — verified by mutation, not by passing. **A third sender means a third case here**; a fixture-only suite is how this went unnoticed for so long.
+**The double opt-in gate is guarded by `functions/api/admin/bands/__tests__/announce-double-opt-in.test.js`**, which seeds an **unverified** follower and asserts it is never queued or emailed, one case per sender. **A third sender means a third case.** Before it, every fixture seeded `verified = 1`, and deleting the gate left all tests green.
 
-When a performance is announced (`is_announced` 0→1), verified followers of that band are emailed once. Delivery is tracked **per-follower** in `band_follow_notifications (performance_id, band_follow_id)`: the announce records each _successful_ send. Failed sends leave no row, so `POST /api/admin/bands/:id/resend-announcement` recovers them by emailing only followers without a notification row (never double-sending). Shared send+record logic lives in `functions/utils/bandFollowNotify.js`. **Do not reintroduce a fire-once latch without per-follower tracking** — it silently drops fans whose first send failed (the bug this replaced).
+When a performance is announced (`is_announced` 0→1), verified followers are emailed once, tracked per follower in `band_follow_notifications (performance_id, band_follow_id)`; `POST /api/admin/bands/:id/resend-announcement` emails only followers with no live claim (`claimIsLiveSql`), never a delivered row (see "A claim is not a delivery record"). Shared logic: `functions/utils/bandFollowNotify.js`. **Do not reintroduce a fire-once latch without per-follower tracking.**
 
-Follow, subscriber, and single-band digest mail carries RFC 8058 one-click unsubscribe headers whose URL is the same link shown in the body. Multi-band digests deliberately carry no one-click headers because one click must not silently remove only one of several follows.
+Follow, subscriber and single-band digest mail carries RFC 8058 one-click unsubscribe headers (`functions/utils/email.js`); multi-band digests deliberately do not, because one click must not silently remove only one of several follows.
 
-Bot protection on the public email-input endpoints (follow, subscribe) goes through `verifyTurnstile()` in `functions/utils/turnstile.js`, which **fails closed in production**: if `TURNSTILE_SECRET_KEY` is unset it allows only local-dev requests and rejects everything else (mirrors `CSRF_SECRET`). The secret **must** be configured in the production Pages project.
+Bot protection on follow and subscribe goes through `verifyTurnstile()` (`functions/utils/turnstile.js`), which **fails closed in production**: `TURNSTILE_SECRET_KEY` must be set in the production Pages project.
 
 ### Public senders cap emails per recipient (#1337)
 
@@ -791,19 +707,17 @@ Post-deploy probes check iCal, sitemap, and SSR identity metadata without writin
 
 ### Edge E2E against a preview (#1292)
 
-Node and local `wrangler` do not enforce the Workers runtime's limits, which is how a PBKDF2 count the edge refuses broke signup for three months with every test green. `.github/workflows/edge-e2e.yml` runs the login and user-management specs against a real Pages **preview** deployment.
+Node and local `wrangler` do not enforce the Workers runtime's limits (the PBKDF2 incident). `.github/workflows/edge-e2e.yml` runs the login and user-management specs against a real Pages **preview** deployment.
 
-- **Data:** previews bind only the scratch D1 `settimes-e2e-db`. `scripts/reset-e2e-db.mjs` rebuilds it from `database/setup-complete.sql` each run, then loads `database/seed-test-data.sql` (the venues, events and bands local E2E uses), so phase 1 can run `share-schedule` and `event-creation` unchanged. It refuses any target other than that exact name and id, deletes the schema file's local test accounts, and seeds the E2E admin plus a `viewer@settimes.ca` whose password is random and discarded.
-- **Drop order:** children are dropped before their parents. D1 ignores `foreign_keys = OFF`, and a child's implicit DELETE fails once its parent is gone.
-- **Plain-text vars live in `wrangler.toml` (`[env.preview.vars]`), never the dashboard.** A deploy with that file replaces the dashboard's plain-text vars and keeps only secrets; the first run lost all three that way. Secrets stay in the dashboard. Production is unaffected only because every production var is a secret.
-- **Production code paths:** previews set `ENVIRONMENT=preview`, which `isDevRequest` treats as production (secure cookies, real CSRF). They use Cloudflare's always-pass Turnstile test keys and no email provider.
-- **Origin:** tests hit the branch alias `edge-e2e.longweekend-bandcrawl.pages.dev`, because the middleware's Origin allowlist needs a stable origin. The preview env's `CORS_ALLOWED_ORIGINS` names exactly that alias.
-- **Rate limits are production's** (5 logins per minute per IP), so the run is two phases with no retries: user management and `invite-signup.spec` on one stored session, then `login.spec` after the window clears.
-- **Emailed tokens are read from D1 (#1292).** `emailed-token-flows.spec` covers password-reset completion, follow confirmation and subscription verification: previews have no email provider, so `e2e/utils/d1.js` reads the token (or seeds a reset token) with `wrangler d1 execute`. Remote mode (`E2E_D1_REMOTE=1`, set only on edge phase 1) can name nothing but the scratch D1, using the reset script's own constant; otherwise it uses the local state. Every confirmation is clicked in a real browser, per "Emailed links never act on a GET".
-- **`invite-signup.spec` is the PBKDF2 canary (#1292).** It completes a real signup, so `hashPassword` runs on the edge's request path and a refusal is a 500 the spec asserts against. It needs the invite code, which the API returns only when email is unconfigured (previews, local E2E). Its invitee context passes an empty `storageState` explicitly: inside Playwright Test, `browser.newContext()` inherits the project's, so the "invitee" would otherwise be the signed-in admin.
-- **Ready means the alias serves THIS RUN'S deployment** (`scripts/wait-for-preview.mjs`, #1340), three times running: it serves the `edge-e2e-deployment.txt` marker the workflow writes into `dist` (`run_id-attempt`), `/api/events/timeline` answers JSON, `/admin` loads the local dist's hashed entry script, and the local dist's hashed `AdminApp` chunk comes back as JavaScript. **Only the marker names the deployment:** Vite hashes come from frontend source, so a functions-only PR or a re-run serves byte-identical names from the previous deployment. Functions alone were not enough: `/` once returned 200 while the alias still pointed at the previous run's deleted deployment, and `/admin` once rendered the admin error boundary while Functions answered. **A missing chunk is not a 404 on Pages:** the SPA fallback answers `200 text/html`, so the chunk check is on content-type. Phase 2 runs after a phase-1 test failure but never when reset, deploy or readiness failed, and the reset retries as a whole (D1 code 7500 has failed it).
-- **Queueing and teardown:** one shared database, so runs queue (`cancel-in-progress: false`). Every run deletes its deployment, and a failed delete fails the job, so stale previews (#1295) cannot pile up.
-- **Not run** for fork or Dependabot PRs, which get no secrets. The job says so; it never passes silently.
+- **Data:** previews bind only the scratch D1 `settimes-e2e-db`. `scripts/reset-e2e-db.mjs` rebuilds it each run from `database/setup-complete.sql` plus `database/seed-test-data.sql`, refuses any other name or id, and drops children before parents (D1 ignores `foreign_keys = OFF`).
+- **Plain-text vars live in `wrangler.toml` (`[env.preview.vars]`), never the dashboard**: a deploy replaces dashboard plain-text vars and keeps only secrets.
+- Previews set `ENVIRONMENT=preview` (production code paths under `isDevRequest`), use Turnstile's always-pass test keys and no email provider. Tests hit the stable alias `edge-e2e.longweekend-bandcrawl.pages.dev`, which the preview's `CORS_ALLOWED_ORIGINS` names.
+- **Production rate limits apply**, so the run is two phases with no retries.
+- Emailed tokens are read from D1 (`e2e/utils/d1.js`); remote mode (`E2E_D1_REMOTE=1`) can name only the scratch D1. Every confirmation is clicked in a real browser. **`invite-signup.spec` is the PBKDF2 canary**; its invitee context passes an empty `storageState` explicitly, or it inherits the signed-in admin.
+- **Ready means the alias serves THIS RUN'S deployment** (`scripts/wait-for-preview.mjs`, #1340). Only the `edge-e2e-deployment.txt` marker proves it (Vite hashes repeat across runs). A missing chunk is `200 text/html` on Pages, so check content-type.
+- Runs queue (`cancel-in-progress: false`); every run deletes its deployment and a failed delete fails the job. Fork and Dependabot PRs get no secrets and are skipped loudly.
+
+Full text: `docs/field-notes/testing-gates.md`.
 
 ### Playwright artifacts carry typed secrets — upload only scrubbed ones
 
@@ -907,31 +821,24 @@ make review        # CodeRabbit review of this branch vs origin/main
 make review-wip    # same, but for uncommitted working-tree changes
 ```
 
-Requires the CodeRabbit CLI (`brew install --cask coderabbit`, then `coderabbit auth login`); both targets fail with an install/auth hint if it is missing.
+Requires the CodeRabbit CLI (`brew install --cask coderabbit`, then `coderabbit auth login`); both targets fail with a hint if it is missing. **Run it before opening the PR**: the same review runs on the PR, so a post-open finding costs a fix plus a push. `make gate` deliberately excludes it (network, minutes).
 
-**Run this before opening the PR, not after.** The same review runs automatically on the PR, so anything it finds post-open costs a fix plus a force-push round trip. Findings it has caught that the local gates did not: assertions that pass on the wrong branch's output, a spy recording statement _preparation_ rather than _execution_, and a SQL guard that stayed inert for legacy rows after a write-side fix.
+- **It is a strict subset of the PR review.** The CLI does not load `.github/instructions/**`; the PR bot does. So a post-open `Minor` citing "coding guidelines" is expected, and an "as per coding guidelines" finding from `make review` is unsubstantiated by construction: grep the instruction files for the cited wording before agreeing (#1048). Passing `-c` was tried and not adopted.
+- **Green can mean "did not look"**: CodeRabbit passes a PR whose every file is path-excluded. For a lockfile-only bump read Snyk and Dependabot; `scripts/__tests__/lockfileIntegrity.test.js` guards `resolved` hosts and `integrity` hashes. A lockfile change _not_ produced by npm on your machine deserves a human diff read.
+- **Read threads and review bodies**: "Outside diff range" comments and collapsed nitpicks live in the body, which a `reviewThreads` query misses.
 
-**`make review` is a strict subset of the PR review, and the gap is structural — not flake.** The CLI does not load `.github/instructions/**`; the PR bot does. That is why `coderabbit review` has a `-c, --config <files...>` flag for "additional instructions" at all. Three findings on 2026-08-19 (#866, #873 ×2) appeared only post-open and every one cited _"As per coding guidelines"_, tracing to rules in that directory — e.g. `nodejs-javascript-vitest.instructions.md`'s "Write tests for all new features and bug fixes". **So a post-open `Minor` is expected, not a sign the pre-PR gate failed.** The CLI _does_ read `.coderabbit.yaml` and the `knowledge_base.learnings` (its output says "Based on learnings"); only the instruction files are missing.
-
-`make gate` deliberately does **not** include it — `gate` must stay fast and offline-capable; `review` needs the network and takes minutes.
-
-Reading CodeRabbit correctly — worked examples in `docs/field-notes/coderabbit.md`:
-
-- **An "as per coding guidelines" finding from `make review` is unsubstantiated by construction** — that invocation passes no `-c`, so it never loads `.github/instructions/**` (a CLI run given `-c` would). Open the applicable instruction files and grep the _cited wording_ before agreeing or declining — a clean grep is a hypothesis (#1048). Passing `-c .github/instructions/*.md` was tried and is **not** adopted.
-- **Green can mean "did not look".** CodeRabbit skips a PR whose every file is path-excluded and still reports pass. For a **lockfile-only** bump, read Snyk and Dependabot instead; `scripts/__tests__/lockfileIntegrity.test.js` guards `resolved` hosts and `integrity` hashes, which no advisory check covers. A lockfile change _not_ produced by npm on your machine deserves a human diff read.
-- **Findings are not all in threads.** "Outside diff range" comments and the collapsed "Nitpick comments" live in each review's **body** — a `reviewThreads` query misses both, and a "Trivial" nitpick was once a vacuous test. Read threads _and_ bodies.
+Worked examples: `docs/field-notes/coderabbit.md`.
 
 ### CodeRabbit has a hard review budget — batch your pushes
 
-**Every push to a PR branch that changes at least one review-eligible file triggers a review** (a push touching only path-excluded files, such as a lockfile, is skipped and uses no allowance). The allowance is **dynamic** (it has read 1, 3, 4 and 5 reviews/hour on Essentials) — read it from a _current_ review footer or comment `@coderabbitai rate limit` on the PR, never from memory or this file. History: `docs/field-notes/coderabbit.md`.
+**Every push changing a review-eligible file triggers a review.** The allowance is dynamic: read it from a _current_ review footer or `@coderabbitai rate limit`, never from memory. Usage billing is OFF (2026-09-24), so going over means a **rate-limited, unreviewed head commit** while every other check is green, and nothing re-runs it.
 
-**Usage-based billing was switched OFF on 2026-09-24.** Past the allowance a review is now **rate-limited, not billed** — so the failure changed shape from a bill to an **unreviewed commit**. CodeRabbit posts a rate-limit notice instead of a review, and nothing re-runs it when the window refills. A PR merged in that state ships a head commit no reviewer looked at, while every other check is green. That is the green-means-did-not-look class, and it is worse than the bill was, because nothing surfaces it.
+- **Before merging any PR, run `make await-review PR=<n>` and merge only on exit 0.** It waits out a cooldown, posts one `@coderabbitai review`, and resets on a new push. Only the `CodeRabbit` status description `Review completed` on the head SHA means a review ran (`scripts/coderabbit-await-review.mjs`); a green check or a review object does not. Slowing down is the intended cost.
+- **Concentration is the failure, not volume.** Read your diff and run the suite locally, then push once. Iterate as a **draft** (`auto_review.drafts: false`) and `gh pr ready` at the final state.
+- `make hooks` installs `.githooks/pre-push`, which warns at the first review in the window and blocks at `LIMIT`. Its counter is per developer (`~/.cache/coderabbit/push-log`, shared with `wrhn-mcp`'s hook), and any failure to ask `gh` about drafts counts the push (`scripts/__tests__/prePushDraftLookup.test.js`).
+- **Override only for urgency** (show day, an incident, someone blocked): `CODERABBIT_OVERAGE=1 git push`, then `make await-review`.
 
-- **Before merging any PR, run `make await-review PR=<n>` and merge only on exit 0.** It watches the `CodeRabbit` commit status on the PR's _current head_, waits out a rate-limit cooldown (parsed from CodeRabbit's comment, else 10 min), posts one `@coderabbitai review`, and keeps watching; a new push resets it. **Slowing down is the intended cost** (owner decision, 2026-09-24): a merge waits for the review, never the reverse. `--once` classifies without acting.
-- **Do not judge "reviewed" by the check being green, or by a review object.** The rate-limited status _passes_ by design, and 13 of 32 merged PRs had a completed review with no review object on the head. Only the status description `Review completed` on the head SHA means a review ran — which is what the script reads (`scripts/coderabbit-await-review.mjs`, header has the evidence).
-- **Concentration is the failure, not volume** — #998 burned 4 reviews in ~25 min on a two-line change. Read your own diff and run the right suite locally, then push once. Iterate as a **draft** PR (`auto_review.drafts: false`, so drafts cost nothing) and `gh pr ready` at the final state.
-- `make hooks` installs `.githooks/pre-push`, which warns at the first review in the window and blocks at `LIMIT` (update it only against a current footer; erring low blocks pushes the budget would allow). POSIX `sh`; its one network call asks `gh` whether each pushed PR is a **draft** and skips counting only on an explicit `true` — every failure (no `gh`, offline, no PR, >5 s) counts the push, so it cannot fail open (`scripts/__tests__/prePushDraftLookup.test.js`). **Its counter is per developer, not per repo** (`~/.cache/coderabbit/push-log`, shared with `wrhn-mcp`'s hook — the two must agree on that path, not on counting rules), because the allowance is — a per-repo log let 3 + 3 pushes across the two repos reach 6 on 2026-09-24, while both hooks still had `LIMIT=5`, with neither noticing.
-- **Override on urgency to land, not issue priority:** show day, a production incident, or someone blocked → `CODERABBIT_OVERAGE=1 git push`. It no longer bills; it accepts a rate-limited review, which `make await-review` then recovers. Everything else: waiting is free, the window refills.
+History: `docs/field-notes/coderabbit.md`.
 
 ### Before every push (including follow-up commits during PR review)
 
@@ -980,13 +887,13 @@ Production evidence: `/api/admin/Users`, `/api/admin/MFA/setup` and `/api/Events
 | SAST                  | CodeQL (`codeql.yml`); Semgrep (`semgrep.yml`, #1173)                                                        |
 | Review                | CodeRabbit                                                                                                   |
 
-- **If the repo goes private again**, CodeQL, gitleaks and dependency-review fail on the Free plan, which has no Advanced Security. Remove "Detect Secrets (gitleaks)" from the `protect-main` ruleset in the same change that deletes its workflow, or every PR waits on a check that cannot run. A permanently red check is worse than none.
-- **The gitleaks PR check scans every commit in the PR's range**, so a later commit cannot clear a fixture that trips it: rewrite the commit, or add its fingerprint to `.gitleaksignore` with a reason. Name test credentials so gitleaks' `generic-api-key` rule (a secret-like identifier assigned a high-entropy string) does not match.
-- **Semgrep's gate is the `Semgrep / Scan` job.** The Semgrep App's `semgrep-cloud-platform/scan` check passes regardless of findings. On a PR the job is diff-aware and fails on new findings; on push and weekly it reports without failing and uploads SARIF (category `semgrep`). Findings come from the JSON, never the exit code: semgrep can exit 0 with findings, and exit 0 without having run, so never remove the `test -s semgrep.json` guard. Exit 1 means blocking findings and goes on to the count; exit >1 means it could not run and fails the job. It runs under `env -u GITHUB_ACTIONS` (semgrep's own `git fetch` fails without persisted credentials) with `fetch-depth: 0` on the PR's head commit, diffing against `SEMGREP_BASELINE_REF`; `SEMGREP_*` variables restore the metadata. Dependabot and fork PRs skip loudly; any other run without `SEMGREP_APP_TOKEN` fails. Keep the gate in the workflow, not the Rule Board, which lives outside git.
-- **The weekly security digest** (`security-digest.yml`, `scripts/security-digest.mjs`, #1247) keeps one `security-digest` issue. It opens for any alert older than 7 days, a required scanner (`REQUIRED_SCANNERS`: CodeQL, Semgrep) with no analysis in 14 days, or an `npm audit` advisory not in `ACCEPTED_NPM_AUDIT`. A failed read fails the job; only a per-tool `404 "no analysis found"` means "none". Analyses are fetched per tool by name. `ACCEPTED_NPM_AUDIT` holds recorded decisions keyed `lockfile|package|advisory`, never by package alone; the digest lists accepted entries no longer flagged, so the list shrinks.
+- **If the repo goes private again**, CodeQL, gitleaks and dependency-review cannot run on the Free plan. Remove "Detect Secrets (gitleaks)" from the `protect-main` ruleset in the same change that deletes its workflow: a permanently red check is worse than none.
+- **gitleaks scans every commit in a PR's range**, so a later commit cannot clear a fixture: rewrite the commit, or add its fingerprint to `.gitleaksignore` with a reason. Name test credentials so `generic-api-key` does not match.
+- **Semgrep's gate is the `Semgrep / Scan` job**; the App's `semgrep-cloud-platform/scan` check passes regardless. Findings come from the JSON, never the exit code, so never remove the `test -s semgrep.json` guard; exit >1 fails the job. Diff-aware on PRs, report-only on push and weekly (SARIF category `semgrep`). It runs under `env -u GITHUB_ACTIONS` with `fetch-depth: 0` on the PR head, diffing against `SEMGREP_BASELINE_REF`. Any non-Dependabot, non-fork run without `SEMGREP_APP_TOKEN` fails. Keep the gate in the workflow, not the Rule Board.
+- **The weekly security digest** (`security-digest.yml`, `scripts/security-digest.mjs`, #1247) keeps one `security-digest` issue: alerts older than 7 days, a `REQUIRED_SCANNERS` tool silent for 14 days, or an `npm audit` advisory not in `ACCEPTED_NPM_AUDIT` (keyed `lockfile|package|advisory`). A failed read fails the job; only a per-tool `404 "no analysis found"` means none.
 - **Snyk Code is deliberately not enabled** (2026-09-22): Semgrep's gate lives in git.
 
-Plan-tier history, the job logs and the Semgrep investigation: `docs/field-notes/security-tooling.md`.
+Plan-tier history, job logs and the Semgrep investigation: `docs/field-notes/security-tooling.md`.
 
 ### Outbound requests go only to fixed addresses (SSRF)
 
@@ -1057,12 +964,12 @@ Most of this is Cloudflare-side state that can be silently undone, with nothing 
 | **Account** resources    | Cloudflare account                                                                  | D1 databases                                                                                 |
 | **This repository**      | `frontend/public/_headers`                                                          | **HSTS** — listed only because the zone toggle reading "off" is correct and looks like a gap |
 
-- **Preview deployments bind only the scratch D1**, via the `[env.preview]` block in `wrangler.toml` (2026-10-13). Without it, previews inherit production D1 and R2. Never bind a production resource there; `scripts/__tests__/previewBindings.test.js` enforces both halves.
+- **Preview deployments bind only the scratch D1** via `[env.preview]` in `wrangler.toml`; without it previews inherit production D1 and R2. Never bind a production resource there (`scripts/__tests__/previewBindings.test.js`).
 - **Rocket Loader stays disabled**; strict CSP blocks the scripts it rewrites.
-- **`www` → apex is a zone _dynamic_ 301** (`concat("https://settimes.ca", http.request.uri.path)`, query preserved, #984). A static redirect would send every deep path to `/`. Keep `www` as a Pages custom domain: without it, old links become TLS errors instead of redirects. `/` deliberately emits no raw-HTML canonical, so if `www` ever stops redirecting, the duplicate-host problem returns.
-- **SSL/TLS is Full (strict), minimum TLS 1.2.** A proxied origin with a bad certificate fails closed, on purpose.
-- **HSTS is served from `frontend/public/_headers`**, so the zone's HSTS toggle reading "off" is correct. Do not also enable the zone toggle; check the live header before concluding anything is missing.
-- **DMARC:** `v=DMARC1; p=quarantine; adkim=r; aspf=r; pct=100; rua=mailto:dmarc@settimes.ca`. Alignment stays relaxed because iCloud (human mail) and Resend via SES (application mail, including band-follow confirmations) are both legitimate senders; strict alignment would quarantine confirmations silently. `p=reject` waits until reports show both paths pass. If no reports arrive within a few days, check that the catch-all routes `dmarc@`.
-- Removed 2026-08-29; do not recreate: `dev.settimes.ca` (a dead tunnel), the unused `ADMIN_PASSWORD`/`MASTER_PASSWORD` Pages vars, and the empty `bandcrawl-db` D1. To check whether a D1 is empty, query `sqlite_master`; the API's `num_tables` is wrong.
+- **`www` → apex is a zone _dynamic_ 301** preserving path and query (#984); a static redirect would send every deep path to `/`. Keep `www` as a Pages custom domain, or old links become TLS errors. `/` emits no raw-HTML canonical, so if `www` stops redirecting the duplicate-host problem returns.
+- **SSL/TLS is Full (strict), minimum TLS 1.2.**
+- **HSTS is served from `frontend/public/_headers`**; do not also enable the zone toggle.
+- **DMARC** is `p=quarantine` with relaxed alignment, because iCloud (human mail) and Resend via SES (application mail) are both legitimate senders; strict alignment would quarantine confirmations silently. `p=reject` waits until reports show both paths pass.
+- Removed 2026-08-29; do not recreate: `dev.settimes.ca`, the `ADMIN_PASSWORD`/`MASTER_PASSWORD` Pages vars, and the empty `bandcrawl-db` D1. To check whether a D1 is empty, query `sqlite_master`; the API's `num_tables` is wrong.
 
-Before-and-after evidence, the redirect rule and DMARC reasoning: `docs/field-notes/cloudflare-settings.md`.
+Full record, redirect rule and DMARC reasoning: `docs/field-notes/cloudflare-settings.md`.

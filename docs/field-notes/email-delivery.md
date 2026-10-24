@@ -5,6 +5,7 @@ limit. `CLAUDE.md` keeps the rules; this file keeps the incidents, measurements
 and reasoning behind them. Read it before changing the code a section guards.
 
 ## A claim is not a delivery record (#1152)
+
 `band_follow_notifications` used **one** row to mean two things: _"I am sending
 to this person"_ and _"this person has been sent to."_ A Worker that died
 between the two -- and the gap is a live network round-trip wide -- left a row
@@ -88,3 +89,17 @@ was_, so a reused key cannot prove a send; counting it delivered would silently
 drop a follower whose first attempt was rejected. It is logged at `error` and
 eligible for retry at once, though a retry cannot succeed until the 24h key expires: a possible late duplicate, never a silent drop.
 Postmark and MailChannels do not receive the key because they have no equivalent.
+
+## Emailed links never act on a GET (#1291) — `CLAUDE.md` text as of 2026-10-24
+
+Corporate mail scanners fetch email links with GET, so confirmation and unsubscribe links must not mutate state when scanned. GET renders a no-store, noindex page with a button and writes nothing; POST performs the action. Confirmation and unsubscribe POSTs accept the token from the form or the query string, so the unsubscribe routes are ready for RFC 8058 one-click; outgoing mail does not yet send the `List-Unsubscribe` / `List-Unsubscribe-Post` headers that would let a mail client use it. Confirmation URLs are echoed in API responses only for explicitly allowed development requests when email delivery is unconfigured. Confirmation links expire after 7 days; an expired pending request is deleted on re-request and receives a fresh token and consent timestamp. _(Superseded: `functions/utils/email.js` now sends both headers; see the later paragraph.)_
+
+**The page's `<meta name="referrer" content="same-origin">` is load-bearing.** `functions/_middleware.js` sends `Referrer-Policy: no-referrer` on every Function response, and under that policy a browser submits the form with `Origin: null`, which the origin allowlist rejects with 403. Every button failed in Chromium; `curl` (no `Origin` at all) passed, and so did every unit test. Verify a change to these pages by clicking the button in a real browser against `wrangler pages dev`, not with `curl`. Do not allowlist `"null"` instead: sandboxed iframes send it too.
+
+**The gate is now guarded by `functions/api/admin/bands/__tests__/announce-double-opt-in.test.js`, and it was previously unguarded.** Until that file existed, deleting `AND verified = 1` from _either_ recipient query left all 1,169 backend tests green: ten announce-related test files seed followers, and every one of them wrote `verified = 1`, so no fixture could ever distinguish a gated query from an ungated one. The suite looked thorough and proved nothing about the property it most needed to prove. The new tests seed an **unverified** follower and assert they are never queued or emailed, one case per call site — verified by mutation, not by passing. **A third sender means a third case here**; a fixture-only suite is how this went unnoticed for so long.
+
+When a performance is announced (`is_announced` 0→1), verified followers of that band are emailed once. Delivery is tracked **per-follower** in `band_follow_notifications (performance_id, band_follow_id)`: the announce records each _successful_ send. Failed sends leave no row, so `POST /api/admin/bands/:id/resend-announcement` recovers them by emailing only followers without a notification row (never double-sending). Shared send+record logic lives in `functions/utils/bandFollowNotify.js`. **Do not reintroduce a fire-once latch without per-follower tracking** — it silently drops fans whose first send failed (the bug this replaced). _(Superseded by #1152: resend retries followers with no live claim; see `CLAUDE.md`.)_
+
+Follow, subscriber, and single-band digest mail carries RFC 8058 one-click unsubscribe headers whose URL is the same link shown in the body. Multi-band digests deliberately carry no one-click headers because one click must not silently remove only one of several follows.
+
+Bot protection on the public email-input endpoints (follow, subscribe) goes through `verifyTurnstile()` in `functions/utils/turnstile.js`, which **fails closed in production**: if `TURNSTILE_SECRET_KEY` is unset it allows only local-dev requests and rejects everything else (mirrors `CSRF_SECRET`). The secret **must** be configured in the production Pages project.

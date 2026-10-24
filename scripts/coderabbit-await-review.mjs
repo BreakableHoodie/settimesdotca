@@ -68,6 +68,10 @@ export const MAX_CONSECUTIVE_GH_FAILURES = 5;
 // CodeRabbit keeps adding wordings (#1210 "Review paused", #1226 "Internal
 // error occurred during review"); this bounds the next one.
 export const UNKNOWN_SETTLE_MS = 15 * 60_000;
+// A completed status with neither a review object nor a clean-review comment
+// for the head is waited on this long, then reported as a failure: either may
+// land a little after the status, but not tens of minutes after (#1367).
+export const CONFIRM_SETTLE_MS = 10 * 60_000;
 
 /**
  * Map the latest `CodeRabbit` commit status on a SHA to a state.
@@ -141,6 +145,19 @@ export function countBodyFindings(body) {
   return found;
 }
 
+/**
+ * Does this CodeRabbit comment confirm a CLEAN review of `head`? CodeRabbit
+ * edits one summary comment in place; after a review that found nothing it
+ * reads "No actionable comments were generated in the recent review" and
+ * names the range it reviewed, "...between <base> and <head>." (#1364). The
+ * SHA is what ties it to THIS commit: the same sentence about an earlier
+ * commit proves nothing about the head.
+ */
+export function confirmsCleanReview(body, head) {
+  const text = String(body || "");
+  return /No actionable comments were generated/i.test(text) && new RegExp(`\\band\\s+${head}\\b`).test(text);
+}
+
 function gh(args) {
   return execFileSync("gh", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 }
@@ -187,12 +204,19 @@ export function ghDeps(pr) {
     },
     getHeadReviewFindings(head) {
       // Every CodeRabbit review OF THIS COMMIT. A review of an earlier commit
-      // says nothing about the head, and an incremental review with nothing to
-      // say posts no review object at all, which correctly counts as clean.
+      // says nothing about the head. An incremental review with nothing to say
+      // posts no review object at all, so "no object" is only clean when the
+      // summary comment confirms it for this SHA; otherwise the object may
+      // simply not have landed yet, and the result is unconfirmed.
       const reviews = ghList(`repos/{owner}/{repo}/pulls/${pr}/reviews`).filter(
         (r) => r.user?.login === "coderabbitai[bot]" && r.commit_id === head,
       );
-      const total = { outsideDiff: 0, nitpicks: 0, duplicates: 0, other: 0, url: null };
+      const confirmed =
+        reviews.length > 0 ||
+        ghList(`repos/{owner}/{repo}/issues/${pr}/comments`).some(
+          (c) => c.user?.login === "coderabbitai[bot]" && confirmsCleanReview(c.body, head),
+        );
+      const total = { confirmed, outsideDiff: 0, nitpicks: 0, duplicates: 0, other: 0, url: null };
       for (const r of reviews) {
         const c = countBodyFindings(r.body);
         for (const k of ["outsideDiff", "nitpicks", "duplicates", "other"]) total[k] += c[k];
@@ -268,6 +292,7 @@ export async function awaitReview(deps, opts = {}) {
   let unknownSince = null;
   let unknownDescription = null;
   let pausedRequestPosted = false;
+  let unconfirmedSince = null;
   // Every piece of PER-HEAD state resets here and only here. The three
   // head-change paths each once reset it by hand, and one forgot the skip
   // timer (#1200 review), letting an old head's skip time shorten the new
@@ -282,6 +307,7 @@ export async function awaitReview(deps, opts = {}) {
     unknownSince = null;
     unknownDescription = null;
     pausedRequestPosted = false;
+    unconfirmedSince = null;
   };
   let lastReported = "";
 
@@ -351,6 +377,23 @@ export async function awaitReview(deps, opts = {}) {
       // Read after the status: on #1364 CodeRabbit's summary comment landed 3 s
       // BEFORE "Review completed", so the review exists by the time it reads so.
       const f = deps.getHeadReviewFindings(head);
+      if (!f.confirmed) {
+        // Reviewed by status, but nothing yet shows WHAT the review found.
+        if (once) {
+          deps.log(`head ${short} reads "${status.description}", but no review or clean-review comment for it yet.`);
+          return 2;
+        }
+        unconfirmedSince ??= deps.now();
+        if (deps.now() - unconfirmedSince >= CONFIRM_SETTLE_MS) {
+          deps.log(
+            `head ${short} reads "${status.description}", but after ${Math.round(CONFIRM_SETTLE_MS / 60_000)} min ` +
+              "there is still no review object or clean-review comment for it; read the PR before merging.",
+          );
+          return 1;
+        }
+        await deps.sleep(pollMs);
+        return undefined;
+      }
       const found = f.outsideDiff + f.nitpicks + f.duplicates + f.other;
       if (found > 0 && !allowFindings) {
         deps.log(

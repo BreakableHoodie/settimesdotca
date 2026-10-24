@@ -7,8 +7,10 @@ import {
   SKIP_SETTLE_MS,
   STALE_IN_PROGRESS_MS,
   UNKNOWN_SETTLE_MS,
+  CONFIRM_SETTLE_MS,
   awaitReview,
   classifyStatus,
+  confirmsCleanReview,
   countBodyFindings,
   parseCooldownMs,
 } from "../coderabbit-await-review.mjs";
@@ -34,7 +36,7 @@ function fakeDeps({
   comment = RL_COMMENT,
   commentAt = "1970-01-01T00:00:00Z",
   busy = () => false,
-  findings = () => ({ outsideDiff: 0, nitpicks: 0, duplicates: 0, other: 0, url: null }),
+  findings = () => ({ confirmed: true, outsideDiff: 0, nitpicks: 0, duplicates: 0, other: 0, url: null }),
 }) {
   let t = 0;
   let si = 0;
@@ -418,6 +420,7 @@ const BODY_1362 = [
 ].join("\n");
 const BODY_1364 = "<summary>\ud83e\uddf9 Nitpick comments: 1</summary><blockquote>";
 const FOUND = {
+  confirmed: true,
   outsideDiff: 2,
   nitpicks: 1,
   duplicates: 0,
@@ -482,7 +485,7 @@ describe("awaitReview: reviewed is not clean (#1365)", () => {
   it("exits 5 on findings in an unrecognised section", async () => {
     const deps = fakeDeps({
       statuses: [COMPLETED],
-      findings: () => ({ outsideDiff: 0, nitpicks: 0, duplicates: 0, other: 1, url: null }),
+      findings: () => ({ confirmed: true, outsideDiff: 0, nitpicks: 0, duplicates: 0, other: 1, url: null }),
     });
     expect(await awaitReview(deps, { pollMs: 1000 })).toBe(5);
     expect(deps.calls.logs.at(-1)).toMatch(/1 in an unrecognised section/);
@@ -511,9 +514,60 @@ describe("awaitReview: reviewed is not clean (#1365)", () => {
       statuses: [IN_PROGRESS, COMPLETED],
       heads: ["aaaaaaaa1", "bbbbbbbb2"],
       findings: (sha) =>
-        sha === "aaaaaaaa1" ? FOUND : { outsideDiff: 0, nitpicks: 0, duplicates: 0, other: 0, url: null },
+        sha === "aaaaaaaa1"
+          ? FOUND
+          : { confirmed: true, outsideDiff: 0, nitpicks: 0, duplicates: 0, other: 0, url: null },
     });
     expect(await awaitReview(deps, { pollMs: 1000 })).toBe(0);
     expect(deps.calls.findingShas).toEqual(["bbbbbbbb2"]);
+  });
+});
+
+// #1367 review: a completed status with no review object is only clean when
+// CodeRabbit's summary comment confirms it FOR THIS SHA.
+const HEAD = "3e7522c8c7de4bf0b12b35e682ed03f9cc89ef55";
+const CLEAN_1364 =
+  "No actionable comments were generated in the recent review.\n" +
+  "Reviewing files that changed from the base of the PR and between " +
+  `2e95c3336de5f2611d6702264c6c29cc0e590226 and ${HEAD}.`;
+const UNCONFIRMED = { confirmed: false, outsideDiff: 0, nitpicks: 0, duplicates: 0, other: 0, url: null };
+
+describe("confirmsCleanReview", () => {
+  it("accepts #1364's clean summary for the commit it names as reviewed up to", () => {
+    expect(confirmsCleanReview(CLEAN_1364, HEAD)).toBe(true);
+  });
+
+  it("rejects the same summary for any other commit, including the range's base", () => {
+    expect(confirmsCleanReview(CLEAN_1364, "2e95c3336de5f2611d6702264c6c29cc0e590226")).toBe(false);
+    expect(confirmsCleanReview(CLEAN_1364, "ffffffffffffffffffffffffffffffffffffffff")).toBe(false);
+  });
+
+  it("rejects a comment naming the head that does not say the review was clean", () => {
+    expect(confirmsCleanReview(`Reviewing files ... between abc and ${HEAD}.`, HEAD)).toBe(false);
+  });
+});
+
+describe("awaitReview: an absent review object needs confirmation", () => {
+  it("waits while unconfirmed, then succeeds once the confirmation lands", async () => {
+    let n = 0;
+    const deps = fakeDeps({
+      statuses: [COMPLETED],
+      findings: () => (n++ < 2 ? UNCONFIRMED : { ...UNCONFIRMED, confirmed: true }),
+    });
+    expect(await awaitReview(deps, { pollMs: 60_000 })).toBe(0);
+    expect(deps.calls.findingShas).toHaveLength(3);
+  });
+
+  it("--once reports an unconfirmed head as NOT reviewed", async () => {
+    const deps = fakeDeps({ statuses: [COMPLETED], findings: () => UNCONFIRMED });
+    expect(await awaitReview(deps, { once: true })).toBe(2);
+  });
+
+  it("gives up with a reason, not success, when confirmation never comes", async () => {
+    const deps = fakeDeps({ statuses: [COMPLETED], findings: () => UNCONFIRMED });
+    expect(await awaitReview(deps, { pollMs: 60_000 })).toBe(1);
+    expect(deps.calls.logs.at(-1)).toMatch(/no review object or clean-review comment/);
+    // Bounded by the settle period, not the three-hour overall timeout.
+    expect(deps.calls.sleeps.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(CONFIRM_SETTLE_MS);
   });
 });

@@ -11,6 +11,7 @@ import {
   main,
   RUNNER_LIMITS,
 } from "../security-digest.mjs";
+import { LOCKFILES } from "../lockfiles.mjs";
 
 const NOW = new Date("2026-10-10T12:00:00Z");
 
@@ -219,6 +220,8 @@ describe("security digest", () => {
     try {
       const script = join(dir, "security-digest.mjs");
       copyFileSync(new URL("../security-digest.mjs", import.meta.url), script);
+      // Its one local import travels with it, as it does in the repo.
+      copyFileSync(new URL("../lockfiles.mjs", import.meta.url), join(dir, "lockfiles.mjs"));
       // No gh on PATH: main() must RUN and fail loudly, not be skipped.
       const result = spawnSync(process.execPath, [script], { env: { PATH: dir }, encoding: "utf8" });
       expect(result.status).not.toBe(0);
@@ -254,6 +257,19 @@ describe("security digest", () => {
     expect(ghCalls[0]).toContain("--paginate");
   });
 
+  it("audits every lockfile in its own directory, the MCP Worker's included", () => {
+    const npmCwds = [];
+    const runner = (file, args, options = {}) => {
+      if (file === "npm") {
+        npmCwds.push(options.cwd);
+        return { status: 0, stdout: JSON.stringify({ metadata: { vulnerabilities: {} }, vulnerabilities: {} }) };
+      }
+      return { status: 0, stdout: "[]" };
+    };
+    collectSecurityData({ runner, root: "/repo" });
+    expect(npmCwds).toEqual(["/repo", "/repo/frontend", "/repo/workers-mcp-server"]);
+  });
+
   it("parses npm audit JSON even when npm audit exits non-zero", () => {
     const calls = [];
     const runner = (file, args) => {
@@ -269,7 +285,8 @@ describe("security digest", () => {
     const digest = main({ runner, now: NOW });
     expect(digest.body).toContain("critical 1");
     expect(digest.shouldOpen).toBe(true);
-    expect(calls.filter(([file]) => file === "npm")).toHaveLength(2);
+    // One audit per lockfile, in that lockfile's own directory.
+    expect(calls.filter(([file]) => file === "npm")).toHaveLength(LOCKFILES.length);
   });
 
   it("creates its label before opening the first digest issue", () => {

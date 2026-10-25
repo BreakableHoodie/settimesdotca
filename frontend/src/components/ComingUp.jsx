@@ -72,13 +72,13 @@ function ComingUp({ bands, currentTime }) {
         <div className="bg-accent-500 px-4 py-2.5 text-bg-navy shadow-lg sm:py-3" role="status" aria-live="polite">
           <div className="container mx-auto max-w-(--breakpoint-2xl)" title={message}>
             <div className="flex items-center gap-2 sm:hidden">
-              <span className="shrink-0 text-[11px] font-bold uppercase tracking-[0.18em] text-bg-navy">Up Next</span>
+              <span className="shrink-0 text-[11px] font-bold uppercase tracking-[0.18em] text-bg-navy">Up next</span>
               <span className="shrink-0 rounded-sm bg-bg-navy/15 px-2 py-1 text-xs font-semibold text-bg-navy">
                 {formatTimeUntil(minutesUntil)}
               </span>
               <span className="min-w-0 truncate text-sm font-semibold text-bg-navy">
                 {nextBand.name}
-                {nextBand.venue && <span className="text-bg-navy"> · {nextBand.venue}</span>}
+                {nextBand.venue && <span className="text-bg-navy">, {nextBand.venue}</span>}
               </span>
             </div>
             <p className="hidden text-center font-bold leading-normal sm:block sm:text-sm md:text-base">

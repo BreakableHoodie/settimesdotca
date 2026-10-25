@@ -122,7 +122,7 @@ export default function SubscribePage() {
       <div className="max-w-2xl mx-auto pt-20">
         {/* Header */}
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-text-primary mb-4">Never Miss a Show</h1>
+          <h1 className="text-4xl font-bold text-text-primary mb-4">Never miss a show</h1>
           <p className="text-xl text-text-secondary">
             Get an email when a lineup or set times are announced. No algorithm, no ads, just shows.
           </p>
@@ -134,7 +134,7 @@ export default function SubscribePage() {
             {/* Email */}
             <div>
               <label htmlFor="email" className="block text-text-primary font-medium mb-2">
-                Email Address
+                Email address
               </label>
               <input
                 type="email"
@@ -195,14 +195,14 @@ export default function SubscribePage() {
 
         {/* Alternative feeds */}
         <div className="mt-12 text-center">
-          <h2 className="text-2xl font-bold text-text-primary mb-4">Prefer RSS or Calendar Sync?</h2>
+          <h2 className="text-2xl font-bold text-text-primary mb-4">Prefer RSS or calendar sync?</h2>
           <div className="flex flex-wrap justify-center gap-4">
             <a
               href="/api/feeds/ical?city=waterloo&genre=all"
               className="px-6 py-3 bg-surface hover:bg-surface-hover text-text-primary rounded-lg border border-border transition"
             >
               <CalendarDays size={16} className="mr-2 inline" aria-hidden="true" />
-              Subscribe to Calendar
+              Subscribe to calendar
             </a>
             <a
               href="/api/events/public?city=waterloo&genre=all"

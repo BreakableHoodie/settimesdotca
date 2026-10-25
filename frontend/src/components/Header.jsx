@@ -109,10 +109,10 @@ function Header({ eventName, eventDate, selectedVenues, venues = [] }) {
             {eventName ? (
               <>
                 <span className="font-semibold text-text-primary">{eventName}</span>
-                {formattedDate && <span className="text-accent-400"> · {formattedDate}</span>}
+                {formattedDate && <span className="text-accent-400">, {formattedDate}</span>}
               </>
             ) : (
-              'Discover · Plan · Experience'
+              'Set times for live music in Waterloo Region.'
             )}
           </p>
           {eventName && <VenueStrip venues={venues} activeVenues={selectedVenues} />}

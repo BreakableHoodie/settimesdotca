@@ -54,7 +54,7 @@ class ErrorBoundary extends Component {
             {showDevDetails && this.state.error && (
               <details className="mb-6 text-left">
                 <summary className="cursor-pointer text-accent-400 hover:text-accent-300 mb-2">
-                  Error Details (Dev Only)
+                  Error details (dev only)
                 </summary>
                 <div className="bg-bg-navy p-4 rounded text-sm text-text-secondary overflow-auto max-h-60">
                   <p className="font-mono text-error-400 mb-2">{this.state.error.toString()}</p>
@@ -70,7 +70,7 @@ class ErrorBoundary extends Component {
                 onClick={() => window.location.reload()}
                 className="px-6 py-3 bg-accent-500 text-bg-navy rounded hover:bg-accent-600 transition-colors font-medium"
               >
-                Refresh Page
+                Refresh page
               </button>
               <HomeLink className="px-6 py-3 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors font-medium" />
             </div>
@@ -89,14 +89,14 @@ function HomeLink({ className }) {
   if (!inRouter) {
     return (
       <a href="/" className={className}>
-        Go Home
+        Go home
       </a>
     )
   }
 
   return (
     <Link to="/" className={className}>
-      Go Home
+      Go home
     </Link>
   )
 }

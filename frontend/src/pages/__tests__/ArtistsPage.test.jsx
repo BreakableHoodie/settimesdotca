@@ -326,7 +326,7 @@ describe('ArtistsPage — ShuffleBlock', () => {
 
   it('renders a Shuffle button in the discover section', async () => {
     renderPage()
-    const section = await screen.findByRole('region', { name: /discover artists/i })
+    const section = await screen.findByRole('region', { name: /five at random/i })
     expect(within(section).getByRole('button', { name: /draw five/i })).toBeInTheDocument()
   })
 
@@ -386,7 +386,7 @@ describe('ArtistsPage — ShuffleBlock', () => {
     })
 
     renderPage()
-    const section = await screen.findByRole('region', { name: /discover artists/i })
+    const section = await screen.findByRole('region', { name: /five at random/i })
     const shuffleBtn = within(section).getByRole('button', { name: /draw five/i })
     fireEvent.click(shuffleBtn)
 
@@ -417,7 +417,7 @@ describe('ArtistsPage — ShuffleBlock', () => {
     })
 
     renderPage()
-    const section = await screen.findByRole('region', { name: /discover artists/i })
+    const section = await screen.findByRole('region', { name: /five at random/i })
     const shuffleBtn = within(section).getByRole('button', { name: /draw five/i })
 
     fireEvent.click(shuffleBtn)
@@ -453,7 +453,7 @@ describe('ArtistsPage — ShuffleBlock', () => {
     })
 
     renderPage()
-    const section = await screen.findByRole('region', { name: /discover artists/i })
+    const section = await screen.findByRole('region', { name: /five at random/i })
     fireEvent.click(within(section).getByRole('button', { name: /draw five/i }))
 
     await screen.findByText('No Listen Band')
@@ -481,7 +481,7 @@ describe('ArtistsPage — ShuffleBlock', () => {
     })
 
     renderPage()
-    const section = await screen.findByRole('region', { name: /discover artists/i })
+    const section = await screen.findByRole('region', { name: /five at random/i })
     fireEvent.click(within(section).getByRole('button', { name: /draw five/i }))
 
     await screen.findByText('Has Listen Band')

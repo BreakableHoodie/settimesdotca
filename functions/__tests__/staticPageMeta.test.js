@@ -27,7 +27,9 @@ const REPO_ROOT = path.join(FUNCTIONS_DIR, "..");
 // scan and ssrMeta.test.js) means any such drift fails HERE.
 const DEFAULT_HTML = readFileSync(path.join(REPO_ROOT, "frontend", "index.html"), "utf8");
 
-const HOMEPAGE_DESCRIPTION = "Discover upcoming live music events and build your personalized show schedule.";
+// Only the homepage description says this, so finding it on another page means
+// index.html's default leaked through. Keep it in step with frontend/index.html.
+const HOMEPAGE_DESCRIPTION = "pick the sets you want, and build your own route through the night.";
 
 // Every identity tag serveWithInjectedMeta's DEFAULT_META_RE strips from
 // index.html and that a registered page must re-inject exactly once. Keyed

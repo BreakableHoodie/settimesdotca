@@ -78,7 +78,7 @@ function generateScheduleId(bandName, performanceId) {
 }
 
 function formatEventSlugLabel(eventSlug) {
-  if (!eventSlug) return 'Event Schedule'
+  if (!eventSlug) return 'Event schedule'
   return eventSlug
     .split('-')
     .filter(Boolean)
@@ -390,9 +390,9 @@ export default function BandProfilePage() {
           <Alert variant="error" className="mb-6">
             <h2 className="text-xl font-bold mb-2">
               {isPublishGateError
-                ? 'Band Profiles Unavailable'
+                ? 'Band profiles unavailable'
                 : isNotFoundError
-                  ? 'Band Not Found'
+                  ? 'Band not found'
                   : 'Failed to load band profile'}
             </h2>
             <p>
@@ -411,7 +411,7 @@ export default function BandProfilePage() {
               icon={<ArrowLeft size={14} />}
               iconPosition="left"
             >
-              Back to Schedule
+              Back to schedule
             </Button>
           </div>
         </div>
@@ -445,7 +445,7 @@ export default function BandProfilePage() {
                   className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-500/20 text-accent-400 hover:bg-accent-500/30 transition-colors text-sm font-medium"
                 >
                   <CalendarDays size={14} />
-                  {sourceEventSlug ? 'Back to Schedule' : 'My Route'}
+                  {sourceEventSlug ? 'Back to schedule' : 'My Route'}
                 </Link>
               )}
               <ThemeToggle />
@@ -817,7 +817,7 @@ export default function BandProfilePage() {
 
           {/* Right Column - Upcoming & Past Shows */}
           <div className={profile.stats ? 'lg:col-span-2 space-y-6' : 'space-y-6'}>
-            {/* Upcoming Shows */}
+            {/* Upcoming shows */}
             {profile.upcoming && profile.upcoming.length > 0 && (
               <Card variant="elevated" className="border-2 border-accent-500/30">
                 <div className="mb-5 flex items-center gap-3 border-b border-text-primary/10 pb-4">
@@ -825,7 +825,7 @@ export default function BandProfilePage() {
                     <CalendarDays size={18} aria-hidden="true" />
                   </span>
                   <h2 className="flex flex-1 items-center gap-2 text-xl font-bold text-accent-500 sm:text-2xl">
-                    Upcoming Shows
+                    Upcoming shows
                     <Badge variant="primary" className="ml-1">
                       {profile.upcoming.length}
                     </Badge>
@@ -910,12 +910,12 @@ export default function BandProfilePage() {
                                 size="sm"
                                 icon={isInSchedule(performance) ? <Check size={14} /> : <Plus size={14} />}
                               >
-                                {isInSchedule(performance) ? 'In Schedule' : 'Add to Schedule'}
+                                {isInSchedule(performance) ? 'In schedule' : 'Add to schedule'}
                               </Button>
                             )}
                             {performance.event_slug && (
                               <Button as={Link} to={`/event/${performance.event_slug}`} variant="primary" size="sm">
-                                View Event →
+                                View event
                               </Button>
                             )}
                           </div>
@@ -935,7 +935,7 @@ export default function BandProfilePage() {
                     <TrendingUp size={18} aria-hidden="true" />
                   </span>
                   <h2 className="flex flex-1 items-center gap-2 text-xl font-bold text-text-primary sm:text-2xl">
-                    Performance History
+                    Performance history
                     <Badge variant="secondary" className="ml-1">
                       {profile.past.length}
                     </Badge>
@@ -1017,7 +1017,7 @@ export default function BandProfilePage() {
                           </div>
                           {performance.event_slug && (
                             <Button as={Link} to={`/event/${performance.event_slug}`} variant="secondary" size="sm">
-                              View Event →
+                              View event
                             </Button>
                           )}
                         </div>
@@ -1040,10 +1040,10 @@ export default function BandProfilePage() {
           </div>
         </div>
 
-        {/* Back to Events */}
+        {/* Back to events */}
         <div className="pt-2 text-center">
           <Button as={Link} to={returnEventPath} variant="secondary" icon={<ArrowLeft size={14} />} iconPosition="left">
-            {returnEventSlug ? 'Back to Schedule' : 'Back to Events'}
+            {returnEventSlug ? 'Back to schedule' : 'Back to events'}
           </Button>
         </div>
       </div>

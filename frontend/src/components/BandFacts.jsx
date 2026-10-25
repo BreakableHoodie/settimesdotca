@@ -49,7 +49,7 @@ export default function BandFacts({ band, stats }) {
     <Card variant="elevated">
       <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold text-text-primary">
         <Lightbulb size={18} className="text-accent-500" aria-hidden="true" />
-        Fast Facts
+        Fast facts
       </h3>
       <ul className="space-y-2.5">
         {facts.map((fact, index) => (

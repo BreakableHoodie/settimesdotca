@@ -119,7 +119,7 @@ for (const theme of THEMES) {
 
     test("events list (/)", async ({ page }) => {
       await page.goto("/");
-      // Use exact:true to avoid matching both "Events" h1 and "Past Events" h2.
+      // Use exact:true to avoid matching both "Events" h1 and "Past events" h2.
       await expect(page.getByRole("heading", { name: "Events", exact: true })).toBeVisible();
       await expect(page.locator('[data-testid="event-card"]').first()).toBeVisible();
       await waitForPrivacyBannerSettled(page);
@@ -132,9 +132,9 @@ for (const theme of THEMES) {
       test.skip(!slug, "No seeded event slug found on the homepage event card");
 
       await page.goto(`/event/${slug}`);
-      // "Full Lineup" is ScheduleView's unconditional heading — waiting for it
+      // "Full lineup" is ScheduleView's unconditional heading — waiting for it
       // guarantees the schedule has rendered past the loading skeleton.
-      await expect(page.getByRole("heading", { name: "Full Lineup" })).toBeVisible({ timeout: 15000 });
+      await expect(page.getByRole("heading", { name: "Full lineup" })).toBeVisible({ timeout: 15000 });
       await waitForPrivacyBannerSettled(page);
 
       await assertNoColorContrastViolations(page, `${theme} — event schedule (/event/${slug})`);
@@ -142,7 +142,7 @@ for (const theme of THEMES) {
 
     test("subscribe page (/subscribe)", async ({ page }) => {
       await page.goto("/subscribe");
-      await expect(page.getByRole("heading", { name: "Never Miss a Show" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Never miss a show" })).toBeVisible();
 
       await assertNoColorContrastViolations(page, `${theme} — subscribe (/subscribe)`);
     });

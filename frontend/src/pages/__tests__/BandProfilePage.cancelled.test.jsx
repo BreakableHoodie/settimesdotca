@@ -103,7 +103,7 @@ describe('BandProfilePage — cancelled set rendering (#732)', () => {
     expect(heading.querySelector('s')).toBeNull()
   })
 
-  it('hides the "Add to Schedule" toggle for a cancelled upcoming set (not selectable)', async () => {
+  it('hides the "Add to schedule" toggle for a cancelled upcoming set (not selectable)', async () => {
     fetchPublicJson.mockReset()
     fetchPublicJson.mockResolvedValue({
       id: 208,
@@ -124,7 +124,7 @@ describe('BandProfilePage — cancelled set rendering (#732)', () => {
 
     expect(screen.queryByRole('button', { name: /add to schedule/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /in schedule/i })).not.toBeInTheDocument()
-    // The "View Event" link must still be there -- only the schedule toggle is suppressed.
+    // The "View event" link must still be there -- only the schedule toggle is suppressed.
     expect(screen.getByRole('link', { name: /view event/i })).toBeInTheDocument()
   })
 

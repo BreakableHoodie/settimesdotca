@@ -41,17 +41,17 @@ const mainJsx = path.join(path.dirname(currentFile), '../main.jsx')
 // passes while no test actually runs.
 const COVERED_PATHS = new Set([
   '/', // Home — EventsPage, ready: event-card
-  '/event/:slug', // Event schedule — App/ScheduleView, ready: "Full Lineup"
-  '/events/:slug/recap', // Event recap — EventRecapPage, ready: "Archived Lineup"
-  '/embed/:slug', // Embed — EmbedPage/ScheduleView, ready: "Full Lineup"
-  '/subscribe', // SubscribePage, ready: "Never Miss a Show"
-  '/reset-password', // no-token error/form state, ready: "Reset Password"
-  '/activate', // no-token error state, ready: "Activation Failed"
+  '/event/:slug', // Event schedule — App/ScheduleView, ready: "Full lineup"
+  '/events/:slug/recap', // Event recap — EventRecapPage, ready: "Archived lineup"
+  '/embed/:slug', // Embed — EmbedPage/ScheduleView, ready: "Full lineup"
+  '/subscribe', // SubscribePage, ready: "Never miss a show"
+  '/reset-password', // no-token error/form state, ready: "Reset password"
+  '/activate', // no-token error state, ready: "Activation failed"
   '/privacy', // PrivacyPage, ready: "Privacy Policy"
   '/terms', // TermsPage, ready: "Terms of Service"
   '/about', // AboutPage, ready: "About"
   '/contact', // ContactPage, ready: "Contact"
-  '/stats', // StatsPage, ready: "SetTimes by the Numbers"
+  '/stats', // StatsPage, ready: "SetTimes by the numbers"
   '/band/:id', // BandProfilePage, ready: main h1
   '/venue/:id', // VenuePage, ready: main h1
   '/s/:slug', // SharePreviewPage (runtime-created share link), ready: "-stop route"

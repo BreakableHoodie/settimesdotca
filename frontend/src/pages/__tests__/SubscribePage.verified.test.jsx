@@ -91,12 +91,12 @@ describe('SubscribePage after the confirmation link', () => {
     })
     renderAt('/subscribe')
 
-    expect(screen.getByRole('textbox', { name: 'Email Address' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Email address' })).toBeInTheDocument()
     expect(screen.queryByLabelText('City')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Genre Preference')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Email Frequency')).not.toBeInTheDocument()
 
-    fireEvent.change(screen.getByRole('textbox', { name: 'Email Address' }), {
+    fireEvent.change(screen.getByRole('textbox', { name: 'Email address' }), {
       target: { value: 'fan@example.com' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }))
@@ -122,7 +122,7 @@ describe('SubscribePage after the confirmation link', () => {
       json: async () => ({ message: 'Subscription created' }),
     })
     renderAt('/subscribe')
-    fireEvent.change(screen.getByRole('textbox', { name: 'Email Address' }), {
+    fireEvent.change(screen.getByRole('textbox', { name: 'Email address' }), {
       target: { value: 'fan@example.com' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }))
@@ -142,7 +142,7 @@ describe('SubscribePage after the confirmation link', () => {
     Object.assign(turnstileMock, { enabled: true, status: 'pending', submitWhenReady: () => false })
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
     const view = renderAt('/subscribe')
-    fireEvent.change(screen.getByRole('textbox', { name: 'Email Address' }), {
+    fireEvent.change(screen.getByRole('textbox', { name: 'Email address' }), {
       target: { value: 'fan@example.com' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }))
@@ -170,7 +170,7 @@ describe('SubscribePage after the confirmation link', () => {
       submitWhenReady: () => false,
     })
     renderAt('/subscribe')
-    fireEvent.change(screen.getByRole('textbox', { name: 'Email Address' }), {
+    fireEvent.change(screen.getByRole('textbox', { name: 'Email address' }), {
       target: { value: 'fan@example.com' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }))

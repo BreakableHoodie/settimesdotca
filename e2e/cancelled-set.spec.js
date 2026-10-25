@@ -61,7 +61,7 @@ const localInstant = (dateStr, hours, minutes = 0) => {
 /**
  * Seeds one published event with sets at the same venue: a cancelled set
  * whose 19:00–19:30 window brackets the fixed clock time below (so WITHOUT
- * the suppression it would show "Live Now" and be selectable — the fixture
+ * the suppression it would show "Live now" and be selectable — the fixture
  * must sit inside the live window, or a broken suppression and a correct one
  * would look identical), and a normal scheduled set later the same night as
  * a live comparison baseline.
@@ -186,7 +186,7 @@ test.describe("Cancelled set — rendering and accessibility (#732)", () => {
     // 3. Positive control (MINOR 7): "Actually Live" sits in the SAME
     // 19:00–19:30 window as the cancelled set and IS live at 19:15 — its
     // status text and route button must be genuinely present. Without this,
-    // asserting "Live Now" is absent from the cancelled card proves nothing:
+    // asserting "Live now" is absent from the cancelled card proves nothing:
     // nothing else on the page is live at 19:15 either (the scheduled
     // comparison below starts at 20:00), so the negative assertion would
     // pass identically whether suppression works or the whole live/soon
@@ -194,21 +194,21 @@ test.describe("Cancelled set — rendering and accessibility (#732)", () => {
     //
     // Scoped to the live band's OWN card (via its route button's nearest
     // "rounded-xl" ancestor, the card's root div) rather than a bare
-    // `page.getByText("Live Now")` -- if suppression regressed and the
-    // CANCELLED card also started showing "Live Now", an unscoped locator
+    // `page.getByText("Live now")` -- if suppression regressed and the
+    // CANCELLED card also started showing "Live now", an unscoped locator
     // would hit a strict-mode "resolved to 2 elements" error instead of
     // cleanly failing step 4 below, which is a much noisier signal for the
     // same underlying regression.
     const liveRouteButton = page.getByRole("button", { name: new RegExp(`Add ${liveName} to my route`) });
     await expect(liveRouteButton).toBeVisible();
     const liveCard = liveRouteButton.locator('xpath=ancestor::div[contains(@class, "rounded-xl")][1]');
-    await expect(liveCard.getByText("Live Now")).toBeVisible();
+    await expect(liveCard.getByText("Live now")).toBeVisible();
 
     // 4. No live/soon time math leaks through onto the CANCELLED card
     // specifically, even though 19:15 sits squarely inside its own window
-    // too — proven meaningful by step 3 above actually finding "Live Now"
+    // too — proven meaningful by step 3 above actually finding "Live now"
     // on the live band's card.
-    await expect(card.getByText("Live Now")).toHaveCount(0);
+    await expect(card.getByText("Live now")).toHaveCount(0);
     await expect(card.getByText(/Starts in \d+m/)).toHaveCount(0);
 
     // Comparison baseline: the scheduled (non-cancelled) band on the SAME

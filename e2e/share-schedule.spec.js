@@ -96,7 +96,7 @@ test("a shared schedule link shows and imports exactly the selected stops", asyn
     await expect(routeList.getByText(names[2], { exact: true })).toHaveCount(0);
 
     await sharedPage.getByRole("button", { name: /Add 2 stops to my route/ }).click();
-    const loadDialog = sharedPage.getByRole("dialog", { name: "Load Shared Route" });
+    const loadDialog = sharedPage.getByRole("dialog", { name: "Load shared route" });
     await expect(loadDialog).toBeVisible();
     await loadDialog.getByRole("button", { name: "Replace" }).click();
 

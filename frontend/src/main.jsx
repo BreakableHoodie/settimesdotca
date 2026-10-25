@@ -106,7 +106,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                 <Route
                   path="/events/:slug/recap"
                   element={
-                    <ErrorBoundary title="Event Recap Error" message="Unable to load event recap. Please try again.">
+                    <ErrorBoundary title="Event recap error" message="Unable to load event recap. Please try again.">
                       <Suspense fallback={<LoadingFallback />}>
                         <EventRecapPage />
                       </Suspense>
@@ -118,7 +118,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                 <Route
                   path="/band/:id"
                   element={
-                    <ErrorBoundary title="Band Profile Error" message="Unable to load band profile. Please try again.">
+                    <ErrorBoundary title="Band profile error" message="Unable to load band profile. Please try again.">
                       <Suspense fallback={<LoadingFallback />}>
                         <BandProfilePage />
                       </Suspense>
@@ -131,7 +131,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                   path="/artists"
                   element={
                     <ErrorBoundary
-                      title="Artists Error"
+                      title="Artists error"
                       message="Unable to load the artist directory. Please try again."
                     >
                       <Suspense fallback={<LoadingFallback />}>
@@ -145,7 +145,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                 <Route
                   path="/venues"
                   element={
-                    <ErrorBoundary title="Venues Error" message="Unable to load venues. Please try again.">
+                    <ErrorBoundary title="Venues error" message="Unable to load venues. Please try again.">
                       <Suspense fallback={<LoadingFallback />}>
                         <VenuesPage />
                       </Suspense>
@@ -155,7 +155,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                 <Route
                   path="/venue/:id"
                   element={
-                    <ErrorBoundary title="Venue Error" message="Unable to load this venue. Please try again.">
+                    <ErrorBoundary title="Venue error" message="Unable to load this venue. Please try again.">
                       <Suspense fallback={<LoadingFallback />}>
                         <VenuePage />
                       </Suspense>
@@ -167,7 +167,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                 <Route
                   path="/s/:slug"
                   element={
-                    <ErrorBoundary title="Share Preview Error" message="Unable to load this shared route.">
+                    <ErrorBoundary title="Share preview error" message="Unable to load this shared route.">
                       <Suspense fallback={<LoadingFallback />}>
                         <SharePreviewPage />
                       </Suspense>

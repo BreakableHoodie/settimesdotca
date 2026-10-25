@@ -3,7 +3,7 @@
  *
  * Measured before this guard existed: on a 390px viewport a fan passed roughly
  * 1,300px of chrome -- header, lifecycle pill, clock, title block, poster chip,
- * tab toggle, "How it works", "Full Lineup" heading, view toggle, Copy, Select
+ * tab toggle, "How it works", "Full lineup" heading, view toggle, Copy, Select
  * All, genre dropdown -- before the first act name. Nine controls before one
  * band, on the page people hold standing in the street.
  *
@@ -51,7 +51,7 @@ test.describe("Event page fold (#1074 / Vol 18 phase 1)", () => {
     await page.goto(`/event/${SEEDED_EVENT}`);
     // Wait for a REAL ACT to be in the DOM, never a heading.
     //
-    // This waited on the "Full Lineup" heading until Copilot pointed out the
+    // This waited on the "Full lineup" heading until Copilot pointed out the
     // circularity: that heading is now `sr-only` below `sm:` -- the very change
     // this test measures -- so the readiness signal depended on a visually hidden
     // element and told us nothing about whether the lineup had rendered. It is

@@ -144,9 +144,9 @@ function MySchedule({
   eventEndDate = null,
 }) {
   const [currentTime, setCurrentTime] = useState(() => (nowOverride ? new Date(nowOverride) : new Date()))
-  const [copyButtonLabel, setCopyButtonLabel] = useState('Copy Schedule')
+  const [copyButtonLabel, setCopyButtonLabel] = useState('Copy schedule')
   const [isCopyingSchedule, setIsCopyingSchedule] = useState(false)
-  const [shareButtonLabel, setShareButtonLabel] = useState('Share Schedule')
+  const [shareButtonLabel, setShareButtonLabel] = useState('Share schedule')
 
   // Update current time every minute
   useEffect(() => {
@@ -191,7 +191,7 @@ function MySchedule({
   // Filter (not scroll-anchor, locked product decision): once a day tab is
   // active, everything below — conflict/overlap detection, the countdown
   // list, the "longest break" reminder — operates on just that day's
-  // selections. Share Schedule / Lock-In deliberately read the RAW `bands`
+  // selections. Share schedule / Lock-In deliberately read the RAW `bands`
   // prop instead (see handleShareSchedule/performanceIds below), not this
   // filtered set, so sharing/locking in always covers the fan's whole
   // multi-day route regardless of which day tab they're looking at.
@@ -409,7 +409,7 @@ function MySchedule({
             onClick={onBrowseAll}
             className="mt-2 px-6 py-3 min-h-[44px] rounded-lg bg-accent-500/20 border border-accent-500/50 text-accent-400 font-semibold hover:bg-accent-500/30 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500"
           >
-            Browse Lineup
+            Browse lineup
           </button>
         )}
       </div>
@@ -436,7 +436,7 @@ function MySchedule({
             onClick={onBrowseAll}
             className="mt-2 px-6 py-3 min-h-[44px] rounded-lg bg-accent-500/20 border border-accent-500/50 text-accent-400 font-semibold hover:bg-accent-500/30 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500"
           >
-            Browse Lineup
+            Browse lineup
           </button>
         )}
       </div>
@@ -561,8 +561,8 @@ function MySchedule({
         const url = `${window.location.origin}/s/${slug}`
         const success = await copyToClipboard(url)
         if (success) {
-          setShareButtonLabel('Link Copied!')
-          setTimeout(() => setShareButtonLabel('Share Schedule'), 2000)
+          setShareButtonLabel('Link copied!')
+          setTimeout(() => setShareButtonLabel('Share schedule'), 2000)
         }
         return
       }
@@ -574,8 +574,8 @@ function MySchedule({
     const fallbackUrl = `${window.location.origin}${window.location.pathname}?s=${legacyIds}`
     const success = await copyToClipboard(fallbackUrl)
     if (success) {
-      setShareButtonLabel('Link Copied!')
-      setTimeout(() => setShareButtonLabel('Share Schedule'), 2000)
+      setShareButtonLabel('Link copied!')
+      setTimeout(() => setShareButtonLabel('Share schedule'), 2000)
     }
   }
 
@@ -624,7 +624,7 @@ function MySchedule({
                   if (success) {
                     setCopyButtonLabel('Copied!')
                     setTimeout(() => {
-                      setCopyButtonLabel('Copy Schedule')
+                      setCopyButtonLabel('Copy schedule')
                       setIsCopyingSchedule(false)
                     }, 2000)
                   } else {
@@ -646,10 +646,10 @@ function MySchedule({
                 <button
                   onClick={handleShareSchedule}
                   className="text-xs px-3 py-1.5 rounded bg-bg-purple/60 border border-bg-purple/40 text-text-primary flex items-center gap-2 transition-transform duration-150 hover:bg-bg-purple/80 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500 min-h-[44px]"
-                  title={shareButtonLabel === 'Link Copied!' ? 'Share link copied to clipboard' : 'Share your schedule'}
+                  title={shareButtonLabel === 'Link copied!' ? 'Share link copied to clipboard' : 'Share your schedule'}
                   aria-label="Copy shareable link to your schedule"
                 >
-                  {shareButtonLabel === 'Link Copied!' ? (
+                  {shareButtonLabel === 'Link copied!' ? (
                     <Check size={14} aria-hidden="true" />
                   ) : (
                     <Link size={14} aria-hidden="true" />
@@ -663,7 +663,7 @@ function MySchedule({
                 title="Clear all selected bands"
               >
                 <Trash2 size={14} aria-hidden="true" />
-                <span>Clear All</span>
+                <span>Clear all</span>
               </button>
             </div>
           </div>
@@ -750,12 +750,13 @@ function MySchedule({
                         <Footprints size={14} aria-hidden="true" />
                         <span>
                           ~{transition.walkMin} min walk to {transition.venue}
+                          {transition.buffer != null && ','}
                         </span>
                         {transition.buffer != null && (
                           <span
                             className={transition.buffer < 3 ? 'font-semibold text-error-400' : 'text-text-tertiary'}
                           >
-                            · {bufferLabel(transition.buffer)}
+                            {bufferLabel(transition.buffer)}
                           </span>
                         )}
                       </span>
@@ -799,7 +800,7 @@ function MySchedule({
                         const parts = []
                         if (conflictNames.length > 0) parts.push(`Same time as ${conflictNames.join(', ')}`)
                         if (overlapNames.length > 0) parts.push(`Overlaps with ${overlapNames.join(', ')}`)
-                        return parts.join(' · ')
+                        return parts.join('. ')
                       })()}
                     />
                   </div>

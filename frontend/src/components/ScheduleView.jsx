@@ -71,7 +71,7 @@ function ScheduleView({
   const [localGenreFilter, setLocalGenreFilter] = useState(null)
   const [localGroupBy, setLocalGroupBy] = useState('time')
   const isExternal = controls === 'external'
-  const copyAllLabel = justCopied ? 'Copied!' : isExternal ? 'Copy this list' : 'Copy Visible Schedule'
+  const copyAllLabel = justCopied ? 'Copied!' : isExternal ? 'Copy this list' : 'Copy visible schedule'
   const venueFilter = controlledVenueFilter === undefined ? localVenueFilter : controlledVenueFilter
   const genreFilter = controlledGenreFilter === undefined ? localGenreFilter : controlledGenreFilter
   const groupBy = controlledGroupBy === undefined ? localGroupBy : controlledGroupBy
@@ -246,7 +246,7 @@ function ScheduleView({
       {isExternal ? (
         // The sticky control row owns the visible heading space; this still
         // names the region for a screen reader.
-        <h2 className="sr-only">Full Lineup</h2>
+        <h2 className="sr-only">Full lineup</h2>
       ) : (
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex-1 text-center sm:text-left">
@@ -254,7 +254,7 @@ function ScheduleView({
               screen reader. Hidden VISUALLY on mobile only, where it costs ~56px
               directly above the lineup while saying less than the "UPCOMING"
               heading immediately below it and the "Lineup" tab above it. */}
-            <h2 className="sr-only sm:not-sr-only text-2xl font-bold text-text-primary text-center">Full Lineup</h2>
+            <h2 className="sr-only sm:not-sr-only text-2xl font-bold text-text-primary text-center">Full lineup</h2>
             {!showPast && hiddenFinished > 0 && (
               <p className="text-xs text-accent-400/80 mt-1 text-center sm:text-left">
                 {hiddenFinished} finished {hiddenFinished === 1 ? 'set hidden' : 'sets hidden'}
@@ -347,7 +347,7 @@ function ScheduleView({
                       }`}
                       title={allSelected ? 'All visible bands already selected' : 'Select all visible bands'}
                     >
-                      {allSelected ? 'All Selected' : 'Select All'}
+                      {allSelected ? 'All selected' : 'Select all'}
                     </button>
                   )}
                 </div>
@@ -384,7 +384,7 @@ function ScheduleView({
                     onChange={handleVenueSelectChange}
                     className="min-h-[44px] w-full rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-text-primary focus:border-accent-500 focus:outline-hidden"
                   >
-                    <option value="">All Venues</option>
+                    <option value="">All venues</option>
                     {uniqueVenues.map(venue => (
                       <option key={venue} value={venue}>
                         {venue}
@@ -406,7 +406,7 @@ function ScheduleView({
                     onChange={event => setGenreFilter(event.target.value || null)}
                     className="min-h-[44px] w-full rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-text-primary focus:border-accent-500 focus:outline-hidden"
                   >
-                    <option value="">All Genres</option>
+                    <option value="">All genres</option>
                     {uniqueGenres.map(genre => (
                       <option key={genre} value={genre}>
                         {genre}
@@ -586,7 +586,7 @@ function ScheduleView({
                     <div className="relative ml-0 sm:ml-4">
                       <div className="hidden sm:flex items-center mb-4">
                         <h3 className="bg-bg-navy text-text-primary font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
-                          {time === 'TBD' ? 'Time To Be Announced' : formatTime(time)}
+                          {time === 'TBD' ? 'Time to be announced' : formatTime(time)}
                         </h3>
                         <div className="flex-1 h-0.5 bg-bg-navy/20 ml-4"></div>
                       </div>
@@ -633,7 +633,7 @@ function ScheduleView({
                     <div className="relative ml-0 sm:ml-4 opacity-60">
                       <div className="hidden sm:flex items-center mb-4">
                         <h3 className="bg-surface text-text-tertiary font-mono font-semibold text-base md:text-lg px-4 py-2 rounded-lg shadow">
-                          {time === 'TBD' ? 'Time To Be Announced' : formatTime(time)}
+                          {time === 'TBD' ? 'Time to be announced' : formatTime(time)}
                         </h3>
                         <div className="flex-1 h-0.5 bg-surface ml-4"></div>
                       </div>

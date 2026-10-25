@@ -212,7 +212,7 @@ describe('theme token contrast (WCAG AA, 4.5:1)', () => {
     const warning400 = resolveHex('--color-warning-400', theme)
     const { start: gradientStart, end: gradientEnd } = resolveGradientAccentStops(theme)
 
-    // Root-cause regression guard for #617: BandCard's selected/"Live Now"
+    // Root-cause regression guard for #617: BandCard's selected/"Live now"
     // state renders `bg-gradient-accent` behind `text-bg-navy` — both the
     // start and end stops must independently clear 4.5:1 against bg-navy,
     // since text can sit over either end of the gradient depending on card size.

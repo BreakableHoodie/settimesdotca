@@ -112,4 +112,31 @@ describe('PosterImage', () => {
     // caller still hears about every failure.
     expect(onError).toHaveBeenCalledTimes(2)
   })
+
+  it('reports unavailable only when the original fails too, once per src (#1368)', () => {
+    const onUnavailable = vi.fn()
+    const { rerender } = render(<PosterImage src={POSTER_URL} alt="poster" width={200} onUnavailable={onUnavailable} />)
+    const img = screen.getByRole('img', { name: 'poster' })
+
+    fireEvent.error(img) // the transform failed: fall back, still a poster to try
+    expect(onUnavailable).not.toHaveBeenCalled()
+
+    fireEvent.error(img) // the original failed too
+    fireEvent.error(img)
+    expect(onUnavailable).toHaveBeenCalledTimes(1)
+
+    // A new poster gets its own two chances.
+    rerender(<PosterImage src={`${POSTER_URL}?v=2`} alt="poster" width={200} onUnavailable={onUnavailable} />)
+    fireEvent.error(img)
+    expect(onUnavailable).toHaveBeenCalledTimes(1)
+    fireEvent.error(img)
+    expect(onUnavailable).toHaveBeenCalledTimes(2)
+  })
+
+  it('reports a foreign-host poster unavailable on its first error: there is no transform to fall back from', () => {
+    const onUnavailable = vi.fn()
+    render(<PosterImage src="https://example.com/poster.jpg" alt="poster" width={200} onUnavailable={onUnavailable} />)
+    fireEvent.error(screen.getByRole('img', { name: 'poster' }))
+    expect(onUnavailable).toHaveBeenCalledTimes(1)
+  })
 })

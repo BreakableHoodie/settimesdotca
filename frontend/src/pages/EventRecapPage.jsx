@@ -91,6 +91,8 @@ export default function EventRecapPage() {
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
   const [posterLightboxOpen, setPosterLightboxOpen] = useState(false)
+  // A poster that cannot load hides its whole block (#1368).
+  const [posterUnavailableUrl, setPosterUnavailableUrl] = useState(null)
   const event = data?.event || null
   const stats = data?.stats || null
   const bands = Array.isArray(data?.bands) ? data.bands : []
@@ -189,7 +191,7 @@ export default function EventRecapPage() {
                 uploaded for this edition; omitted entirely otherwise. Clicking
                 it opens the same click-to-enlarge lightbox as the live event
                 page (#655). */}
-            {event.poster_url && (
+            {event.poster_url && posterUnavailableUrl !== event.poster_url && (
               <div className="mt-4 overflow-hidden rounded-xl border border-border bg-bg-navy/40">
                 <button
                   type="button"
@@ -202,6 +204,7 @@ export default function EventRecapPage() {
                     width={800}
                     alt={`${event.name} poster`}
                     loading="lazy"
+                    onUnavailable={() => setPosterUnavailableUrl(event.poster_url)}
                     /* Two-value aspect-ratio (#659 review): reserves a 3:4 box
                        while the lazy image has no intrinsic dimensions, then
                        yields to the real ratio on load. object-contain stays

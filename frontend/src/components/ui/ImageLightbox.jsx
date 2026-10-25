@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 import { X } from 'lucide-react'
 import PosterImage from '../PosterImage'
@@ -38,6 +38,8 @@ import { useBodyScrollLock } from '../../hooks/useBodyScrollLock'
  * simple and automatically covers any future caller of this component.
  */
 export default function ImageLightbox({ src, alt, isOpen, onClose, width = 1600 }) {
+  // Keyed to the URL: a different image gets its own chance to load.
+  const [unavailableSrc, setUnavailableSrc] = useState(null)
   const dialogRef = useRef(null)
   const previousActiveElement = useRef(null)
 
@@ -153,13 +155,22 @@ export default function ImageLightbox({ src, alt, isOpen, onClose, width = 1600 
             failure. Never let this render with no alt attribute at all:
             React omits the attribute entirely for `undefined`, and AT then
             falls back to announcing the URL. */}
-        <PosterImage
-          src={src}
-          width={width}
-          alt={alt || 'Enlarged image'}
-          loading="eager"
-          className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"
-        />
+        {unavailableSrc === src ? (
+          // A broken image here explains nothing (#1368). White over the dark
+          // scrim is theme-independent, which the theming rules allow.
+          <p role="status" className="rounded-lg bg-black/70 px-4 py-3 text-white">
+            This image could not be loaded.
+          </p>
+        ) : (
+          <PosterImage
+            src={src}
+            width={width}
+            alt={alt || 'Enlarged image'}
+            loading="eager"
+            className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"
+            onUnavailable={() => setUnavailableSrc(src)}
+          />
+        )}
       </div>
     </div>
   )

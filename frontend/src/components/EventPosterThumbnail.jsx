@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import PosterImage from './PosterImage'
 
 /**
@@ -60,7 +61,12 @@ import PosterImage from './PosterImage'
  * Resize either variant and its `width` has to move with it.
  */
 function EventPosterThumbnail({ posterUrl, eventName, onOpen, variant = 'standalone' }) {
-  if (!posterUrl) return null
+  // Keyed to the URL, so a new poster gets its own chance to load.
+  const [unavailableUrl, setUnavailableUrl] = useState(null)
+  // No poster, or one that cannot load: render nothing, exactly like an edition
+  // without one. A broken image sized by its alt text pushed the title off the
+  // screen (#1368), and a thumbnail that opens a broken lightbox helps nobody.
+  if (!posterUrl || unavailableUrl === posterUrl) return null
 
   const label = eventName ? `${eventName} poster` : 'Event poster'
   const isInline = variant === 'inline'
@@ -76,6 +82,7 @@ function EventPosterThumbnail({ posterUrl, eventName, onOpen, variant = 'standal
         <PosterImage
           src={posterUrl}
           alt={label}
+          onUnavailable={() => setUnavailableUrl(posterUrl)}
           width={isInline ? 80 : 200}
           // The inline variant renders in the sticky bar, above the fold — lazy
           // loading it would delay LCP and pop in. Standalone stays lazy.

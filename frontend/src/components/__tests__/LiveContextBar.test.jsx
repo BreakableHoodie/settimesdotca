@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import LiveContextBar, { computeIdentityCollapseStyle, IDENTITY_COLLAPSE_TRANSITION_CLASS } from '../LiveContextBar'
 
@@ -144,22 +144,26 @@ describe('LiveContextBar', () => {
       />
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /My Route/i }))
+    fireEvent.click(screen.getByRole('button', { name: /My route/i }))
     expect(onViewChange).toHaveBeenCalledWith('mine')
 
-    fireEvent.change(screen.getByLabelText(/Venue switcher/i), {
+    // Venue and time live in the one filter panel, not in the bar itself.
+    expect(screen.queryByRole('combobox', { name: 'Venue' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Filter' }))
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Venue' }), {
       target: { value: 'Stage B' },
     })
     expect(onVenueFilterChange).toHaveBeenCalledWith('Stage B')
 
-    fireEvent.change(screen.getByLabelText(/Time filter/i), {
+    fireEvent.change(screen.getByRole('combobox', { name: 'Time' }), {
       target: { value: 'now' },
     })
 
     expect(onTimeFilterChange).toHaveBeenCalledWith('now')
   })
 
-  it('collapses and expands the filter panel when the toggle is clicked', () => {
+  it('opens the filter panel as a dialog from the Filter button and closes it again', () => {
     render(
       <LiveContextBar
         eventData={eventData}
@@ -175,19 +179,137 @@ describe('LiveContextBar', () => {
       />
     )
 
-    // Filters are open by default — panel and aria-expanded=true are present
-    const toggles = screen.getAllByRole('button', { name: /hide filters/i })
-    expect(toggles[0]).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByLabelText(/Time filter/i)).toBeInTheDocument()
+    const filterButton = screen.getByRole('button', { name: 'Filter' })
+    expect(filterButton).toHaveAttribute('aria-haspopup', 'dialog')
+    expect(filterButton).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 
-    // Click to collapse
-    fireEvent.click(toggles[0])
-    expect(screen.getAllByRole('button', { name: /show filters/i })[0]).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByLabelText(/Time filter/i)).not.toBeInTheDocument()
+    fireEvent.click(filterButton)
+    expect(screen.getByRole('dialog', { name: 'Filter the lineup' })).toBeInTheDocument()
+    expect(filterButton).toHaveAttribute('aria-expanded', 'true')
 
-    // Click again to re-expand
-    fireEvent.click(screen.getAllByRole('button', { name: /show filters/i })[0])
-    expect(screen.getByLabelText(/Time filter/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^Show \d+ sets?$/ }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('counts only non-default filters on the Filter button, in its accessible name too', () => {
+    const props = {
+      eventData,
+      currentTime: new Date('2026-05-06T19:30:00'),
+      bands,
+      selectedCount: 0,
+      view: 'all',
+      onViewChange: vi.fn(),
+    }
+    const { rerender } = render(<LiveContextBar {...props} />)
+    expect(screen.getByRole('button', { name: 'Filter' })).toBeInTheDocument()
+
+    rerender(<LiveContextBar {...props} venueFilter="Stage A" genreFilter="Punk" timeFilter="now" />)
+    expect(screen.getByRole('button', { name: 'Filter, 3 active' })).toBeInTheDocument()
+
+    rerender(<LiveContextBar {...props} groupBy="venue" showPast />)
+    expect(screen.getByRole('button', { name: 'Filter, 2 active' })).toBeInTheDocument()
+  })
+
+  it('keeps a control for every filter the badge counts, even when its option has gone', () => {
+    render(
+      <LiveContextBar
+        eventData={eventData}
+        currentTime={new Date('2026-05-06T19:30:00')}
+        bands={bands}
+        view="all"
+        onViewChange={vi.fn()}
+        onVenueFilterChange={vi.fn()}
+        onToggleShowPast={vi.fn()}
+        venueFilter="Closed Venue"
+        showPast
+        finishedCount={0}
+      />
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Filter, 2 active' }))
+    const dialog = screen.getByRole('dialog', { name: 'Filter the lineup' })
+    // A venue no longer in the lineup still shows as the selection, not "All venues".
+    expect(within(dialog).getByRole('combobox', { name: 'Venue' })).toHaveValue('Closed Venue')
+    // "Show finished sets" stays while ticked, with nothing finished in view.
+    expect(within(dialog).getByRole('checkbox', { name: /Show finished sets/ })).toBeChecked()
+  })
+
+  it('"Clear all" resets every filter and is disabled when nothing is active', () => {
+    const handlers = {
+      onVenueFilterChange: vi.fn(),
+      onGenreFilterChange: vi.fn(),
+      onTimeFilterChange: vi.fn(),
+      onGroupByChange: vi.fn(),
+      onToggleShowPast: vi.fn(),
+    }
+    const props = {
+      eventData,
+      currentTime: new Date('2026-05-06T19:30:00'),
+      bands,
+      view: 'all',
+      onViewChange: vi.fn(),
+      ...handlers,
+    }
+    const { rerender } = render(<LiveContextBar {...props} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    expect(screen.getByRole('button', { name: 'Clear all' })).toBeDisabled()
+
+    rerender(
+      <LiveContextBar
+        {...props}
+        venueFilter="Stage A"
+        genreFilter="Punk"
+        genreOptions={['Punk']}
+        timeFilter="now"
+        groupBy="venue"
+        showPast
+      />
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Clear all' }))
+    expect(handlers.onVenueFilterChange).toHaveBeenCalledWith(null)
+    expect(handlers.onGenreFilterChange).toHaveBeenCalledWith(null)
+    expect(handlers.onTimeFilterChange).toHaveBeenCalledWith('all')
+    expect(handlers.onGroupByChange).toHaveBeenCalledWith('time')
+    expect(handlers.onToggleShowPast).toHaveBeenCalledTimes(1)
+  })
+
+  it('offers "Show finished sets" only when sets have finished', () => {
+    const props = {
+      eventData,
+      currentTime: new Date('2026-05-06T19:30:00'),
+      bands,
+      view: 'all',
+      onViewChange: vi.fn(),
+      onToggleShowPast: vi.fn(),
+    }
+    const { rerender } = render(<LiveContextBar {...props} finishedCount={0} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+
+    rerender(<LiveContextBar {...props} finishedCount={2} />)
+    fireEvent.click(screen.getByRole('checkbox', { name: /Show finished sets \(2\)/ }))
+    expect(props.onToggleShowPast).toHaveBeenCalledTimes(1)
+  })
+
+  it('has exactly one control row: no stat pills, tagline, or route-count pill', () => {
+    render(
+      <LiveContextBar
+        eventData={{ ...eventData, age_restriction: '19+', presented_by: 'SetTimes' }}
+        currentTime={new Date('2026-05-06T19:30:00')}
+        bands={bands}
+        selectedCount={2}
+        view="all"
+        onViewChange={vi.fn()}
+      />
+    )
+    expect(screen.queryByText(/Fast lookup/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/stops? in route/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /filters$/i })).not.toBeInTheDocument()
+    // The segmented control and Filter are the only controls outside the
+    // identity block's status badge and social links.
+    expect(screen.getByRole('button', { name: 'Lineup' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /My route/ })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /^Filter/ })).toHaveLength(1)
   })
 
   it('does not show a Doors chip when the event has no doors_json (#569)', () => {
@@ -227,7 +349,7 @@ describe('LiveContextBar', () => {
       />
     )
 
-    expect(screen.getAllByText('Doors 6:30 PM').length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/Doors at 6:30 PM/).length).toBeGreaterThan(0)
   })
 
   it('shows "Tonight" instead of "0 days away" pre-doors on the event\'s own day (#596)', () => {
@@ -248,7 +370,10 @@ describe('LiveContextBar', () => {
       />
     )
 
-    expect(screen.getAllByText('Tonight').length).toBeGreaterThan(0)
+    // The summary's own sentence, not the "Live Tonight" badge (which would mean
+    // the lifecycle flipped before doors).
+    expect(screen.getAllByText(/\bsets?\. Tonight\.$/).length).toBeGreaterThan(0)
+    expect(screen.queryByText('Live Tonight')).not.toBeInTheDocument()
     expect(screen.queryByText(/0 days away/)).not.toBeInTheDocument()
   })
 
@@ -272,7 +397,7 @@ describe('LiveContextBar', () => {
         />
       )
 
-      expect(screen.getAllByText('19+').length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/19\+/).length).toBeGreaterThan(0)
       expect(screen.queryByText(/Presented by/i)).not.toBeInTheDocument()
     })
 
@@ -296,7 +421,7 @@ describe('LiveContextBar', () => {
       // an unlabelled organisation name told a screen reader nothing about what it
       // was -- both surfaces now say "Presented by".
       expect(screen.getAllByText(/Presented by Downtown Waterloo BIA/).length).toBeGreaterThan(0)
-      expect(screen.queryByText('19+')).not.toBeInTheDocument()
+      expect(screen.queryByText(/19\+/)).not.toBeInTheDocument()
     })
 
     it('appears in the mobile summary line when the presenter is set (#1063)', () => {
@@ -383,21 +508,21 @@ describe('LiveContextBar', () => {
         />
       )
 
-      expect(screen.queryByText('19+')).not.toBeInTheDocument()
+      expect(screen.queryByText(/19\+/)).not.toBeInTheDocument()
       expect(screen.queryByText(/Presented by/i)).not.toBeInTheDocument()
     })
   })
 
-  // #665: Tabs and the filters toggle are the functional controls and must
-  // stay reachable regardless of the venue/time filter panel's open state —
-  // previously they were rendered INSIDE the same `isFiltersOpen` gate as
-  // the selects, so closing filters also hid the Live Lineup/My Route tabs.
-  describe('Tabs stay reachable independent of the filter panel (#665)', () => {
+  // #665: the view switch and Filter button are the functional controls and
+  // must stay reachable at every width and whether or not the panel is open
+  // (they used to share a collapsible gate with the venue/time selects).
+  describe('Control row stays reachable at every width (#665)', () => {
     afterEach(() => {
       setViewportWidth(1024)
     })
 
-    it('keeps the Tabs visible after collapsing the venue/time filters', () => {
+    it.each([375, 1024])('shows the view switch and Filter at %ipx, with the panel closed', width => {
+      setViewportWidth(width)
       render(
         <LiveContextBar
           eventData={eventData}
@@ -413,56 +538,26 @@ describe('LiveContextBar', () => {
         />
       )
 
-      const toggles = screen.getAllByRole('button', { name: /hide filters/i })
-      fireEvent.click(toggles[0])
-
-      expect(screen.queryByLabelText(/Time filter/i)).not.toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /Live Lineup/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /My Route/i })).toBeInTheDocument()
-      // The toggle itself must also stay reachable once collapsed.
-      expect(screen.getAllByRole('button', { name: /show filters/i }).length).toBeGreaterThan(0)
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.queryByRole('combobox', { name: 'Time' })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Lineup' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /My route/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Filter' })).toBeInTheDocument()
     })
 
-    it('defaults the filter panel open on a desktop-width viewport', () => {
-      setViewportWidth(1024)
+    it('hides Filter in the My route view, which the filters do not shape', () => {
       render(
         <LiveContextBar
           eventData={eventData}
           currentTime={new Date('2026-05-06T19:30:00')}
           bands={bands}
-          selectedCount={0}
-          view="all"
+          selectedCount={1}
+          view="mine"
           onViewChange={vi.fn()}
-          venueFilter={null}
-          onVenueFilterChange={vi.fn()}
-          timeFilter="all"
-          onTimeFilterChange={vi.fn()}
         />
       )
-
-      expect(screen.getByLabelText(/Time filter/i)).toBeInTheDocument()
-    })
-
-    it('defaults the filter panel collapsed on a phone-width viewport, Tabs still present', () => {
-      setViewportWidth(375)
-      render(
-        <LiveContextBar
-          eventData={eventData}
-          currentTime={new Date('2026-05-06T19:30:00')}
-          bands={bands}
-          selectedCount={0}
-          view="all"
-          onViewChange={vi.fn()}
-          venueFilter={null}
-          onVenueFilterChange={vi.fn()}
-          timeFilter="all"
-          onTimeFilterChange={vi.fn()}
-        />
-      )
-
-      expect(screen.queryByLabelText(/Time filter/i)).not.toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /Live Lineup/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /My Route/i })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /^Filter/ })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Lineup' })).toBeInTheDocument()
     })
   })
 

@@ -65,7 +65,7 @@ test("a shared schedule link shows and imports exactly the selected stops", asyn
   await expect(main.getByRole("button", { name: `Remove ${names[0]} from my route` })).toBeVisible();
   await expect(main.getByRole("button", { name: `Remove ${names[1]} from my route` })).toBeVisible();
 
-  await page.getByRole("button", { name: /^My Route/ }).click();
+  await page.getByRole("button", { name: /^My route/ }).click();
   const shareResponsePromise = page.waitForResponse(
     (response) => response.url().endsWith("/api/schedule/share") && response.request().method() === "POST",
   );

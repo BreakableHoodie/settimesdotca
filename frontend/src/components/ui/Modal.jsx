@@ -3,6 +3,28 @@ import PropTypes from 'prop-types'
 import { X } from 'lucide-react'
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock'
 
+// The last control a pointer pressed, captured before any click handler opens a
+// modal. Module-level so every Modal shares one listener.
+// Only a press in the last second counts: an old press (say, the start of a
+// scroll) must not become the return target of a modal opened by an effect.
+const POINTER_TRIGGER_MAX_AGE_MS = 1000
+let lastPointerTrigger = null
+let lastPointerAt = 0
+if (typeof document !== 'undefined') {
+  document.addEventListener(
+    'pointerdown',
+    event => {
+      lastPointerTrigger = event.target?.closest?.('button, a[href], [tabindex]:not([tabindex="-1"])') ?? null
+      lastPointerAt = Date.now()
+    },
+    true
+  )
+}
+const recentPointerTrigger = () =>
+  lastPointerTrigger?.isConnected && Date.now() - lastPointerAt <= POINTER_TRIGGER_MAX_AGE_MS
+    ? lastPointerTrigger
+    : null
+
 /**
  * Modal Component - Design System v2.0
  *
@@ -36,6 +58,7 @@ export default function Modal({
   showCloseButton = true,
   closeOnBackdropClick = true,
   className = '',
+  placement = 'center',
 }) {
   const modalRef = useRef(null)
   const previousActiveElement = useRef(null)
@@ -121,8 +144,12 @@ export default function Modal({
   // Save previous focus and set initial focus when modal opens
   useEffect(() => {
     if (isOpen) {
-      // Save currently focused element
-      previousActiveElement.current = document.activeElement
+      // Save currently focused element. Safari never focuses a button on a
+      // mouse click, so there activeElement is <body> and focus would be lost
+      // on close; fall back to the control the pointer last pressed.
+      const active = document.activeElement
+      previousActiveElement.current =
+        (!active || active === document.body) && recentPointerTrigger() ? recentPointerTrigger() : active
 
       // Focus first focusable element or modal itself
       const focusableElements = getFocusableElements()
@@ -177,17 +204,24 @@ export default function Modal({
     full: 'max-w-[95vw]',
   }
 
+  // 'sheet' sits at the bottom edge below `sm` (thumb reach on a phone) and
+  // centres from `sm` up; every existing caller keeps the centred default.
+  const isSheet = placement === 'sheet'
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fade-in"
+      className={`fixed inset-0 z-50 flex justify-center bg-black/80 backdrop-blur-xs animate-fade-in ${
+        isSheet ? 'items-end p-0 sm:items-center sm:p-4' : 'items-center p-4'
+      }`}
       onClick={handleBackdropClick}
       role="presentation"
     >
       <div
         ref={modalRef}
         className={`
-          w-full bg-bg-darker border border-border rounded-xl shadow-xl
+          w-full bg-bg-darker border border-border shadow-xl
           max-h-[90vh] overflow-y-auto animate-scale-in
+          ${isSheet ? 'rounded-t-xl sm:rounded-xl' : 'rounded-xl'}
           ${sizeClasses[size] || sizeClasses.md}
           ${className}
         `
@@ -249,4 +283,6 @@ Modal.propTypes = {
   showCloseButton: PropTypes.bool,
   /** Additional CSS classes */
   className: PropTypes.string,
+  /** 'sheet' docks to the bottom edge on phones; 'center' (default) always centres */
+  placement: PropTypes.oneOf(['center', 'sheet']),
 }

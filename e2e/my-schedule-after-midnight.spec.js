@@ -82,10 +82,10 @@ test("My Route sorts an after-midnight set after the evening sets", async ({ pag
     await expect(main.getByRole("button", { name: `Remove ${name} from my route` })).toBeVisible();
   }
 
-  await page.getByRole("button", { name: /^My Route/ }).click();
+  await page.getByRole("button", { name: /^My route/ }).click();
   await expect(main.getByRole("heading", { name: "My Route" })).toBeVisible();
   await expect.poll(() => namesInGroups(main, names)).toEqual([names[1], names[2], names[0]]);
 
-  await page.getByRole("button", { name: "Live Lineup", exact: true }).click();
+  await page.getByRole("button", { name: "Lineup", exact: true }).click();
   await expect.poll(() => namesInGroups(main, names)).toEqual([names[1], names[2], names[0]]);
 });

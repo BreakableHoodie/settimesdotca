@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import LiveContextBar from '../LiveContextBar'
 
@@ -103,6 +103,7 @@ describe('LiveContextBar — cancelled sets', () => {
       />
     )
 
+    fireEvent.click(screen.getByRole('button', { name: 'Filter' }))
     expect(screen.getByRole('option', { name: 'Room 47' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'Roost' })).toBeInTheDocument()
   })

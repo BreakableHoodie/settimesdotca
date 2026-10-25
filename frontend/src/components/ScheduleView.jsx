@@ -4,13 +4,12 @@ import { copyToClipboard } from '../utils/clipboard'
 import { compareByName } from '../utils/sortableName'
 import { dayNumberByDate, orderedFestivalDays } from '../utils/festivalDays'
 import { formatTime, formatTimeRange } from '../utils/timeFormat'
-import { filterPerformancesByTime } from '../utils/timeFilter'
+import { UNSCHEDULED, currentTimeMs, deriveLineup } from '../utils/lineupFilter'
 import { useFestivalDayFilter } from '../hooks/useFestivalDayFilter'
 import { useIsNarrow } from '../hooks/useIsNarrow'
 import BandCard from './BandCard'
 import { DayDivider, DayTabs } from './ui'
 
-const UNSCHEDULED = Symbol('unscheduled')
 const UNSCHEDULED_FILTER_VALUE = '__unscheduled__'
 
 // Groups by (festival day, clock time) rather than bare clock time. `band.date`
@@ -52,23 +51,33 @@ function ScheduleView({
   timeFilter = 'all',
   venueFilter: controlledVenueFilter,
   onVenueFilterChange,
+  genreFilter: controlledGenreFilter,
+  groupBy: controlledGroupBy,
+  // 'inline' draws the filter rows itself (the embed). 'external' means the
+  // event page's single control row owns every filter, so none render here;
+  // genreFilter/groupBy then come in as props, and copy/select-all follow the
+  // lineup instead of sitting above it.
+  controls = 'inline',
   showVenueFilter = true,
   eventSlug,
   doorsJson = null,
   eventStartDate = null,
   eventEndDate = null,
 }) {
-  const [copyAllLabel, setCopyAllLabel] = useState('Copy Visible Schedule')
+  const [justCopied, setJustCopied] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const [isCopyingAll, setIsCopyingAll] = useState(false)
   const [localVenueFilter, setLocalVenueFilter] = useState(null)
-  const [genreFilter, setGenreFilter] = useState(null)
-  const [groupBy, setGroupBy] = useState('time')
+  const [localGenreFilter, setLocalGenreFilter] = useState(null)
+  const [localGroupBy, setLocalGroupBy] = useState('time')
+  const isExternal = controls === 'external'
+  const copyAllLabel = justCopied ? 'Copied!' : isExternal ? 'Copy this list' : 'Copy Visible Schedule'
   const venueFilter = controlledVenueFilter === undefined ? localVenueFilter : controlledVenueFilter
-  const nowMs = useMemo(() => {
-    const d = currentTime instanceof Date ? currentTime : new Date(currentTime)
-    return d.getTime()
-  }, [currentTime])
+  const genreFilter = controlledGenreFilter === undefined ? localGenreFilter : controlledGenreFilter
+  const groupBy = controlledGroupBy === undefined ? localGroupBy : controlledGroupBy
+  const setGenreFilter = next => setLocalGenreFilter(next)
+  const setGroupBy = next => setLocalGroupBy(next)
+  const nowMs = useMemo(() => currentTimeMs(currentTime), [currentTime])
 
   // Day-divider support (#541): numbering/gate derive from the full incoming
   // `bands` set (not the filtered/split subsets below) so day numbers stay
@@ -88,9 +97,24 @@ function ScheduleView({
     setActiveDayNumber,
   } = useFestivalDayFilter(festivalDays, { currentTime, startDate: eventStartDate, endDate: eventEndDate })
 
-  const dayFilteredBands = useMemo(
-    () => (hasDayTabs && activeDate ? bands.filter(band => band.date === activeDate) : bands),
-    [bands, hasDayTabs, activeDate]
+  // The filter chain is shared with the event page's filter panel (see
+  // deriveLineup), so the "Show N sets" button and this list cannot disagree.
+  const {
+    dayFilteredBands,
+    genres: uniqueGenres,
+    finishedCount,
+    visibleBands,
+  } = useMemo(
+    () =>
+      deriveLineup(bands, {
+        activeDate: hasDayTabs ? activeDate : null,
+        timeFilter,
+        venueFilter,
+        genreFilter,
+        showPast,
+        nowMs,
+      }),
+    [bands, hasDayTabs, activeDate, timeFilter, venueFilter, genreFilter, showPast, nowMs]
   )
 
   const uniqueVenues = useMemo(
@@ -98,46 +122,6 @@ function ScheduleView({
     [dayFilteredBands]
   )
   const hasUnscheduled = useMemo(() => dayFilteredBands.some(b => !b.venue), [dayFilteredBands])
-  const uniqueGenres = useMemo(
-    () => [...new Set(dayFilteredBands.filter(b => b.genre).map(b => b.genre))].sort(),
-    [dayFilteredBands]
-  )
-
-  // Apply time filter first, then venue/genre filter (before showPast so finishedCount is accurate)
-  const timeFilteredBands = useMemo(
-    () => filterPerformancesByTime(dayFilteredBands, timeFilter),
-    [dayFilteredBands, timeFilter]
-  )
-
-  const venueGenreFilteredBands = useMemo(
-    () =>
-      timeFilteredBands.filter(b => {
-        if (venueFilter === UNSCHEDULED) return !b.venue
-        if (venueFilter && b.venue !== venueFilter) return false
-        if (genreFilter && b.genre !== genreFilter) return false
-        return true
-      }),
-    [timeFilteredBands, venueFilter, genreFilter]
-  )
-
-  // Count finished sets within the active venue/genre filter (not affected by showPast toggle)
-  const finishedCount = useMemo(
-    () =>
-      // endMs, not the raw endTime string: prepareBands derives an end for an
-      // open-ended set ("12:25 - END"), and the grouping below already uses
-      // endMs. Testing the string hid that set as past without counting it.
-      venueGenreFilteredBands.reduce((count, band) => (band.endMs > 0 && band.endMs <= nowMs ? count + 1 : count), 0),
-    [venueGenreFilteredBands, nowMs]
-  )
-
-  const visibleBands = useMemo(
-    () =>
-      showPast
-        ? venueGenreFilteredBands
-        : // Untimed sets (endMs 0) always show; timed ones hide once over.
-          venueGenreFilteredBands.filter(band => !(band.endMs > 0) || band.endMs > nowMs),
-    [venueGenreFilteredBands, showPast, nowMs]
-  )
 
   const sortedBands = useMemo(
     () =>
@@ -194,10 +178,13 @@ function ScheduleView({
   }, [sortedBands])
 
   const selectedBandsSet = useMemo(() => new Set(selectedBands), [selectedBands])
-  const visibleBandIds = useMemo(() => visibleBands.map(band => band.id), [visibleBands])
+  // A cancelled set stays on screen (struck through) but can never be added
+  // (#732), so "Add all" counts and adds only the sets a fan can actually pick.
+  const selectableBands = useMemo(() => visibleBands.filter(band => !band.is_cancelled), [visibleBands])
+  const visibleBandIds = useMemo(() => selectableBands.map(band => band.id), [selectableBands])
   const canToggleBands = typeof onToggleBand === 'function'
   const canTogglePast = typeof onToggleShowPast === 'function'
-  const canSelectAll = typeof onSelectAll === 'function' && visibleBands.length > 0
+  const canSelectAll = typeof onSelectAll === 'function' && selectableBands.length > 0
 
   const allSelected = visibleBandIds.length > 0 && visibleBandIds.every(id => selectedBandsSet.has(id))
   const canCopyVisible = sortedBands.length > 0
@@ -220,9 +207,9 @@ function ScheduleView({
     setIsCopyingAll(true)
     const success = await copyBands(sortedBands)
     if (success) {
-      setCopyAllLabel('Copied!')
+      setJustCopied(true)
       setTimeout(() => {
-        setCopyAllLabel('Copy Visible Schedule')
+        setJustCopied(false)
         setIsCopyingAll(false)
       }, 2000)
     } else {
@@ -232,7 +219,7 @@ function ScheduleView({
 
   const handleSelectAll = () => {
     if (!canSelectAll) return
-    onSelectAll(visibleBands)
+    onSelectAll(selectableBands)
   }
 
   const handleVenueFilterToggle = nextVenue => {
@@ -256,114 +243,120 @@ function ScheduleView({
 
   return (
     <div className="py-2 space-y-3 sm:py-6 sm:space-y-8">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex-1 text-center sm:text-left">
-          {/* Kept in the a11y tree at every width -- it names this region for a
+      {isExternal ? (
+        // The sticky control row owns the visible heading space; this still
+        // names the region for a screen reader.
+        <h2 className="sr-only">Full Lineup</h2>
+      ) : (
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex-1 text-center sm:text-left">
+            {/* Kept in the a11y tree at every width -- it names this region for a
               screen reader. Hidden VISUALLY on mobile only, where it costs ~56px
               directly above the lineup while saying less than the "UPCOMING"
-              heading immediately below it and the "Live Lineup" tab above it. */}
-          <h2 className="sr-only sm:not-sr-only text-2xl font-bold text-text-primary text-center">Full Lineup</h2>
-          {!showPast && hiddenFinished > 0 && (
-            <p className="text-xs text-accent-400/80 mt-1 text-center sm:text-left">
-              {hiddenFinished} finished {hiddenFinished === 1 ? 'set hidden' : 'sets hidden'}
-            </p>
-          )}
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <div
-            className="inline-flex items-center rounded-full border border-border bg-surface p-0.5"
-            role="group"
-            aria-label="Group lineup by"
-          >
-            {['time', 'venue'].map(mode => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => setGroupBy(mode)}
-                aria-pressed={groupBy === mode}
-                className={`min-h-[44px] rounded-full px-3 py-1.5 text-xs font-medium capitalize transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 ${
-                  groupBy === mode ? 'bg-accent-500/20 text-accent-400' : 'text-text-tertiary hover:text-text-primary'
-                }`}
-              >
-                By {mode}
-              </button>
-            ))}
+              heading immediately below it and the "Lineup" tab above it. */}
+            <h2 className="sr-only sm:not-sr-only text-2xl font-bold text-text-primary text-center">Full Lineup</h2>
+            {!showPast && hiddenFinished > 0 && (
+              <p className="text-xs text-accent-400/80 mt-1 text-center sm:text-left">
+                {hiddenFinished} finished {hiddenFinished === 1 ? 'set hidden' : 'sets hidden'}
+              </p>
+            )}
           </div>
-          {finishedCount > 0 && canTogglePast && (
-            <button
-              onClick={onToggleShowPast}
-              className={`text-xs px-3 py-1.5 min-h-[44px] rounded transition-transform duration-150 hover:brightness-110 active:scale-95 border focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
-                showPast
-                  ? 'bg-accent-500/20 border-accent-500/50 text-accent-400 hover:bg-accent-500/30'
-                  : 'bg-bg-purple/50 border-accent-500/50 text-accent-400 hover:bg-bg-purple'
-              }`}
-              title={showPast ? 'Hide finished sets' : 'Show finished sets'}
-              aria-label={showPast ? 'Hide finished sets' : 'Show finished sets'}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div
+              className="inline-flex items-center rounded-full border border-border bg-surface p-0.5"
+              role="group"
+              aria-label="Group lineup by"
             >
-              {showPast ? 'Hide finished sets' : 'Show finished sets'}
-            </button>
-          )}
-          <div className="relative">
-            {/* Deliberately NOT a <details>. A closed <details> is supposed to hide
+              {['time', 'venue'].map(mode => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setGroupBy(mode)}
+                  aria-pressed={groupBy === mode}
+                  className={`min-h-[44px] rounded-full px-3 py-1.5 text-xs font-medium capitalize transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 ${
+                    groupBy === mode ? 'bg-accent-500/20 text-accent-400' : 'text-text-tertiary hover:text-text-primary'
+                  }`}
+                >
+                  By {mode}
+                </button>
+              ))}
+            </div>
+            {finishedCount > 0 && canTogglePast && (
+              <button
+                onClick={onToggleShowPast}
+                className={`text-xs px-3 py-1.5 min-h-[44px] rounded transition-transform duration-150 hover:brightness-110 active:scale-95 border focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
+                  showPast
+                    ? 'bg-accent-500/20 border-accent-500/50 text-accent-400 hover:bg-accent-500/30'
+                    : 'bg-bg-purple/50 border-accent-500/50 text-accent-400 hover:bg-bg-purple'
+                }`}
+                title={showPast ? 'Hide finished sets' : 'Show finished sets'}
+                aria-label={showPast ? 'Hide finished sets' : 'Show finished sets'}
+              >
+                {showPast ? 'Hide finished sets' : 'Show finished sets'}
+              </button>
+            )}
+            <div className="relative">
+              {/* Deliberately NOT a <details>. A closed <details> is supposed to hide
                 its non-summary children, but measured here at 390px it did not:
                 details.open was false while Select All still occupied 62px above
                 the fold, so the disclosure read as closed and cost the space
                 anyway. Conditional rendering has no UA-behaviour dependency and
                 is assertable in a test. */}
-            <button
-              type="button"
-              onClick={() => setMoreOpen(open => !open)}
-              aria-expanded={moreOpen}
-              className="text-xs px-3 py-1.5 min-h-[44px] rounded border border-border bg-surface text-text-tertiary cursor-pointer hover:text-text-primary hover:bg-surface-hover list-none flex items-center gap-1 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
-            >
-              <ChevronDown size={12} aria-hidden="true" />
-              More
-            </button>
-            {moreOpen && (
-              <div className="absolute right-0 z-10 mt-1 flex gap-2 rounded-lg border border-border bg-surface p-2 shadow-lg">
-                <button
-                  onClick={handleCopyAll}
-                  className={`text-xs px-3 py-1.5 min-h-[44px] rounded border text-text-primary flex items-center gap-2 transition-transform duration-150 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
-                    canCopyVisible
-                      ? 'bg-bg-purple/60 border-bg-purple/40 hover:bg-bg-purple/80 hover:brightness-110 active:scale-95'
-                      : 'bg-surface border-border text-text-tertiary cursor-not-allowed'
-                  }`}
-                  title={
-                    !canCopyVisible
-                      ? 'No visible bands to copy'
-                      : copyAllLabel === 'Copied!'
-                        ? 'Visible schedule copied to clipboard'
-                        : 'Copy the visible schedule'
-                  }
-                  aria-label="Copy the visible schedule"
-                  disabled={isCopyingAll || !canCopyVisible}
-                >
-                  {copyAllLabel === 'Copied!' ? (
-                    <Check size={14} aria-hidden="true" />
-                  ) : (
-                    <Copy size={14} aria-hidden="true" />
-                  )}
-                  <span className="transition-opacity duration-200 ease-in-out">{copyAllLabel}</span>
-                </button>
-                {canSelectAll && (
+              <button
+                type="button"
+                onClick={() => setMoreOpen(open => !open)}
+                aria-expanded={moreOpen}
+                className="text-xs px-3 py-1.5 min-h-[44px] rounded border border-border bg-surface text-text-tertiary cursor-pointer hover:text-text-primary hover:bg-surface-hover list-none flex items-center gap-1 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
+              >
+                <ChevronDown size={12} aria-hidden="true" />
+                More
+              </button>
+              {moreOpen && (
+                <div className="absolute right-0 z-10 mt-1 flex gap-2 rounded-lg border border-border bg-surface p-2 shadow-lg">
                   <button
-                    onClick={handleSelectAll}
-                    disabled={allSelected}
-                    className={`text-xs px-3 py-1.5 min-h-[44px] rounded transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
-                      allSelected
-                        ? 'bg-gray-500/20 border border-gray-500/50 text-text-disabled cursor-not-allowed'
-                        : 'bg-accent-500/20 border border-accent-500/50 text-accent-400 hover:bg-accent-500/30'
+                    onClick={handleCopyAll}
+                    className={`text-xs px-3 py-1.5 min-h-[44px] rounded border text-text-primary flex items-center gap-2 transition-transform duration-150 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
+                      canCopyVisible
+                        ? 'bg-bg-purple/60 border-bg-purple/40 hover:bg-bg-purple/80 hover:brightness-110 active:scale-95'
+                        : 'bg-surface border-border text-text-tertiary cursor-not-allowed'
                     }`}
-                    title={allSelected ? 'All visible bands already selected' : 'Select all visible bands'}
+                    title={
+                      !canCopyVisible
+                        ? 'No visible bands to copy'
+                        : copyAllLabel === 'Copied!'
+                          ? 'Visible schedule copied to clipboard'
+                          : 'Copy the visible schedule'
+                    }
+                    aria-label="Copy the visible schedule"
+                    disabled={isCopyingAll || !canCopyVisible}
                   >
-                    {allSelected ? 'All Selected' : 'Select All'}
+                    {copyAllLabel === 'Copied!' ? (
+                      <Check size={14} aria-hidden="true" />
+                    ) : (
+                      <Copy size={14} aria-hidden="true" />
+                    )}
+                    <span className="transition-opacity duration-200 ease-in-out">{copyAllLabel}</span>
                   </button>
-                )}
-              </div>
-            )}
+                  {canSelectAll && (
+                    <button
+                      onClick={handleSelectAll}
+                      disabled={allSelected}
+                      className={`text-xs px-3 py-1.5 min-h-[44px] rounded transition-transform duration-150 hover:brightness-110 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-400 ${
+                        allSelected
+                          ? 'bg-gray-500/20 border border-gray-500/50 text-text-disabled cursor-not-allowed'
+                          : 'bg-accent-500/20 border border-accent-500/50 text-accent-400 hover:bg-accent-500/30'
+                      }`}
+                      title={allSelected ? 'All visible bands already selected' : 'Select all visible bands'}
+                    >
+                      {allSelected ? 'All Selected' : 'Select All'}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Day-tab filter (#542 PR-3): a hard FILTER — selecting a day renders
           ONLY that day's performances, never "all days" merged. Gated on
@@ -376,7 +369,8 @@ function ScheduleView({
       )}
 
       {/* Filter pills */}
-      {(showVenueFilter || uniqueGenres.length > 0) &&
+      {!isExternal &&
+        (showVenueFilter || uniqueGenres.length > 0) &&
         (uniqueVenues.length > 1 || uniqueGenres.length > 0 || hasUnscheduled) && (
           <div className="space-y-3">
             <div className="grid gap-2 sm:hidden">
@@ -465,7 +459,7 @@ function ScheduleView({
                   {uniqueGenres.map(genre => (
                     <button
                       key={genre}
-                      onClick={() => setGenreFilter(prev => (prev === genre ? null : genre))}
+                      onClick={() => setGenreFilter(genreFilter === genre ? null : genre)}
                       aria-pressed={genreFilter === genre}
                       className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
                         genreFilter === genre
@@ -558,16 +552,30 @@ function ScheduleView({
           {/* Upcoming Section */}
           {upcomingByTime.length > 0 && (
             <div className="space-y-1 sm:space-y-8">
-              {/* Compact on mobile: this heading sat directly above the lineup
+              {isExternal ? (
+                // "Later" exists only to separate this list from a Now Playing
+                // section above it; with nothing playing it labels the whole
+                // lineup, which the page already names.
+                nowPlaying.length > 0 && (
+                  <div className="flex items-center mb-1 sm:mb-4">
+                    <h2 className="text-base font-semibold text-text-secondary">Later</h2>
+                    <div className="flex-1 h-0.5 bg-bg-purple/30 ml-4"></div>
+                  </div>
+                )
+              ) : (
+                <>
+                  {/* Compact on mobile: this heading sat directly above the lineup
                   costing ~60px with its margin. It still earns its place -- it is
                   what separates UPCOMING from a NOW PLAYING section when one
                   exists -- so it is shrunk rather than hidden. Desktop unchanged. */}
-              <div className="flex items-center mb-1 sm:mb-4">
-                <h2 className="bg-bg-purple text-text-primary font-mono font-bold text-xs px-2 py-0.5 sm:text-lg md:text-xl sm:px-4 sm:py-2 rounded-lg shadow-lg">
-                  UPCOMING
-                </h2>
-                <div className="flex-1 h-0.5 bg-bg-purple/30 ml-4"></div>
-              </div>
+                  <div className="flex items-center mb-1 sm:mb-4">
+                    <h2 className="bg-bg-purple text-text-primary font-mono font-bold text-xs px-2 py-0.5 sm:text-lg md:text-xl sm:px-4 sm:py-2 rounded-lg shadow-lg">
+                      UPCOMING
+                    </h2>
+                    <div className="flex-1 h-0.5 bg-bg-purple/30 ml-4"></div>
+                  </div>
+                </>
+              )}
               {upcomingByTime.map(({ time, date, bands: timeBands }, idx) => {
                 const previousDate = idx > 0 ? upcomingByTime[idx - 1].date : undefined
                 const showDayDivider = hasDayTabs && date !== previousDate
@@ -652,6 +660,39 @@ function ScheduleView({
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {isExternal && (canSelectAll || canCopyVisible) && (
+        // Actions follow the content they act on: they used to sit above the
+        // lineup, costing a row before the first band.
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-3">
+          {canSelectAll && (
+            <button
+              type="button"
+              onClick={handleSelectAll}
+              disabled={allSelected}
+              aria-label={
+                allSelected
+                  ? `All ${selectableBands.length} visible sets are in My route`
+                  : `Add all ${selectableBands.length} visible sets to My route`
+              }
+              className="min-h-[44px] rounded-md px-2 text-sm font-medium text-accent-400 hover:text-text-primary disabled:cursor-not-allowed disabled:text-text-disabled focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
+            >
+              {allSelected
+                ? `All ${selectableBands.length} in My route`
+                : `Add all ${selectableBands.length} to My route`}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleCopyAll}
+            disabled={isCopyingAll || !canCopyVisible}
+            aria-label="Copy the visible schedule"
+            className="min-h-[44px] rounded-md px-2 text-sm font-medium text-text-secondary hover:text-text-primary disabled:cursor-not-allowed disabled:text-text-disabled focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
+          >
+            {copyAllLabel}
+          </button>
         </div>
       )}
     </div>

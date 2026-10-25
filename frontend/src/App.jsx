@@ -19,6 +19,8 @@ import { getTimeFilterOptions } from './utils/timeFilter'
 import { computeNextMove } from './utils/nextMove'
 import { validateBandsData } from './utils/validation'
 import { prepareBands } from './utils/bandUtils'
+import { currentTimeMs, deriveLineup } from './utils/lineupFilter'
+import { useFestivalDayFilter } from './hooks/useFestivalDayFilter'
 import { orderedFestivalDays } from './utils/festivalDays'
 import { saveSelectedBands } from './utils/scheduleStorage'
 import { resolveRouteDiff } from './utils/routeDiff'
@@ -176,6 +178,8 @@ function App() {
   const [showPast, setShowPast] = useState(false)
   const [timeFilter, setTimeFilter] = useState(() => getStoredTimeFilter(slug))
   const [venueFilter, setVenueFilter] = useState(null)
+  const [genreFilter, setGenreFilter] = useState(null)
+  const [groupBy, setGroupBy] = useState('time')
   const [currentTime, setCurrentTime] = useState(() => new Date())
   const [debugTime, setDebugTime] = useState(() => getInitialDebugTime())
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
@@ -379,6 +383,9 @@ function App() {
     setView(stored.length > 0 ? 'mine' : 'all')
     setTimeFilter(getStoredTimeFilter(slug))
     setVenueFilter(null)
+    // Another event has other genres; a carried-over filter could empty its lineup.
+    setGenreFilter(null)
+    setGroupBy('time')
   }, [slug])
 
   useEffect(() => {
@@ -653,7 +660,8 @@ function App() {
 
   const selectAll = (bandsToSelect = bands) => {
     const normalizedBands = Array.isArray(bandsToSelect)
-      ? bandsToSelect.filter(band => band && typeof band.id === 'string')
+      ? // Cancelled sets are never selectable (#732), whoever calls this.
+        bandsToSelect.filter(band => band && typeof band.id === 'string' && !band.is_cancelled)
       : []
 
     if (normalizedBands.length === 0) {
@@ -724,6 +732,27 @@ function App() {
   const toggleShowPast = () => setShowPast(prev => !prev)
   const shouldShowLoading = loading && bands.length === 0
   const effectiveNow = debugTime || currentTime
+  // The filter panel in LiveContextBar and the lineup in ScheduleView read the
+  // SAME derivation, so "Show N sets" and the genre options can never drift from
+  // what the list renders. The day tab is URL state, read here by the same hook.
+  const { isMultiDay: hasDayTabs, activeDate } = useFestivalDayFilter(eventFestivalDays, {
+    currentTime: effectiveNow,
+    startDate: eventData?.date,
+    endDate: eventData?.end_date,
+  })
+  const lineupNowMs = currentTimeMs(effectiveNow)
+  const lineup = useMemo(
+    () =>
+      deriveLineup(bands, {
+        activeDate: hasDayTabs ? activeDate : null,
+        timeFilter,
+        venueFilter,
+        genreFilter,
+        showPast,
+        nowMs: lineupNowMs,
+      }),
+    [bands, hasDayTabs, activeDate, timeFilter, venueFilter, genreFilter, showPast, lineupNowMs]
+  )
   // "Next Move" live companion: the single glanceable action for right now,
   // derived from the user's route + current time (see utils/nextMove.js). When
   // active (event is live/near), it supersedes the simpler ComingUp banner.
@@ -862,6 +891,15 @@ function App() {
           onVenueFilterChange={setVenueFilter}
           timeFilter={timeFilter}
           onTimeFilterChange={setTimeFilter}
+          genreFilter={genreFilter}
+          onGenreFilterChange={setGenreFilter}
+          genreOptions={lineup.genres}
+          groupBy={groupBy}
+          onGroupByChange={setGroupBy}
+          showPast={showPast}
+          onToggleShowPast={toggleShowPast}
+          finishedCount={lineup.finishedCount}
+          visibleCount={lineup.visibleBands.length}
           posterUrl={eventData?.poster_url}
           onPosterOpen={() => setPosterLightboxOpen(true)}
         />
@@ -984,6 +1022,11 @@ function App() {
               timeFilter={timeFilter}
               venueFilter={venueFilter}
               onVenueFilterChange={setVenueFilter}
+              // An archived event has no LiveContextBar, so its lineup keeps the
+              // inline controls (and their own genre/group state).
+              genreFilter={isArchived ? undefined : genreFilter}
+              groupBy={isArchived ? undefined : groupBy}
+              controls={isArchived ? 'inline' : 'external'}
               showVenueFilter={false}
               eventSlug={slug || eventData?.slug}
               doorsJson={eventData?.doors_json}

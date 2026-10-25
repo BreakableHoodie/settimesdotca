@@ -29,9 +29,23 @@ import { test, expect } from "@playwright/test";
 // which is what this polls for.
 //
 // 15s because a cold CI mobile run can exceed the default 5s.
+// The homepage re-renders just after first paint (the first band link was one
+// artist at 0 ms and another 400 ms later, once a set for tonight sorted to the
+// top). `.first()` re-resolves on every action, and a coordinate click can land
+// on whatever card has just moved under it, so the text read and the page
+// opened were two different artists. Pin the anchor by its href, and openProfile
+// activates it with a DOM click, which no layout shift can redirect.
+async function pinLink(page, link) {
+  await expect(link).toBeVisible();
+  const href = await link.getAttribute("href");
+  expect(href).toBeTruthy();
+  return page.locator(`a[href=${JSON.stringify(href)}]`).first();
+}
+
 async function openProfile(page, link) {
   const before = ((await page.locator("main h1").textContent()) ?? "").trim();
-  await link.click();
+  await expect(link).toBeVisible();
+  await link.evaluate((anchor) => anchor.click());
   await page.waitForURL(/\/bands?\//);
   // Poll until the heading is BOTH non-empty and different. "Different" alone
   // is only sufficient because BandProfileSkeleton currently renders no <h1>
@@ -80,8 +94,12 @@ test.describe("Band Profile Viewing", () => {
     // Navigate to public homepage first to get a band
     await page.goto("/");
 
-    // Click on first band link (may be in event card or band list)
-    const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
+    // Click on first band link (may be in event card or band list), pinned so
+    // its text and the page it opens are the same artist (see pinLink).
+    const bandLink = await pinLink(
+      page,
+      page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first(),
+    );
 
     // Unconditional, for the same reason as public-timeline.spec.js: an
     // `if (await bandLink.isVisible())` wrapper turns "no band link on the page"
@@ -270,8 +288,10 @@ test.describe("Band Profile Viewing", () => {
     await page.goto("/");
 
     // Navigate to band profile
-    const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
-    await expect(bandLink).toBeVisible();
+    const bandLink = await pinLink(
+      page,
+      page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first(),
+    );
     // The anchor wraps the whole card, so this is name + venue + time + genre --
     // never just the name. Hence the containment direction used below.
     const linkText = ((await bandLink.textContent()) ?? "").trim();
@@ -381,8 +401,10 @@ test.describe("Band Profile Viewing", () => {
     // on pushState BEFORE React renders, so `main a[href^="/event/"]` could
     // match the HOMEPAGE timeline and the test would pass without ever opening
     // a profile.
-    const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
-    await expect(bandLink).toBeVisible();
+    const bandLink = await pinLink(
+      page,
+      page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first(),
+    );
     await openProfile(page, bandLink);
 
     // BandProfilePage links each performance with `<Link to={`/event/${slug}`}>`,
@@ -403,8 +425,10 @@ test.describe("Band Profile Viewing", () => {
     await page.goto("/");
 
     // Navigate to band profile
-    const bandLink = page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first();
-    await expect(bandLink).toBeVisible();
+    const bandLink = await pinLink(
+      page,
+      page.locator('a[href*="/band/"]').or(page.locator('a[href*="/bands/"]')).first(),
+    );
     await bandLink.click();
 
     // Wait for page to fully load

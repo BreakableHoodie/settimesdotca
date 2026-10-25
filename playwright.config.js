@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { ADMIN_STORAGE_STATE } from "./e2e/utils/paths.js";
 
 // Run the WHOLE suite on the app's clock: America/Toronto (#1256).
 // The app classifies "today" in Toronto (functions/utils/eventDay.js); specs
@@ -18,7 +19,7 @@ const useWrangler = process.env.PLAYWRIGHT_USE_WRANGLER !== "false";
 const webServerCommand = useWrangler
   ? "npx wrangler pages dev frontend/dist --port 8788 --binding ENVIRONMENT=development"
   : "npm run dev --prefix frontend";
-const storageStatePath = "e2e/.auth/admin.json";
+const storageStatePath = ADMIN_STORAGE_STATE;
 const skipA11yVisual = process.env.PLAYWRIGHT_SKIP_A11Y_VISUAL === "true";
 
 export default defineConfig({

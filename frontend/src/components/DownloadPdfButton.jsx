@@ -175,7 +175,6 @@ export default function DownloadPdfButton({ className = '' }) {
       type="button"
       onClick={handleClick}
       disabled={isGenerating}
-      aria-label="Download this page as a PDF file"
       className={`no-print inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-500 disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
     >
       <Download size={16} aria-hidden="true" />

@@ -43,7 +43,7 @@ describe('DownloadPdfButton', () => {
 
   it('renders a Download PDF button', () => {
     render(<DownloadPdfButton />)
-    expect(screen.getByRole('button', { name: /download this page as a pdf/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /download pdf/i })).toBeInTheDocument()
     expect(screen.getByText('Download PDF')).toBeInTheDocument()
   })
 
@@ -55,7 +55,7 @@ describe('DownloadPdfButton', () => {
   it('calls doc.save() with a .pdf filename when clicked', async () => {
     injectLegalDocument('Terms')
     render(<DownloadPdfButton />)
-    fireEvent.click(screen.getByRole('button', { name: /download this page as a pdf/i }))
+    fireEvent.click(screen.getByRole('button', { name: /download pdf/i }))
     await waitFor(() => {
       expect(mockSave).toHaveBeenCalledTimes(1)
       expect(mockSave).toHaveBeenCalledWith(expect.stringMatching(/\.pdf$/))
@@ -65,7 +65,7 @@ describe('DownloadPdfButton', () => {
   it('uses the privacy filename when document.title contains "Privacy"', async () => {
     injectLegalDocument('Privacy')
     render(<DownloadPdfButton />)
-    fireEvent.click(screen.getByRole('button', { name: /download this page as a pdf/i }))
+    fireEvent.click(screen.getByRole('button', { name: /download pdf/i }))
     await waitFor(() => {
       expect(mockSave).toHaveBeenCalledWith('settimes-privacy-policy.pdf')
     })
@@ -74,7 +74,7 @@ describe('DownloadPdfButton', () => {
   it('uses the terms filename when document.title contains "Terms"', async () => {
     injectLegalDocument('Terms')
     render(<DownloadPdfButton />)
-    fireEvent.click(screen.getByRole('button', { name: /download this page as a pdf/i }))
+    fireEvent.click(screen.getByRole('button', { name: /download pdf/i }))
     await waitFor(() => {
       expect(mockSave).toHaveBeenCalledWith('settimes-terms-of-service.pdf')
     })
@@ -84,7 +84,7 @@ describe('DownloadPdfButton', () => {
     const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {})
     injectLegalDocument('Terms')
     render(<DownloadPdfButton />)
-    fireEvent.click(screen.getByRole('button', { name: /download this page as a pdf/i }))
+    fireEvent.click(screen.getByRole('button', { name: /download pdf/i }))
     await waitFor(() => {
       expect(mockSave).toHaveBeenCalledTimes(1)
     })
@@ -94,7 +94,7 @@ describe('DownloadPdfButton', () => {
   it('disables the button while generating and re-enables after', async () => {
     injectLegalDocument('Terms')
     render(<DownloadPdfButton />)
-    const btn = screen.getByRole('button', { name: /download this page as a pdf/i })
+    const btn = screen.getByRole('button', { name: /download pdf/i })
     fireEvent.click(btn)
     // Immediately after click the button should be disabled
     expect(btn).toBeDisabled()

@@ -62,7 +62,10 @@ function transitionAnimatesAll(value) {
 
 // One finding per declaration, with the line it starts on: the whole sheet is
 // scanned, so a declaration broken across lines is still read as one.
-function scanCss(relPath, source) {
+function scanCss(relPath, raw) {
+  // CSS ignores comments, so must the scan (`transition: /* x */ 200ms` is an
+  // implicit `all`). Newlines inside a comment are kept, so line numbers hold.
+  const source = raw.replace(/\/\*[\s\S]*?\*\//g, comment => comment.replace(/[^\n]/g, ' '))
   const lineOf = index => source.slice(0, index).split('\n').length
   const found = []
   for (const m of source.matchAll(/backdrop-filter\s*:|backdrop-blur/g)) {
@@ -228,6 +231,7 @@ describe('public site shape language (#1248)', () => {
         '.a { transition: opacity 200ms, all 1s; }', // `all` later in the list
         '.a { transition: opacity 200ms, 300ms linear; }', // an unnamed later item
         '.a {\n  transition:\n    200ms ease;\n}', // a declaration across lines
+        '.a { transition: /* note */ 200ms ease; }', // a comment is not a property
         '.a { transition-property: all; }',
         '.a { @apply transition-all; }',
       ]) {
@@ -238,6 +242,7 @@ describe('public site shape language (#1248)', () => {
         '.a { transition: box-shadow 200ms ease, transform 200ms ease; }',
         '.a { transition: 200ms opacity; }', // property after the duration
         '.a { transition: none; }',
+        '/* transition: all 1s; */ .a { color: red; }', // commented out entirely
         '.a { transition-property: opacity, transform; }',
         '.a { transition-duration: 200ms; }',
         '.a { animation: shimmer 1.5s infinite; }',

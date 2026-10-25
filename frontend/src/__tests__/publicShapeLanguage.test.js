@@ -42,13 +42,27 @@ function walk(dir, extension = /\.(js|jsx)$/) {
 // in CSS: index.css holds every theme's gradient tokens and the skeleton
 // shimmer, so that rule would be mostly allowlist.
 const CSS_BLUR = /backdrop-filter\s*:|backdrop-blur/
-const CSS_TRANSITION_ALL = /transition(?:-property)?\s*:\s*all\b|(?<![\w-])transition-all(?![\w-])/
+// `transition` animates `all` when an item names `all` OR names no property at
+// all (`transition: 200ms ease`), and an item may be any entry of a
+// comma-separated list (CodeRabbit, #1371). So each item is parsed: its first
+// token must be a property name, not a time, a timing function or `all`.
+const TIMING =
+  /^(?:-?[\d.]+m?s|ease(?:-in|-out|-in-out)?|linear|step-start|step-end|steps\(|cubic-bezier\(|linear\(|initial|inherit|unset|revert|none)/
+function animatesAll(line) {
+  if (/(?<![\w-])transition-all(?![\w-])/.test(line)) return true
+  const declaration = /(?:^|[;{\s])transition\s*:\s*([^;}]+)/.exec(line)
+  if (!declaration) return /transition-property\s*:\s*[^;]*\ball\b/.test(line)
+  return declaration[1].split(',').some(item => {
+    const first = item.trim().split(/\s+/)[0] ?? ''
+    return first === 'all' || first === '' || TIMING.test(first)
+  })
+}
 
 function scanCss(relPath, source) {
   const found = []
   source.split('\n').forEach((text, i) => {
     if (CSS_BLUR.test(text)) found.push(`${relPath}:${i + 1} blur`)
-    if (CSS_TRANSITION_ALL.test(text)) found.push(`${relPath}:${i + 1} transition: all`)
+    if (animatesAll(text)) found.push(`${relPath}:${i + 1} transition: all`)
   })
   return found
 }
@@ -193,19 +207,25 @@ describe('public site shape language (#1248)', () => {
     })
 
     it('stylesheet blur and transition: all', () => {
+      expect(CSS_BLUR.test('  backdrop-filter: blur(8px);')).toBe(true)
+      expect(CSS_BLUR.test('  filter: blur(2px);')).toBe(false)
       for (const bad of [
-        '  backdrop-filter: blur(8px);',
         '  transition: all 200ms ease;',
+        '  transition: 200ms ease;', // no property named: that is `all`
+        '  transition: opacity 200ms, all 1s;', // `all` later in the list
+        '  transition: opacity 200ms, 300ms linear;', // an unnamed later item
+        '  transition-property: all;',
         '  @apply transition-all;',
       ]) {
-        expect(CSS_BLUR.test(bad) || CSS_TRANSITION_ALL.test(bad), bad).toBe(true)
+        expect(animatesAll(bad), bad).toBe(true)
       }
       for (const good of [
-        '  filter: blur(2px);',
-        '  transition: box-shadow 200ms ease;',
+        '  transition: box-shadow 200ms ease, transform 200ms ease;',
         '  transition-property: opacity;',
+        '  transition-duration: 200ms;',
+        '  animation: shimmer 1.5s infinite;',
       ]) {
-        expect(CSS_BLUR.test(good) || CSS_TRANSITION_ALL.test(good), good).toBe(false)
+        expect(animatesAll(good), good).toBe(false)
       }
     })
 

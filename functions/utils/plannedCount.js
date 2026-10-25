@@ -6,9 +6,12 @@
  * number of distinct planners. Anonymised `anon:<n>` rows still count once each.
  */
 
-// A count of one or two says very little, can embarrass a band, and nearly
-// identifies the planners, so it never leaves the server. PrivacyPage.jsx
-// states this number ("at least three"): change both together.
+// A count of one or two says very little and can embarrass a band, so it is
+// not shown. This is a presentation floor, NOT a privacy control: builds are
+// unauthenticated, so a caller can add their own planners to cross it and then
+// subtract them (CodeRabbit, #1385). What protects people is that the count is
+// anonymous: how many, never who. PrivacyPage.jsx states this number ("reaches
+// three"): change both together.
 export const PLANNED_COUNT_MIN = 3;
 
 /**

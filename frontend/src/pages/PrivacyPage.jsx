@@ -57,11 +57,11 @@ export default function PrivacyPage() {
               linked across events. Thirty days after the event, that code is replaced by an anonymous sequence number.
               Database backups may hold the earlier code for up to 30 days more. The counts show how many people plan
               schedules and which sets are popular. An artist&apos;s page shows how many people planned each of their
-              sets, once at least three have; smaller counts are never shown. None of this identifies you. We use
-              Cloudflare Analytics Engine — a privacy-safe, aggregate, first-party metrics sink on our infrastructure
-              provider (Cloudflare) — rather than third-party tracking scripts or tracking pixels. Limited request
-              metadata may be processed briefly by Cloudflare for security and abuse prevention, but public browsing is
-              not tied to a persistent account or profiling identifier in our application data.
+              sets once the count reaches three. It is a count only: it says how many, never who. None of this
+              identifies you. We use Cloudflare Analytics Engine — a privacy-safe, aggregate, first-party metrics sink
+              on our infrastructure provider (Cloudflare) — rather than third-party tracking scripts or tracking pixels.
+              Limited request metadata may be processed briefly by Cloudflare for security and abuse prevention, but
+              public browsing is not tied to a persistent account or profiling identifier in our application data.
             </p>
 
             <h3 className="text-text-secondary font-medium mb-2 mt-4">

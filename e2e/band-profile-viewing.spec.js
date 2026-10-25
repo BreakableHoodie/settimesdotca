@@ -36,7 +36,7 @@ import { test, expect } from "@playwright/test";
 // opened were two different artists. Pin the anchor by its href, and openProfile
 // activates it with a DOM click, which no layout shift can redirect.
 async function pinLink(page, link) {
-  await expect(link).toBeVisible();
+  await link.click({ trial: true });
   const href = await link.getAttribute("href");
   expect(href).toBeTruthy();
   return page.locator(`a[href=${JSON.stringify(href)}]`).first();
@@ -44,7 +44,9 @@ async function pinLink(page, link) {
 
 async function openProfile(page, link) {
   const before = ((await page.locator("main h1").textContent()) ?? "").trim();
-  await expect(link).toBeVisible();
+  // Playwright's actionability checks (visible, stable, enabled, not covered),
+  // then the DOM click, which no layout shift can redirect.
+  await link.click({ trial: true });
   await link.evaluate((anchor) => anchor.click());
   await page.waitForURL(/\/bands?\//);
   // Poll until the heading is BOTH non-empty and different. "Different" alone

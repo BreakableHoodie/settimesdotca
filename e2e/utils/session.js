@@ -21,31 +21,39 @@ import { ADMIN_LOGIN_LOCK, ADMIN_STORAGE_STATE, TOTP_LEDGER } from "./paths";
 // so only a holder that died mid-login has its lock broken.
 const ADMIN_LOGIN_LOCK_STALE_MS = 120_000;
 
+// Every form login in the suite goes through this (loginAsAdmin, auth.setup,
+// login.spec): a second login voids the first's pending 2FA challenge, so two
+// at once fail with "Invalid or expired MFA token". Time spent queued is not
+// the test's own work: allow for it BEFORE queueing (a test that times out in
+// the queue can no longer be extended), then charge only the actual wait.
+export const withAdminLoginLock = async (fn) => {
+  const ownTimeout = test.info().timeout;
+  test.info().setTimeout(ownTimeout + ADMIN_LOGIN_LOCK_STALE_MS);
+  const queuedAt = Date.now();
+  fs.mkdirSync(path.dirname(ADMIN_LOGIN_LOCK), { recursive: true });
+  return withFileLock(
+    ADMIN_LOGIN_LOCK,
+    async () => {
+      test.info().setTimeout(ownTimeout + (Date.now() - queuedAt));
+      return fn();
+    },
+    { staleMs: ADMIN_LOGIN_LOCK_STALE_MS },
+  );
+};
+
 export const loginAsAdmin = async (page) => {
   await page.goto("/admin");
   // Wait for either admin tab buttons (valid session) or login form (session expired/invalidated)
   await page.waitForSelector('button[role="tab"], input[type="email"]', { state: "visible", timeout: 15000 });
   if (await page.locator('input[type="email"]').isVisible()) {
-    // One form login at a time across every worker. While this one waited,
-    // another may have logged in and saved its session: try that first, and
-    // log in (revoking it) only if it does not work either.
-    // Time spent queued behind other workers' logins is not this test's work.
-    // Allow for it BEFORE queueing (a test that times out in the queue can no
-    // longer be extended), then charge only the wait that actually happened.
-    const ownTimeout = test.info().timeout;
-    test.info().setTimeout(ownTimeout + ADMIN_LOGIN_LOCK_STALE_MS);
-    const queuedAt = Date.now();
-    await withFileLock(
-      ADMIN_LOGIN_LOCK,
-      async () => {
-        test.info().setTimeout(ownTimeout + (Date.now() - queuedAt));
-        if (await adoptSavedAdminSession(page)) return;
-        await submitAdminLogin(page);
-        await page.waitForSelector('button[role="tab"]', { state: "visible", timeout: 15000 });
-        await saveAdminSession(page);
-      },
-      { staleMs: ADMIN_LOGIN_LOCK_STALE_MS },
-    );
+    // While this one waited, another worker may have logged in and saved its
+    // session: try that first, and log in (revoking it) only if it fails too.
+    await withAdminLoginLock(async () => {
+      if (await adoptSavedAdminSession(page)) return;
+      await submitAdminLogin(page);
+      await page.waitForSelector('button[role="tab"]', { state: "visible", timeout: 15000 });
+      await saveAdminSession(page);
+    });
   }
 };
 

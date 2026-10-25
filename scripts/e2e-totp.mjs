@@ -156,7 +156,13 @@ export async function nextE2eTotpCode(password, nowMs = Date.now(), { ledgerPath
     step = await withFileLock(`${ledgerPath}.lock`, () => {
       markTotpStepSpent(readLedgerStep(ledgerPath));
       const chosen = pick();
-      if (chosen !== null) fs.writeFileSync(ledgerPath, JSON.stringify({ lastStep: chosen }));
+      if (chosen !== null) {
+        // Temp file and rename: a process killed mid-write must not leave a
+        // truncated ledger, which persists and would fail every later run.
+        const temp = `${ledgerPath}.${process.pid}.tmp`;
+        fs.writeFileSync(temp, JSON.stringify({ lastStep: chosen }));
+        fs.renameSync(temp, ledgerPath);
+      }
       return chosen;
     });
   } else {

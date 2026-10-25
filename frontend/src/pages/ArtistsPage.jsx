@@ -151,7 +151,9 @@ function ShuffleBlock() {
           type="button"
           onClick={draw}
           disabled={loading}
-          aria-label={drawn ? 'Draw five more artists' : 'Draw five artists'}
+          // The name starts with the words on the button (WCAG 2.5.3, label in name):
+          // a voice user says what they see.
+          aria-label={loading ? undefined : drawn ? 'Draw again: five more artists' : 'Shuffle: draw five artists'}
           className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-accent-500/50 bg-accent-500/15 px-4 py-2 text-sm font-semibold text-accent-400 transition hover:bg-accent-500/25 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 disabled:opacity-60"
         >
           <Shuffle size={16} aria-hidden="true" />

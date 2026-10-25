@@ -423,8 +423,8 @@ describe('ArtistsPage — ShuffleBlock', () => {
     fireEvent.click(shuffleBtn)
     await screen.findByText('Redraw Band')
 
-    // After first draw the button aria-label becomes "Draw five more artists"
-    const drawAgainBtn = within(section).getByRole('button', { name: /draw five more artists/i })
+    // After the first draw the name becomes "Draw again: five more artists"
+    const drawAgainBtn = within(section).getByRole('button', { name: /^draw again: five more artists$/i })
     fireEvent.click(drawAgainBtn)
 
     await waitFor(() => {

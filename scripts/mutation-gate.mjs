@@ -702,6 +702,18 @@ export const MUTATIONS = [
     tests: ["functions/api/feeds/__tests__/ical.test.js"],
   },
   {
+    id: "planned-count-privacy-floor",
+    invariant:
+      "CLAUDE.md 'Schedule builds are per-event pseudonyms, anonymised 30 days after the event (#1245)' — an artist page never shows a planned count under PLANNED_COUNT_MIN (#1246)",
+    file: "functions/utils/plannedCount.js",
+    find: "count < PLANNED_COUNT_MIN",
+    replace: "count < 0",
+    tests: [
+      "functions/api/bands/__tests__/stats-planned-count.test.js",
+      "functions/utils/__tests__/plannedCount.test.js",
+    ],
+  },
+  {
     id: "outbound-fetch-fixed-address-only",
     invariant:
       "CLAUDE.md 'Outbound requests go only to fixed addresses (SSRF)' — every server fetch targets a hard-coded https URL or env.ASSETS",

@@ -17,6 +17,12 @@ on:
       - "e2e/**"
       - "wrangler.toml"
       - "playwright.config.js"
+      # Dependencies change what is built and deployed, and the Playwright
+      # that tests it (root lockfile), so a dependency-only PR runs this too.
+      - "package.json"
+      - "package-lock.json"
+      - "frontend/package.json"
+      - "frontend/package-lock.json"
       - "scripts/reset-e2e-db.mjs"
       - ".github/workflows/edge-e2e.yml"
 

@@ -6,7 +6,14 @@ on:
         paths:
             - 'e2e/accessibility/**'
             - 'e2e/visual-regression.spec.js'
+            - 'e2e/utils/**'
             - 'frontend/**'
+            # axe-core and Playwright are pinned in the ROOT lockfile. Without
+            # these, a dependency-only PR (#1379 moved axe-core 4.13 -> 4.14)
+            # skipped this job, and the new rule failed the next frontend PR.
+            - 'package.json'
+            - 'package-lock.json'
+            - 'playwright.config.js'
             - '.github/actions/e2e-env/**'
             - '.github/workflows/e2e-a11y-visual.yml'
     schedule:

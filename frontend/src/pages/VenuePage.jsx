@@ -206,7 +206,7 @@ export default function VenuePage() {
   const displayAddress = typeof venue?.address === 'string' ? venue.address.trim() : ''
 
   return (
-    <main id="main-content" tabIndex={-1} className="min-h-screen bg-gradient-dark">
+    <main id="main-content" tabIndex={-1} className="min-h-screen">
       {/* description/canonical/og:* /twitter:* AND JSON-LD are all SSR-owned
           for this route -- functions/venue/[id].js injects them server-side
           (with a structured PostalAddress and a broader sameAs than this

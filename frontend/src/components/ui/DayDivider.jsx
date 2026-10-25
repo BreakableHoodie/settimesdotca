@@ -32,7 +32,7 @@ const DayDivider = memo(function DayDivider({ date, dayNumber, doorsJson = null,
       role="separator"
       aria-label={`Day ${dayNumber}`}
     >
-      <span className="text-xs font-bold tracking-widest uppercase text-text-primary bg-surface border border-border px-3 py-1.5 rounded-full whitespace-nowrap">
+      <span className="text-xs font-bold tracking-widest uppercase text-text-primary bg-surface border border-border px-3 py-1.5 rounded-sm whitespace-nowrap">
         Day {dayNumber} &middot; {formatFestivalDate(date, 'long')}
       </span>
       {doorsTime && (

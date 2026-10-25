@@ -210,7 +210,7 @@ export default function Modal({
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex justify-center bg-black/80 backdrop-blur-xs animate-fade-in ${
+      className={`fixed inset-0 z-50 flex justify-center bg-black/80 animate-fade-in ${
         isSheet ? 'items-end p-0 sm:items-center sm:p-4' : 'items-center p-4'
       }`}
       onClick={handleBackdropClick}

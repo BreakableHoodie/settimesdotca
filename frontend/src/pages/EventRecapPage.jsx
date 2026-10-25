@@ -133,7 +133,7 @@ export default function EventRecapPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-linear-to-br from-bg-navy to-bg-purple">
+      <div className="flex items-center justify-center min-h-screen">
         <Loading />
       </div>
     )
@@ -141,7 +141,7 @@ export default function EventRecapPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple p-6">
+      <div className="min-h-screen p-6">
         <Alert variant="error">{error}</Alert>
       </div>
     )
@@ -149,7 +149,7 @@ export default function EventRecapPage() {
 
   if (!event || !stats || !Array.isArray(bands)) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple flex items-center justify-center p-4">
+      <div className="min-h-screen flex items-center justify-center p-4">
         <Alert variant="error">Event recap data is unavailable.</Alert>
       </div>
     )
@@ -175,11 +175,11 @@ export default function EventRecapPage() {
         <title>{event.name} — Event Recap | SetTimes.ca</title>
       </Helmet>
 
-      <main id="main-content" className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple px-4 py-10">
+      <main id="main-content" className="min-h-screen px-4 py-10">
         <div className="mx-auto max-w-5xl">
-          <header className="mb-8 rounded-2xl border border-border bg-surface p-6 shadow-xl backdrop-blur-xs">
+          <header className="mb-8 rounded-2xl border border-border bg-surface p-6 shadow-xl">
             <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-accent-400">
-              <span className="inline-flex items-center gap-2 rounded-full border border-accent-400/20 bg-accent-400/10 px-3 py-1">
+              <span className="inline-flex items-center gap-2 rounded-sm border border-accent-400/20 bg-accent-400/10 px-3 py-1">
                 <Archive size={14} aria-hidden="true" />
                 Archive
               </span>
@@ -391,7 +391,7 @@ export default function EventRecapPage() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {band.is_returning === false && (
-                        <span className="inline-block bg-accent-400/20 text-accent-400 text-xs font-medium px-2 py-0.5 rounded-full">
+                        <span className="inline-block bg-accent-400/20 text-accent-400 text-xs font-medium px-2 py-0.5 rounded-sm">
                           First timer
                         </span>
                       )}

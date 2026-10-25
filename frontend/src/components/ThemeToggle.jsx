@@ -58,7 +58,7 @@ export default function ThemeToggle() {
         <div
           role="group"
           aria-label="Colour theme"
-          className="absolute right-0 top-full z-50 mt-1 flex items-center gap-1 rounded-full border border-border bg-bg-purple/95 px-1.5 py-1 shadow-lg backdrop-blur-xs"
+          className="absolute right-0 top-full z-50 mt-1 flex items-center gap-1 rounded-lg border border-border bg-bg-purple px-1.5 py-1 shadow-lg"
         >
           {VALID_THEMES.map(name => {
             const isActive = name === theme

@@ -69,7 +69,7 @@ function ArtistCard({ artist }) {
   const socialLinks = getRowIcons(artist)
 
   return (
-    <div className="rounded-xl border border-border bg-gradient-card p-4 transition hover:border-accent-400/50">
+    <div className="rounded-xl border border-border bg-surface p-4 transition hover:border-accent-400/50">
       <Link
         to={buildBandProfileHref(artist.name)}
         className="flex min-w-0 items-center gap-4 rounded-lg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
@@ -149,7 +149,7 @@ function ShuffleBlock() {
           onClick={draw}
           disabled={loading}
           aria-label={drawn ? 'Draw five more artists' : 'Draw five artists'}
-          className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-accent-500/50 bg-accent-500/15 px-4 py-2 text-sm font-semibold text-accent-400 transition hover:bg-accent-500/25 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 disabled:opacity-60"
+          className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-accent-500/50 bg-accent-500/15 px-4 py-2 text-sm font-semibold text-accent-400 transition hover:bg-accent-500/25 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 disabled:opacity-60"
         >
           <Shuffle size={16} aria-hidden="true" />
           {loading ? 'Drawing…' : drawn ? 'Draw again' : 'Shuffle'}
@@ -170,7 +170,7 @@ function ShuffleBlock() {
             return (
               <li
                 key={artist.id}
-                className="rounded-lg border border-border bg-gradient-card transition hover:border-accent-400/50"
+                className="rounded-lg border border-border bg-surface transition hover:border-accent-400/50"
               >
                 {/* Name + meta: link to profile. Separate from listen so no <a> nests inside <a>. */}
                 <Link
@@ -280,7 +280,7 @@ function PlatformFilterChips({ allArtists, activeFilters, onToggle }) {
             type="button"
             aria-pressed={pressed}
             onClick={() => onToggle(key)}
-            className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 ${
+            className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-semibold transition focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 ${
               pressed
                 ? 'border-accent-400 bg-accent-500/20 text-accent-400'
                 : 'border-border bg-surface text-text-secondary hover:border-accent-400/50 hover:text-text-primary'
@@ -296,7 +296,7 @@ function PlatformFilterChips({ allArtists, activeFilters, onToggle }) {
         <button
           type="button"
           onClick={() => onToggle(null)}
-          className="inline-flex min-h-[36px] items-center rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-text-tertiary transition hover:border-accent-400/50 hover:text-text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
+          className="inline-flex min-h-[36px] items-center rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-text-tertiary transition hover:border-accent-400/50 hover:text-text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
         >
           Clear filters
         </button>
@@ -389,7 +389,7 @@ export default function ArtistsPage() {
       : artists.filter(artist => activeFilters.every(key => (artist.link_fields || []).includes(key)))
 
   return (
-    <main id="main-content" tabIndex={-1} className="min-h-screen bg-gradient-dark">
+    <main id="main-content" tabIndex={-1} className="min-h-screen">
       {/* Identity meta (canonical/og:* /description) is SSR-owned for this route
           -- functions/utils/staticPageMeta.js's STATIC_PAGES["/artists"] entry
           injects it server-side. Declaring it here too would duplicate it on
@@ -432,7 +432,7 @@ export default function ArtistsPage() {
             onChange={e => setQuery(e.target.value)}
             placeholder="Search artists by name or genre…"
             aria-label="Search artists by name or genre"
-            className="min-h-[44px] w-full rounded-full border border-border bg-bg-purple/60 py-3 pl-10 pr-4 text-text-primary placeholder:text-text-tertiary focus:border-accent-400 focus:outline-hidden"
+            className="min-h-[44px] w-full rounded-md border border-border bg-bg-purple/60 py-3 pl-10 pr-4 text-text-primary placeholder:text-text-tertiary focus:border-accent-400 focus:outline-hidden"
           />
         </div>
 
@@ -479,7 +479,7 @@ export default function ArtistsPage() {
                   type="button"
                   onClick={handleLoadMore}
                   disabled={loadingMore}
-                  className="min-h-[44px] rounded-full border border-accent-500/50 bg-accent-500/15 px-6 py-3 font-semibold text-accent-400 transition hover:bg-accent-500/25 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 disabled:opacity-60"
+                  className="min-h-[44px] rounded-md border border-accent-500/50 bg-accent-500/15 px-6 py-3 font-semibold text-accent-400 transition hover:bg-accent-500/25 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 disabled:opacity-60"
                 >
                   {loadingMore ? 'Loading…' : 'Load more'}
                 </button>

@@ -19,7 +19,7 @@ function VenueCard({ venue }) {
   return (
     <Link
       to={`/venue/${venue.id}`}
-      className="flex items-center gap-4 rounded-xl border border-border bg-gradient-card p-4 transition hover:scale-[1.01] hover:border-accent-400/50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
+      className="flex items-center gap-4 rounded-xl border border-border bg-surface p-4 transition hover:scale-[1.01] hover:border-accent-400/50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
     >
       <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-accent-500/20 text-accent-400">
         <MapPin size={22} aria-hidden="true" />
@@ -91,7 +91,7 @@ export default function VenuesPage() {
   }
 
   return (
-    <main id="main-content" tabIndex={-1} className="min-h-screen bg-gradient-dark">
+    <main id="main-content" tabIndex={-1} className="min-h-screen">
       {/* Identity meta (canonical/og:* /description) is SSR-owned for this route
           -- functions/utils/staticPageMeta.js's STATIC_PAGES["/venues"] entry
           injects it server-side. Declaring it here too would duplicate it on
@@ -130,7 +130,7 @@ export default function VenuesPage() {
             onChange={e => setQuery(e.target.value)}
             placeholder="Search venues by name or city…"
             aria-label="Search venues by name or city"
-            className="min-h-[44px] w-full rounded-full border border-border bg-bg-purple/60 py-3 pl-10 pr-4 text-text-primary placeholder:text-text-tertiary focus:border-accent-400 focus:outline-hidden"
+            className="min-h-[44px] w-full rounded-md border border-border bg-bg-purple/60 py-3 pl-10 pr-4 text-text-primary placeholder:text-text-tertiary focus:border-accent-400 focus:outline-hidden"
           />
         </div>
 
@@ -155,7 +155,7 @@ export default function VenuesPage() {
                   type="button"
                   onClick={handleLoadMore}
                   disabled={loadingMore}
-                  className="min-h-[44px] rounded-full border border-accent-500/50 bg-accent-500/15 px-6 py-3 font-semibold text-accent-400 transition hover:bg-accent-500/25 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 disabled:opacity-60"
+                  className="min-h-[44px] rounded-md border border-accent-500/50 bg-accent-500/15 px-6 py-3 font-semibold text-accent-400 transition hover:bg-accent-500/25 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 disabled:opacity-60"
                 >
                   {loadingMore ? 'Loading…' : 'Load more'}
                 </button>

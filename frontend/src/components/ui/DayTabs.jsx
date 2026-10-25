@@ -44,7 +44,7 @@ const DayTabs = memo(function DayTabs({ days, activeDayNumber, onSelectDay, clas
     <div
       role="tablist"
       aria-label="Festival day"
-      className={`inline-flex items-center gap-1 overflow-x-auto rounded-full border border-border bg-surface p-1 ${className}`.trim()}
+      className={`inline-flex items-center gap-1 overflow-x-auto rounded-lg border border-border bg-surface p-1 ${className}`.trim()}
     >
       {days.map((date, index) => {
         const dayNumber = index + 1
@@ -61,7 +61,7 @@ const DayTabs = memo(function DayTabs({ days, activeDayNumber, onSelectDay, clas
             tabIndex={isActive ? 0 : -1}
             onClick={() => onSelectDay(dayNumber)}
             onKeyDown={event => handleKeyDown(event, index)}
-            className={`min-h-[44px] min-w-[44px] whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-semibold transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 ${
+            className={`min-h-[44px] min-w-[44px] whitespace-nowrap rounded-md px-4 py-1.5 text-sm font-semibold transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 ${
               isActive
                 ? 'bg-accent-500 text-bg-navy'
                 : 'text-text-tertiary hover:bg-surface-hover hover:text-text-primary'

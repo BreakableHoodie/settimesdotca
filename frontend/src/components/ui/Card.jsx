@@ -22,7 +22,8 @@ export default function Card({
   ...props
 }) {
   // Base classes
-  const baseClasses = 'bg-bg-dark border border-border rounded-xl shadow-base transition-all duration-base'
+  const baseClasses =
+    'bg-bg-dark border border-border rounded-xl shadow-base transition-[box-shadow,transform] duration-base'
 
   // Variant styles
   const variantClasses = {
@@ -30,8 +31,8 @@ export default function Card({
     elevated: 'shadow-md',
     outlined: 'bg-transparent',
     flat: 'shadow-none',
-    gradient: 'bg-gradient-card backdrop-blur-xs',
-    glow: 'bg-gradient-card shadow-glow-accent',
+    gradient: 'bg-surface',
+    glow: 'bg-surface shadow-glow-accent',
   }
 
   // Padding styles

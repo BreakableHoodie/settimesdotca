@@ -11,7 +11,7 @@ export default function TermsPage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple">
+    <div className="min-h-screen">
       {/* description/canonical are SSR-owned for this route --
           functions/utils/staticPageMeta.js's STATIC_PAGES["/terms"] entry
           injects them server-side; declaring them here too would duplicate

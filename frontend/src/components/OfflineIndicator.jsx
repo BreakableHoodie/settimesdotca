@@ -21,8 +21,10 @@ export default function OfflineIndicator() {
   if (!isOffline) return null
 
   return (
+    // The same 20% warning tint, mixed into the opaque ground: it floats over
+    // the lineup, so a translucent fill let the sets show through the text.
     <div
-      className="fixed left-4 right-4 z-50 flex items-center gap-2 rounded-lg border border-warning-500/50 bg-warning-500/20 px-4 py-3 text-text-primary shadow-lg"
+      className="fixed left-4 right-4 z-50 flex items-center gap-2 rounded-lg border border-warning-500/50 bg-[color-mix(in_srgb,var(--color-warning-500)_20%,var(--color-bg-navy))] px-4 py-3 text-text-primary shadow-lg"
       style={{ bottom: PRIVACY_BANNER_OFFSET }}
     >
       <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">

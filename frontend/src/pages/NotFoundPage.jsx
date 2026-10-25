@@ -12,7 +12,7 @@ export default function NotFoundPage() {
   }, [])
 
   return (
-    <div className="min-h-screen flex flex-col bg-linear-to-br from-bg-navy to-bg-purple">
+    <div className="min-h-screen flex flex-col">
       <Helmet>
         <title>Page Not Found | SetTimes</title>
       </Helmet>
@@ -27,7 +27,7 @@ export default function NotFoundPage() {
           </p>
           <Link
             to="/"
-            className="inline-block px-6 py-3 bg-accent-500 text-bg-navy font-semibold rounded-lg hover:brightness-110 transition-all"
+            className="inline-block px-6 py-3 bg-accent-500 text-bg-navy font-semibold rounded-lg hover:brightness-110 transition-[filter]"
           >
             Back to Events
           </Link>

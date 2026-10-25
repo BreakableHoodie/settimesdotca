@@ -192,14 +192,26 @@ This design system establishes the visual foundation for SetTimes.ca, ensuring c
 
 ## Border Radius
 
+Tailwind's own scale (`frontend/src/index.css`, #1248). An inflated scale (md 12px, lg 16px) once made every short element read as a pill whatever class it used.
+
 ```css
---radius-sm:   0.25rem  /* 4px - small elements */
---radius-base: 0.5rem   /* 8px - buttons, inputs */
---radius-md:   0.75rem  /* 12px - cards */
---radius-lg:   1rem     /* 16px - modals */
---radius-xl:   1.5rem   /* 24px - hero elements */
---radius-full: 9999px   /* Circular */
+--radius-sm:   0.25rem   /* 4px - labels and tags */
+--radius:      0.25rem   /* 4px - `rounded` */
+--radius-md:   0.375rem  /* 6px - controls: buttons, inputs, selects, chips */
+--radius-lg:   0.5rem    /* 8px - cards, segmented-control containers */
+--radius-xl:   0.75rem   /* 12px - modals, large panels */
+--radius-full: 9999px    /* only things that are round */
 ```
+
+**Shape encodes meaning** (enforced on public pages by `frontend/src/__tests__/publicShapeLanguage.test.js`):
+
+| What it is | Radius | Examples |
+|---|---|---|
+| A thing that is itself round | `rounded-full` | photos and initials, icon-only round buttons, dots, count badges, progress bars |
+| A control you press or type in | `rounded-md` | text buttons, inputs, selects, segments, filter chips, day tabs |
+| A label that describes something | `rounded-sm` | status badges (Upcoming, Cancelled), genre tags, day labels |
+
+Round text (a pill) is never used. No decorative blur, no decorative gradients: a gradient is allowed only as a scrim that keeps text readable over a photo.
 
 ---
 
@@ -233,7 +245,7 @@ This design system establishes the visual foundation for SetTimes.ca, ensuring c
 - Background: `--color-accent-500`
 - Text: White
 - Padding: `12px 24px` (base), `10px 20px` (sm), `14px 28px` (lg)
-- Border radius: `--radius-base`
+- Border radius: `--radius-md`
 - Hover: `--color-accent-600`
 - Focus: Outline with `--shadow-glow-accent`
 
@@ -261,7 +273,7 @@ This design system establishes the visual foundation for SetTimes.ca, ensuring c
 - Border: `1px solid rgba(255, 255, 255, 0.1)`
 - Text: `--color-text-primary`
 - Padding: `10px 16px`
-- Border radius: `--radius-base`
+- Border radius: `--radius-md`
 - Focus: Border `--color-primary-500`, shadow `--shadow-glow-primary`
 
 **Select**
@@ -279,20 +291,20 @@ This design system establishes the visual foundation for SetTimes.ca, ensuring c
 **Base Card**
 - Background: `--color-bg-dark`
 - Border: `1px solid rgba(255, 255, 255, 0.1)`
-- Border radius: `--radius-md`
+- Border radius: `--radius-lg`
 - Padding: `--space-6`
 - Shadow: `--shadow-base`
 
 **Elevated Card (Hover)**
 - Shadow: `--shadow-lg`
 - Transform: `translateY(-2px)`
-- Transition: `all 200ms ease`
+- Transition: `box-shadow 200ms ease, transform 200ms ease` (never `all`)
 
 ### Badges
 
 **Status Badge**
 - Padding: `4px 12px`
-- Border radius: `--radius-full`
+- Border radius: `--radius-sm` (a label, not a pill; see Border Radius)
 - Font size: `--text-xs`
 - Font weight: `--font-medium`
 - Uppercase: true
@@ -306,13 +318,12 @@ This design system establishes the visual foundation for SetTimes.ca, ensuring c
 ### Modals
 
 **Modal Overlay**
-- Background: `rgba(0, 0, 0, 0.8)`
-- Backdrop blur: `8px`
+- Background: `rgba(0, 0, 0, 0.8)` (no blur)
 
 **Modal Content**
 - Background: `--color-bg-darker`
 - Border: `1px solid rgba(255, 255, 255, 0.1)`
-- Border radius: `--radius-lg`
+- Border radius: `--radius-xl`
 - Max width: `600px` (default), `900px` (large)
 - Padding: `--space-8`
 - Shadow: `--shadow-xl`
@@ -444,12 +455,12 @@ All text must meet WCAG 2.1 AA standards:
 
 ```jsx
 // Primary
-<button className="px-6 py-3 bg-accent-500 text-white rounded-lg font-medium hover:bg-accent-600 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:ring-offset-2 focus:ring-offset-bg-navy transition-colors">
+<button className="px-6 py-3 bg-accent-500 text-white rounded-md font-medium hover:bg-accent-600 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:ring-offset-2 focus:ring-offset-bg-navy transition-colors">
   Create Event
 </button>
 
 // Secondary
-<button className="px-6 py-3 border-2 border-text-secondary text-text-primary rounded-lg font-medium hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors">
+<button className="px-6 py-3 border-2 border-text-secondary text-text-primary rounded-md font-medium hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors">
   Cancel
 </button>
 ```
@@ -464,7 +475,7 @@ All text must meet WCAG 2.1 AA standards:
   <input
     type="text"
     id="event-name"
-    className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-text-primary placeholder-text-tertiary focus:border-primary-500 focus:ring-2 focus:ring-primary-500/50 focus:outline-none transition-colors"
+    className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-md text-text-primary placeholder-text-tertiary focus:border-primary-500 focus:ring-2 focus:ring-primary-500/50 focus:outline-none transition-colors"
     placeholder="Long Weekend Band Crawl Vol. 6"
   />
 </div>
@@ -473,7 +484,7 @@ All text must meet WCAG 2.1 AA standards:
 ### Card
 
 ```jsx
-<div className="bg-bg-dark border border-white/10 rounded-xl p-6 shadow-base hover:shadow-lg transition-shadow">
+<div className="bg-bg-dark border border-white/10 rounded-lg p-6 shadow-base hover:shadow-lg transition-shadow">
   <h3 className="text-xl font-bold text-text-primary mb-2">Event Title</h3>
   <p className="text-text-secondary">Event description goes here...</p>
 </div>

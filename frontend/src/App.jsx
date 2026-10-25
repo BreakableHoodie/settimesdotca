@@ -785,7 +785,7 @@ function App() {
           </p>
           <button
             onClick={() => window.location.reload()}
-            className="px-6 py-3 bg-accent-500 text-bg-navy font-semibold rounded-lg hover:brightness-110 transition-all"
+            className="px-6 py-3 bg-accent-500 text-bg-navy font-semibold rounded-lg hover:brightness-110 transition-[filter]"
           >
             Try Again
           </button>
@@ -805,7 +805,7 @@ function App() {
           <p className="text-accent-400 mb-6">{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="px-6 py-3 bg-accent-500 text-bg-navy font-semibold rounded-lg hover:brightness-110 transition-all"
+            className="px-6 py-3 bg-accent-500 text-bg-navy font-semibold rounded-lg hover:brightness-110 transition-[filter]"
           >
             Refresh Page
           </button>
@@ -820,7 +820,7 @@ function App() {
   const posterVariables = eventPageStyle(eventData, LIGHT_THEMES.has(theme))
   const posterStyle = posterVariables && {
     ...posterVariables,
-    background: 'linear-gradient(180deg, var(--color-bg-navy) 0%, var(--color-bg-purple) 100%)',
+    background: 'var(--color-bg-navy)',
     color: 'var(--color-text-primary)',
   }
 
@@ -854,7 +854,7 @@ function App() {
       </Helmet>
       <OfflineIndicator />
       {isArchived ? (
-        <header className="sticky top-0 z-50 border-b-2 border-border bg-bg-navy/90 backdrop-blur-xs px-4 py-3">
+        <header className="sticky top-0 z-50 border-b-2 border-border bg-bg-navy px-4 py-3">
           <div className="container mx-auto max-w-6xl flex items-center justify-between">
             <Link
               to="/"
@@ -1178,7 +1178,7 @@ function App() {
       />
       {scheduleToast && (
         <div className="fixed bottom-4 left-1/2 z-50 w-full max-w-md -translate-x-1/2 px-4">
-          <div className="rounded-xl border border-border bg-bg-purple/95 px-4 py-3 shadow-xl backdrop-blur-xs">
+          <div className="rounded-xl border border-border bg-bg-purple px-4 py-3 shadow-xl">
             <div className="flex items-center justify-between gap-3">
               <p className="text-sm text-text-secondary">{scheduleToast.message}</p>
               {scheduleToast.type === 'undo' ? (

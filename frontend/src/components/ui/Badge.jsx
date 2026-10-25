@@ -22,7 +22,7 @@ const Badge = memo(function Badge({
   ...props
 }) {
   // Base classes
-  const baseClasses = 'inline-flex items-center font-medium rounded-full uppercase tracking-wide'
+  const baseClasses = 'inline-flex items-center font-medium rounded-sm uppercase tracking-wide'
 
   // Variant styles
   const variantClasses = {

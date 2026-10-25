@@ -431,7 +431,7 @@ export default function BandProfilePage() {
           owns no identity meta on this route. */}
 
       {/* Sticky Navigation Header */}
-      <header className="sticky top-0 z-50 border-b border-text-primary/10 bg-bg-navy/95 backdrop-blur-xs">
+      <header className="sticky top-0 z-50 border-b border-text-primary/10 bg-bg-navy">
         <div className="container mx-auto px-4 max-w-6xl">
           <div className="flex items-center justify-between h-14">
             <Link to="/" className="text-xl font-bold font-display hover:opacity-80 transition-opacity">
@@ -470,7 +470,7 @@ export default function BandProfilePage() {
         <div className="bg-bg-purple rounded-xl border-2 border-accent-500/30 overflow-hidden mb-6 shadow-xl">
           {/* Band Photo with Overlay */}
           {profile.photo_url ? (
-            <div className="relative h-72 overflow-hidden bg-linear-to-b from-bg-navy via-bg-purple to-bg-navy sm:h-80">
+            <div className="relative h-72 overflow-hidden bg-bg-navy sm:h-80">
               <img
                 src={profile.photo_url}
                 alt={profile.photo_alt_text || profile.name}
@@ -482,6 +482,7 @@ export default function BandProfilePage() {
                 fetchPriority="high"
                 className={`h-full w-full object-cover opacity-60 ${BAND_PHOTO_CROP}`}
               />
+              {/* Scrim, not decoration: a dark gradient over the photo so the white name and tags on it stay legible. */}
               <div className="absolute inset-0 bg-linear-to-t from-black/85 via-black/35 to-transparent" />
               {/* Page-level action lives in the header, not beside the bio —
                   the old placement floated awkwardly above the bio on mobile
@@ -502,7 +503,7 @@ export default function BandProfilePage() {
                   }
                   title={profile.name}
                   text={`${profile.name} on SetTimes`}
-                  className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-white/30 bg-black/50 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-black/70 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white"
+                  className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-white/30 bg-black/70 px-4 py-2 text-sm font-semibold text-white transition hover:bg-black/90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white"
                 />
               </div>
               <div className="absolute inset-x-0 bottom-0 p-6">
@@ -520,7 +521,7 @@ export default function BandProfilePage() {
                     </span>
                   )}
                   {profile.origin && (
-                    <span className="inline-flex items-center gap-1.5 rounded-lg border-2 border-white/40 bg-black/40 px-3.5 py-2 text-sm font-bold text-white shadow-lg backdrop-blur-xs">
+                    <span className="inline-flex items-center gap-1.5 rounded-lg border-2 border-white/40 bg-black/60 px-3.5 py-2 text-sm font-bold text-white shadow-lg">
                       <MapPin size={14} className="shrink-0" aria-hidden="true" />
                       {profile.origin}
                     </span>
@@ -529,7 +530,7 @@ export default function BandProfilePage() {
               </div>
             </div>
           ) : (
-            <div className="bg-linear-to-br from-bg-purple to-bg-navy p-6 sm:p-8">
+            <div className="bg-bg-purple p-6 sm:p-8">
               {/* Share sits top-right of the header on both variants — see the
                   photo-variant comment above. */}
               <div className="flex items-start justify-between gap-4">
@@ -603,7 +604,7 @@ export default function BandProfilePage() {
                       href={safeInstagramHref(profile.social.instagram)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-linear-to-br from-purple-500 to-pink-500 px-4 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-pink-300 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple"
+                      className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-pink-500 px-4 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-pink-300 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple"
                       onClick={() => trackSocialClick(profile.id, 'instagram')}
                     >
                       <InstagramIcon size={16} className="shrink-0" />
@@ -663,7 +664,7 @@ export default function BandProfilePage() {
                       href={safeExternalHref(profile.social.apple_music)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-linear-to-br from-pink-700 to-red-700 px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-pink-300 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple"
+                      className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-red-700 px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-pink-300 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-purple"
                       onClick={() => trackSocialClick(profile.id, 'apple_music')}
                     >
                       <AppleMusicIcon size={16} className="shrink-0" />
@@ -751,7 +752,7 @@ export default function BandProfilePage() {
                 <li key={mate.id}>
                   <Link
                     to={`/band/${mate.id}`}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-gradient-card px-3 py-1.5 text-sm text-text-secondary transition hover:border-accent-400/50 hover:text-text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
+                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-text-secondary transition hover:border-accent-400/50 hover:text-text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
                   >
                     {mate.name}
                     <span
@@ -859,7 +860,7 @@ export default function BandProfilePage() {
                                 )}
                               </h3>
                               {isCancelled && (
-                                <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-500/25 px-2.5 py-1 text-xs font-semibold text-text-primary">
+                                <span className="inline-flex items-center gap-1.5 rounded-sm bg-warning-500/25 px-2.5 py-1 text-xs font-semibold text-text-primary">
                                   <TriangleAlert size={14} aria-hidden="true" />
                                   Cancelled
                                 </span>
@@ -969,7 +970,7 @@ export default function BandProfilePage() {
                                 )}
                               </h3>
                               {isCancelled && (
-                                <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-500/25 px-2.5 py-1 text-xs font-semibold text-text-primary">
+                                <span className="inline-flex items-center gap-1.5 rounded-sm bg-warning-500/25 px-2.5 py-1 text-xs font-semibold text-text-primary">
                                   <TriangleAlert size={14} aria-hidden="true" />
                                   Cancelled
                                 </span>

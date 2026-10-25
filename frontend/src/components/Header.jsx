@@ -26,10 +26,10 @@ function Header({ eventName, eventDate, selectedVenues, venues = [] }) {
     paddingTop: `${headerPadding}px`,
     paddingBottom: `${headerPadding}px`,
     boxShadow: `0 8px 24px rgba(4, 8, 16, ${0.14 * scrollProgress})`,
-    // Driven from --color-bg-navy (was a hardcoded rgba(8,16,32,…) near-black
-    // triplet) so the sticky header composites correctly on light themes too —
-    // the hardcoded value put the title at ~2.6:1 on daybreak/silver-lining (#617).
-    backgroundColor: `color-mix(in srgb, var(--color-bg-navy) ${Math.round((0.65 + 0.25 * scrollProgress) * 100)}%, transparent)`,
+    // Opaque --color-bg-navy (#1248). It was 65-90% opaque behind a blur; with
+    // the blur gone, any transparency shows the lineup scrolling through it.
+    // A token, never a fixed colour, so light themes keep their contrast (#617).
+    backgroundColor: 'var(--color-bg-navy)',
   }
   const titleScale = 1 - 0.12 * scrollProgress
   const fadeProgress = Math.min(1, scrollProgress * 1.75)
@@ -88,7 +88,7 @@ function Header({ eventName, eventDate, selectedVenues, venues = [] }) {
 
   return (
     <header
-      className="sticky top-0 z-50 border-b border-accent-500/30 transition-[padding,box-shadow,background-color] duration-300 ease-out bg-linear-to-b from-bg-navy to-bg-purple backdrop-blur-xs"
+      className="sticky top-0 z-50 border-b border-accent-500/30 transition-[padding,box-shadow,background-color] duration-300 ease-out bg-bg-navy"
       style={headerStyle}
     >
       <div className="container mx-auto max-w-(--breakpoint-2xl) px-4">

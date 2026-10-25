@@ -66,7 +66,7 @@ export default function PrivacyBanner() {
   return (
     <div
       ref={bannerRef}
-      className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-bg-navy/95 px-4 py-3 text-sm text-text-secondary backdrop-blur-sm"
+      className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-bg-navy px-4 py-3 text-sm text-text-secondary"
     >
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p>
@@ -78,7 +78,7 @@ export default function PrivacyBanner() {
         <button
           type="button"
           onClick={handleDismiss}
-          className="inline-flex min-h-[44px] items-center justify-center rounded-full border border-accent-500/60 px-4 py-1 text-accent-400 transition hover:border-accent-400 hover:text-text-primary"
+          className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-accent-500/60 px-4 py-1 text-accent-400 transition hover:border-accent-400 hover:text-text-primary"
         >
           Got it
         </button>

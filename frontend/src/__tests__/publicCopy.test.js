@@ -42,7 +42,8 @@ function walk(dir) {
 // the same character, so all are the same defect. (Arrows are above U+00FF,
 // so they have no `\x` spelling.)
 const MIDDLE_DOT = /·|&middot;|&#0*183;|&#x0*b7;|\\u00b7|\\u\{0*b7\}|\\xb7/i
-const ARROW = /[←→]|&[lr]arr;|&#0*859[24];|&#x0*219[02];|\\u219[02]|\\u\{0*219[02]\}/i
+const ARROW =
+  /[←→]|&(?:[lr]arr|(?:long|short)?(?:left|right)arrow);|&#0*859[24];|&#x0*219[02];|\\u219[02]|\\u\{0*219[02]\}/i
 
 // Replace every comment with spaces (newlines kept so line numbers hold),
 // leaving strings, template literals and JSX text alone. A comment marker
@@ -154,6 +155,10 @@ describe('plain copy on the public site (#1248)', () => {
 
     it('arrow in every spelling', () => {
       for (const bad of [
+        'View schedule &rightarrow;',
+        '&leftarrow; Back',
+        '&LongRightArrow; next',
+
         '← Back',
         'View schedule →',
         '&rarr;',

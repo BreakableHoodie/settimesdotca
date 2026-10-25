@@ -41,29 +41,42 @@ function walk(dir, extension = /\.(js|jsx)$/) {
 // `transition: all` (CodeRabbit, #1371). Gradients are deliberately NOT scanned
 // in CSS: index.css holds every theme's gradient tokens and the skeleton
 // shimmer, so that rule would be mostly allowlist.
-const CSS_BLUR = /backdrop-filter\s*:|backdrop-blur/
-// `transition` animates `all` when an item names `all` OR names no property at
-// all (`transition: 200ms ease`), and an item may be any entry of a
-// comma-separated list (CodeRabbit, #1371). So each item is parsed: its first
-// token must be a property name, not a time, a timing function or `all`.
-const TIMING =
-  /^(?:-?[\d.]+m?s|ease(?:-in|-out|-in-out)?|linear|step-start|step-end|steps\(|cubic-bezier\(|linear\(|initial|inherit|unset|revert|none)/
-function animatesAll(line) {
-  if (/(?<![\w-])transition-all(?![\w-])/.test(line)) return true
-  const declaration = /(?:^|[;{\s])transition\s*:\s*([^;}]+)/.exec(line)
-  if (!declaration) return /transition-property\s*:\s*[^;]*\ball\b/.test(line)
-  return declaration[1].split(',').some(item => {
-    const first = item.trim().split(/\s+/)[0] ?? ''
-    return first === 'all' || first === '' || TIMING.test(first)
+// `transition` animates `all` when an item names `all`, or names no property
+// at all (`transition: 200ms ease`), and that item may be any entry of a
+// comma-separated list. The grammar lets the property come anywhere in an item
+// (`200ms opacity` is valid) and allows `none`, so each item is searched for a
+// property token rather than read by position (CodeRabbit, #1371).
+const NOT_A_PROPERTY =
+  /^(?:-?[\d.]+m?s|ease(?:-in|-out|-in-out)?|linear|step-start|step-end|steps\(.*|cubic-bezier\(.*|linear\(.*|allow-discrete|normal)$/
+function transitionAnimatesAll(value) {
+  const v = value.trim()
+  if (/^(?:none|initial|inherit|unset|revert(?:-layer)?)$/.test(v)) return false
+  return v.split(',').some(item => {
+    const property = item
+      .trim()
+      .split(/\s+/)
+      .find(token => token && !NOT_A_PROPERTY.test(token))
+    return property === undefined || property === 'all'
   })
 }
 
+// One finding per declaration, with the line it starts on: the whole sheet is
+// scanned, so a declaration broken across lines is still read as one.
 function scanCss(relPath, source) {
+  const lineOf = index => source.slice(0, index).split('\n').length
   const found = []
-  source.split('\n').forEach((text, i) => {
-    if (CSS_BLUR.test(text)) found.push(`${relPath}:${i + 1} blur`)
-    if (animatesAll(text)) found.push(`${relPath}:${i + 1} transition: all`)
-  })
+  for (const m of source.matchAll(/backdrop-filter\s*:|backdrop-blur/g)) {
+    found.push(`${relPath}:${lineOf(m.index)} blur`)
+  }
+  for (const m of source.matchAll(/(?<![\w-])transition-all(?![\w-])/g)) {
+    found.push(`${relPath}:${lineOf(m.index)} transition: all`)
+  }
+  for (const m of source.matchAll(/(?<![\w-])transition\s*:\s*([^;}]+)/g)) {
+    if (transitionAnimatesAll(m[1])) found.push(`${relPath}:${lineOf(m.index)} transition: all`)
+  }
+  for (const m of source.matchAll(/(?<![\w-])transition-property\s*:\s*([^;}]+)/g)) {
+    if (/(?:^|,)\s*all\s*(?:,|$)/.test(m[1].trim())) found.push(`${relPath}:${lineOf(m.index)} transition: all`)
+  }
   return found
 }
 
@@ -207,26 +220,31 @@ describe('public site shape language (#1248)', () => {
     })
 
     it('stylesheet blur and transition: all', () => {
-      expect(CSS_BLUR.test('  backdrop-filter: blur(8px);')).toBe(true)
-      expect(CSS_BLUR.test('  filter: blur(2px);')).toBe(false)
+      const flags = css => scanCss('x.css', css).length > 0
       for (const bad of [
-        '  transition: all 200ms ease;',
-        '  transition: 200ms ease;', // no property named: that is `all`
-        '  transition: opacity 200ms, all 1s;', // `all` later in the list
-        '  transition: opacity 200ms, 300ms linear;', // an unnamed later item
-        '  transition-property: all;',
-        '  @apply transition-all;',
+        '.a { backdrop-filter: blur(8px); }',
+        '.a { transition: all 200ms ease; }',
+        '.a { transition: 200ms ease; }', // no property named: that is `all`
+        '.a { transition: opacity 200ms, all 1s; }', // `all` later in the list
+        '.a { transition: opacity 200ms, 300ms linear; }', // an unnamed later item
+        '.a {\n  transition:\n    200ms ease;\n}', // a declaration across lines
+        '.a { transition-property: all; }',
+        '.a { @apply transition-all; }',
       ]) {
-        expect(animatesAll(bad), bad).toBe(true)
+        expect(flags(bad), bad).toBe(true)
       }
       for (const good of [
-        '  transition: box-shadow 200ms ease, transform 200ms ease;',
-        '  transition-property: opacity;',
-        '  transition-duration: 200ms;',
-        '  animation: shimmer 1.5s infinite;',
+        '.a { filter: blur(2px); }',
+        '.a { transition: box-shadow 200ms ease, transform 200ms ease; }',
+        '.a { transition: 200ms opacity; }', // property after the duration
+        '.a { transition: none; }',
+        '.a { transition-property: opacity, transform; }',
+        '.a { transition-duration: 200ms; }',
+        '.a { animation: shimmer 1.5s infinite; }',
       ]) {
-        expect(animatesAll(good), good).toBe(false)
+        expect(flags(good), good).toBe(false)
       }
+      expect(scanCss('x.css', '.a {}\n.b {\n  transition:\n    1s;\n}')).toEqual(['x.css:3 transition: all'])
     })
 
     it('see-through bars', () => {

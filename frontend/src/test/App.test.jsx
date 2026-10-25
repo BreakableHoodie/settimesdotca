@@ -461,8 +461,10 @@ describe('one control row (#1248)', () => {
     expect(screen.getByRole('button', { name: 'Filter' })).toBeInTheDocument()
   })
 
-  it('clears the genre filter and grouping when the fan moves to another event', async () => {
-    mockScheduleFetch({ bands: [punkAlpha, folkBeta] })
+  it('clears genre, grouping and finished sets when the fan moves to another event', async () => {
+    // Gamma has already ended at this pinned "now", so "Show finished sets" is offered.
+    mockScheduleFetch({ bands: [punkAlpha, folkBeta, { ...bandGammaPast, genre: 'Punk' }] })
+    window.localStorage.setItem(DEBUG_TIME_STORAGE_KEY, new Date('2030-06-15T18:00:00').toISOString())
     function GoToOther() {
       const navigate = useNavigate()
       return (
@@ -489,7 +491,8 @@ describe('one control row (#1248)', () => {
     const dialog = screen.getByRole('dialog', { name: 'Filter the lineup' })
     fireEvent.change(within(dialog).getByLabelText('Genre'), { target: { value: 'Punk' } })
     fireEvent.click(within(dialog).getByRole('radio', { name: 'Venue' }))
-    expect(screen.getByRole('button', { name: 'Filter, 2 active' })).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: /Show finished sets/ }))
+    expect(screen.getByRole('button', { name: 'Filter, 3 active' })).toBeInTheDocument()
     fireEvent.keyDown(document, { key: 'Escape' })
 
     // Same <App/> instance, new slug: nothing set on the last event carries over.

@@ -383,9 +383,11 @@ function App() {
     setView(stored.length > 0 ? 'mine' : 'all')
     setTimeFilter(getStoredTimeFilter(slug))
     setVenueFilter(null)
-    // Another event has other genres; a carried-over filter could empty its lineup.
+    // Every filter is per event: another event has other genres, and a filter
+    // carried over would count on its badge and could empty its lineup.
     setGenreFilter(null)
     setGroupBy('time')
+    setShowPast(false)
   }, [slug])
 
   useEffect(() => {

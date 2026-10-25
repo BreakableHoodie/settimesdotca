@@ -6,6 +6,7 @@ import { eventLocalFestivalToday } from "../../../utils/eventDay.js";
 import { publicEventStatusSql } from "../../../utils/eventVisibility.js";
 import { BAND_LINK_FIELD_KEYS } from "../../../utils/bandLinkFields.js";
 import { isCanonicalPositiveId } from "../../../utils/validation/ids.js";
+import { publicPlannedCount } from "../../../utils/plannedCount.js";
 
 /**
  * Public API: Get band profile with rich stats
@@ -116,6 +117,8 @@ export async function onRequestGet(context) {
         p.performance_date,
         p.notes,
         p.is_cancelled,
+        (SELECT COUNT(*) FROM schedule_builds sb
+          WHERE sb.event_id = p.event_id AND sb.performance_id = p.id) AS planned_count,
         v.id as venue_id,
         v.name as venue_name,
         v.address as venue_address,
@@ -288,6 +291,8 @@ export async function onRequestGet(context) {
         start_time: p.start_time,
         end_time: p.end_time,
         is_cancelled: p.is_cancelled,
+        // Aggregate-only and floored: null under PLANNED_COUNT_MIN or when cancelled.
+        planned_count: publicPlannedCount(p.planned_count, p.is_cancelled),
       })),
       past: pastPerformances.map((p) => ({
         id: p.performance_id,
@@ -305,6 +310,7 @@ export async function onRequestGet(context) {
         is_cancelled: p.is_cancelled,
         start_time: p.start_time,
         end_time: p.end_time,
+        planned_count: publicPlannedCount(p.planned_count, p.is_cancelled),
       })),
     };
 

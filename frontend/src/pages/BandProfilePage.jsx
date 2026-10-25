@@ -895,6 +895,11 @@ export default function BandProfilePage() {
                                 </span>
                               )}
                             </div>
+                            {typeof performance.planned_count === 'number' && (
+                              <p className="mt-2 text-sm text-text-secondary">
+                                {performance.planned_count} fans are planning to see this set
+                              </p>
+                            )}
                             {performance.notes && (
                               <p className="mt-2 text-sm italic text-text-tertiary">{performance.notes}</p>
                             )}
@@ -1011,6 +1016,11 @@ export default function BandProfilePage() {
                                 </span>
                               )}
                             </div>
+                            {typeof performance.planned_count === 'number' && (
+                              <p className="mt-2 text-sm text-text-secondary">
+                                {performance.planned_count} fans planned this set
+                              </p>
+                            )}
                             {performance.notes && (
                               <p className="mt-2 text-sm italic text-text-tertiary">{performance.notes}</p>
                             )}

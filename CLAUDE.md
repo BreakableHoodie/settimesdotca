@@ -471,6 +471,8 @@ Three things in `functions/scheduled/anonymize-schedule-builds.js` are load-bear
 - **Each rewrite carries `NOT EXISTS` for its label.** Labels are computed from a read. A concurrent run could otherwise give the same `anon:N` to two builders and merge them, with no error unless they shared a set.
 - **Eligibility is keyed on the event's last date, not its status.** An event moved back to draft after it ran must still be anonymised.
 
+**The public count (#1246).** An artist's page shows "N fans planned this set" per set, from `COUNT(*)` over `schedule_builds` for that event and performance (the unique index makes each row one planner; `anon:` rows count once each). Every value goes through `publicPlannedCount()` in `functions/utils/plannedCount.js`, which returns `null` for a cancelled set or a count under `PLANNED_COUNT_MIN` (3), so a count of 1 or 2 never leaves the server. `PrivacyPage.jsx` states the same "at least three": change the constant and the policy together. The floor is in the mutation gate. **The count is indicative, not audited:** `schedule/build` is unauthenticated and takes any well-formed `user_session`, so fabricated sessions can inflate it (about 30 a minute per IP under the `/api/schedule` limit). Padding past the floor reveals only that an anonymous person planned the set. A per-IP cap was rejected because it would undercount real fans sharing venue wifi. Never use this number for anything that needs to be trustworthy (payouts, rankings with stakes) without a server-issued identity first.
+
 The privacy policy's 30 days covers the live table. D1 Time Travel can hold earlier values for its own window, and the policy says so.
 
 ---

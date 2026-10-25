@@ -322,7 +322,7 @@ describe('select all', () => {
 
     // Select-all follows the lineup it acts on (below the last band), not a
     // menu above it.
-    fireEvent.click(screen.getByRole('button', { name: 'Add all 2 visible sets to My route' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add all 2 to My route' }))
 
     expect(await screen.findByRole('button', { name: 'Remove Alpha Wolves from my route' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Remove Beta Foxes from my route' })).toBeInTheDocument()
@@ -330,7 +330,7 @@ describe('select all', () => {
     await waitFor(() => {
       expect(getSelectedBands('test-event')).toEqual(['evt-alpha-101', 'evt-beta-202'])
     })
-    expect(screen.getByRole('button', { name: 'All 2 visible sets are in My route' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'All 2 in My route' })).toBeDisabled()
   })
 })
 
@@ -533,11 +533,11 @@ describe('one control row (#1248)', () => {
     await findAlphaToggle()
     const main = screen.getByRole('main')
 
-    const addAll = within(main).getByRole('button', { name: 'Add all 2 visible sets to My route' })
+    const addAll = within(main).getByRole('button', { name: 'Add all 2 to My route' })
     const lastBand = within(main).getByRole('button', { name: 'Add Beta Foxes to my route' })
     // DOCUMENT_POSITION_FOLLOWING: addAll comes after the last band.
     expect(lastBand.compareDocumentPosition(addAll) & window.Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(within(main).getByRole('button', { name: 'Copy the visible schedule' })).toHaveTextContent('Copy this list')
+    expect(within(main).getByRole('button', { name: 'Copy this list' })).toBeInTheDocument()
   })
 
   it('shows the "Later" heading only while something is playing now', async () => {

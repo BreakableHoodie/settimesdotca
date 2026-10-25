@@ -269,7 +269,7 @@ describe('ScheduleView — P2: copy action respects visible filters', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /^Stage A$/i }))
     openMore()
-    fireEvent.click(screen.getByRole('button', { name: /copy the visible schedule/i }))
+    fireEvent.click(screen.getByRole('button', { name: /copy visible schedule/i }))
 
     await waitFor(() => expect(copyToClipboard).toHaveBeenCalledTimes(1))
 
@@ -523,17 +523,17 @@ describe("ScheduleView — controls='inline' (default) vs 'external' (#1248)", (
     const onSelectAll = vi.fn()
     renderView({ bands, controls: 'external', genreFilter: 'Punk', groupBy: 'time', onSelectAll })
 
-    const addAll = screen.getByRole('button', { name: 'Add all 1 visible sets to My route' })
+    const addAll = screen.getByRole('button', { name: 'Add all 1 to My route' })
     expect(addAll).toHaveTextContent('Add all 1 to My route')
     fireEvent.click(addAll)
     expect(onSelectAll).toHaveBeenCalledTimes(1)
     expect(onSelectAll.mock.calls[0][0].map(b => b.name)).toEqual(['Alpha'])
 
-    fireEvent.click(screen.getByRole('button', { name: 'Copy the visible schedule' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Copy this list' }))
     await waitFor(() => expect(copyToClipboard).toHaveBeenCalledTimes(1))
     expect(copyToClipboard.mock.calls[0][0]).toContain('Alpha')
     expect(copyToClipboard.mock.calls[0][0]).not.toContain('Beta')
-    expect(await screen.findByRole('button', { name: 'Copy the visible schedule' })).toHaveTextContent('Copied!')
+    expect(await screen.findByRole('button', { name: 'Copied!' })).toBeInTheDocument()
   })
 
   it('never counts or adds a cancelled set in "Add all" (#732)', () => {
@@ -551,14 +551,14 @@ describe("ScheduleView — controls='inline' (default) vs 'external' (#1248)", (
     ]
     renderView({ bands: withCancelled, controls: 'external', genreFilter: null, groupBy: 'time', onSelectAll })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add all 1 visible sets to My route' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add all 1 to My route' }))
     expect(onSelectAll.mock.calls[0][0].map(b => b.id)).toEqual(['live'])
   })
 
   it("hides 'Add all' when no select-all handler is given", () => {
     renderView({ bands, controls: 'external', onSelectAll: undefined })
     expect(screen.queryByRole('button', { name: /^Add all/ })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Copy the visible schedule' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Copy this list' })).toBeInTheDocument()
   })
 
   it("shows 'Later' only above the upcoming list when something is playing (external)", () => {

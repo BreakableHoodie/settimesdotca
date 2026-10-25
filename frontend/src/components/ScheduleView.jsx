@@ -327,7 +327,6 @@ function ScheduleView({
                           ? 'Visible schedule copied to clipboard'
                           : 'Copy the visible schedule'
                     }
-                    aria-label="Copy the visible schedule"
                     disabled={isCopyingAll || !canCopyVisible}
                   >
                     {copyAllLabel === 'Copied!' ? (
@@ -672,11 +671,6 @@ function ScheduleView({
               type="button"
               onClick={handleSelectAll}
               disabled={allSelected}
-              aria-label={
-                allSelected
-                  ? `All ${selectableBands.length} visible sets are in My route`
-                  : `Add all ${selectableBands.length} visible sets to My route`
-              }
               className="min-h-[44px] rounded-md px-2 text-sm font-medium text-accent-400 hover:text-text-primary disabled:cursor-not-allowed disabled:text-text-disabled focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
             >
               {allSelected
@@ -688,7 +682,6 @@ function ScheduleView({
             type="button"
             onClick={handleCopyAll}
             disabled={isCopyingAll || !canCopyVisible}
-            aria-label="Copy the visible schedule"
             className="min-h-[44px] rounded-md px-2 text-sm font-medium text-text-secondary hover:text-text-primary disabled:cursor-not-allowed disabled:text-text-disabled focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
           >
             {copyAllLabel}

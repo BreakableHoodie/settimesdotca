@@ -269,7 +269,7 @@ describe('ScheduleView — P2: copy action respects visible filters', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /^Stage A$/i }))
     openMore()
-    fireEvent.click(screen.getByRole('button', { name: /copy the visible schedule/i }))
+    fireEvent.click(screen.getByRole('button', { name: /copy visible schedule/i }))
 
     await waitFor(() => expect(copyToClipboard).toHaveBeenCalledTimes(1))
 
@@ -468,5 +468,119 @@ describe('ScheduleView — P1: read-only schedule surfaces hide dead actions', (
     expect(screen.queryByRole('button', { name: /Select All/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Show finished sets/i })).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/add .* to my schedule/i)).not.toBeInTheDocument()
+  })
+})
+
+describe("ScheduleView — controls='inline' (default) vs 'external' (#1248)", () => {
+  const bands = [
+    makeBand({ id: '1', name: 'Alpha', venue: 'Roost', genre: 'Punk' }),
+    makeBand({
+      id: '2',
+      name: 'Beta',
+      venue: 'Blue Room',
+      genre: 'Folk',
+      startTime: '21:30',
+      startMs: Date.parse('2024-06-01T21:30:00'),
+      endMs: Date.parse('2024-06-01T22:30:00'),
+    }),
+  ]
+
+  it('keeps the inline controls by default, which the embed relies on', () => {
+    renderView({ bands })
+
+    expect(screen.getByRole('button', { name: /by time/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /by venue/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^more$/i })).toBeInTheDocument()
+    expect(screen.getByLabelText('Genre filter')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Full Lineup' })).toHaveClass('sm:not-sr-only')
+  })
+
+  it("renders none of those rows with controls='external', and still names the region", () => {
+    renderView({ bands, controls: 'external', genreFilter: null, groupBy: 'time' })
+
+    expect(screen.queryByRole('button', { name: /by (time|venue)/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^more$/i })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Genre filter')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Full Lineup' })).toHaveClass('sr-only')
+    expect(screen.getByRole('heading', { name: 'Full Lineup' })).not.toHaveClass('sm:not-sr-only')
+  })
+
+  it('treats genreFilter and groupBy as controlled props when external', () => {
+    const { rerender } = renderView({ bands, controls: 'external', genreFilter: 'Punk', groupBy: 'time' })
+    expect(screen.getByText('Alpha')).toBeInTheDocument()
+    expect(screen.queryByText('Beta')).not.toBeInTheDocument()
+
+    rerender(
+      <MemoryRouter>
+        <ScheduleView {...defaultProps} bands={bands} controls="external" genreFilter={null} groupBy="venue" />
+      </MemoryRouter>
+    )
+    expect(screen.getByRole('heading', { name: 'Roost' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Blue Room' })).toBeInTheDocument()
+  })
+
+  it('puts "Add all N" and "Copy this list" after the lineup, and copies what is visible', async () => {
+    const onSelectAll = vi.fn()
+    renderView({ bands, controls: 'external', genreFilter: 'Punk', groupBy: 'time', onSelectAll })
+
+    const addAll = screen.getByRole('button', { name: 'Add all 1 to My route' })
+    expect(addAll).toHaveTextContent('Add all 1 to My route')
+    fireEvent.click(addAll)
+    expect(onSelectAll).toHaveBeenCalledTimes(1)
+    expect(onSelectAll.mock.calls[0][0].map(b => b.name)).toEqual(['Alpha'])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy this list' }))
+    await waitFor(() => expect(copyToClipboard).toHaveBeenCalledTimes(1))
+    expect(copyToClipboard.mock.calls[0][0]).toContain('Alpha')
+    expect(copyToClipboard.mock.calls[0][0]).not.toContain('Beta')
+    expect(await screen.findByRole('button', { name: 'Copied!' })).toBeInTheDocument()
+  })
+
+  it('never counts or adds a cancelled set in "Add all" (#732)', () => {
+    const onSelectAll = vi.fn()
+    const withCancelled = [
+      makeBand({ id: 'live', name: 'Playing' }),
+      makeBand({
+        id: 'gone',
+        name: 'Pulled',
+        is_cancelled: 1,
+        startTime: '22:00',
+        startMs: Date.parse('2024-06-01T22:00:00'),
+        endMs: Date.parse('2024-06-01T23:00:00'),
+      }),
+    ]
+    renderView({ bands: withCancelled, controls: 'external', genreFilter: null, groupBy: 'time', onSelectAll })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add all 1 to My route' }))
+    expect(onSelectAll.mock.calls[0][0].map(b => b.id)).toEqual(['live'])
+  })
+
+  it("hides 'Add all' when no select-all handler is given", () => {
+    renderView({ bands, controls: 'external', onSelectAll: undefined })
+    expect(screen.queryByRole('button', { name: /^Add all/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Copy this list' })).toBeInTheDocument()
+  })
+
+  it("shows 'Later' only above the upcoming list when something is playing (external)", () => {
+    const playing = makeBand({
+      id: '3',
+      name: 'Playing Now',
+      startTime: '19:30',
+      endTime: '20:30',
+      startMs: NOW_MS - 30 * 60 * 1000,
+      endMs: NOW_MS + 30 * 60 * 1000,
+    })
+    const { unmount } = renderView({ bands, controls: 'external' })
+    expect(screen.queryByRole('heading', { name: 'Later' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /upcoming/i })).not.toBeInTheDocument()
+    unmount()
+
+    renderView({ bands: [...bands, playing], controls: 'external' })
+    expect(screen.getByRole('heading', { name: 'Later' })).toBeInTheDocument()
+  })
+
+  it("keeps the 'UPCOMING' heading when inline", () => {
+    renderView({ bands })
+    expect(screen.getByRole('heading', { name: 'UPCOMING' })).toBeInTheDocument()
   })
 })

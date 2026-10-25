@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { HelmetProvider } from 'react-helmet-async'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
 import { ThemeProvider } from '../components/ThemeProvider.jsx'
@@ -148,7 +148,7 @@ function renderApp(initialEntry = '/event/test-event') {
 }
 
 // The signal that the schedule finished loading and rendered the "all"
-// (Live Lineup) view: Alpha's toggle button is present. Used instead of a
+// (Lineup) view: Alpha's toggle button is present. Used instead of a
 // fixed sleep so tests don't race the fetch mock's microtask queue.
 const findAlphaToggle = () => screen.findByRole('button', { name: 'Add Alpha Wolves to my route' })
 
@@ -188,7 +188,7 @@ describe('band selection (toggleBand)', () => {
     })
 
     // The My Route tab badge reflects the new count.
-    const mineTab = screen.getByRole('button', { name: /^My Route/ })
+    const mineTab = screen.getByRole('button', { name: /^My route/ })
     expect(within(mineTab).getByText('1')).toBeInTheDocument()
   })
 
@@ -289,20 +289,20 @@ describe('view toggle (All vs Mine)', () => {
     renderApp()
 
     expect(await screen.findByRole('heading', { name: 'My Route', level: 2 })).toBeInTheDocument()
-    const mineTab = screen.getByRole('button', { name: /^My Route/ })
-    const allTab = screen.getByRole('button', { name: 'Live Lineup' })
+    const mineTab = screen.getByRole('button', { name: /^My route/ })
+    const allTab = screen.getByRole('button', { name: 'Lineup' })
     expect(mineTab).toHaveAttribute('aria-pressed', 'true')
     expect(allTab).toHaveAttribute('aria-pressed', 'false')
   })
 
-  it('defaults to Live Lineup with no stored selection, and the tabs actually switch views', async () => {
+  it('defaults to Lineup with no stored selection, and the tabs actually switch views', async () => {
     renderApp()
     await findAlphaToggle()
 
-    const allTab = screen.getByRole('button', { name: 'Live Lineup' })
+    const allTab = screen.getByRole('button', { name: 'Lineup' })
     expect(allTab).toHaveAttribute('aria-pressed', 'true')
 
-    fireEvent.click(screen.getByRole('button', { name: /^My Route/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^My route/ }))
     // With nothing selected, MySchedule renders its empty state rather than
     // the "My Route" heading (that heading only appears once bands.length > 0).
     const main = screen.getByRole('main')
@@ -310,7 +310,7 @@ describe('view toggle (All vs Mine)', () => {
     // ScheduleView's band toggle buttons are gone once MySchedule is showing.
     expect(within(main).queryByRole('button', { name: 'Add Alpha Wolves to my route' })).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Live Lineup' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Lineup' }))
     expect(await findAlphaToggle()).toBeInTheDocument()
   })
 })
@@ -320,10 +320,9 @@ describe('select all', () => {
     renderApp()
     await findAlphaToggle()
 
-    // Copy and Select All now sit behind a "More" disclosure; a user opens it
-    // before reaching them. Only the navigation changed, not the assertion.
-    fireEvent.click(screen.getByRole('button', { name: /^more$/i }))
-    fireEvent.click(screen.getByRole('button', { name: 'Select All' }))
+    // Select-all follows the lineup it acts on (below the last band), not a
+    // menu above it.
+    fireEvent.click(screen.getByRole('button', { name: 'Add all 2 to My route' }))
 
     expect(await screen.findByRole('button', { name: 'Remove Alpha Wolves from my route' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Remove Beta Foxes from my route' })).toBeInTheDocument()
@@ -331,7 +330,7 @@ describe('select all', () => {
     await waitFor(() => {
       expect(getSelectedBands('test-event')).toEqual(['evt-alpha-101', 'evt-beta-202'])
     })
-    expect(screen.getByRole('button', { name: 'All Selected' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'All 2 in My route' })).toBeDisabled()
   })
 })
 
@@ -347,7 +346,7 @@ describe('clear + undo', () => {
     within(dialog).getByText('Are you sure you want to clear your entire route?')
     fireEvent.click(within(dialog).getByRole('button', { name: 'Clear', exact: true }))
 
-    // Confirming clears the route AND flips the view back to Live Lineup
+    // Confirming clears the route AND flips the view back to Lineup
     // (App.jsx's doActualClear calls setView('all')) — so the visible proof
     // of the clear is Alpha's toggle button reverting to "Add", not a
     // MySchedule empty state (that view is no longer mounted).
@@ -377,7 +376,8 @@ describe('filters', () => {
     renderApp()
     await findAlphaToggle()
 
-    const timeSelect = screen.getByLabelText(/Time filter/i)
+    fireEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    const timeSelect = screen.getByRole('combobox', { name: 'Time' })
     fireEvent.change(timeSelect, { target: { value: 'today' } })
 
     expect(timeSelect).toHaveValue('today')
@@ -392,7 +392,8 @@ describe('filters', () => {
     await findAlphaToggle()
     expect(screen.getByRole('button', { name: 'Add Beta Foxes to my route' })).toBeInTheDocument()
 
-    fireEvent.change(screen.getByLabelText(/Venue switcher/i), { target: { value: 'Venue B' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    fireEvent.change(screen.getByRole('combobox', { name: 'Venue' }), { target: { value: 'Venue B' } })
 
     const main = screen.getByRole('main')
     expect(within(main).queryByRole('button', { name: 'Add Alpha Wolves to my route' })).not.toBeInTheDocument()
@@ -412,13 +413,149 @@ describe('filters', () => {
     const main = screen.getByRole('main')
     expect(within(main).queryByRole('button', { name: /Gamma Owls/ })).not.toBeInTheDocument()
 
-    fireEvent.click(within(main).getByRole('button', { name: 'Show finished sets' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /Show finished sets/ }))
     expect(await within(main).findByRole('button', { name: 'Add Gamma Owls to my route' })).toBeInTheDocument()
 
-    fireEvent.click(within(main).getByRole('button', { name: 'Hide finished sets' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /Show finished sets/ }))
     await waitFor(() => {
       expect(within(main).queryByRole('button', { name: /Gamma Owls/ })).not.toBeInTheDocument()
     })
+  })
+})
+
+describe('one control row (#1248)', () => {
+  const punkAlpha = { ...bandAlpha, genre: 'Punk' }
+  const folkBeta = { ...bandBeta, genre: 'Folk' }
+
+  it('renders no filter control outside the dialog: no group-by, More menu, or genre select', async () => {
+    mockScheduleFetch({ bands: [punkAlpha, folkBeta] })
+    renderApp()
+    await findAlphaToggle()
+
+    expect(screen.queryByRole('button', { name: /^by (time|venue)$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^more$/i })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/genre/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    // Exactly one Filter button, beside the view switch.
+    expect(screen.getAllByRole('button', { name: /^Filter/ })).toHaveLength(1)
+  })
+
+  it('filters by genre from the dialog, reports "1 active", and Clear all restores every set', async () => {
+    mockScheduleFetch({ bands: [punkAlpha, folkBeta] })
+    renderApp()
+    await findAlphaToggle()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    const dialog = screen.getByRole('dialog', { name: 'Filter the lineup' })
+    fireEvent.change(within(dialog).getByLabelText('Genre'), { target: { value: 'Punk' } })
+
+    const main = screen.getByRole('main')
+    expect(within(main).getByRole('button', { name: 'Add Alpha Wolves to my route' })).toBeInTheDocument()
+    expect(within(main).queryByRole('button', { name: 'Add Beta Foxes to my route' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Filter, 1 active' })).toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Clear all' }))
+    expect(within(main).getByRole('button', { name: 'Add Beta Foxes to my route' })).toBeInTheDocument()
+    expect(within(main).getByRole('button', { name: 'Add Alpha Wolves to my route' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Filter' })).toBeInTheDocument()
+  })
+
+  it('clears genre, grouping and finished sets when the fan moves to another event', async () => {
+    // Gamma has already ended at this pinned "now", so "Show finished sets" is offered.
+    mockScheduleFetch({ bands: [punkAlpha, folkBeta, { ...bandGammaPast, genre: 'Punk' }] })
+    window.localStorage.setItem(DEBUG_TIME_STORAGE_KEY, new Date('2030-06-15T18:00:00').toISOString())
+    function GoToOther() {
+      const navigate = useNavigate()
+      return (
+        <button type="button" onClick={() => navigate('/event/other-event')}>
+          Go to other event
+        </button>
+      )
+    }
+    render(
+      <ThemeProvider>
+        <HelmetProvider>
+          <MemoryRouter initialEntries={['/event/test-event']}>
+            <GoToOther />
+            <Routes>
+              <Route path="/event/:slug" element={<App />} />
+            </Routes>
+          </MemoryRouter>
+        </HelmetProvider>
+      </ThemeProvider>
+    )
+    await findAlphaToggle()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    const dialog = screen.getByRole('dialog', { name: 'Filter the lineup' })
+    fireEvent.change(within(dialog).getByLabelText('Genre'), { target: { value: 'Punk' } })
+    fireEvent.click(within(dialog).getByRole('radio', { name: 'Venue' }))
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: /Show finished sets/ }))
+    expect(screen.getByRole('button', { name: 'Filter, 3 active' })).toBeInTheDocument()
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    // Same <App/> instance, new slug: nothing set on the last event carries over.
+    fireEvent.click(screen.getByRole('button', { name: 'Go to other event' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Filter' })).toBeInTheDocument())
+    const main = screen.getByRole('main')
+    expect(await within(main).findByRole('button', { name: 'Add Beta Foxes to my route' })).toBeInTheDocument()
+  })
+
+  it('"Show N sets" reports the count the lineup will show, and closes the dialog', async () => {
+    mockScheduleFetch({ bands: [punkAlpha, folkBeta] })
+    renderApp()
+    await findAlphaToggle()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    expect(screen.getByRole('button', { name: 'Show 2 sets' })).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Genre'), { target: { value: 'Folk' } })
+    const showButton = screen.getByRole('button', { name: 'Show 1 set' })
+    fireEvent.click(showButton)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('Group by Venue in the dialog renders a heading per venue', async () => {
+    mockScheduleFetch({ bands: [punkAlpha, folkBeta] })
+    renderApp()
+    await findAlphaToggle()
+    const main = screen.getByRole('main')
+    expect(within(main).queryByRole('heading', { name: 'Venue A' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Venue' }))
+
+    expect(within(main).getByRole('heading', { name: 'Venue A' })).toBeInTheDocument()
+    expect(within(main).getByRole('heading', { name: 'Venue B' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Filter, 1 active' })).toBeInTheDocument()
+  })
+
+  it('moves "Add all" and "Copy this list" after the lineup', async () => {
+    renderApp()
+    await findAlphaToggle()
+    const main = screen.getByRole('main')
+
+    const addAll = within(main).getByRole('button', { name: 'Add all 2 to My route' })
+    const lastBand = within(main).getByRole('button', { name: 'Add Beta Foxes to my route' })
+    // DOCUMENT_POSITION_FOLLOWING: addAll comes after the last band.
+    expect(lastBand.compareDocumentPosition(addAll) & window.Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(main).getByRole('button', { name: 'Copy this list' })).toBeInTheDocument()
+  })
+
+  it('shows the "Later" heading only while something is playing now', async () => {
+    renderApp()
+    await findAlphaToggle()
+    // Real "now" (2026) is long before the 2030 fixtures: nothing is playing.
+    expect(screen.queryByRole('heading', { name: 'Later' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'UPCOMING' })).not.toBeInTheDocument()
+    cleanup()
+
+    // Pin "now" inside Alpha's 20:00-20:30 set, with Beta still to come.
+    window.localStorage.setItem(DEBUG_TIME_STORAGE_KEY, new Date('2030-06-15T20:10:00').toISOString())
+    renderApp()
+    await findAlphaToggle()
+    expect(screen.getByRole('heading', { name: 'Later' })).toBeInTheDocument()
   })
 })
 

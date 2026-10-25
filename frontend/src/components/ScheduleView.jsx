@@ -263,7 +263,7 @@ function ScheduleView({
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <div
-              className="inline-flex items-center rounded-full border border-border bg-surface p-0.5"
+              className="inline-flex items-center rounded-lg border border-border bg-surface p-0.5"
               role="group"
               aria-label="Group lineup by"
             >
@@ -273,7 +273,7 @@ function ScheduleView({
                   type="button"
                   onClick={() => setGroupBy(mode)}
                   aria-pressed={groupBy === mode}
-                  className={`min-h-[44px] rounded-full px-3 py-1.5 text-xs font-medium capitalize transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 ${
+                  className={`min-h-[44px] rounded-md px-3 py-1.5 text-xs font-medium capitalize transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 ${
                     groupBy === mode ? 'bg-accent-500/20 text-accent-400' : 'text-text-tertiary hover:text-text-primary'
                   }`}
                 >
@@ -382,7 +382,7 @@ function ScheduleView({
                     id="schedule-venue-filter"
                     value={venueFilter === UNSCHEDULED ? UNSCHEDULED_FILTER_VALUE : venueFilter || ''}
                     onChange={handleVenueSelectChange}
-                    className="min-h-[44px] w-full rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-text-primary focus:border-accent-500 focus:outline-hidden"
+                    className="min-h-[44px] w-full rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-text-primary focus:border-accent-500 focus:outline-hidden"
                   >
                     <option value="">All Venues</option>
                     {uniqueVenues.map(venue => (
@@ -404,7 +404,7 @@ function ScheduleView({
                     id="schedule-genre-filter"
                     value={genreFilter || ''}
                     onChange={event => setGenreFilter(event.target.value || null)}
-                    className="min-h-[44px] w-full rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-text-primary focus:border-accent-500 focus:outline-hidden"
+                    className="min-h-[44px] w-full rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-text-primary focus:border-accent-500 focus:outline-hidden"
                   >
                     <option value="">All Genres</option>
                     {uniqueGenres.map(genre => (
@@ -426,7 +426,7 @@ function ScheduleView({
                       key={venue}
                       onClick={() => handleVenueFilterToggle(venue)}
                       aria-pressed={venueFilter === venue}
-                      className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
+                      className={`text-xs px-3 py-1.5 min-h-[44px] rounded-md border whitespace-nowrap transition-colors ${
                         venueFilter === venue
                           ? 'bg-accent-500/20 border-accent-500/50 text-accent-400'
                           : 'bg-surface border-border text-text-tertiary hover:bg-surface-hover'
@@ -439,7 +439,7 @@ function ScheduleView({
                     <button
                       onClick={() => handleVenueFilterToggle(UNSCHEDULED)}
                       aria-pressed={venueFilter === UNSCHEDULED}
-                      className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
+                      className={`text-xs px-3 py-1.5 min-h-[44px] rounded-md border whitespace-nowrap transition-colors ${
                         venueFilter === UNSCHEDULED
                           ? 'bg-accent-500/20 border-accent-500/50 text-accent-400'
                           : 'bg-surface border-border text-text-tertiary hover:bg-surface-hover'
@@ -460,7 +460,7 @@ function ScheduleView({
                       key={genre}
                       onClick={() => setGenreFilter(genreFilter === genre ? null : genre)}
                       aria-pressed={genreFilter === genre}
-                      className={`text-xs px-3 py-1.5 min-h-[44px] rounded-full border whitespace-nowrap transition-colors ${
+                      className={`text-xs px-3 py-1.5 min-h-[44px] rounded-md border whitespace-nowrap transition-colors ${
                         genreFilter === genre
                           ? 'bg-accent-500/20 border-accent-500/50 text-accent-400'
                           : 'bg-surface border-border text-text-tertiary hover:bg-surface-hover'

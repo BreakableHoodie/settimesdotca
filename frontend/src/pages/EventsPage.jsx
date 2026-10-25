@@ -41,7 +41,7 @@ export default function EventsPage() {
   }, [refreshBanner])
 
   return (
-    <main id="main-content" tabIndex={-1} className="min-h-screen bg-gradient-dark">
+    <main id="main-content" tabIndex={-1} className="min-h-screen">
       <Helmet>
         <title>SetTimes – Live Music Events &amp; Show Schedules</title>
         <meta
@@ -120,7 +120,7 @@ export default function EventsPage() {
               <CalendarDays size={16} />
               <span className="text-sm font-medium">You have a schedule in progress</span>
             </div>
-            <span className="text-accent-400 text-sm font-medium flex items-center gap-2 group-hover:gap-3 transition-all">
+            <span className="text-accent-400 text-sm font-medium flex items-center gap-2 group-hover:gap-3 transition-[gap]">
               Continue building
               <ArrowRight size={12} />
             </span>

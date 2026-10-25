@@ -54,11 +54,7 @@ if (typeof window !== 'undefined' && import.meta.env.DEV) {
 
 function LoadingFallback() {
   return (
-    <div
-      className="flex items-center justify-center min-h-screen bg-linear-to-br from-bg-navy to-bg-purple"
-      role="status"
-      aria-live="polite"
-    >
+    <div className="flex items-center justify-center min-h-screen" role="status" aria-live="polite">
       <div className="text-text-primary text-xl">Loading...</div>
     </div>
   )

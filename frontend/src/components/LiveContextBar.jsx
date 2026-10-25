@@ -346,7 +346,7 @@ function LiveContextBar({
 
   return (
     <>
-      <section className="sticky top-[57px] z-40 border-b border-border bg-bg-navy/92 backdrop-blur-xs">
+      <section className="sticky top-[57px] z-40 border-b border-border bg-bg-navy">
         <div role="status" aria-live="polite" className="sr-only">
           {lifecycleAnnouncement}
         </div>
@@ -386,7 +386,7 @@ function LiveContextBar({
                     <span
                       role="button"
                       tabIndex={0}
-                      className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${lifecycle.classes}`}
+                      className={`inline-flex items-center rounded-sm border px-2.5 py-1 text-xs font-semibold ${lifecycle.classes}`}
                       aria-label={`Event status: ${lifecycle.label}`}
                       onClick={handleLifecycleTap}
                       onKeyDown={e => {
@@ -425,7 +425,7 @@ function LiveContextBar({
                 <span
                   role="button"
                   tabIndex={0}
-                  className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${lifecycle.classes}`}
+                  className={`inline-flex items-center rounded-sm border px-2.5 py-1 text-xs font-semibold ${lifecycle.classes}`}
                   aria-label={`Event status: ${lifecycle.label}`}
                   onClick={handleLifecycleTap}
                   onKeyDown={e => {

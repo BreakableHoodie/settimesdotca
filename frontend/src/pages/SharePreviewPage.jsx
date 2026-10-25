@@ -141,7 +141,7 @@ export default function SharePreviewPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple px-4 py-8">
+      <div className="min-h-screen px-4 py-8">
         <div className="mx-auto max-w-2xl">
           <Link
             to="/"
@@ -162,7 +162,7 @@ export default function SharePreviewPage() {
 
   if (notFound) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-linear-to-br from-bg-navy to-bg-purple px-4 text-center">
+      <div className="flex min-h-screen flex-col items-center justify-center px-4 text-center">
         <Helmet>
           <title>Shared Route Not Found | SetTimes</title>
         </Helmet>
@@ -177,7 +177,7 @@ export default function SharePreviewPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple p-6">
+      <div className="min-h-screen p-6">
         <Helmet>
           <title>Error | SetTimes</title>
         </Helmet>
@@ -209,7 +209,7 @@ export default function SharePreviewPage() {
   const stopCount = routeBands.length
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple">
+    <div className="min-h-screen">
       <Helmet>
         <title>Shared Route — {shareData.event_name} | SetTimes</title>
       </Helmet>
@@ -235,7 +235,7 @@ export default function SharePreviewPage() {
                 {band.is_cancelled ? <s className="text-text-secondary">{band.name}</s> : band.name}
               </p>
               {band.is_cancelled === 1 && (
-                <span className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-warning-500/25 px-2.5 py-1 text-xs font-semibold text-text-primary">
+                <span className="mt-1 inline-flex items-center gap-1.5 rounded-sm bg-warning-500/25 px-2.5 py-1 text-xs font-semibold text-text-primary">
                   <TriangleAlert size={14} aria-hidden="true" />
                   Cancelled
                 </span>

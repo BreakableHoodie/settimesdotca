@@ -108,7 +108,7 @@ export default function SubscribePage() {
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple p-4">
+    <div className="min-h-screen p-4">
       {/* Identity meta (canonical/og:* /twitter:* /description) is SSR-owned for
           this route -- functions/utils/staticPageMeta.js's
           STATIC_PAGES["/subscribe"] entry injects it server-side (with
@@ -129,7 +129,7 @@ export default function SubscribePage() {
         </div>
 
         {/* Form */}
-        <div className="bg-surface backdrop-blur-lg rounded-2xl p-8 border border-border">
+        <div className="bg-surface rounded-2xl p-8 border border-border">
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Email */}
             <div>

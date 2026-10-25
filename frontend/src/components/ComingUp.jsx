@@ -64,16 +64,16 @@ function ComingUp({ bands, currentTime }) {
   return (
     <div
       aria-hidden={!hasNext}
-      className={`overflow-hidden transition-all duration-300 ease-out ${
+      className={`overflow-hidden transition-[max-height,opacity] duration-300 ease-out ${
         hasNext ? 'max-h-28 sm:max-h-32 opacity-100' : 'max-h-0 opacity-0'
       }`}
     >
       {hasNext && (
-        <div className="bg-gradient-accent px-4 py-2.5 text-bg-navy shadow-lg sm:py-3" role="status" aria-live="polite">
+        <div className="bg-accent-500 px-4 py-2.5 text-bg-navy shadow-lg sm:py-3" role="status" aria-live="polite">
           <div className="container mx-auto max-w-(--breakpoint-2xl)" title={message}>
             <div className="flex items-center gap-2 sm:hidden">
               <span className="shrink-0 text-[11px] font-bold uppercase tracking-[0.18em] text-bg-navy">Up Next</span>
-              <span className="shrink-0 rounded-full bg-bg-navy/15 px-2 py-1 text-xs font-semibold text-bg-navy">
+              <span className="shrink-0 rounded-sm bg-bg-navy/15 px-2 py-1 text-xs font-semibold text-bg-navy">
                 {formatTimeUntil(minutesUntil)}
               </span>
               <span className="min-w-0 truncate text-sm font-semibold text-bg-navy">

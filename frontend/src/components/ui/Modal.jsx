@@ -210,7 +210,7 @@ export default function Modal({
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex justify-center bg-black/80 backdrop-blur-xs animate-fade-in ${
+      className={`fixed inset-0 z-50 flex justify-center bg-black/80 animate-fade-in ${
         isSheet ? 'items-end p-0 sm:items-center sm:p-4' : 'items-center p-4'
       }`}
       onClick={handleBackdropClick}
@@ -243,7 +243,7 @@ export default function Modal({
             {showCloseButton && (
               <button
                 onClick={onClose}
-                className="p-2 hover:bg-surface-hover rounded-lg transition-colors"
+                className="p-2 hover:bg-surface-hover rounded-md transition-colors"
                 aria-label="Close modal"
               >
                 <X size={20} className="text-text-secondary" />

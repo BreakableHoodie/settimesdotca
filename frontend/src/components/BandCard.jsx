@@ -152,15 +152,15 @@ function BandCard({
   const startingSoon = !isCancelled && isStartingSoon(band, currentTime)
   const minutesUntil = startingSoon ? Math.ceil((band.startMs - nowMs) / 60000) : 0
 
-  // Both selected and playing states use the amber gradient — dark text required throughout
+  // both selected and playing states use the solid amber fill — dark text required throughout
   const onAmber = isSelected || isPlaying
 
-  const baseClasses = `w-full p-4 rounded-xl transition-all duration-200 ${
+  const baseClasses = `w-full p-4 rounded-xl transition-[transform,box-shadow,background-color] duration-200 ${
     isSelected
-      ? 'bg-gradient-accent text-bg-navy shadow-lg scale-[1.02] ring-2 ring-warning-400 ring-offset-2 ring-offset-bg-navy'
+      ? 'bg-accent-500 text-bg-navy shadow-lg scale-[1.02] ring-2 ring-warning-400 ring-offset-2 ring-offset-bg-navy'
       : isPlaying
-        ? 'bg-gradient-accent text-bg-navy shadow-glow-accent playing-now'
-        : 'bg-gradient-card text-text-primary hover:bg-bg-purple/80 hover:scale-[1.01] shadow-md border border-border'
+        ? 'bg-accent-500 text-bg-navy shadow-glow-accent playing-now'
+        : 'bg-surface text-text-primary hover:bg-surface-hover hover:scale-[1.01] shadow-md border border-border'
   } relative`
 
   // ONE source of truth for the name shown and the name announced. The visible
@@ -180,7 +180,7 @@ function BandCard({
         <button
           type="button"
           onClick={handleRemove}
-          className={`absolute top-2 right-2 h-11 w-11 flex items-center justify-center text-lg font-bold rounded-full transition-all duration-150 z-10 ${
+          className={`absolute top-2 right-2 h-11 w-11 flex items-center justify-center text-lg font-bold rounded-full transition-colors duration-150 z-10 ${
             onAmber
               ? 'bg-bg-navy/20 hover:bg-bg-navy/30 text-bg-navy'
               : 'bg-surface hover:bg-surface-hover text-text-secondary hover:text-text-primary'
@@ -242,7 +242,7 @@ function BandCard({
         </div>
         {isCancelled && (
           <span
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-semibold ${
               onAmber ? 'bg-yellow-900/80 text-yellow-100' : 'bg-warning-500/25 text-text-primary'
             }`}
           >
@@ -252,7 +252,7 @@ function BandCard({
         )}
         {band.genre && (
           <span
-            className={`text-xs px-2 py-0.5 rounded-full border leading-normal ${
+            className={`text-xs px-2 py-0.5 rounded-sm border leading-normal ${
               onAmber ? 'bg-bg-navy/15 border-bg-navy/20 text-bg-navy' : 'bg-surface border-border text-text-secondary'
             }`}
           >
@@ -299,7 +299,7 @@ function BandCard({
         {/* Inline warning - always visible, no interaction needed */}
         {warningType && warningText && (
           <div
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold mt-1 ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-semibold mt-1 ${
               onAmber
                 ? warningType === 'overlap'
                   ? 'bg-yellow-900/80 text-yellow-100'

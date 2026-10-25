@@ -39,7 +39,7 @@ export default function Input({
 
   const inputClasses = `
     w-full px-4 py-2.5 min-h-[44px]
-    bg-surface border rounded-lg
+    bg-surface border rounded-md
     text-text-primary placeholder-text-tertiary
     transition-colors duration-base
     focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-navy

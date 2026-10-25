@@ -79,12 +79,12 @@ export default function ConfirmDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in" role="presentation">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-xs" aria-hidden="true" />
+      <div className="absolute inset-0 bg-black/70" aria-hidden="true" />
 
       {/* Dialog */}
       <div
         ref={dialogRef}
-        className="relative bg-bg-purple rounded-lg shadow-xl max-w-md w-full border border-border animate-scale-in"
+        className="relative bg-bg-purple rounded-xl shadow-xl max-w-md w-full border border-border animate-scale-in"
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"

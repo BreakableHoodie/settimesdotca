@@ -11,7 +11,7 @@ export default function TermsPage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple">
+    <div className="min-h-screen">
       {/* description/canonical are SSR-owned for this route --
           functions/utils/staticPageMeta.js's STATIC_PAGES["/terms"] entry
           injects them server-side; declaring them here too would duplicate
@@ -35,7 +35,10 @@ export default function TermsPage() {
         <div className="border border-border bg-surface rounded-lg px-4 py-3 mb-10 text-sm text-text-secondary">
           <strong className="text-text-primary">SetTimes is a free, community-run project.</strong> These terms are
           provided in good faith to be clear and fair — not legal advice. Questions?{' '}
-          <a href="mailto:hello@settimes.ca" className="text-accent-400 hover:text-accent-500 transition-colors">
+          <a
+            href="mailto:hello@settimes.ca"
+            className="text-accent-400 underline underline-offset-2 hover:text-accent-500 transition-colors"
+          >
             hello@settimes.ca
           </a>
         </div>
@@ -48,7 +51,10 @@ export default function TermsPage() {
               community-run event-schedule tool for live-music events in Waterloo Region, Ontario, Canada. It is
               operated from <strong className="text-text-secondary">Waterloo Region, Ontario, Canada</strong>. You can
               reach us at{' '}
-              <a href="mailto:hello@settimes.ca" className="text-accent-400 hover:text-accent-500 transition-colors">
+              <a
+                href="mailto:hello@settimes.ca"
+                className="text-accent-400 underline underline-offset-2 hover:text-accent-500 transition-colors"
+              >
                 hello@settimes.ca
               </a>
               .
@@ -132,7 +138,10 @@ export default function TermsPage() {
               <li>
                 <strong className="text-text-primary">Takedown.</strong> If you believe content on the Service infringes
                 your rights or is inaccurate, email{' '}
-                <a href="mailto:hello@settimes.ca" className="text-accent-400 hover:text-accent-500 transition-colors">
+                <a
+                  href="mailto:hello@settimes.ca"
+                  className="text-accent-400 underline underline-offset-2 hover:text-accent-500 transition-colors"
+                >
                   hello@settimes.ca
                 </a>{' '}
                 and we will review and, where appropriate, remove or correct it. We may remove any Submission at our
@@ -196,7 +205,10 @@ export default function TermsPage() {
             <h2 className="text-text-primary text-lg font-semibold mb-3">8. Privacy</h2>
             <p>
               Your use of the Service is also governed by our{' '}
-              <Link to="/privacy" className="text-accent-400 hover:text-accent-500 transition-colors">
+              <Link
+                to="/privacy"
+                className="text-accent-400 underline underline-offset-2 hover:text-accent-500 transition-colors"
+              >
                 Privacy Policy
               </Link>
               , which explains what personal information we collect, how we use it, and your rights under Canadian
@@ -230,7 +242,10 @@ export default function TermsPage() {
             <h2 className="text-text-primary text-lg font-semibold mb-3">11. Contact</h2>
             <p>
               Questions about these Terms? Email{' '}
-              <a href="mailto:hello@settimes.ca" className="text-accent-400 hover:text-accent-500 transition-colors">
+              <a
+                href="mailto:hello@settimes.ca"
+                className="text-accent-400 underline underline-offset-2 hover:text-accent-500 transition-colors"
+              >
                 hello@settimes.ca
               </a>
               .

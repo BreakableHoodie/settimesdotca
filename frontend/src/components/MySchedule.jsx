@@ -70,7 +70,7 @@ function ForkCard({ band1, band2, onToggleBand }) {
           <div key={band.id} className="px-3 py-3 flex flex-col gap-1.5 h-full">
             <p className="font-bold text-text-primary text-sm leading-snug">{band.name}</p>
             {band.genre && (
-              <span className="self-start text-xs px-2 py-0.5 rounded-full bg-surface border border-border text-text-secondary leading-normal">
+              <span className="self-start text-xs px-2 py-0.5 rounded-sm bg-surface border border-border text-text-secondary leading-normal">
                 {band.genre}
               </span>
             )}
@@ -79,7 +79,7 @@ function ForkCard({ band1, band2, onToggleBand }) {
             <button
               onClick={() => onToggleBand(removeId)}
               aria-label={`Keep ${band.name}, remove ${removeId === band2.id ? band2.name : band1.name}`}
-              className="mt-auto w-full py-2 text-xs font-semibold rounded-lg bg-accent-500/20 border border-accent-500/50 text-accent-400 hover:bg-accent-500/30 active:scale-95 transition-all focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500 min-h-[44px]"
+              className="mt-auto w-full py-2 text-xs font-semibold rounded-lg bg-accent-500/20 border border-accent-500/50 text-accent-400 hover:bg-accent-500/30 active:scale-95 transition-[background-color,transform] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500 min-h-[44px]"
             >
               Keep this one
             </button>

@@ -98,7 +98,7 @@ export default function ResetPasswordPage() {
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-text-primary text-xl">Verifying reset token...</div>
       </div>
     )
@@ -106,8 +106,8 @@ export default function ResetPasswordPage() {
 
   if (status === 'error') {
     return (
-      <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-surface backdrop-blur-lg rounded-2xl p-8 border border-border text-center">
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-surface rounded-2xl p-8 border border-border text-center">
           <h1 className="text-2xl font-bold text-text-primary mb-4">Reset Failed</h1>
           <p className="text-text-secondary mb-6">{message}</p>
           <button
@@ -123,8 +123,8 @@ export default function ResetPasswordPage() {
 
   if (status === 'success') {
     return (
-      <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-surface backdrop-blur-lg rounded-2xl p-8 border border-border text-center">
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-surface rounded-2xl p-8 border border-border text-center">
           <h1 className="text-2xl font-bold text-text-primary mb-4">✓ Password Reset</h1>
           <p className="text-text-secondary mb-6">{message}</p>
           <button
@@ -139,8 +139,8 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-surface backdrop-blur-lg rounded-2xl p-8 border border-border">
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-surface rounded-2xl p-8 border border-border">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-text-primary mb-2">Reset Password</h1>
           <p className="text-text-secondary">

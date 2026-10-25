@@ -10,7 +10,7 @@ export default function ContactPage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-bg-navy to-bg-purple">
+    <div className="min-h-screen">
       {/* description/canonical are SSR-owned for this route --
           functions/utils/staticPageMeta.js's STATIC_PAGES["/contact"] entry
           injects them server-side; declaring them here too would duplicate
@@ -42,7 +42,10 @@ export default function ContactPage() {
             <h2 className="text-text-primary text-lg font-semibold mb-3">Get in touch</h2>
             <p>
               The best way to reach SetTimes is by email:{' '}
-              <a href="mailto:hello@settimes.ca" className="text-accent-400 hover:text-accent-500 transition-colors">
+              <a
+                href="mailto:hello@settimes.ca"
+                className="text-accent-400 underline underline-offset-2 hover:text-accent-500 transition-colors"
+              >
                 hello@settimes.ca
               </a>
               . We&apos;re a small, community-run team based in Waterloo Region, and we read every message.
@@ -71,7 +74,10 @@ export default function ContactPage() {
             <p>
               If something on SetTimes is inaccurate, out of date, or you believe it infringes your rights, let us know
               and we&apos;ll review it promptly — correcting or removing content where appropriate (see our{' '}
-              <Link to="/terms" className="text-accent-400 hover:text-accent-500 transition-colors">
+              <Link
+                to="/terms"
+                className="text-accent-400 underline underline-offset-2 hover:text-accent-500 transition-colors"
+              >
                 Terms of Service
               </Link>
               , §4).
@@ -90,7 +96,10 @@ export default function ContactPage() {
             <h2 className="text-text-primary text-lg font-semibold mb-3">Press &amp; general</h2>
             <p>
               For press inquiries, partnership ideas, or anything else, reach out at{' '}
-              <a href="mailto:hello@settimes.ca" className="text-accent-400 hover:text-accent-500 transition-colors">
+              <a
+                href="mailto:hello@settimes.ca"
+                className="text-accent-400 underline underline-offset-2 hover:text-accent-500 transition-colors"
+              >
                 hello@settimes.ca
               </a>
               .

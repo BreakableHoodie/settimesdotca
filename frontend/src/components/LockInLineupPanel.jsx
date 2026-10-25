@@ -146,7 +146,7 @@ export default function LockInLineupPanel({ performanceIds, bandCount }) {
               <button
                 type="submit"
                 disabled={followStatus === 'loading'}
-                className="shrink-0 min-h-[44px] rounded-lg bg-accent-500 px-4 py-2 text-sm font-semibold text-bg-navy transition-all hover:bg-accent-400 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500"
+                className="shrink-0 min-h-[44px] rounded-lg bg-accent-500 px-4 py-2 text-sm font-semibold text-bg-navy transition-[background-color,transform] hover:bg-accent-400 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500"
               >
                 {followStatus === 'loading' ? 'Saving…' : 'Notify me'}
               </button>

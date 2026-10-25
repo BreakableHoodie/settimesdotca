@@ -592,7 +592,7 @@ function EventCard({
     <Card
       hoverable={!expanded}
       className={`
-        transition-all overflow-hidden
+        transition-[box-shadow,transform,opacity,border-color] overflow-hidden
         ${isLive ? 'ring-2 ring-error-500/50 shadow-glow-accent' : ''}
         ${isUpcoming ? 'border-primary-500/20' : ''}
         ${isPast ? 'opacity-75' : ''}
@@ -706,7 +706,7 @@ function EventCard({
                   whether a fan can attend at all; learning "19+" after
                   arriving is the failure this prevents. */}
               {event.age_restriction && (
-                <span className="rounded-full border border-border bg-surface px-2 py-0.5 text-xs font-semibold text-text-primary">
+                <span className="rounded-sm border border-border bg-surface px-2 py-0.5 text-xs font-semibold text-text-primary">
                   {event.age_restriction}
                 </span>
               )}
@@ -972,7 +972,7 @@ function EventCard({
 
                       {isCancelled && (
                         <div className="mb-3">
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-500/25 px-2.5 py-1 text-xs font-semibold text-text-primary">
+                          <span className="inline-flex items-center gap-1.5 rounded-sm bg-warning-500/25 px-2.5 py-1 text-xs font-semibold text-text-primary">
                             <TriangleAlert size={12} aria-hidden="true" />
                             Cancelled
                           </span>

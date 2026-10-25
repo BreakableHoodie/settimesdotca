@@ -3,9 +3,9 @@ import { readFileSync } from "node:fs";
 import { posix } from "node:path";
 import { fileURLToPath } from "node:url";
 import semver from "semver";
+import { LOCKFILES } from "../lockfiles.mjs";
 
 const REPO_ROOT = fileURLToPath(new URL("../..", import.meta.url));
-const LOCKFILES = ["package-lock.json", "frontend/package-lock.json", "workers-mcp-server/package-lock.json"];
 
 // These two plugins have not declared support for eslint 10 yet. They are the
 // only intentional peer-range exceptions in the two lockfiles.
@@ -39,8 +39,7 @@ const KNOWN_OVERRIDE_CONFLICTS = {
   "frontend/package-lock.json|node_modules/puppeteer-core|@puppeteer/browsers":
     "drops extract-zip (#819); puppeteer-core 24.43.1 pins 2.13.2 exactly (#1208)",
   "frontend/package-lock.json|node_modules/puppeteer-core|ws": "audit alerts (#327), via the lighthouse ws override",
-  // The MCP Worker's lockfile was outside this scan until #1374 (CodeRabbit):
-  // both of these were live and unseen.
+  // The MCP Worker's lockfile: both edges were live before it was scanned.
   "workers-mcp-server/package-lock.json|node_modules/miniflare|undici":
     "GHSA-4qv8-2p9j-2685 + GHSA-f72v-6w45-q472 (undici <=7.30.0); miniflare pins 7.29.1 exactly, 7.30.1 is a patch bump (2026-10-25)",
   "workers-mcp-server/package-lock.json|node_modules/tsx|esbuild":

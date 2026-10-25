@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { cwd as currentWorkingDirectory } from "node:process";
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { LOCKFILES, lockfileDir } from "./lockfiles.mjs";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ALERT_AGE_DAYS = 7;
@@ -30,11 +31,14 @@ const REPOSITORY = "BreakableHoodie/settimesdotca";
 // NEXT advisory published against it. That happened before this list shipped:
 // the September decision to accept the Lighthouse CI toolchain (#1208) would
 // have covered basic-ftp and compression advisories published in October.
+
 export const ACCEPTED_NPM_AUDIT = {
   "frontend/package-lock.json|postcss-selector-parser|GHSA-rj75-hqrm-r3gf":
     "build-time only, pinned by @tailwindcss/typography; re-check on its next release (#1267)",
   "frontend/package-lock.json|basic-ftp|GHSA-c475-qrg2-pj4r":
     "dev-only, via @lhci/cli > proxy-agent > pac-proxy-agent > get-uri. Client.list() runs only if LHCI is given a proxy whose PAC file is fetched over ftp://; quality.yml and lighthouserc.json set no proxy, so it is unreachable in our use. Accepted by Dre 2026-10-14; re-check if a proxy is ever configured or on the next @lhci/cli release",
+  "frontend/package-lock.json|zod|GHSA-mrhx-c7xc-m3w5":
+    "dev-only, zod@3 via lighthouse > puppeteer-core > chromium-bidi (Lighthouse CI). Every 3.x is in range and forcing zod 4 breaks chromium-bidi's schemas; zod@4 elsewhere is fixed. Accepted by Dre 2026-10-25; re-check on the next lighthouse / puppeteer-core release",
 };
 
 // The issue lists at most this many alerts. GitHub rejects an issue body over
@@ -280,10 +284,11 @@ export function collectSecurityData({ runner = defaultRunner, root = currentWork
     if (result.status !== 0 && /no analysis found/i.test(`${result.stderr ?? ""}${result.stdout ?? ""}`)) return [];
     return flattenPages(parseCommandJson(result, `code-scanning analysis fetch (${tool})`));
   });
-  const npmAudit = ["package-lock.json", "frontend/package-lock.json"].map((lockfile) => {
+  const npmAudit = LOCKFILES.map((lockfile) => {
+    const dir = lockfileDir(lockfile);
     const audit = parseCommandJson(
       runner("npm", ["audit", "--json", "--package-lock-only"], {
-        cwd: root + (lockfile.startsWith("frontend/") ? "/frontend" : ""),
+        cwd: dir ? `${root}/${dir}` : root,
       }),
       `npm audit (${lockfile})`,
       { allowNonZero: true },

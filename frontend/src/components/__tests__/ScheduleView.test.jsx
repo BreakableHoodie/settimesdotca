@@ -217,12 +217,12 @@ describe('ScheduleView — Bug 5: blank venue filter button', () => {
   })
 })
 
-// Copy Visible Schedule and Select All now sit behind a "More" disclosure, so a
+// Copy visible schedule and Select all now sit behind a "More" disclosure, so a
 // user opens it before reaching them. Only the navigation changed -- every
 // assertion below is the same one it always was.
 const openMore = () => fireEvent.click(screen.getByRole('button', { name: /^more$/i }))
 
-describe('ScheduleView — P1: Select All respects visible filters', () => {
+describe('ScheduleView — P1: Select all respects visible filters', () => {
   it('passes only the visible filtered bands to the bulk select handler', () => {
     const onSelectAll = vi.fn()
     const bands = [
@@ -234,7 +234,7 @@ describe('ScheduleView — P1: Select All respects visible filters', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /^Stage A$/i }))
     openMore()
-    fireEvent.click(screen.getByRole('button', { name: /Select All/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Select all/i }))
 
     expect(onSelectAll).toHaveBeenCalledTimes(1)
     expect(onSelectAll).toHaveBeenCalledWith([
@@ -253,8 +253,8 @@ describe('ScheduleView — P1: Select All respects visible filters', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Stage A$/i }))
 
     openMore()
-    expect(screen.getByRole('button', { name: /All Selected/i })).toBeDisabled()
-    expect(screen.queryByRole('button', { name: /^Select All$/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /All selected/i })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /^Select all$/i })).not.toBeInTheDocument()
   })
 })
 
@@ -465,7 +465,7 @@ describe('ScheduleView — P1: read-only schedule surfaces hide dead actions', (
       onToggleShowPast: undefined,
     })
 
-    expect(screen.queryByRole('button', { name: /Select All/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Select all/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Show finished sets/i })).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/add .* to my schedule/i)).not.toBeInTheDocument()
   })
@@ -492,7 +492,7 @@ describe("ScheduleView — controls='inline' (default) vs 'external' (#1248)", (
     expect(screen.getByRole('button', { name: /by venue/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^more$/i })).toBeInTheDocument()
     expect(screen.getByLabelText('Genre filter')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Full Lineup' })).toHaveClass('sm:not-sr-only')
+    expect(screen.getByRole('heading', { name: 'Full lineup' })).toHaveClass('sm:not-sr-only')
   })
 
   it("renders none of those rows with controls='external', and still names the region", () => {
@@ -501,8 +501,8 @@ describe("ScheduleView — controls='inline' (default) vs 'external' (#1248)", (
     expect(screen.queryByRole('button', { name: /by (time|venue)/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^more$/i })).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Genre filter')).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Full Lineup' })).toHaveClass('sr-only')
-    expect(screen.getByRole('heading', { name: 'Full Lineup' })).not.toHaveClass('sm:not-sr-only')
+    expect(screen.getByRole('heading', { name: 'Full lineup' })).toHaveClass('sr-only')
+    expect(screen.getByRole('heading', { name: 'Full lineup' })).not.toHaveClass('sm:not-sr-only')
   })
 
   it('treats genreFilter and groupBy as controlled props when external', () => {

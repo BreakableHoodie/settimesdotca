@@ -47,7 +47,7 @@ function Body({ state }) {
       <>
         <p className={titleClass}>{nowBand.name}</p>
         <p className={subClass}>
-          {nowBand.venue ? `${nowBand.venue} · ` : ''}
+          {nowBand.venue ? `${nowBand.venue}, ` : ''}
           {minutesLeft} min left
         </p>
         {nextBand && (
@@ -63,17 +63,17 @@ function Body({ state }) {
     const { nextBand, minutesToNext, walkMin, slackMin } = state
     let walkLine
     if (walkMin == null) {
-      walkLine = `Starts in ${formatMins(minutesToNext)}`
+      walkLine = `Starts in ${formatMins(minutesToNext)}.`
     } else if (slackMin != null && slackMin <= 0) {
-      walkLine = `~${walkMin} min walk · leave now`
+      walkLine = `~${walkMin} min walk. Leave now.`
     } else {
-      walkLine = `~${walkMin} min walk · ${formatMins(slackMin)} to spare`
+      walkLine = `~${walkMin} min walk, ${formatMins(slackMin)} to spare.`
     }
     return (
       <>
         <p className={titleClass}>Head to {nextBand.venue || 'the next venue'}</p>
         <p className={subClass}>
-          {nextBand.name} · {walkLine}
+          {nextBand.name}. {walkLine}
         </p>
       </>
     )
@@ -99,7 +99,7 @@ function Body({ state }) {
     <>
       <p className={titleClass}>{nextBand.name}</p>
       <p className={subClass}>
-        {nextBand.venue ? `${nextBand.venue} · ` : ''}in {formatMins(minutesToNext)}
+        {nextBand.venue ? `${nextBand.venue}, ` : ''}in {formatMins(minutesToNext)}
       </p>
     </>
   )

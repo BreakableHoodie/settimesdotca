@@ -63,7 +63,7 @@ test("a password reset link completes, hashing the new password on the server", 
   await page.getByLabel(/^new password/i).fill(newPassword);
   await page.getByLabel(/^confirm/i).fill(newPassword);
   // The page posts to /api/auth/reset-password (re-exporting reset-password-complete.js).
-  const response = await clickAndWaitForPost(page, "/api/auth/reset-password", "Reset Password");
+  const response = await clickAndWaitForPost(page, "/api/auth/reset-password", "Reset password");
   expect(response.status(), await response.text()).toBe(200);
   await expect(page.getByText(/password reset successfully/i)).toBeVisible();
 

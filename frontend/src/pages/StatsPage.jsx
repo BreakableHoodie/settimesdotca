@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
+import { ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { fetchPublicJson } from '../utils/publicApi'
 import { buildBandProfileHref } from '../utils/bandProfileLink'
@@ -97,12 +98,15 @@ export default function StatsPage() {
 
       <main id="main-content" tabIndex={-1} className="container mx-auto max-w-2xl px-4 py-12">
         <div className="mb-8">
-          <Link to="/" className="text-sm text-accent-400 transition-colors hover:text-accent-500">
-            ← Back to SetTimes
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 text-sm text-accent-400 transition-colors hover:text-accent-500"
+          >
+            <ArrowLeft size={14} aria-hidden="true" /> Back to SetTimes
           </Link>
         </div>
 
-        <h1 className="mb-3 text-3xl font-bold text-text-primary">SetTimes by the Numbers</h1>
+        <h1 className="mb-3 text-3xl font-bold text-text-primary">SetTimes by the numbers</h1>
         <p className="mb-10 leading-relaxed text-text-secondary">
           A live look at the free, community-run schedule tool for Waterloo Region — every count below updates as the
           Vol. 17 lineup comes together.

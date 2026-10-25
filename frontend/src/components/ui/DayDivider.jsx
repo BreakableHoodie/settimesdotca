@@ -9,7 +9,7 @@ import { formatTime } from '../../utils/timeFormat'
  * DayDivider - Design System v1.0
  *
  * Festival-day header shown between sets on different days of a multi-day
- * event (#541): "DAY N · August 2" (no weekday, #681 — see
+ * event (#541): "DAY N, August 2" (no weekday, #681 — see
  * `formatFestivalDate`'s docblock for why). Public / theme-following
  * surface — semantic tokens only, never hardcoded white.
  *
@@ -33,7 +33,7 @@ const DayDivider = memo(function DayDivider({ date, dayNumber, doorsJson = null,
       aria-label={`Day ${dayNumber}`}
     >
       <span className="text-xs font-bold tracking-widest uppercase text-text-primary bg-surface border border-border px-3 py-1.5 rounded-sm whitespace-nowrap">
-        Day {dayNumber} &middot; {formatFestivalDate(date, 'long')}
+        Day {dayNumber}, {formatFestivalDate(date, 'long')}
       </span>
       {doorsTime && (
         <span className="inline-flex items-center gap-1 text-xs font-medium text-text-secondary whitespace-nowrap">

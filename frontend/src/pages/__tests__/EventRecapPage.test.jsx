@@ -65,8 +65,8 @@ describe('EventRecapPage — roster-only archive (no venue/time data)', () => {
     expect(within(statsRegion).queryByText('Venues')).not.toBeInTheDocument()
     expect(within(statsRegion).queryByText(/^Venues:/)).not.toBeInTheDocument()
     // Sibling stats are unaffected.
-    expect(within(statsRegion).getByText('Total Sets')).toBeInTheDocument()
-    expect(within(statsRegion).getByText('First Timers')).toBeInTheDocument()
+    expect(within(statsRegion).getByText('Total sets')).toBeInTheDocument()
+    expect(within(statsRegion).getByText('First timers')).toBeInTheDocument()
   })
 
   it('never renders "TBD–TBD" time ranges', async () => {

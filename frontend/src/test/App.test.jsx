@@ -340,9 +340,9 @@ describe('clear + undo', () => {
     renderApp()
     await screen.findByRole('heading', { name: 'My Route', level: 2 })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Clear All' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Clear all' }))
 
-    const dialog = await screen.findByRole('dialog', { name: 'Clear Route' })
+    const dialog = await screen.findByRole('dialog', { name: 'Clear route' })
     within(dialog).getByText('Are you sure you want to clear your entire route?')
     fireEvent.click(within(dialog).getByRole('button', { name: 'Clear', exact: true }))
 
@@ -569,17 +569,17 @@ describe('shared-schedule import via ?s=', () => {
     })
   })
 
-  it('opens the Load Shared Route confirm when a route already exists, and Merge unions the two routes', async () => {
+  it('opens the Load shared route confirm when a route already exists, and Merge unions the two routes', async () => {
     window.localStorage.setItem(SELECTED_BANDS_KEY, JSON.stringify({ 'test-event': ['evt-alpha-101'] }))
     renderApp('/event/test-event?s=202')
 
-    const dialog = await screen.findByRole('dialog', { name: 'Load Shared Route' })
+    const dialog = await screen.findByRole('dialog', { name: 'Load shared route' })
     within(dialog).getByText('Beta Foxes') // "You'd add"
     within(dialog).getByText('Alpha Wolves') // "Only yours"
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Merge' }))
 
-    expect(screen.queryByRole('dialog', { name: 'Load Shared Route' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Load shared route' })).not.toBeInTheDocument()
     await waitFor(() => {
       expect(getSelectedBands('test-event')).toEqual(['evt-alpha-101', 'evt-beta-202'])
     })
@@ -589,10 +589,10 @@ describe('shared-schedule import via ?s=', () => {
     window.localStorage.setItem(SELECTED_BANDS_KEY, JSON.stringify({ 'test-event': ['evt-alpha-101'] }))
     renderApp('/event/test-event?s=202')
 
-    const dialog = await screen.findByRole('dialog', { name: 'Load Shared Route' })
+    const dialog = await screen.findByRole('dialog', { name: 'Load shared route' })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Replace' }))
 
-    expect(screen.queryByRole('dialog', { name: 'Load Shared Route' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Load shared route' })).not.toBeInTheDocument()
     await waitFor(() => {
       expect(getSelectedBands('test-event')).toEqual(['evt-beta-202'])
     })
@@ -604,7 +604,7 @@ describe('shared-schedule import via ?share= (useSharedRouteImport -> handleShar
     const fetchMock = mockScheduleFetch({ shareSnapshot: { performance_ids: [202], band_names: ['Beta Foxes'] } })
     renderApp('/event/test-event?share=shared-abc123')
 
-    const dialog = await screen.findByRole('dialog', { name: 'Load Shared Route' })
+    const dialog = await screen.findByRole('dialog', { name: 'Load shared route' })
     within(dialog).getByText('Beta Foxes')
 
     expect(fetchMock).toHaveBeenCalledWith('/api/schedule/share/shared-abc123?import=1')

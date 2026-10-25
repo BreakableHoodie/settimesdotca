@@ -44,7 +44,7 @@ describe('VenuesPage', () => {
     expect(screen.getByRole('searchbox', { name: /search venues/i })).toBeInTheDocument()
     expect(await screen.findByText('Roost')).toBeInTheDocument()
     expect(screen.getByText(/Waterloo, ON/)).toBeInTheDocument()
-    expect(screen.getByText(/5 sets · 2 events/)).toBeInTheDocument()
+    expect(screen.getByText(/5 sets, 2 events/)).toBeInTheDocument()
   })
 
   it('queries the API with the search term', async () => {

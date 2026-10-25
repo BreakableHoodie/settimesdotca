@@ -1,4 +1,4 @@
-import { Archive, Bell, CircleAlert, WifiOff, X } from 'lucide-react'
+import { Archive, ArrowLeft, Bell, CircleAlert, WifiOff, X } from 'lucide-react'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
@@ -787,7 +787,7 @@ function App() {
             onClick={() => window.location.reload()}
             className="px-6 py-3 bg-accent-500 text-bg-navy font-semibold rounded-lg hover:brightness-110 transition-[filter]"
           >
-            Try Again
+            Try again
           </button>
         </div>
       </div>
@@ -807,7 +807,7 @@ function App() {
             onClick={() => window.location.reload()}
             className="px-6 py-3 bg-accent-500 text-bg-navy font-semibold rounded-lg hover:brightness-110 transition-[filter]"
           >
-            Refresh Page
+            Refresh page
           </button>
         </div>
       </div>
@@ -825,7 +825,7 @@ function App() {
   }
 
   // Breadcrumb navigation
-  const breadcrumbs = [{ label: 'Events', href: '/' }, { label: eventData?.name || 'Event Schedule' }]
+  const breadcrumbs = [{ label: 'Events', href: '/' }, { label: eventData?.name || 'Event schedule' }]
 
   return (
     <div
@@ -862,8 +862,11 @@ function App() {
             >
               <span className="text-accent-500">Set</span>Times
             </Link>
-            <Link to="/" className="text-sm text-text-secondary hover:text-text-primary transition-colors">
-              ← All Events
+            <Link
+              to="/"
+              className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors"
+            >
+              <ArrowLeft size={14} aria-hidden="true" /> All events
             </Link>
           </div>
         </header>
@@ -943,7 +946,7 @@ function App() {
                 <>
                   {' '}
                   <Link to={`/events/${eventData.slug}/recap`} className="text-accent-400 hover:underline">
-                    View the recap →
+                    View the recap
                   </Link>
                 </>
               )}
@@ -969,7 +972,7 @@ function App() {
           <section className="bg-bg-purple/80 border border-accent-500/30 rounded-lg p-4">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               <div>
-                <h2 className="text-text-primary font-semibold text-lg">Realtime Test Time</h2>
+                <h2 className="text-text-primary font-semibold text-lg">Realtime test time</h2>
                 <p className="text-text-tertiary text-sm">
                   Use this to simulate &ldquo;Now Playing&rdquo; and upcoming sets before event day.
                 </p>
@@ -1097,7 +1100,7 @@ function App() {
           setSharedScheduleConfirmOpen(false)
           setPendingSharedBands([])
         }}
-        title="Load Shared Route"
+        title="Load shared route"
         size="sm"
         footer={
           <>
@@ -1164,7 +1167,7 @@ function App() {
       </Modal>
       <ConfirmDialog
         isOpen={clearConfirmOpen}
-        title="Clear Route"
+        title="Clear route"
         message="Are you sure you want to clear your entire route?"
         confirmText="Clear"
         onConfirm={doActualClear}

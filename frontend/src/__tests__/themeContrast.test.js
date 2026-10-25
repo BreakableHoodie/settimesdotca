@@ -12,7 +12,7 @@
 //
 //   #617  a `text-bg-navy` consumer sat at ~2.3-2.9:1 until the paired gradient
 //         was darkened to match --color-accent-500.
-//   this  ComingUp.jsx's "Up Next" banner -- role="status", aria-live="polite",
+//   this  ComingUp.jsx's "Up next" banner -- role="status", aria-live="polite",
 //         the show-day element telling fans what is playing next -- rendered
 //         `text-bg-navy` on a hand-rolled `from-accent-500 to-primary-600`
 //         gradient. On arctic-night that `to` stop is indigo #4f46e5 against

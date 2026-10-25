@@ -45,7 +45,7 @@ function RouteDiffSection({ title, hint, bands, tone }) {
               </span>
               <span className="block text-xs text-text-tertiary">
                 {formatTimeRange(band.startTime, band.endTime)}
-                {band.venue ? ` · ${band.venue}` : ''}
+                {band.venue ? `, ${band.venue}` : ''}
               </span>
             </li>
           )

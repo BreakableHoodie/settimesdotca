@@ -46,13 +46,13 @@ export default function EventsPage() {
         <title>SetTimes – Live Music Events &amp; Show Schedules</title>
         <meta
           name="description"
-          content="Discover upcoming live music events and build your personalized show schedule. Browse artists, venues, and set times all in one place."
+          content="Set times for live music in Waterloo Region. Browse artists and venues, pick the sets you want, and build your own route through the night."
         />
         <link rel="canonical" href="https://settimes.ca/" />
         <meta property="og:title" content="SetTimes – Live Music Events & Show Schedules" />
         <meta
           property="og:description"
-          content="Discover upcoming live music events and build your personalized show schedule. Browse artists, venues, and set times all in one place."
+          content="Set times for live music in Waterloo Region. Browse artists and venues, pick the sets you want, and build your own route through the night."
         />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://settimes.ca/" />
@@ -61,7 +61,7 @@ export default function EventsPage() {
         <meta name="twitter:title" content="SetTimes – Live Music Events & Show Schedules" />
         <meta
           name="twitter:description"
-          content="Discover upcoming live music events and build your personalized show schedule."
+          content="Set times for live music in Waterloo Region. Pick your sets and build your own route."
         />
         <script type="application/ld+json">
           {JSON.stringify({
@@ -69,7 +69,8 @@ export default function EventsPage() {
             '@type': 'WebSite',
             name: 'SetTimes',
             url: 'https://settimes.ca',
-            description: 'Discover live music events and build your personalized show schedule.',
+            description:
+              'Set times for live music in Waterloo Region, and a way to build your own route through the night.',
           })}
         </script>
       </Helmet>
@@ -79,7 +80,7 @@ export default function EventsPage() {
             <h1 className="mb-2 text-4xl font-bold text-text-primary font-display">
               <span className="text-accent-500">Set</span>Times
             </h1>
-            <p className="text-lg text-accent-400">Discover · Plan · Experience</p>
+            <p className="text-lg text-accent-400">Set times for live music in Waterloo Region.</p>
             {/* One flex row owning the space BETWEEN the links, rather than two
                 inline-flex siblings separated only by collapsed JSX whitespace.
                 That whitespace is a single space (~4px) while each link's own

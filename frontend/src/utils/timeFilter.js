@@ -217,13 +217,13 @@ export function filterPerformancesByTime(performances, timeFilter) {
  */
 export function getTimeFilterOptions() {
   return [
-    { value: 'all', label: 'Any Time', description: 'Show all performances' },
-    { value: 'now', label: 'Happening Now', description: 'Currently performing or starting soon' },
+    { value: 'all', label: 'Any time', description: 'Show all performances' },
+    { value: 'now', label: 'Happening now', description: 'Currently performing or starting soon' },
     { value: 'today', label: 'Today', description: 'Performances happening today' },
-    { value: 'this-week', label: 'This Week', description: 'Performances this week' },
-    { value: 'next-week', label: 'Next Week', description: 'Performances next week' },
-    { value: 'this-month', label: 'This Month', description: 'Performances this month' },
-    { value: 'next-month', label: 'Next Month', description: 'Performances next month' },
+    { value: 'this-week', label: 'This week', description: 'Performances this week' },
+    { value: 'next-week', label: 'Next week', description: 'Performances next week' },
+    { value: 'this-month', label: 'This month', description: 'Performances this month' },
+    { value: 'next-month', label: 'Next month', description: 'Performances next month' },
   ]
 }
 
@@ -281,7 +281,7 @@ export function getTimeDescription(performance) {
   // If performance is happening now
   if (isHappeningNow(performance)) {
     if (startTime <= now && endTime >= now) {
-      return `Happening Now${durationStr}`
+      return `Happening now${durationStr}`
     } else if (startTime > now) {
       const minutesUntil = Math.ceil((startTime - now) / (1000 * 60))
       return `Starting in ${minutesUntil} minute${minutesUntil !== 1 ? 's' : ''}${durationStr}`

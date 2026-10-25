@@ -251,7 +251,7 @@ export default function SharePreviewPage() {
                   const multiDay = knownDays.size > 1
                   const dayLabel = multiDay ? festivalDayLabel(band) : null
                   const parts = [dayLabel, formatSetTime(band), band.venue].filter(Boolean)
-                  return <p className="mt-1 text-sm text-text-secondary">{parts.join(' · ')}</p>
+                  return <p className="mt-1 text-sm text-text-secondary">{parts.join(', ')}</p>
                 })()}
             </li>
           ))}

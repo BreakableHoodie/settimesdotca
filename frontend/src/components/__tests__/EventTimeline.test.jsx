@@ -283,7 +283,7 @@ describe('EventTimeline recap links', () => {
 
     expect(await screen.findByText('Upcoming Fest')).toBeInTheDocument()
 
-    // Past events sit behind the "Show History" toggle
+    // Past events sit behind the "Show history" toggle
     fireEvent.click(screen.getByRole('button', { name: /show history/i }))
     expect(await screen.findByText('Past Fest')).toBeInTheDocument()
 
@@ -748,7 +748,7 @@ describe('EventTimeline poster thumbnails (#658)', () => {
 // would ship multiple megabytes on every homepage load even though the past
 // list starts collapsed. The past cards — and therefore their <img> tags —
 // must be conditionally rendered (not just CSS-hidden), so the browser never
-// fetches a single past poster until "Show History" is clicked.
+// fetches a single past poster until "Show history" is clicked.
 describe('EventTimeline past-section poster lazy mounting (#658)', () => {
   afterEach(() => {
     // restoreAllMocks does NOT undo a direct assignment to global.fetch --
@@ -837,7 +837,7 @@ describe('EventTimeline past-section poster lazy mounting (#658)', () => {
     })
 
     // Exactly one link TO the event named by the event itself per card — the
-    // poster+title link. The card also carries a "View Lineup"/"Build Your
+    // poster+title link. The card also carries a "View lineup"/"Build your
     // Schedule" primary CTA that navigates to the same page, but that button
     // is labelled by its action, not by the event name, so it must not be
     // counted here; the event name is announced as a link exactly once.
@@ -865,7 +865,7 @@ describe('EventTimeline past-section poster lazy mounting (#658)', () => {
       now: [],
       // A non-empty upcoming bucket keeps Past collapsed by default (Past only
       // auto-expands when it's the sole non-empty bucket), which this test
-      // relies on to exercise the manual "Show History" toggle below.
+      // relies on to exercise the manual "Show history" toggle below.
       upcoming: [
         {
           id: 2,
@@ -921,7 +921,7 @@ describe('EventTimeline past-section poster lazy mounting (#658)', () => {
       now: [],
       // A non-empty upcoming bucket keeps Past collapsed by default (Past only
       // auto-expands when it's the sole non-empty bucket), which this test
-      // relies on to exercise the manual "Show History" toggle below.
+      // relies on to exercise the manual "Show history" toggle below.
       upcoming: [
         {
           id: 10,
@@ -1225,7 +1225,7 @@ describe('EventTimeline empty lineup and between-seasons states', () => {
     )
 
     expect(await screen.findByText('Upcoming Fest')).toBeInTheDocument()
-    // Past events sit behind the "Show History" toggle -- auto-expand does
+    // Past events sit behind the "Show history" toggle -- auto-expand does
     // NOT fire here because Upcoming Fest keeps hasUpcoming true.
     fireEvent.click(screen.getByRole('button', { name: /show history/i }))
     expect(await screen.findByText('Undocumented Past Fest')).toBeInTheDocument()
@@ -1327,7 +1327,7 @@ describe('EventTimeline empty lineup and between-seasons states', () => {
       </MemoryRouter>
     )
 
-    // No click on "Show History" -- the past event should already be visible.
+    // No click on "Show history" -- the past event should already be visible.
     expect(await screen.findByText('Long Weekend Band Crawl Vol 17')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /hide history/i })).toBeInTheDocument()
   })
@@ -1358,8 +1358,8 @@ describe('EventTimeline empty lineup and between-seasons states', () => {
       </MemoryRouter>
     )
 
-    expect(await screen.findByText('Browse past events — new dates will be announced here')).toBeInTheDocument()
-    expect(screen.queryByText('Discover upcoming live music events')).not.toBeInTheDocument()
+    expect(await screen.findByText('Browse past events. New dates will be announced here.')).toBeInTheDocument()
+    expect(screen.queryByText('Upcoming shows in Waterloo Region.')).not.toBeInTheDocument()
     unmount()
 
     stubTimeline({
@@ -1387,8 +1387,8 @@ describe('EventTimeline empty lineup and between-seasons states', () => {
       </MemoryRouter>
     )
 
-    expect(await screen.findByText('Discover upcoming live music events')).toBeInTheDocument()
-    expect(screen.queryByText('Browse past events — new dates will be announced here')).not.toBeInTheDocument()
+    expect(await screen.findByText('Upcoming shows in Waterloo Region.')).toBeInTheDocument()
+    expect(screen.queryByText('Browse past events. New dates will be announced here.')).not.toBeInTheDocument()
   })
 
   // Regression: the auto-expand effect above is keyed on `[timeline]`, and
@@ -1458,7 +1458,7 @@ describe('EventTimeline empty lineup and between-seasons states', () => {
     await vi.advanceTimersByTimeAsync(60000)
     await waitFor(() => expect(fetchCount).toBeGreaterThan(1))
 
-    // ...but the collapse must survive it: still "Show History", and no past
+    // ...but the collapse must survive it: still "Show history", and no past
     // event content leaked back into the DOM under either name. Testing
     // Library's waitFor (not a bare synchronous assertion, and not vitest's
     // own vi.waitFor) is required here -- it wraps each retry in act(),
@@ -1604,8 +1604,8 @@ describe('EventTimeline between-seasons filter copy accuracy', () => {
     // condition the same screen says "new dates will be announced here" directly
     // above an alert explaining that filters are hiding the upcoming events --
     // two contradictory claims, one of them false.
-    expect(screen.getByText('Discover upcoming live music events')).toBeInTheDocument()
-    expect(screen.queryByText('Browse past events — new dates will be announced here')).not.toBeInTheDocument()
+    expect(screen.getByText('Upcoming shows in Waterloo Region.')).toBeInTheDocument()
+    expect(screen.queryByText('Browse past events. New dates will be announced here.')).not.toBeInTheDocument()
   })
 })
 

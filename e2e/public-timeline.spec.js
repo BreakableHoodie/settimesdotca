@@ -11,7 +11,7 @@ import { test, expect } from "@playwright/test";
 //
 // This supersedes the #602 fix it replaces rather than dropping it. That bug
 // was `.first()` grabbing a LIVE event, which EventTimeline auto-expands
-// (`useState(isLive)`), so its "View Details" toggle already read "Hide
+// (`useState(isLive)`), so its "View details" toggle already read "Hide
 // Details" and the click timed out — CI-only and time-of-day dependent. The
 // seeded event is dated two weeks out and is never live, so the card is
 // reliably collapsed; naming it removes the whole class rather than filtering
@@ -34,7 +34,7 @@ test.describe("Public Timeline Viewing", () => {
   test("should display upcoming events without authentication", async ({ page }) => {
     await page.goto("/");
 
-    // Use exact:true to avoid matching both "Events" h1 and "Past Events" h2
+    // Use exact:true to avoid matching both "Events" h1 and "Past events" h2
     await expect(page.getByRole("heading", { name: "Events", exact: true })).toBeVisible();
 
     const eventCards = page.locator('[data-testid="event-card"]');
@@ -47,7 +47,7 @@ test.describe("Public Timeline Viewing", () => {
     const firstEvent = await seededEventCard(page);
     await firstEvent.getByRole("button", { name: /view details/i }).click();
 
-    // Verify the card expanded (button flips to Hide Details)
+    // Verify the card expanded (button flips to Hide details)
     await expect(firstEvent.getByRole("button", { name: /hide details/i })).toBeVisible();
 
     // Seed data guarantees the upcoming event has venues
@@ -139,7 +139,7 @@ test.describe("Public Timeline Viewing", () => {
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto("/");
 
-    // Use exact:true to avoid matching both "Events" h1 and "Past Events" h2
+    // Use exact:true to avoid matching both "Events" h1 and "Past events" h2
     await expect(page.getByRole("heading", { name: "Events", exact: true })).toBeVisible();
 
     const eventCards = page.locator('[data-testid="event-card"]');
@@ -200,7 +200,7 @@ test.describe("Public Timeline Viewing", () => {
     await expect(page).not.toHaveURL(/\/admin\/login/);
     await expect(page).not.toHaveURL(/\/login/);
 
-    // Use exact:true to avoid matching both "Events" h1 and "Past Events" h2
+    // Use exact:true to avoid matching both "Events" h1 and "Past events" h2
     await expect(page.getByRole("heading", { name: "Events", exact: true })).toBeVisible();
 
     const eventCards = page.locator('[data-testid="event-card"]');

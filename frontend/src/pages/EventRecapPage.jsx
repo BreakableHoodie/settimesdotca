@@ -221,14 +221,14 @@ export default function EventRecapPage() {
                 className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-accent-400 px-5 py-3 font-semibold text-bg-navy transition-colors hover:bg-accent-400/90"
               >
                 <CalendarDays size={16} aria-hidden="true" />
-                View Archived Schedule
+                View archived schedule
               </Link>
               <Link
                 to="/"
                 className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-border px-5 py-3 font-semibold text-text-secondary transition-colors hover:bg-surface-hover"
               >
                 <ArrowLeft size={16} aria-hidden="true" />
-                Browse All Events
+                Browse all events
               </Link>
             </div>
           </header>
@@ -237,17 +237,17 @@ export default function EventRecapPage() {
             aria-label="Event statistics"
             className={`mb-10 grid grid-cols-2 gap-4 ${hasVenueData ? 'sm:grid-cols-5' : 'sm:grid-cols-4'}`}
           >
-            <StatCard label="Total Sets" value={stats.total_sets ?? '—'} />
+            <StatCard label="Total sets" value={stats.total_sets ?? '—'} />
             {hasVenueData && <StatCard label="Venues" value={stats.venue_count} />}
-            <StatCard label="First Timers" value={stats.first_timers ?? '—'} />
-            <StatCard label="Returning Acts" value={stats.returning_acts ?? '—'} />
-            <StatCard label="Saved Route" value={savedBands.length || '—'} />
+            <StatCard label="First timers" value={stats.first_timers ?? '—'} />
+            <StatCard label="Returning acts" value={stats.returning_acts ?? '—'} />
+            <StatCard label="Saved route" value={savedBands.length || '—'} />
           </section>
 
           <section aria-label="Your route recap" className="mb-10 rounded-2xl border border-border bg-surface p-6">
             <div className="mb-5 flex items-center gap-2">
               <Route size={18} className="text-accent-400" aria-hidden="true" />
-              <h2 className="text-2xl font-semibold text-text-primary">Your Route Recap</h2>
+              <h2 className="text-2xl font-semibold text-text-primary">Your route recap</h2>
             </div>
 
             {savedBands.length > 0 ? (
@@ -311,7 +311,7 @@ export default function EventRecapPage() {
           <section aria-label="Venue recap" className="mb-10 rounded-2xl border border-border bg-surface p-6">
             <div className="mb-5 flex items-center gap-2">
               <MapPin size={18} className="text-accent-400" aria-hidden="true" />
-              <h2 className="text-2xl font-semibold text-text-primary">Venue Recap</h2>
+              <h2 className="text-2xl font-semibold text-text-primary">Venue recap</h2>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               {venueRecap.map(venue => (
@@ -334,7 +334,7 @@ export default function EventRecapPage() {
                       to={`/event/${event.slug}`}
                       className="text-xs font-semibold text-accent-400 transition-colors hover:text-accent-300"
                     >
-                      View schedule →
+                      View schedule
                     </Link>
                   </div>
                   <ul className="space-y-2 text-sm text-text-secondary">
@@ -365,7 +365,7 @@ export default function EventRecapPage() {
           </section>
 
           <section aria-label="Archived lineup">
-            <h2 className="mb-4 text-xl font-semibold text-text-primary">Archived Lineup</h2>
+            <h2 className="mb-4 text-xl font-semibold text-text-primary">Archived lineup</h2>
             <ul className="space-y-3">
               {bands.length === 0 ? (
                 <li className="text-text-tertiary text-sm py-4 text-center">No performers recorded for this event.</li>
@@ -413,7 +413,7 @@ export default function EventRecapPage() {
                 className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-border px-5 py-3 font-semibold text-text-secondary transition-colors hover:bg-surface-hover"
               >
                 <CalendarDays size={16} aria-hidden="true" />
-                Archived Schedule
+                Archived schedule
               </Link>
               <Link
                 to="/subscribe"

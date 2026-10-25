@@ -35,7 +35,7 @@ describe('BandCard — cancelled sets', () => {
   // isStartingSoon's minutesUntil math, see BandCard.jsx). Without pinning
   // this debug hook, the "playing" fixture below wouldn't actually be
   // "playing" whenever the suite happened to run on a different real-world
-  // date, and "says Live Now for a playing set" would silently pass or fail
+  // date, and "says Live now for a playing set" would silently pass or fail
   // by coincidence rather than by design. This is the same override
   // timeFilter.test.js already uses for exactly this reason.
   beforeEach(() => {
@@ -78,15 +78,15 @@ describe('BandCard — cancelled sets', () => {
     expect(screen.getByText('Deer Fang').closest('s')).not.toBeNull()
   })
 
-  it('says Live Now for a playing set that is NOT cancelled', () => {
+  it('says Live now for a playing set that is NOT cancelled', () => {
     // Baseline: proves the fixture really is inside its set window.
     renderCard({ is_cancelled: 0 })
-    expect(screen.getByText('Live Now')).toBeInTheDocument()
+    expect(screen.getByText('Live now')).toBeInTheDocument()
   })
 
-  it('does NOT say Live Now when the same playing set is cancelled', () => {
+  it('does NOT say Live now when the same playing set is cancelled', () => {
     renderCard({ is_cancelled: 1 })
-    expect(screen.queryByText('Live Now')).toBeNull()
+    expect(screen.queryByText('Live now')).toBeNull()
   })
 
   it('hides the add/remove toggle', () => {

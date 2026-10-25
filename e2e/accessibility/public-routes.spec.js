@@ -37,33 +37,33 @@ const surfaces = [
   {
     path: "/event/:future",
     label: "Event schedule",
-    ready: (page) => page.getByRole("heading", { name: "Full Lineup" }),
+    ready: (page) => page.getByRole("heading", { name: "Full lineup" }),
   },
   {
     path: "/events/:past/recap",
     label: "Event recap",
-    ready: (page) => page.getByRole("heading", { name: "Archived Lineup" }),
+    ready: (page) => page.getByRole("heading", { name: "Archived lineup" }),
   },
-  { path: "/embed/:future", label: "Embed", ready: (page) => page.getByRole("heading", { name: "Full Lineup" }) },
-  { path: "/subscribe", label: "Subscribe", ready: (page) => page.getByRole("heading", { name: "Never Miss a Show" }) },
+  { path: "/embed/:future", label: "Embed", ready: (page) => page.getByRole("heading", { name: "Full lineup" }) },
+  { path: "/subscribe", label: "Subscribe", ready: (page) => page.getByRole("heading", { name: "Never miss a show" }) },
   {
     path: "/reset-password",
     label: "Reset password (no token)",
     // No token means the verify step never runs, so the FORM never renders --
     // this is the error state, same as /activate below. The token-verified form
     // is still unscanned (needs a live reset row); tracked separately.
-    ready: (page) => page.getByRole("heading", { name: "Reset Failed" }),
+    ready: (page) => page.getByRole("heading", { name: "Reset failed" }),
   },
   {
     path: "/activate",
     label: "Activate (no token)",
-    ready: (page) => page.getByRole("heading", { name: "Activation Failed" }),
+    ready: (page) => page.getByRole("heading", { name: "Activation failed" }),
   },
   { path: "/privacy", label: "Privacy", ready: (page) => page.getByRole("heading", { name: "Privacy Policy" }) },
   { path: "/terms", label: "Terms", ready: (page) => page.getByRole("heading", { name: "Terms of Service" }) },
   { path: "/about", label: "About", ready: (page) => page.getByRole("heading", { name: "About SetTimes" }) },
   { path: "/contact", label: "Contact", ready: (page) => page.getByRole("heading", { name: "Contact" }) },
-  { path: "/stats", label: "Stats", ready: (page) => page.getByRole("heading", { name: "SetTimes by the Numbers" }) },
+  { path: "/stats", label: "Stats", ready: (page) => page.getByRole("heading", { name: "SetTimes by the numbers" }) },
   // Directory pages. Their <h1> renders before the fetch resolves, so a heading
   // is NOT a ready signal -- wait on a real card's profile link.
   {

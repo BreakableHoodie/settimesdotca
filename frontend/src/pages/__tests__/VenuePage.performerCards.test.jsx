@@ -266,7 +266,7 @@ describe('VenuePage — performer cards (#742)', () => {
     })
 
     expect(screen.queryByText(/Starts in 15m/)).not.toBeInTheDocument()
-    expect(screen.getByText(/Live Now/i)).toBeInTheDocument()
+    expect(screen.getByText(/Live now/i)).toBeInTheDocument()
   })
 
   it('renders a cancelled set struck through inside the new card, not as a plain row', async () => {

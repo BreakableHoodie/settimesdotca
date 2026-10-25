@@ -4,7 +4,7 @@ import LiveContextBar from '../LiveContextBar'
 
 // LiveContextBar is one of the four named consumers in the design spec's
 // suppression #1 ("Never up next") -- a cancelled set must not sustain a
-// "Happening Now"/"Live Tonight" lifecycle label, and must not inflate the
+// "Happening now"/"Live Tonight" lifecycle label, and must not inflate the
 // "N sets" count in the summary line (#732).
 describe('LiveContextBar — cancelled sets', () => {
   it('does not let a cancelled-only band\'s schedule window keep a long-past event "Live Tonight"', () => {

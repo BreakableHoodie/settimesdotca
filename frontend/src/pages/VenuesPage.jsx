@@ -14,7 +14,7 @@ function VenueCard({ venue }) {
   const counts = [
     `${venue.performance_count} ${venue.performance_count === 1 ? 'set' : 'sets'}`,
     `${venue.event_count} ${venue.event_count === 1 ? 'event' : 'events'}`,
-  ].join(' · ')
+  ].join(', ')
 
   return (
     <Link

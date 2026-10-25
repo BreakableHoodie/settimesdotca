@@ -68,7 +68,7 @@ export default function BandStats({ stats }) {
     <Card variant="elevated">
       <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold text-text-primary">
         <TrendingUp size={18} className="text-accent-500" aria-hidden="true" />
-        Performance Snapshot
+        Performance snapshot
       </h3>
 
       {/* Each group is its own <dl> rather than one <dl> wrapping two layout
@@ -123,7 +123,7 @@ export default function BandStats({ stats }) {
                     {isDate
                       ? formatStatDate(value)
                       : isVenue && value?.name
-                        ? `${value.name}${value.count !== undefined ? ` · ${value.count}×` : ''}`
+                        ? `${value.name}${value.count !== undefined ? ` (${value.count}×)` : ''}`
                         : '—'}
                   </dd>
                 </Card>

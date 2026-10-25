@@ -38,7 +38,7 @@ function BandCard({
   // link unconditionally, so a nameless band rendered an empty link with a broken
   // href -- reintroducing in the board exactly what #726/WCAG 2.5.3 fixed in the
   // card. Caught by Copilot on #1085.
-  const displayName = band.name || 'Unnamed Artist'
+  const displayName = band.name || 'Unnamed artist'
   const labelBase = isSelected ? `Remove ${displayName} from my route` : `Add ${displayName} to my route`
   const bandProfileHref = band.name ? buildBandProfileHref(band.name, eventSlug) : null
 
@@ -165,7 +165,7 @@ function BandCard({
 
   // ONE source of truth for the name shown and the name announced. The visible
   // fallback used to be a literal in the markup while the labels interpolated
-  // band.name directly, so a nameless band rendered "Unnamed Artist" but
+  // band.name directly, so a nameless band rendered "Unnamed artist" but
   // announced "undefined" — WCAG 2.5.3 (Label in Name) requires the accessible
   // name to contain the visible text. Derive both from this.
 
@@ -206,7 +206,7 @@ function BandCard({
             className={`soon-pill${onAmber ? ' soon-pill--dark' : ''}`}
             aria-label={`Starts in ${minutesUntil} ${minutesUntil === 1 ? 'minute' : 'minutes'} at ${formatTime(band.startTime)}`}
           >
-            Starts in {minutesUntil}m · {formatTime(band.startTime)}
+            Starts in {minutesUntil}m, at {formatTime(band.startTime)}
           </span>
         )}
         {/* Visible pill on the unselected card (#729): bg-bg-navy/60 blended
@@ -272,7 +272,7 @@ function BandCard({
           }`}
         >
           {getTimeDescription(band)}
-          {isPlaying && <span className="ml-2 text-xs uppercase tracking-wide">Live Now</span>}
+          {isPlaying && <span className="ml-2 text-xs uppercase tracking-wide">Live now</span>}
         </p>
         {/* Optional per-set day indicator (#742, venue page). getTimeDescription
             above is date-blind within the same festival week -- three sets on

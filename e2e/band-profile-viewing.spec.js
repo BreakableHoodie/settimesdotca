@@ -341,7 +341,7 @@ test.describe("Band Profile Viewing", () => {
     //
     //   1. `.first()` in DOM order resolves to the brand link (`a[href="/"]`),
     //      which goes to "/" -- and NO heading on "/" matches /schedule/i. The
-    //      headings there are SetTimes, Events, Happening Now, Coming Up, Past
+    //      headings there are SetTimes, Events, Happening now, Coming up, Past
     //      Events. The only "schedule" heading is the sr-only h1 on
     //      /event/<slug>, which that click never reaches.
     //   2. The whole assertion sat behind `if (await ...isVisible())`, so when
@@ -362,7 +362,7 @@ test.describe("Band Profile Viewing", () => {
     await expect(page).toHaveURL(/\/band\//);
 
     // The brand link is always present in the profile header, unlike
-    // "Back to Schedule", which renders only when ?fromEvent= resolves.
+    // "Back to schedule", which renders only when ?fromEvent= resolves.
     const home = page.getByRole("link", { name: /settimes/i }).first();
     await expect(home).toBeVisible();
     await home.click();
@@ -371,7 +371,7 @@ test.describe("Band Profile Viewing", () => {
     // unconditionally; the page's h1 is the SetTimes brand.
     await expect(page).toHaveURL(/\/$/);
     // exact: true is load-bearing -- Playwright's name matching defaults to
-    // case-insensitive SUBSTRING, so "Events" also matches the "Past Events"
+    // case-insensitive SUBSTRING, so "Events" also matches the "Past events"
     // heading and trips strict mode. Same collision class as an unscoped
     // getByText.
     await expect(page.getByRole("heading", { name: "Events", exact: true })).toBeVisible();

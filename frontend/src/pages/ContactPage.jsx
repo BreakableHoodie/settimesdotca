@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Helmet } from 'react-helmet-async'
+import { ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 export default function ContactPage() {
@@ -30,8 +31,11 @@ export default function ContactPage() {
 
       <main id="main-content" tabIndex={-1} className="container mx-auto px-4 max-w-2xl py-12">
         <div className="mb-8">
-          <Link to="/" className="text-accent-400 hover:text-accent-500 text-sm transition-colors">
-            ← Back to SetTimes
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 text-accent-400 hover:text-accent-500 text-sm transition-colors"
+          >
+            <ArrowLeft size={14} aria-hidden="true" /> Back to SetTimes
           </Link>
         </div>
 
@@ -64,7 +68,7 @@ export default function ContactPage() {
                 href="mailto:hello@settimes.ca?subject=Get%20listed"
                 className="text-accent-400 hover:text-accent-500 transition-colors"
               >
-                Email us to get listed →
+                Email us to get listed
               </a>
             </p>
           </section>
@@ -87,7 +91,7 @@ export default function ContactPage() {
                 href="mailto:hello@settimes.ca?subject=Takedown%2Fcorrection"
                 className="text-accent-400 hover:text-accent-500 transition-colors"
               >
-                Email a correction or takedown request →
+                Email a correction or takedown request
               </a>
             </p>
           </section>

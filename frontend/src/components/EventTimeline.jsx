@@ -311,7 +311,7 @@ export default function EventTimeline() {
                 navigating by heading level. Visual size is unchanged. See App.jsx
                 line 731-734 for the same pattern on the event schedule page. */}
             <h2 className="text-4xl font-bold text-text-primary mb-2">Events</h2>
-            {/* Between seasons (no now/upcoming events) the "Discover upcoming"
+            {/* Between seasons (no now/upcoming events) the "Upcoming shows"
                 copy is simply false -- there's nothing upcoming to discover.
                 Swap to copy that's still true: past events are browsable and
                 new dates land here.
@@ -325,19 +325,19 @@ export default function EventTimeline() {
                 screen, two contradictory statements. */}
             <p className="text-text-secondary">
               {hasNow || hasUpcoming || filtersHideFutureEvents
-                ? 'Discover upcoming live music events'
-                : 'Browse past events — new dates will be announced here'}
+                ? 'Upcoming shows in Waterloo Region.'
+                : 'Browse past events. New dates will be announced here.'}
             </p>
           </div>
 
           <div className="flex items-center gap-3">
             {hasActiveFilters && (
               <Button variant="ghost" size="sm" onClick={clearFilters} icon={<X size={14} />}>
-                Clear Filters
+                Clear filters
               </Button>
             )}
             <Button variant="secondary" size="sm" onClick={handleShowFiltersToggle} icon={<Funnel size={14} />}>
-              {showFilters ? 'Hide' : 'Show'} Filters
+              {showFilters ? 'Hide' : 'Show'} filters
             </Button>
           </div>
         </div>
@@ -349,7 +349,7 @@ export default function EventTimeline() {
               {/* Venue Filter */}
               <div>
                 <label htmlFor="timeline-venue-filter" className="block text-sm font-medium text-text-secondary mb-2">
-                  Filter by Venue
+                  Filter by venue
                 </label>
                 <select
                   id="timeline-venue-filter"
@@ -357,7 +357,7 @@ export default function EventTimeline() {
                   onChange={e => handleFilterChange('venue', e.target.value ? parseInt(e.target.value) : null)}
                   className="w-full px-4 py-2 bg-surface border border-border rounded-lg text-text-primary focus:border-primary-500 focus:ring-2 focus:ring-primary-500/50 focus:outline-hidden transition-colors"
                 >
-                  <option value="">All Venues</option>
+                  <option value="">All venues</option>
                   {allVenues.map(venue => (
                     <option key={venue.id} value={venue.id}>
                       {venue.name}
@@ -369,7 +369,7 @@ export default function EventTimeline() {
               {/* Month Filter */}
               <div>
                 <label htmlFor="timeline-month-filter" className="block text-sm font-medium text-text-secondary mb-2">
-                  Filter by Month
+                  Filter by month
                 </label>
                 <select
                   id="timeline-month-filter"
@@ -377,7 +377,7 @@ export default function EventTimeline() {
                   onChange={e => handleFilterChange('month', e.target.value || null)}
                   className="w-full px-4 py-2 bg-surface border border-border rounded-lg text-text-primary focus:border-primary-500 focus:ring-2 focus:ring-primary-500/50 focus:outline-hidden transition-colors"
                 >
-                  <option value="">All Months</option>
+                  <option value="">All months</option>
                   {allMonths.map(month => (
                     <option key={month} value={month}>
                       {(parseLocalDate(`${month}-01`) || new Date(`${month}-01`)).toLocaleDateString('en-US', {
@@ -407,7 +407,7 @@ export default function EventTimeline() {
           <section>
             <div className="flex items-center gap-3 mb-6">
               <span className="inline-block w-3 h-3 rounded-full bg-error-500 animate-pulse" aria-hidden="true" />
-              <h2 className="text-3xl font-bold text-accent-500">Happening Now</h2>
+              <h2 className="text-3xl font-bold text-accent-500">Happening now</h2>
               <Badge variant="error" size="sm">
                 LIVE
               </Badge>
@@ -432,7 +432,7 @@ export default function EventTimeline() {
           <section>
             <div className="flex items-center gap-3 mb-6">
               <CalendarDays size={20} className="text-primary-500" aria-hidden="true" />
-              <h2 className="text-3xl font-bold text-text-primary">Coming Up</h2>
+              <h2 className="text-3xl font-bold text-text-primary">Coming up</h2>
             </div>
             <div className="space-y-6">
               {filteredUpcoming.map(event => (
@@ -455,10 +455,10 @@ export default function EventTimeline() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
               <div className="flex items-center gap-3">
                 <History size={20} className="text-text-tertiary" aria-hidden="true" />
-                <h2 className="text-3xl font-bold text-text-secondary">Past Events</h2>
+                <h2 className="text-3xl font-bold text-text-secondary">Past events</h2>
               </div>
               <Button variant="ghost" size="sm" onClick={handleShowPastToggle}>
-                {showPast ? 'Hide' : 'Show'} History ({filteredPast.length})
+                {showPast ? 'Hide' : 'Show'} history ({filteredPast.length})
               </Button>
             </div>
 
@@ -515,11 +515,11 @@ export default function EventTimeline() {
                 </p>
                 {filtersHideFutureEvents ? (
                   <Button variant="secondary" size="sm" onClick={clearFilters} icon={<X size={14} />}>
-                    Clear Filters
+                    Clear filters
                   </Button>
                 ) : (
                   <Button as={Link} to="/subscribe" variant="secondary" size="sm">
-                    Subscribe for Updates
+                    Subscribe for updates
                   </Button>
                 )}
               </div>
@@ -761,7 +761,7 @@ function EventCard({
                 }
               }}
             >
-              {isPast || event.status === 'archived' ? 'View Lineup' : 'Build Your Schedule'}
+              {isPast || event.status === 'archived' ? 'View lineup' : 'Build your schedule'}
             </Button>
             {/* Past editions get a recap link — the recap page was previously
                 unreachable except by URL (#555). */}
@@ -787,7 +787,7 @@ function EventCard({
                 className="w-full sm:w-auto sm:min-w-[160px]"
                 onClick={() => trackTicketClick(event.id)}
               >
-                Get Tickets
+                Get tickets
               </Button>
             )}
             <Button
@@ -802,7 +802,7 @@ function EventCard({
                 }
               }}
             >
-              {isLoadingDetails ? 'Loading Details...' : expanded ? 'Hide Details' : 'View Details'}
+              {isLoadingDetails ? 'Loading details…' : expanded ? 'Hide details' : 'View details'}
             </Button>
           </div>
         </div>

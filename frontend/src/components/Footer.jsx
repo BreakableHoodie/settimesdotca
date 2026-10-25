@@ -12,7 +12,7 @@ function Footer() {
           <div className="flex justify-center gap-6 text-sm flex-wrap">
             {!isHome && (
               <Link to="/" className="text-accent-400 hover:text-accent-500 transition-colors font-medium">
-                All Events
+                All events
               </Link>
             )}
             {/* Always visible: the in-page subscribe prompts only show before

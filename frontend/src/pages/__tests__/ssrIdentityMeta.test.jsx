@@ -305,7 +305,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
         </MemoryRouter>
       )
     )
-    await screen.findByRole('heading', { level: 1, name: 'Never Miss a Show' })
+    await screen.findByRole('heading', { level: 1, name: 'Never miss a show' })
 
     expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
     await waitFor(() => expect(document.title).toBe('Subscribe — Never Miss a Show | SetTimes'))

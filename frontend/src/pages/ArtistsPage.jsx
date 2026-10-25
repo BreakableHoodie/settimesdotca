@@ -63,7 +63,7 @@ function computePlatformCounts(artists) {
 }
 
 function ArtistCard({ artist }) {
-  const meta = [artist.genre, artist.origin].filter(Boolean).join(' · ')
+  const meta = [artist.genre, artist.origin].filter(Boolean).join(', ')
   const shows = `${artist.performance_count} ${artist.performance_count === 1 ? 'show' : 'shows'}`
   // Icons show ALL platforms in link_fields (resolved presence, #712 invariant).
   const socialLinks = getRowIcons(artist)
@@ -141,9 +141,12 @@ function ShuffleBlock() {
   }, [])
 
   return (
-    <section aria-label="Discover artists" className="mb-8 rounded-xl border border-border bg-surface p-5">
+    <section aria-label="Five at random" className="mb-8 rounded-xl border border-border bg-surface p-5">
       <div className="mb-4 flex items-center justify-between gap-4">
-        <h2 className="font-display text-lg font-bold text-text-primary">Discover an artist</h2>
+        <div>
+          <h2 className="font-display text-lg font-bold text-text-primary">Five at random</h2>
+          <p className="mt-0.5 text-sm text-text-secondary">Shuffle to see five artists from the roster.</p>
+        </div>
         <button
           type="button"
           onClick={draw}
@@ -166,7 +169,7 @@ function ShuffleBlock() {
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5" aria-label="Shuffled artists">
           {results.map(artist => {
             const origin = [artist.origin_city, artist.origin_region].filter(Boolean).join(', ')
-            const meta = [artist.genre, origin].filter(Boolean).join(' · ')
+            const meta = [artist.genre, origin].filter(Boolean).join(', ')
             return (
               <li
                 key={artist.id}

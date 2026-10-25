@@ -176,7 +176,7 @@ test.describe("Input Component - Accessibility", () => {
       page,
       `
       <div>
-        <label for="email-input">Email Address</label>
+        <label for="email-input">Email address</label>
         <input
           id="email-input"
           type="email"
@@ -320,7 +320,7 @@ test.describe("Checkbox Component - Accessibility", () => {
           id="select-all"
           aria-checked="mixed"
         />
-        <label for="select-all">Select All</label>
+        <label for="select-all">Select all</label>
       </div>
     `,
     );
@@ -467,7 +467,7 @@ test.describe("Modal Component - Accessibility", () => {
       page,
       `
       <div role="dialog" aria-modal="true" aria-labelledby="modal-title">
-        <h2 id="modal-title">Confirm Action</h2>
+        <h2 id="modal-title">Confirm action</h2>
         <p>Are you sure you want to proceed?</p>
         <button>Cancel</button>
         <button>Confirm</button>

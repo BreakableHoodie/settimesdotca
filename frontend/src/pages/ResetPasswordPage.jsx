@@ -108,13 +108,13 @@ export default function ResetPasswordPage() {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-surface rounded-2xl p-8 border border-border text-center">
-          <h1 className="text-2xl font-bold text-text-primary mb-4">Reset Failed</h1>
+          <h1 className="text-2xl font-bold text-text-primary mb-4">Reset failed</h1>
           <p className="text-text-secondary mb-6">{message}</p>
           <button
             onClick={() => navigate('/admin/login')}
             className="bg-accent-500 hover:bg-accent-600 text-bg-navy font-bold py-3 px-6 rounded-lg transition"
           >
-            Back to Login
+            Back to login
           </button>
         </div>
       </div>
@@ -125,13 +125,13 @@ export default function ResetPasswordPage() {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-surface rounded-2xl p-8 border border-border text-center">
-          <h1 className="text-2xl font-bold text-text-primary mb-4">✓ Password Reset</h1>
+          <h1 className="text-2xl font-bold text-text-primary mb-4">✓ Password reset</h1>
           <p className="text-text-secondary mb-6">{message}</p>
           <button
             onClick={() => navigate('/admin/login')}
             className="bg-accent-500 hover:bg-accent-600 text-bg-navy font-bold py-3 px-6 rounded-lg transition"
           >
-            Go to Login
+            Go to login
           </button>
         </div>
       </div>
@@ -142,7 +142,7 @@ export default function ResetPasswordPage() {
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-surface rounded-2xl p-8 border border-border">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-text-primary mb-2">Reset Password</h1>
+          <h1 className="text-3xl font-bold text-text-primary mb-2">Reset password</h1>
           <p className="text-text-secondary">
             Set a new password for <span className="font-medium">{user?.email}</span>
           </p>
@@ -151,7 +151,7 @@ export default function ResetPasswordPage() {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label htmlFor="newPassword" className="block text-text-primary font-medium mb-2">
-              New Password
+              New password
             </label>
             <input
               type="password"
@@ -169,7 +169,7 @@ export default function ResetPasswordPage() {
 
           <div>
             <label htmlFor="confirmPassword" className="block text-text-primary font-medium mb-2">
-              Confirm Password
+              Confirm password
             </label>
             <input
               type="password"
@@ -189,7 +189,7 @@ export default function ResetPasswordPage() {
             disabled={status === 'submitting'}
             className="w-full bg-accent-500 hover:bg-accent-600 text-bg-navy font-bold py-3 px-6 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {status === 'submitting' ? 'Resetting Password...' : 'Reset Password'}
+            {status === 'submitting' ? 'Resetting password...' : 'Reset password'}
           </button>
 
           {message && (

@@ -67,7 +67,7 @@ describe('BandCard variant="board"', () => {
   // link to. The board reintroduced both bugs by interpolating band.name directly.
   it('handles a band with no name without an empty link', () => {
     renderBoard({ band: { ...band, name: undefined } })
-    expect(screen.getByText('Unnamed Artist')).toBeInTheDocument()
+    expect(screen.getByText('Unnamed artist')).toBeInTheDocument()
     expect(screen.queryByRole('link')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /add unnamed artist to my route/i })).toBeInTheDocument()
   })

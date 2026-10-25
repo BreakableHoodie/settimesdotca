@@ -148,7 +148,7 @@ describe('ErrorBoundary', () => {
       )
 
       // Check for details element (collapsed by default)
-      const details = screen.queryByText(/Error Details/)
+      const details = screen.queryByText(/Error details/)
 
       // In production build, details won't be rendered
       // In dev build, details will be present
@@ -167,7 +167,7 @@ describe('ErrorBoundary', () => {
         </ErrorBoundary>
       )
 
-      const refreshButton = screen.getByText('Refresh Page')
+      const refreshButton = screen.getByText('Refresh page')
       expect(refreshButton).toBeInTheDocument()
       expect(refreshButton.tagName).toBe('BUTTON')
     })
@@ -179,7 +179,7 @@ describe('ErrorBoundary', () => {
         </ErrorBoundary>
       )
 
-      const homeLink = screen.getByText('Go Home')
+      const homeLink = screen.getByText('Go home')
       expect(homeLink).toBeInTheDocument()
       expect(homeLink).toHaveAttribute('href', '/')
     })
@@ -318,7 +318,7 @@ describe('ErrorBoundary', () => {
         </ErrorBoundary>
       )
 
-      const refreshButton = screen.getByText('Refresh Page')
+      const refreshButton = screen.getByText('Refresh page')
       expect(refreshButton).toHaveClass('bg-accent-500')
       expect(refreshButton).toHaveClass('text-bg-navy')
     })

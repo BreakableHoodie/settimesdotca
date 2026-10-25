@@ -150,23 +150,23 @@ describe('BandCard — corner button is the toggle, container is a labelled grou
 })
 
 // #726 follow-up — WCAG 2.5.3 (Label in Name): the accessible name must contain
-// the visible text. The visible "Unnamed Artist" fallback was a literal in the
+// the visible text. The visible "Unnamed artist" fallback was a literal in the
 // markup while the labels interpolated band.name, so a nameless band rendered
-// "Unnamed Artist" and announced "undefined". Both now derive from displayName.
+// "Unnamed artist" and announced "undefined". Both now derive from displayName.
 describe('BandCard — band with no name', () => {
   const nameless = { id: 9, venue: 'Stage A', startMs: 0, endMs: 0 }
 
   it('announces the visible fallback, never "undefined"', () => {
     const { container } = render(<BandCard band={nameless} isSelected={false} onToggle={() => {}} />)
 
-    expect(container.firstChild).toHaveAttribute('aria-label', 'Unnamed Artist at Stage A')
+    expect(container.firstChild).toHaveAttribute('aria-label', 'Unnamed artist at Stage A')
     expect(container.firstChild.getAttribute('aria-label')).not.toContain('undefined')
   })
 
   it('uses the fallback in the toggle button name too', () => {
     render(<BandCard band={nameless} isSelected={false} onToggle={() => {}} />)
 
-    expect(screen.getByRole('button', { name: 'Add Unnamed Artist to my route' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add Unnamed artist to my route' })).toBeInTheDocument()
   })
 
   it('omits the venue clause when there is no venue', () => {
@@ -174,7 +174,7 @@ describe('BandCard — band with no name', () => {
       <BandCard band={{ id: 10, startMs: 0, endMs: 0 }} isSelected={false} onToggle={() => {}} />
     )
 
-    expect(container.firstChild).toHaveAttribute('aria-label', 'Unnamed Artist')
+    expect(container.firstChild).toHaveAttribute('aria-label', 'Unnamed artist')
     expect(container.firstChild.getAttribute('aria-label')).not.toContain('undefined')
   })
 })

@@ -74,7 +74,10 @@ export default function AboutPage() {
             <p>
               If you&apos;re a venue, promoter, or organizer running a multi-venue event in Waterloo Region and want
               your lineup listed on SetTimes, we&apos;d love to hear from you. Get in touch on our{' '}
-              <Link to="/contact" className="text-accent-400 hover:text-accent-500 transition-colors">
+              <Link
+                to="/contact"
+                className="text-accent-400 underline underline-offset-2 hover:text-accent-500 transition-colors"
+              >
                 Contact page
               </Link>
               .
@@ -90,7 +93,10 @@ export default function AboutPage() {
               crawl is still our flagship, and it&apos;s what shaped everything here: plan a route across venues, catch
               the sets you want, and don&apos;t miss a band. For the current edition&apos;s date and full lineup, head
               to the{' '}
-              <Link to="/" className="text-accent-400 hover:text-accent-500 transition-colors">
+              <Link
+                to="/"
+                className="text-accent-400 underline underline-offset-2 hover:text-accent-500 transition-colors"
+              >
                 schedule
               </Link>
               .
@@ -102,7 +108,10 @@ export default function AboutPage() {
             <p>
               SetTimes is built and maintained for Waterloo Region, not by a company. Questions, feedback, or want to
               get involved? Email us at{' '}
-              <a href="mailto:hello@settimes.ca" className="text-accent-400 hover:text-accent-500 transition-colors">
+              <a
+                href="mailto:hello@settimes.ca"
+                className="text-accent-400 underline underline-offset-2 hover:text-accent-500 transition-colors"
+              >
                 hello@settimes.ca
               </a>
               .

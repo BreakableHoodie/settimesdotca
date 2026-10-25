@@ -44,15 +44,20 @@ export function posterThemeVariables({ ground, ink, accent, nowFill }) {
   const accentFill = ensureContrast(accent, ground, AA_TEXT)
   const accentFillDeep = ensureContrast(mix(accentFill, ink, 0.25), ground, AA_TEXT)
   const card = [tone(0.04), tone(0.08)]
+  // Text sits on the tinted surfaces as well as the ground, so derived tones are
+  // checked against the most ink-ward one (bg-darker); passing there passes on
+  // every lighter surface and the ground. Against the ground alone, the real
+  // Vol 18 light palette put tertiary text on bg-surface at 4.1:1.
+  const hardestSurface = tone(0.12)
   return {
     '--color-bg-navy': ground,
     '--color-bg-dark': tone(0.03),
     '--color-bg-purple': tone(0.06),
-    '--color-bg-darker': tone(0.12),
+    '--color-bg-darker': hardestSurface,
     '--color-text-primary': ink,
-    '--color-text-secondary': ensureContrast(tone(0.82), ground, 7),
-    '--color-text-tertiary': ensureContrast(tone(0.65), ground, AA_TEXT),
-    '--color-text-disabled': ensureContrast(tone(0.45), ground, 3),
+    '--color-text-secondary': ensureContrast(tone(0.82), hardestSurface, 7),
+    '--color-text-tertiary': ensureContrast(tone(0.65), hardestSurface, AA_TEXT),
+    '--color-text-disabled': ensureContrast(tone(0.45), hardestSurface, 3),
     '--color-text-inverse': ground,
     '--color-surface': tone(0.05),
     '--color-surface-hover': tone(0.1),

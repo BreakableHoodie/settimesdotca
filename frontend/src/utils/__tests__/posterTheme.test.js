@@ -63,6 +63,50 @@ describe('posterThemeVariables: the page stays readable for any poster', () => {
   }
 })
 
+// Text sits on tinted surfaces, not only the bare ground: the unselected
+// "My route" tab is text-text-tertiary on bg-surface. Checking tones only
+// against the ground let the real Vol 18 light palette ship that tab at 4.1:1
+// (found by axe once #1248 3b removed the gradient that hid it). These are the
+// palettes the extractor reads from the real Vol 18 and Vol 17 posters.
+const REAL_PALETTES = {
+  'Vol 18 (real)': {
+    light: { ground: '#faf6f6', ink: '#3f3339', accent: '#9a5e89', nowFill: '#cb8bb1' },
+    dark: { ground: '#180e13', ink: '#faf6f6', accent: '#a56893', nowFill: '#511c3f' },
+  },
+  'Vol 17 (real)': {
+    light: { ground: '#e3f1fb', ink: '#40363b', accent: '#546089', nowFill: '#1ebae6' },
+    dark: { ground: '#170f13', ink: '#e3f1fb', accent: '#6e7ba5', nowFill: '#003949' },
+  },
+}
+const SURFACES = [
+  '--color-bg-navy',
+  '--color-bg-dark',
+  '--color-bg-purple',
+  '--color-surface',
+  '--color-surface-hover',
+  '--color-bg-darker',
+]
+const TEXT_MINIMUMS = { '--color-text-primary': 7, '--color-text-secondary': AA_TEXT, '--color-text-tertiary': AA_TEXT }
+
+describe('posterThemeVariables: text reads on every surface it can sit on', () => {
+  const all = {
+    ...REAL_PALETTES,
+    ...Object.fromEntries(Object.entries(SWATCHES).map(([k, s]) => [k, mapPaletteRoles(s, POSTER)])),
+  }
+  for (const [name, palette] of Object.entries(all)) {
+    for (const variant of ['light', 'dark']) {
+      it(`${name}, ${variant}`, () => {
+        const v = posterThemeVariables(palette[variant])
+        for (const [text, minimum] of Object.entries(TEXT_MINIMUMS)) {
+          for (const surface of SURFACES) {
+            expect(contrastRatio(v[text], v[surface]), `${text} on ${surface}`).toBeGreaterThanOrEqual(minimum)
+          }
+        }
+      })
+    }
+  }
+})
+
 describe('applicablePalette', () => {
   const palette = mapPaletteRoles(SWATCHES['Vol 18-like'], POSTER)
 

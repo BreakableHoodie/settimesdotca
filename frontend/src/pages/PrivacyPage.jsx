@@ -198,7 +198,10 @@ export default function PrivacyPage() {
               All email communications require your express consent (double opt-in). Every email includes a one-click
               unsubscribe link and identifies the sender as <strong className="text-text-secondary">SetTimes</strong>.
               You can reach us at{' '}
-              <a href="mailto:hello@settimes.ca" className="text-accent-400 hover:text-accent-500 transition-colors">
+              <a
+                href="mailto:hello@settimes.ca"
+                className="text-accent-400 underline underline-offset-2 hover:text-accent-500 transition-colors"
+              >
                 hello@settimes.ca
               </a>
               .
@@ -213,7 +216,10 @@ export default function PrivacyPage() {
             </p>
             <p>
               For all other requests — access, correction, erasure, or questions — email{' '}
-              <a href="mailto:hello@settimes.ca" className="text-accent-400 hover:text-accent-500 transition-colors">
+              <a
+                href="mailto:hello@settimes.ca"
+                className="text-accent-400 underline underline-offset-2 hover:text-accent-500 transition-colors"
+              >
                 hello@settimes.ca
               </a>
               . We will respond within 30 days.
@@ -232,7 +238,10 @@ export default function PrivacyPage() {
             <h2 className="text-text-primary text-lg font-semibold mb-3">Terms of Service</h2>
             <p>
               Your use of the Service is also governed by our{' '}
-              <Link to="/terms" className="text-accent-400 hover:text-accent-500 transition-colors">
+              <Link
+                to="/terms"
+                className="text-accent-400 underline underline-offset-2 hover:text-accent-500 transition-colors"
+              >
                 Terms of Service
               </Link>
               .

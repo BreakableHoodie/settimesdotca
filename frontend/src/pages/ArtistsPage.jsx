@@ -253,7 +253,7 @@ function OneOfOneCallout() {
         — exactly one artist here plays <strong className="text-text-primary">{entry.tag}</strong>.{' '}
         <Link
           to={`/band/${entry.artist.id}`}
-          className="text-accent-400 underline-offset-2 hover:text-accent-300 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
+          className="text-accent-400 underline underline-offset-2 hover:text-accent-300 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
         >
           {entry.artist.name}
         </Link>

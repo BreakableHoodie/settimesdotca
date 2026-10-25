@@ -24,17 +24,33 @@ const srcRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '../')
 
 const SKIPPED_DIRS = new Set(['admin', '__tests__', 'test'])
 
-function walk(dir) {
+function walk(dir, extension = /\.(js|jsx)$/) {
   let files = []
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name)
     if (entry.isDirectory()) {
-      if (!SKIPPED_DIRS.has(entry.name)) files = files.concat(walk(full))
-    } else if (entry.isFile() && /\.(js|jsx)$/.test(entry.name)) {
+      if (!SKIPPED_DIRS.has(entry.name)) files = files.concat(walk(full, extension))
+    } else if (entry.isFile() && extension.test(entry.name)) {
       files.push(full)
     }
   }
   return files
+}
+
+// Stylesheets get the two rules that have no legitimate use anywhere: blur and
+// `transition: all` (CodeRabbit, #1371). Gradients are deliberately NOT scanned
+// in CSS: index.css holds every theme's gradient tokens and the skeleton
+// shimmer, so that rule would be mostly allowlist.
+const CSS_BLUR = /backdrop-filter\s*:|backdrop-blur/
+const CSS_TRANSITION_ALL = /transition(?:-property)?\s*:\s*all\b|(?<![\w-])transition-all(?![\w-])/
+
+function scanCss(relPath, source) {
+  const found = []
+  source.split('\n').forEach((text, i) => {
+    if (CSS_BLUR.test(text)) found.push(`${relPath}:${i + 1} blur`)
+    if (CSS_TRANSITION_ALL.test(text)) found.push(`${relPath}:${i + 1} transition: all`)
+  })
+  return found
 }
 
 // Gradients that stay, each with the reason it is functional. `match` is a
@@ -134,6 +150,15 @@ describe('public site shape language (#1248)', () => {
     expect(offenders).toEqual([])
   })
 
+  it('has no blur or transition: all in public stylesheets', () => {
+    const sheets = walk(srcRoot, /\.css$/)
+    expect(sheets.length).toBeGreaterThan(0)
+    const offenders = sheets.flatMap(f =>
+      scanCss(path.relative(srcRoot, f).split(path.sep).join('/'), readFileSync(f, 'utf8'))
+    )
+    expect(offenders).toEqual([])
+  })
+
   it('every allowlist entry still matches a real line (no stale exemptions)', () => {
     for (const { file, match, reason } of GRADIENT_ALLOWLIST) {
       expect(reason.length).toBeGreaterThan(10)
@@ -164,6 +189,23 @@ describe('public site shape language (#1248)', () => {
       }
       for (const good of ['bg-surface', 'bg-accent-500 text-bg-navy', 'animate-shimmer', 'text-start from the top']) {
         expect(GRADIENT.test(good), good).toBe(false)
+      }
+    })
+
+    it('stylesheet blur and transition: all', () => {
+      for (const bad of [
+        '  backdrop-filter: blur(8px);',
+        '  transition: all 200ms ease;',
+        '  @apply transition-all;',
+      ]) {
+        expect(CSS_BLUR.test(bad) || CSS_TRANSITION_ALL.test(bad), bad).toBe(true)
+      }
+      for (const good of [
+        '  filter: blur(2px);',
+        '  transition: box-shadow 200ms ease;',
+        '  transition-property: opacity;',
+      ]) {
+        expect(CSS_BLUR.test(good) || CSS_TRANSITION_ALL.test(good), good).toBe(false)
       }
     })
 

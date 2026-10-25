@@ -40,7 +40,7 @@ export default function Select({
 
   const selectClasses = `
     w-full px-4 py-2.5 pr-10 min-h-[44px]
-    bg-surface border rounded-lg
+    bg-surface border rounded-md
     text-text-primary
     transition-colors duration-base
     focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-navy

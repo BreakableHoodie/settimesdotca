@@ -84,7 +84,7 @@ export default function ConfirmDialog({
       {/* Dialog */}
       <div
         ref={dialogRef}
-        className="relative bg-bg-purple rounded-lg shadow-xl max-w-md w-full border border-border animate-scale-in"
+        className="relative bg-bg-purple rounded-xl shadow-xl max-w-md w-full border border-border animate-scale-in"
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"

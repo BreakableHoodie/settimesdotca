@@ -23,7 +23,7 @@ export default function Card({
 }) {
   // Base classes
   const baseClasses =
-    'bg-bg-dark border border-border rounded-xl shadow-base transition-[box-shadow,transform] duration-base'
+    'bg-bg-dark border border-border rounded-lg shadow-base transition-[box-shadow,transform] duration-base'
 
   // Variant styles
   const variantClasses = {

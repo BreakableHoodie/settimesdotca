@@ -4,7 +4,7 @@ function SkeletonBlock({ className = '' }) {
 
 export function BandCardSkeleton() {
   return (
-    <div className="w-full p-4 rounded-xl bg-surface border border-border relative">
+    <div className="w-full p-4 rounded-lg bg-surface border border-border relative">
       <SkeletonBlock className="absolute top-2 right-2 h-11 w-11 rounded-full" />
       <div className="flex flex-col items-center gap-2 pr-10">
         <SkeletonBlock className="h-6 w-32 rounded-lg" />
@@ -31,7 +31,7 @@ export function BandCardSkeletonGrid({ count = 6 }) {
 
 export function EventCardSkeleton() {
   return (
-    <div className="rounded-2xl border border-border bg-surface p-6" role="status" aria-label="Loading event">
+    <div className="rounded-lg border border-border bg-surface p-6" role="status" aria-label="Loading event">
       <SkeletonBlock className="h-7 w-48 mb-3" />
       <SkeletonBlock className="h-4 w-36 mb-4" />
       <div className="flex gap-6 mb-4">
@@ -39,8 +39,8 @@ export function EventCardSkeleton() {
         <SkeletonBlock className="h-4 w-20" />
       </div>
       <div className="flex gap-2">
-        <SkeletonBlock className="h-10 w-32 rounded-lg" />
-        <SkeletonBlock className="h-10 w-32 rounded-lg" />
+        <SkeletonBlock className="h-10 w-32 rounded-md" />
+        <SkeletonBlock className="h-10 w-32 rounded-md" />
       </div>
     </div>
   )

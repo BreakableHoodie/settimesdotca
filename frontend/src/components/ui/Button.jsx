@@ -27,7 +27,7 @@ export default function Button({
 }) {
   // Base classes - always applied
   const baseClasses =
-    'inline-flex items-center justify-center font-medium rounded-lg transition-[background-color,color,box-shadow,transform,filter] duration-base focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-navy disabled:opacity-50 disabled:cursor-not-allowed'
+    'inline-flex items-center justify-center font-medium rounded-md transition-[background-color,color,box-shadow,transform,filter] duration-base focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-navy disabled:opacity-50 disabled:cursor-not-allowed'
 
   // Variant styles - primary uses dark text for WCAG AA contrast (4.5:1)
   const variantClasses = {

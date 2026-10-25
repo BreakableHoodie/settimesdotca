@@ -84,7 +84,7 @@ export default function Combobox({
     }
   }
 
-  const baseClass = `w-full px-4 py-2.5 min-h-[44px] bg-surface border rounded-lg text-text-primary placeholder-text-tertiary transition-colors duration-base focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-navy border-border focus:border-primary-500 focus:ring-primary-500/50 disabled:opacity-50 disabled:cursor-not-allowed ${className}`
+  const baseClass = `w-full px-4 py-2.5 min-h-[44px] bg-surface border rounded-md text-text-primary placeholder-text-tertiary transition-colors duration-base focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-offset-bg-navy border-border focus:border-primary-500 focus:ring-primary-500/50 disabled:opacity-50 disabled:cursor-not-allowed ${className}`
 
   return (
     <div ref={containerRef} className="relative">

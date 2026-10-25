@@ -78,8 +78,8 @@ export const CONFIRM_SETTLE_MS = 10 * 60_000;
  * Descriptions seen on this repo: "Review in progress", "Review completed",
  * "Review paused" (#1210), and "Internal error occurred during review" (#1226),
  * which CodeRabbit posts as a PASSING status on a commit nobody reviewed.
- * "Review rate limited" is from CodeRabbit's docs, not yet observed here —
- * hence the loose /rate.?limit/ match rather than an exact string.
+ * "Review rate limited" was observed on #1374 (2026-10-25), followed by
+ * "Review skipped" on the same head; the loose /rate.?limit/ match stays.
  */
 export function classifyStatus(status) {
   if (!status) return "none";
@@ -184,6 +184,13 @@ export function ghDeps(pr) {
     getStatus(sha) {
       // Newest first; the first CodeRabbit entry is the current one.
       return ghList(`repos/{owner}/{repo}/commits/${sha}/statuses`).find((s) => s.context === "CodeRabbit") || null;
+    },
+    headWasRateLimited(sha) {
+      // Any CodeRabbit status on THIS commit that said rate limited. A skip
+      // after one is the budget running out, not a path-filtered head (#1375).
+      return ghList(`repos/{owner}/{repo}/commits/${sha}/statuses`).some(
+        (s) => s.context === "CodeRabbit" && /rate.?limit/i.test(s.description || ""),
+      );
     },
     getLatestRateLimitComment() {
       // Oldest first, so the newest rate-limit comment is the last match.
@@ -333,6 +340,11 @@ export async function awaitReview(deps, opts = {}) {
     if (state === "in_progress" && deps.now() - Date.parse(status.updated_at) > STALE_IN_PROGRESS_MS) {
       // The head's own review hung. Waiting on it only runs out the timeout.
       state = "stalled";
+    } else if (state === "skipped" && deps.headWasRateLimited?.(head)) {
+      // #1374: "Review rate limited", then "Review skipped" on the same head.
+      // Exit 3 is for a head CodeRabbit skips by design (every file filtered);
+      // a skip that follows a rate limit is waited out and re-requested.
+      state = "rate_limited";
     } else if (state === "unknown") {
       // The rate-limited description has never been observed here. If a
       // rate-limit comment is at least as new as this status, trust it.

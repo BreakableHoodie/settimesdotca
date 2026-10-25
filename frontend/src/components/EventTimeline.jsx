@@ -21,6 +21,30 @@ import PosterImage from './PosterImage'
  */
 const MemoizedEventCard = memo(EventCard)
 
+// The card's poster. Hides its whole box when the poster cannot load (#1368)
+// rather than leaving a broken image whose width comes from its alt text.
+// aspect-[auto_3/4] is the TWO-VALUE aspect-ratio syntax: reserve a 3:4 box
+// while the lazy image has no intrinsic dimensions, then let the real ratio
+// take over once it loads, so nothing letterboxes and expanding History does
+// not cascade layout shifts.
+function TimelinePoster({ src }) {
+  const [unavailableSrc, setUnavailableSrc] = useState(null)
+  if (!src || unavailableSrc === src) return null
+  return (
+    <div className={POSTER_BOX_CLASS}>
+      <PosterImage
+        src={src}
+        width={200}
+        alt=""
+        loading="lazy"
+        decoding="async"
+        className="aspect-[auto_3/4] h-auto w-full"
+        onUnavailable={() => setUnavailableSrc(src)}
+      />
+    </div>
+  )
+}
+
 export default function EventTimeline() {
   const [timeline, setTimeline] = useState({ now: [], upcoming: [], past: [] })
   const [loading, setLoading] = useState(true)
@@ -644,41 +668,13 @@ function EventCard({
                         the past-section cards are additionally gated behind a
                         collapsed "Show History" toggle, so neither mounts until
                         near-viewport or explicitly expanded. */
-                    <div className={POSTER_BOX_CLASS}>
-                      <PosterImage
-                        src={event.poster_url}
-                        width={200}
-                        alt=""
-                        loading="lazy"
-                        decoding="async"
-                        /* aspect-[auto_3/4] is the TWO-VALUE aspect-ratio syntax:
-                           reserve a 3:4 box while the lazy image has no intrinsic
-                           dimensions, then let the real ratio take over once it
-                           loads. This is NOT the fixed-ratio box that caused
-                           letterboxing — that was a stretched container plus
-                           object-contain, which pinned the wrong ratio permanently.
-                           Nothing letterboxes after load here, and the reserved box
-                           stops expanding History from cascading layout shifts. */
-                        className="aspect-[auto_3/4] h-auto w-full"
-                      />
-                    </div>
+                    <TimelinePoster src={event.poster_url} />
                   )}
                   <h3 className="text-2xl font-bold text-accent-500 flex-1 min-w-0">{event.name}</h3>
                 </Link>
               ) : (
                 <div className="flex items-start gap-4 min-w-0 flex-1">
-                  {event.poster_url && (
-                    <div className={POSTER_BOX_CLASS}>
-                      <PosterImage
-                        src={event.poster_url}
-                        width={200}
-                        alt=""
-                        loading="lazy"
-                        decoding="async"
-                        className="aspect-[auto_3/4] h-auto w-full"
-                      />
-                    </div>
-                  )}
+                  {event.poster_url && <TimelinePoster src={event.poster_url} />}
                   <h3 className="text-2xl font-bold text-accent-500 flex-1 min-w-0">{event.name}</h3>
                 </div>
               )}

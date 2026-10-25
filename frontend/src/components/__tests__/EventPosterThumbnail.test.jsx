@@ -140,4 +140,18 @@ describe('EventPosterThumbnail', () => {
       expect(onOpen).toHaveBeenCalledTimes(1)
     })
   })
+
+  // #1368: a broken image sized by its alt text pushed the event title off the
+  // screen. Once the original fails too, the thumbnail renders nothing at all.
+  it('renders nothing once the poster cannot load at all', () => {
+    const { container } = render(
+      <EventPosterThumbnail posterUrl={POSTER_URL} eventName="Buddies Fest 2" onOpen={vi.fn()} variant="inline" />
+    )
+    const img = screen.getByRole('img', { name: 'Buddies Fest 2 poster' })
+    fireEvent.error(img)
+    expect(screen.getByRole('button', { name: 'View Buddies Fest 2 poster' })).toBeInTheDocument()
+    fireEvent.error(img)
+    expect(container).toBeEmptyDOMElement()
+    expect(screen.queryByRole('button', { name: /poster/ })).not.toBeInTheDocument()
+  })
 })

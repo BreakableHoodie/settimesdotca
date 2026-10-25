@@ -27,10 +27,15 @@ export default function PosterImage({
   loading = 'lazy',
   decoding = 'async',
   onError,
+  onUnavailable,
   ...rest
 }) {
   const [fellBack, setFellBack] = useState(false)
   const fellBackRef = useRef(false)
+  const unavailableRef = useRef(false)
+  // A URL off the poster host has no transform: its FIRST error is already the
+  // original failing, so there is nothing to fall back to (CodeRabbit, #1368).
+  const hasTransform = posterImageUrl(src, width) !== src
 
   // A fallback belongs to the URL that failed, not to the component instance.
   // Without this reset, a PosterImage reused for a different poster (the same
@@ -39,6 +44,7 @@ export default function PosterImage({
   // earlier failure.
   useEffect(() => {
     fellBackRef.current = false
+    unavailableRef.current = false
     setFellBack(false)
   }, [src])
 
@@ -49,11 +55,21 @@ export default function PosterImage({
       // throws, and the ref guard below only suppresses OUR fallback
       // transition, never the caller's callback.
       onError?.(event)
-      if (fellBackRef.current) return
+      if (fellBackRef.current || !hasTransform) {
+        // The untransformed original failed too: there is no poster to show.
+        // A broken <img> sized by its alt text spread across the row and
+        // pushed the event title off-screen (#1368), so callers hide their
+        // whole wrapper instead. Reported once per src.
+        if (!unavailableRef.current) {
+          unavailableRef.current = true
+          onUnavailable?.()
+        }
+        return
+      }
       fellBackRef.current = true
       setFellBack(true)
     },
-    [onError]
+    [onError, onUnavailable, hasTransform]
   )
 
   const resolvedSrc = fellBack ? src : posterImageUrl(src, width)
@@ -84,4 +100,6 @@ PosterImage.propTypes = {
   decoding: PropTypes.string,
   /** Optional caller error handler. Composed with the internal fallback, not replaced by it. */
   onError: PropTypes.func,
+  /** Called once when the original also fails: the caller should hide its wrapper (#1368). */
+  onUnavailable: PropTypes.func,
 }

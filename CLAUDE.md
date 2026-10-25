@@ -703,6 +703,8 @@ Requires a running wrangler dev server or uses it automatically via `playwright.
 
 **The E2E admin is enrolled in 2FA (#1253).** Admins and editors without it get `403 MFA_SETUP_REQUIRED` on every admin route, so a password-only test admin exercises nothing. `scripts/e2e-totp.mjs` derives its TOTP secret from `E2E_ADMIN_PASSWORD`: the seeder stores it, and `submitAdminLogin()` in `e2e/utils/session.js` types a fresh code. There is no second secret to provision, and none is committed. Every form login goes through that helper; `scripts/__tests__/seed-e2e-admin.test.js` fails if the seeder and the tests ever derive different secrets.
 
+**Every Playwright process shares one record of spent TOTP steps** (`TOTP_LEDGER` in `e2e/utils/paths.js`, under a lock; #1366). The server accepts a step once and counts a reuse as a failed attempt, so per-process memory let parallel workers and each retry's fresh process lock the admin out (429) for the rest of the run. Form logins are serialised too (a second login voids the first's pending challenge), and `loginAsAdmin` saves the session it creates, so later tests start signed in instead of each spending a code: the CI-mode suite went from 18.3 to 3.4 minutes. A refused code fails at once with the server's message.
+
 ### Post-deploy probes are read-only (#1292)
 
 Post-deploy probes check iCal, sitemap, and SSR identity metadata without writing; `/s/` is excluded because share links expire via cron and no fixed slug is safe to probe. They run after **production** deploys only: a `dev` deploy goes to a Pages preview, which binds no D1 (#1295), so they would fail on missing data rather than on a broken release.

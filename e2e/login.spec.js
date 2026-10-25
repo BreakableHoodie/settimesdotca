@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { ADMIN_EMAIL } from "./credentials";
-import { submitAdminLogin } from "./utils/session";
+import { submitAdminLogin, withAdminLoginLock } from "./utils/session";
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -13,7 +13,7 @@ test.describe("Admin Login", () => {
     await expect(page.getByRole("heading", { name: "Admin Login" })).toBeVisible();
 
     // Password, then the 2FA code: the E2E admin is enrolled (#1253)
-    await submitAdminLogin(page);
+    await withAdminLoginLock(() => submitAdminLogin(page));
 
     // Should redirect to admin panel
     await expect(page).toHaveURL(/\/admin$/);

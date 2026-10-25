@@ -41,6 +41,7 @@ function fakeDeps({
   commentAt = "1970-01-01T00:00:00Z",
   busy = () => false,
   findings = () => ({ confirmed: true, outsideDiff: 0, nitpicks: 0, duplicates: 0, other: 0, url: null }),
+  rateLimitedHeads = [],
 }) {
   let t = 0;
   let si = 0;
@@ -60,6 +61,7 @@ function fakeDeps({
     },
     getLatestRateLimitComment: () => (comment === null ? null : { body: comment, at: commentAt }),
     reviewInProgressElsewhere: () => busy(),
+    headWasRateLimited: (sha) => rateLimitedHeads.includes(sha),
     getHeadReviewFindings: (sha) => {
       calls.findingShas.push(sha);
       return findings(sha);
@@ -221,6 +223,32 @@ describe("awaitReview", () => {
   it("returns 3 for a head that STAYS skipped, instead of waiting forever", async () => {
     const deps = fakeDeps({ statuses: [{ state: "success", description: "Review skipped" }] });
     expect(await awaitReview(deps, { pollMs: 60_000 })).toBe(3);
+  });
+
+  // #1375, from #1374: the head read "Review rate limited", then "Review
+  // skipped". That skip is the budget, not a filtered head: wait out the
+  // cooldown, re-request once, and finish on the completed review.
+  it("re-requests a skip that followed a rate limit on the same head, instead of returning 3", async () => {
+    const SKIPPED = { state: "success", description: "Review skipped" };
+    const deps = fakeDeps({ statuses: [SKIPPED, IN_PROGRESS, COMPLETED], rateLimitedHeads: ["aaaaaaaa1"] });
+    expect(await awaitReview(deps, { pollMs: 60_000 })).toBe(0);
+    expect(deps.calls.requests).toBe(1);
+  });
+
+  it("a skip that persists after a rate limit is a rate limit: budgeted re-requests, never exit 3", async () => {
+    const SKIPPED = { state: "success", description: "Review skipped" };
+    const deps = fakeDeps({ statuses: [SKIPPED], rateLimitedHeads: ["aaaaaaaa1"] });
+    expect(await awaitReview(deps, { pollMs: 1000, maxRequests: 3 })).toBe(1);
+    expect(deps.calls.requests).toBe(3);
+  });
+
+  it("still returns 3 for a skip with no rate limit on that head (a path-filtered head)", async () => {
+    const deps = fakeDeps({
+      statuses: [{ state: "success", description: "Review skipped" }],
+      rateLimitedHeads: ["some-other-sha"],
+    });
+    expect(await awaitReview(deps, { pollMs: 60_000 })).toBe(3);
+    expect(deps.calls.requests).toBe(0);
   });
 
   it("treats a skip as transient: #1200 went skipped -> in progress -> completed", async () => {
@@ -660,5 +688,30 @@ process.stdout.write(JSON.stringify([fixtures[args[1]] ?? []]));
       ],
     });
     expect(ghDeps(7).getHeadReviewFindings(HEAD_SHA).confirmed).toBe(false);
+  });
+
+  // #1375: the real adapter, not the fake. Shapes are from ccc2664d (#1374).
+  it("finds a rate limit only among CodeRabbit's statuses on the requested head", () => {
+    const LIMITED = "e".repeat(40);
+    const OTHER_CONTEXT = "d".repeat(40);
+    stubGh({
+      [`repos/{owner}/{repo}/commits/${LIMITED}/statuses`]: [
+        { context: "CodeRabbit", description: "Review skipped" },
+        { context: "CodeRabbit", description: "Review rate limited" },
+      ],
+      [`repos/{owner}/{repo}/commits/${HEAD_SHA}/statuses`]: [
+        { context: "CodeRabbit", description: "Review skipped" },
+        { context: "CodeRabbit", description: "Review in progress" },
+      ],
+      [`repos/{owner}/{repo}/commits/${OTHER_CONTEXT}/statuses`]: [
+        { context: "CodeRabbit", description: "Review skipped" },
+        { context: "some-other-bot", description: "Review rate limited" },
+      ],
+    });
+    expect(ghDeps(7).headWasRateLimited(LIMITED)).toBe(true);
+    expect(ghDeps(7).headWasRateLimited(HEAD_SHA)).toBe(false);
+    expect(ghDeps(7).headWasRateLimited(OTHER_CONTEXT)).toBe(false);
+    // Each head's own statuses, read through every page.
+    expect(calls()[0]).toEqual(["api", `repos/{owner}/{repo}/commits/${LIMITED}/statuses`, "--paginate", "--slurp"]);
   });
 });

@@ -689,4 +689,29 @@ process.stdout.write(JSON.stringify([fixtures[args[1]] ?? []]));
     });
     expect(ghDeps(7).getHeadReviewFindings(HEAD_SHA).confirmed).toBe(false);
   });
+
+  // #1375: the real adapter, not the fake. Shapes are from ccc2664d (#1374).
+  it("finds a rate limit only among CodeRabbit's statuses on the requested head", () => {
+    const LIMITED = "e".repeat(40);
+    const OTHER_CONTEXT = "d".repeat(40);
+    stubGh({
+      [`repos/{owner}/{repo}/commits/${LIMITED}/statuses`]: [
+        { context: "CodeRabbit", description: "Review skipped" },
+        { context: "CodeRabbit", description: "Review rate limited" },
+      ],
+      [`repos/{owner}/{repo}/commits/${HEAD_SHA}/statuses`]: [
+        { context: "CodeRabbit", description: "Review skipped" },
+        { context: "CodeRabbit", description: "Review in progress" },
+      ],
+      [`repos/{owner}/{repo}/commits/${OTHER_CONTEXT}/statuses`]: [
+        { context: "CodeRabbit", description: "Review skipped" },
+        { context: "some-other-bot", description: "Review rate limited" },
+      ],
+    });
+    expect(ghDeps(7).headWasRateLimited(LIMITED)).toBe(true);
+    expect(ghDeps(7).headWasRateLimited(HEAD_SHA)).toBe(false);
+    expect(ghDeps(7).headWasRateLimited(OTHER_CONTEXT)).toBe(false);
+    // Each head's own statuses, read through every page.
+    expect(calls()[0]).toEqual(["api", `repos/{owner}/{repo}/commits/${LIMITED}/statuses`, "--paginate", "--slurp"]);
+  });
 });

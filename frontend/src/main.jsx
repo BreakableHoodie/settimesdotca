@@ -21,6 +21,7 @@ const ActivatePage = lazy(() => import('./pages/ActivatePage.jsx'))
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage.jsx'))
 const TermsPage = lazy(() => import('./pages/TermsPage.jsx'))
 const AboutPage = lazy(() => import('./pages/AboutPage.jsx'))
+const HistoryPage = lazy(() => import('./pages/HistoryPage.jsx'))
 const ContactPage = lazy(() => import('./pages/ContactPage.jsx'))
 const StatsPage = lazy(() => import('./pages/StatsPage.jsx'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage.jsx'))
@@ -98,6 +99,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                 <Route path="/activate" element={<ActivatePage />} />
                 <Route path="/privacy" element={<PrivacyPage />} />
                 <Route path="/terms" element={<TermsPage />} />
+                <Route path="/history" element={<HistoryPage />} />
                 <Route path="/about" element={<AboutPage />} />
                 <Route path="/contact" element={<ContactPage />} />
                 <Route path="/stats" element={<StatsPage />} />

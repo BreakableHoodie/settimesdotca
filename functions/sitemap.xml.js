@@ -83,6 +83,11 @@ export async function onRequestGet(context) {
     <priority>0.7</priority>
   </url>`,
       `  <url>
+    <loc>https://settimes.ca/history</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>`,
+      `  <url>
     <loc>https://settimes.ca/about</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>

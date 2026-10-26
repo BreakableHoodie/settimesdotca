@@ -76,6 +76,12 @@ const surfaces = [
     label: "Venues directory",
     ready: (page) => page.locator('a[href^="/venue/"]').first(),
   },
+  {
+    // The poster wall: a tile per edition (seed data always has public events).
+    path: "/history",
+    label: "Every edition",
+    ready: (page) => page.locator("main li a").first(),
+  },
   { path: "/band/:resolved", label: "Band profile", needs: "band", ready: (page) => page.locator("main h1") },
   { path: "/venue/:resolved", label: "Venue", needs: "venue", ready: (page) => page.locator("main h1") },
   {

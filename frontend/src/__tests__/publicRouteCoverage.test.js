@@ -50,6 +50,7 @@ const COVERED_PATHS = new Set([
   '/privacy', // PrivacyPage, ready: "Privacy Policy"
   '/terms', // TermsPage, ready: "Terms of Service"
   '/about', // AboutPage, ready: "About"
+  '/history', // HistoryPage, ready: an edition tile link
   '/contact', // ContactPage, ready: "Contact"
   '/stats', // StatsPage, ready: "SetTimes by the numbers"
   '/band/:id', // BandProfilePage, ready: main h1

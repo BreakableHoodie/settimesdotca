@@ -42,6 +42,14 @@ export const STATIC_PAGES = {
     ogTitle: "Venues – SetTimes",
     ogDescription: "Browse every venue that has hosted a SetTimes event.",
   },
+  "/history": {
+    title: "Every edition | SetTimes",
+    description:
+      "Every Long Weekend Band Crawl and SetTimes edition since 2022: the posters, the artists who keep coming back, and the Waterloo Region venues they played.",
+    ogTitle: "Every edition | SetTimes",
+    ogDescription:
+      "Every Long Weekend Band Crawl and SetTimes edition since 2022: the posters, the artists who keep coming back, and the Waterloo Region venues they played.",
+  },
   "/about": {
     title: "About | SetTimes",
     description:

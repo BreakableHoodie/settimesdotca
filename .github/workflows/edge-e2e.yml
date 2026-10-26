@@ -24,6 +24,7 @@ on:
       - "frontend/package.json"
       - "frontend/package-lock.json"
       - "scripts/reset-e2e-db.mjs"
+      - ".github/actions/apt-deb-cache/**"
       - ".github/workflows/edge-e2e.yml"
 
 # One shared scratch D1: runs must queue, never overlap or cancel mid-reset.
@@ -82,9 +83,22 @@ jobs:
           npm ci
           npm ci --prefix frontend
 
+      - name: Restore cached apt packages for Playwright
+        id: apt-debs
+        uses: ./.github/actions/apt-deb-cache
+        with:
+          mode: restore
+
       - name: Install Playwright Chromium
         # Bounded: install-deps shells out to apt-get, which can hang (#881).
         run: timeout -k 30s 300s npx playwright install chromium --with-deps
+
+      - name: Save apt packages for Playwright
+        uses: ./.github/actions/apt-deb-cache
+        with:
+          mode: save
+          key: ${{ steps.apt-debs.outputs.key }}
+          cache-hit: ${{ steps.apt-debs.outputs.cache-hit }}
 
       - name: Build frontend
         working-directory: frontend

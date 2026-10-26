@@ -2,7 +2,7 @@
 
 Canonical active roadmap for SetTimes.ca. Use this file for handoffs between Claude, OpenCode, and humans.
 
-Last updated: 2026-10-14
+Last updated: 2026-10-26
 
 ## Mission
 
@@ -44,7 +44,7 @@ Build SetTimes.ca into the best lean, multi-venue and multi-artist event platfor
 - #1255 — security(rbac): full review — invite double-redeem race, UI/server mismatches, 16 untested boundaries
 - #1253 — security: require 2FA for admin (and possibly editor) accounts
 - #1247 — security: 31 alerts triaged; frozen Semgrep alerts and pinned overrides hid them; add a weekly digest
-- #1267 — security: postcss-selector-parser advisory accepted; re-check on its next release
+- ~~#1267~~ — postcss-selector-parser advisory fixed by a scoped override (2026-10-26)
 
 ### Product and show operations
 

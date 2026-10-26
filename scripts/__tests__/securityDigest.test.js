@@ -100,7 +100,7 @@ describe("security digest", () => {
   // and deliberately accepted advisories would hold the issue open forever.
   // Both directions are asserted, so neither "accept everything" nor
   // "accept nothing" can pass.
-  const ACCEPTED = { name: "postcss-selector-parser", advisory: "GHSA-rj75-hqrm-r3gf", severity: "moderate" };
+  const ACCEPTED = { name: "basic-ftp", advisory: "GHSA-c475-qrg2-pj4r", severity: "moderate" };
 
   it("does not open for npm audit advisories that are all on the accepted list", () => {
     const digest = buildDigest({
@@ -127,7 +127,7 @@ describe("security digest", () => {
     });
     expect(digest.shouldOpen).toBe(true);
     expect(digest.problems.join("\n")).toContain("undici GHSA-aaaa-bbbb-cccc (high)");
-    expect(digest.problems.join("\n")).not.toContain("postcss-selector-parser");
+    expect(digest.problems.join("\n")).not.toContain("basic-ftp");
   });
 
   // The reason acceptance is keyed by advisory: a package-level entry would
@@ -174,7 +174,7 @@ describe("security digest", () => {
       npmAudit: [{ lockfile: "frontend/package-lock.json", findings: [], critical: 0 }],
     });
     expect(Object.keys(ACCEPTED_NPM_AUDIT).length).toBeGreaterThan(0);
-    expect(digest.body).toContain("`frontend/package-lock.json|postcss-selector-parser|GHSA-rj75-hqrm-r3gf`");
+    expect(digest.body).toContain("`frontend/package-lock.json|basic-ftp|GHSA-c475-qrg2-pj4r`");
     expect(digest.shouldOpen).toBe(false);
   });
 

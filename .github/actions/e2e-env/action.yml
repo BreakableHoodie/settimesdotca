@@ -116,7 +116,9 @@ runs:
               # NOT retry on a non-zero return: a retry into a still-locked apt
               # burns another 300s and reports a confusing exit 1 instead of the
               # clear timeout -- which is why the first attempt at this was reverted.
-              APT_LOCKS="/var/lib/apt/lists/lock /var/cache/apt/archives/lock /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend"
+              # The archive lock lives where apt-deb-cache points Dir::Cache::Archives
+              # (#1391); the default path stays listed in case that step is skipped.
+              APT_LOCKS="/var/lib/apt/lists/lock /var/cache/apt/archives/lock $HOME/.cache/apt-debs/lock /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend"
 
               apt_recover() {
                   echo "  recovering apt state (killing orphaned apt/dpkg)" >&2

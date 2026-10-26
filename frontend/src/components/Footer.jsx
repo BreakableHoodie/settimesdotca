@@ -21,6 +21,9 @@ function Footer() {
             <Link to="/subscribe" className="text-accent-400 hover:text-accent-500 transition-colors font-medium">
               Get show announcements
             </Link>
+            <Link to="/history" className="text-text-tertiary hover:text-accent-400 transition-colors">
+              Every edition
+            </Link>
             <Link to="/about" className="text-text-tertiary hover:text-accent-400 transition-colors">
               About
             </Link>

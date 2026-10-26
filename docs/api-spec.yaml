@@ -49,6 +49,68 @@ tags:
     description: Administrative maintenance endpoints
 
 paths:
+  /api/history:
+    get:
+      tags:
+        - Public
+      summary: Every public edition, with returning artists and venues
+      description: |
+        Powers the "Every edition" page (#1250). Every published or archived
+        event, newest first, with its poster, whether it has concluded, and its
+        counted set and venue totals; plus the artists who have played 2 or more
+        editions (at most 24, most first) and every venue with its edition count
+        and first and last edition date. A counted set is not cancelled and
+        passes the reveal-mode gate. Gated by `PUBLIC_DATA_PUBLISH_ENABLED`.
+        Show-critical cache tier, because a cancellation changes the counts.
+      responses:
+        "200":
+          description: Editions, regulars and venues
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [editions, regulars, venues]
+                properties:
+                  editions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        slug: {type: string}
+                        name: {type: string}
+                        date: {type: string, format: date}
+                        end_date: {type: string, format: date, nullable: true}
+                        poster_url: {type: string, nullable: true}
+                        concluded: {type: boolean}
+                        sets: {type: integer}
+                        venues: {type: integer}
+                  regulars:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        band_profile_id: {type: integer}
+                        name: {type: string}
+                        editions: {type: integer}
+                        first:
+                          type: object
+                          properties:
+                            slug: {type: string}
+                            name: {type: string}
+                            date: {type: string, format: date}
+                  venues:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        venue_id: {type: integer}
+                        name: {type: string}
+                        editions: {type: integer}
+                        first_date: {type: string, format: date}
+                        last_date: {type: string, format: date}
+        "500":
+          description: Server error
+
   /api/artists/shuffle:
     get:
       tags:

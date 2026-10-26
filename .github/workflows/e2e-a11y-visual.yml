@@ -15,6 +15,7 @@ on:
             - 'package-lock.json'
             - 'playwright.config.js'
             - '.github/actions/e2e-env/**'
+            - '.github/actions/apt-deb-cache/**'
             - '.github/workflows/e2e-a11y-visual.yml'
     schedule:
         - cron: '0 7 * * 1'

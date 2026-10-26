@@ -16,7 +16,14 @@ describe("path-filtered E2E jobs run on dependency changes", () => {
   it.each([
     [
       "e2e-a11y-visual.yml",
-      ["package.json", "package-lock.json", "playwright.config.js", "e2e/utils/**", "frontend/**"],
+      [
+        "package.json",
+        "package-lock.json",
+        "playwright.config.js",
+        "e2e/utils/**",
+        "frontend/**",
+        ".github/actions/apt-deb-cache/**",
+      ],
     ],
     [
       "edge-e2e.yml",
@@ -26,6 +33,7 @@ describe("path-filtered E2E jobs run on dependency changes", () => {
         "frontend/package.json",
         "frontend/package-lock.json",
         "playwright.config.js",
+        ".github/actions/apt-deb-cache/**",
       ],
     ],
   ])("%s triggers on its dependencies", (workflow, required) => {

@@ -75,6 +75,13 @@ runs:
               restore-keys: |
                   playwright-${{ runner.os }}-
 
+        - name: Restore cached apt packages for Playwright
+          if: inputs.install-playwright == 'true'
+          id: apt-debs
+          uses: ./.github/actions/apt-deb-cache
+          with:
+              mode: restore
+
         - name: Install Playwright browsers
           if: inputs.install-playwright == 'true'
           shell: bash
@@ -232,6 +239,14 @@ runs:
               else
                   run_bounded "playwright install chromium --with-deps" npx playwright install chromium --with-deps
               fi
+
+        - name: Save apt packages for Playwright
+          if: inputs.install-playwright == 'true'
+          uses: ./.github/actions/apt-deb-cache
+          with:
+              mode: save
+              key: ${{ steps.apt-debs.outputs.key }}
+              cache-hit: ${{ steps.apt-debs.outputs.cache-hit }}
 
         - name: Build frontend
           shell: bash

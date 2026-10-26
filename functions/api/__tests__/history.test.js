@@ -106,6 +106,6 @@ describe("GET /api/history (#1250)", () => {
 
     env.PUBLIC_DATA_PUBLISH_ENABLED = "false";
     const gated = await history.onRequestGet({ env, request: new Request("http://localhost/api/history") });
-    expect(gated.status).not.toBe(200);
+    expect(gated.status).toBe(503);
   });
 });

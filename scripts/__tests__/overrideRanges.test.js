@@ -33,6 +33,8 @@ const KNOWN_OVERRIDE_CONFLICTS = {
   "frontend/package-lock.json|node_modules/@lhci/cli|uuid": "GHSA-w5hq-g745-h8pq (#226)",
   "frontend/package-lock.json|node_modules/@lhci/utils|js-yaml":
     "audit alerts (#327); @lhci 0.15.1 is the latest and still declares ^3 (#1208)",
+  "frontend/package-lock.json|node_modules/@tailwindcss/typography|postcss-selector-parser":
+    "GHSA-rj75-hqrm-r3gf (<6.1.5); typography 0.5.20 pins 6.0.10 exactly, 6.1.5 is a minor bump and the built CSS is byte-identical (#1267)",
   "frontend/package-lock.json|node_modules/external-editor|tmp": "January 2026 release (#21)",
   "frontend/package-lock.json|node_modules/miniflare|undici":
     "GHSA-4qv8-2p9j-2685 + GHSA-f72v-6w45-q472 (undici <=7.30.0); miniflare pins 7.29.1 exactly, 7.30.1 is a patch bump (2026-10-25)",

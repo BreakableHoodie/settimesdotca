@@ -2,7 +2,7 @@
 
 Canonical active roadmap for SetTimes.ca. Use this file for handoffs between Claude, OpenCode, and humans.
 
-Last updated: 2026-10-14
+Last updated: 2026-10-26
 
 ## Mission
 

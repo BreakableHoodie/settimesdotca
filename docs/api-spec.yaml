@@ -110,6 +110,8 @@ paths:
                         last_date: {type: string, format: date}
         "500":
           description: Server error
+        "503":
+          $ref: "#/components/responses/PublicDataUnavailable"
 
   /api/artists/shuffle:
     get:

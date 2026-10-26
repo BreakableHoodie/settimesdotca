@@ -17,6 +17,10 @@ import { CACHE_SHOW_CRITICAL } from "../utils/cacheHeaders.js";
 import { concludedEventSql, publicEventStatusSql } from "../utils/eventVisibility.js";
 import { eventLocalFestivalToday } from "../utils/eventDay.js";
 
+// Regulars skip deactivated profiles, as every other surface that sends fans
+// to an artist does (shuffle, one-of-one, stage-mates): deactivating a profile
+// takes it out of discovery. Edition counts and venues still include its sets.
+
 // The most-returning artists listed; the page is a highlight, not a directory.
 export const REGULARS_LIMIT = 24;
 // An artist is a regular once they have played this many distinct editions.

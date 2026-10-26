@@ -181,8 +181,17 @@ export default function HistoryPage() {
             {data.venues.length > 0 && (
               <section aria-labelledby="venues-heading">
                 <h2 id="venues-heading" className="font-display text-2xl font-bold text-text-primary">
-                  Venues across the years
+                  Venues
                 </h2>
+                {/* Older editions were entered without venues, so say where the
+                    record starts rather than imply every venue began then. */}
+                <p className="mt-1 text-sm text-text-tertiary">
+                  Venues are on record from{' '}
+                  {parseLocalDate(
+                    data.venues.reduce((min, v) => (v.first_date < min ? v.first_date : min), '9999')
+                  )?.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}{' '}
+                  on.
+                </p>
                 <table className="mt-4 w-full text-left text-sm">
                   <thead className="text-text-tertiary">
                     <tr className="border-b border-border">

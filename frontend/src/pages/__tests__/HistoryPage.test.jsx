@@ -131,8 +131,9 @@ describe('HistoryPage (#1250)', () => {
     const regulars = screen.getByRole('heading', { name: 'Regulars' }).closest('section')
     expect(within(regulars).getByText('5')).toBeInTheDocument()
     expect(within(regulars).getByText('Vol. 3')).toBeInTheDocument()
-    const venues = screen.getByRole('heading', { name: 'Venues across the years' }).closest('section')
+    const venues = screen.getByRole('heading', { name: 'Venues' }).closest('section')
     expect(within(venues).getByText('2023–2026')).toBeInTheDocument()
+    expect(within(venues).getByText('Venues are on record from May 2023 on.')).toBeInTheDocument()
   })
 
   it('shows the error message when the editions cannot be loaded', async () => {

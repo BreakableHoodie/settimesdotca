@@ -104,6 +104,8 @@ export function classifyStatus(status) {
 /**
  * Pull a wait time out of a CodeRabbit rate-limit comment, e.g.
  * "Please wait **21 minutes and 50 seconds** before requesting another review."
+ * or, since the Essentials plan (#1401), "Next included review available in
+ * 35 minutes."
  * Returns milliseconds INCLUDING slack, or null when no duration is found.
  */
 export function parseCooldownMs(text) {
@@ -111,7 +113,7 @@ export function parseCooldownMs(text) {
   const sentence = String(text)
     .replace(/\*/g, "")
     .split(/(?<=[.!\n])/)
-    .find((s) => /\bwait\b/i.test(s) && /\d+\s*(hour|minute|second)/i.test(s));
+    .find((s) => /\b(wait|available in)\b/i.test(s) && /\d+\s*(hour|minute|second)/i.test(s));
   if (!sentence) return null;
   let ms = 0;
   for (const [, n, unit] of sentence.matchAll(/(\d+)\s*(hours?|minutes?|seconds?)/gi)) {
@@ -201,10 +203,17 @@ export function ghDeps(pr) {
     getLatestRateLimitComment() {
       // Oldest first, so the newest rate-limit comment is the last match.
       const hits = ghList(`repos/{owner}/{repo}/issues/${pr}/comments`).filter(
-        (c) => c.user?.login === "coderabbitai[bot]" && /rate.?limit/i.test(c.body || ""),
+        (c) => c.user?.login === "coderabbitai[bot]" && /rate.?limit|review limit reached/i.test(c.body || ""),
       );
       const last = hits.at(-1);
       return last ? { body: last.body || "", at: last.updated_at } : null;
+    },
+    headCommittedAt(sha) {
+      // When this commit was made, so a limit comment can be told apart from
+      // one about an earlier push. Unreadable reads as "never limited": the
+      // no-status grace period still re-requests, as it did before #1401.
+      const t = Date.parse(gh(["api", `repos/{owner}/{repo}/commits/${sha}`, "--jq", ".commit.committer.date"]).trim());
+      return Number.isFinite(t) ? t : Infinity;
     },
     reviewInProgressElsewhere(head) {
       // A review still running on an EARLIER commit means the head's review is
@@ -309,6 +318,7 @@ export async function awaitReview(deps, opts = {}) {
   let unknownDescription = null;
   let pausedRequestPosted = false;
   let unconfirmedSince = null;
+  let lastRequestAt = null;
   // Every piece of PER-HEAD state resets here and only here. The three
   // head-change paths each once reset it by hand, and one forgot the skip
   // timer (#1200 review), letting an old head's skip time shorten the new
@@ -324,6 +334,13 @@ export async function awaitReview(deps, opts = {}) {
     unknownDescription = null;
     pausedRequestPosted = false;
     unconfirmedSince = null;
+    lastRequestAt = null;
+  };
+  // Every review request goes through here, so a limit comment can be judged
+  // against the latest one (#1401).
+  const requestReview = () => {
+    lastRequestAt = deps.now();
+    deps.requestReview();
   };
   let lastReported = "";
 
@@ -381,6 +398,16 @@ export async function awaitReview(deps, opts = {}) {
       // all. A review of THIS SHA is what the status would have attested, and
       // re-requesting only gets "Already reviewed the last commit".
       state = "reviewed";
+    }
+    if (state === "none") {
+      // #1401: on the Essentials plan an exhausted allowance is a "Review limit
+      // reached" COMMENT with no commit status at all. It applies to this head
+      // only if it is newer than the commit and than our own last request;
+      // otherwise the stale comment would re-trigger its cooldown after every
+      // request while the requested review is still under way.
+      const c = deps.getLatestRateLimitComment();
+      const since = Math.max(deps.headCommittedAt(head), lastRequestAt ?? -Infinity);
+      if (c && Date.parse(c.at) > since) state = "rate_limited";
     }
     // What the head's status said, for messages; a review can now stand without one.
     const said = status ? `reads "${status.description}"` : "has no CodeRabbit status";
@@ -498,7 +525,7 @@ export async function awaitReview(deps, opts = {}) {
       // still consumed budget, and this head must not be retried endlessly.
       requests += 1;
       pausedRequestPosted = true;
-      deps.requestReview();
+      requestReview();
       deps.log(`posted @coderabbitai review (${requests}/${maxRequests}).`);
     }
 
@@ -524,7 +551,7 @@ export async function awaitReview(deps, opts = {}) {
       // Counted BEFORE the call: a request that posts and then throws must
       // still spend budget, or a flaky `gh` could exceed maxRequests.
       requests += 1;
-      deps.requestReview();
+      requestReview();
       deps.log(`posted @coderabbitai review (${requests}/${maxRequests}).`);
       // Give CodeRabbit time to replace the rate-limited status before re-reading
       // it; otherwise the old status triggers a second request at once.
@@ -547,7 +574,7 @@ export async function awaitReview(deps, opts = {}) {
         `no CodeRabbit status on ${short} after ${Math.round(noStatusGraceMs / 60_000)} min; requesting a review.`,
       );
       requests += 1;
-      deps.requestReview();
+      requestReview();
       headSeenAt = deps.now();
     } else if (state === "unknown") {
       deps.log(`unrecognised CodeRabbit status "${status.description}" on ${short}; still waiting.`);

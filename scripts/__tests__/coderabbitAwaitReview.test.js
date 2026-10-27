@@ -26,6 +26,14 @@ const IN_PROGRESS = { state: "pending", description: "Review in progress" };
 // Seen on #1225 (2026-09-29): a PASSING status on a commit no one reviewed.
 const INTERNAL_ERROR = { state: "success", description: "Internal error occurred during review" };
 const NEW_WORDING = { state: "success", description: "Some future CodeRabbit wording" };
+// Verbatim shape of CodeRabbit's comment on #1400 (2026-10-27), posted with NO
+// commit status on the head (#1401).
+const LIMIT_REACHED_1400 = [
+  "> ## Review limit reached",
+  "> The included review limit has been reached and this organization has disabled usage-based review continuation.",
+  "> - [ ]  Ask an admin to enable usage-based reviews",
+  "> **Next included review available in 35 minutes.**",
+].join("\n");
 const RL_COMMENT = "Rate limit exceeded. Please wait **21 minutes and 50 seconds** before requesting another review.";
 
 /**
@@ -44,6 +52,7 @@ function fakeDeps({
   // #1393; tests of a review with no status pass their own.
   findings = null,
   rateLimitedHeads = [],
+  committedAt = 0,
 }) {
   let t = 0;
   let si = 0;
@@ -66,6 +75,7 @@ function fakeDeps({
     getLatestRateLimitComment: () => (comment === null ? null : { body: comment, at: commentAt }),
     reviewInProgressElsewhere: () => busy(),
     headWasRateLimited: (sha) => rateLimitedHeads.includes(sha),
+    headCommittedAt: () => committedAt,
     getHeadReviewFindings: (sha) => {
       calls.findingShas.push(sha);
       if (findings) return findings(sha);
@@ -116,6 +126,10 @@ describe("classifyStatus: a passing check is not a review", () => {
 describe("parseCooldownMs", () => {
   it("parses minutes and seconds out of the rate-limit comment, plus slack", () => {
     expect(parseCooldownMs(RL_COMMENT)).toBe((21 * 60 + 50) * 1000 + COOLDOWN_SLACK_MS);
+  });
+
+  it("parses the review-limit comment's 'available in N minutes' (#1401)", () => {
+    expect(parseCooldownMs(LIMIT_REACHED_1400)).toBe(35 * 60_000 + COOLDOWN_SLACK_MS);
   });
 
   it("returns null when the comment carries no duration", () => {
@@ -569,6 +583,53 @@ const CLEAN_1364 =
   `2e95c3336de5f2611d6702264c6c29cc0e590226 and ${HEAD}.`;
 const UNCONFIRMED = { confirmed: false, outsideDiff: 0, nitpicks: 0, duplicates: 0, other: 0, url: null };
 
+// #1401: on the Essentials plan an exhausted allowance is a "Review limit
+// reached" COMMENT with no commit status at all. The monitor read that as a
+// head nobody had looked at and waited out its 30-minute no-status grace.
+describe("awaitReview: a review-limit comment with no status (#1401)", () => {
+  const ms = (min) => min * 60_000;
+  const at = (min) => new Date(ms(min)).toISOString();
+
+  it("waits the stated time, requests once, and succeeds on the review", async () => {
+    const deps = fakeDeps({
+      statuses: [null, null, COMPLETED],
+      comment: LIMIT_REACHED_1400,
+      commentAt: at(1),
+      committedAt: 0,
+    });
+    expect(await awaitReview(deps, { pollMs: 60_000, noStatusGraceMs: ms(60) })).toBe(0);
+    expect(deps.calls.requests).toBe(1);
+    expect(deps.calls.sleeps[0]).toBe(ms(35) + COOLDOWN_SLACK_MS);
+  });
+
+  it("ignores a limit comment older than the head commit", async () => {
+    // The budget ran out on an earlier push; this head was pushed after it.
+    const deps = fakeDeps({
+      statuses: [null, null, null, COMPLETED],
+      comment: LIMIT_REACHED_1400,
+      commentAt: at(1),
+      committedAt: ms(5),
+    });
+    expect(await awaitReview(deps, { pollMs: 60_000, noStatusGraceMs: ms(60) })).toBe(0);
+    expect(deps.calls.requests).toBe(0);
+    expect(deps.calls.sleeps.every((s) => s === 60_000)).toBe(true);
+  });
+
+  it("does not wait the same stale cooldown again after its own request", async () => {
+    // After the request, the old comment is still the newest: it must not
+    // read as a fresh limit while the requested review is under way.
+    const deps = fakeDeps({
+      statuses: [null, null, null, null, null, COMPLETED],
+      comment: LIMIT_REACHED_1400,
+      commentAt: at(1),
+      committedAt: 0,
+    });
+    expect(await awaitReview(deps, { pollMs: 60_000, noStatusGraceMs: ms(60) })).toBe(0);
+    expect(deps.calls.requests).toBe(1);
+    expect(deps.calls.sleeps.filter((s) => s === ms(35) + COOLDOWN_SLACK_MS)).toHaveLength(1);
+  });
+});
+
 describe("confirmsCleanReview", () => {
   it("accepts #1364's clean summary for the commit it names as reviewed up to", () => {
     expect(confirmsCleanReview(CLEAN_1364, HEAD)).toBe(true);
@@ -729,6 +790,21 @@ process.stdout.write(JSON.stringify([fixtures[args[1]] ?? []]));
   });
 
   // #1375: the real adapter, not the fake. Shapes are from ccc2664d (#1374).
+  it("finds CodeRabbit's 'Review limit reached' comment as a rate limit (#1401)", () => {
+    stubGh({
+      "repos/{owner}/{repo}/issues/7/comments": [
+        { user: BOT, body: LIMIT_REACHED_1400, updated_at: "2026-10-27T15:00:00Z" },
+        { user: { login: "someone" }, body: "Review limit reached?", updated_at: "2026-10-27T15:05:00Z" },
+      ],
+    });
+    expect(ghDeps(7).getLatestRateLimitComment()).toEqual({ body: LIMIT_REACHED_1400, at: "2026-10-27T15:00:00Z" });
+  });
+
+  it("reads an unreadable commit date as 'never limited', the pre-#1401 fallback", () => {
+    stubGh({});
+    expect(ghDeps(7).headCommittedAt("f".repeat(40))).toBe(Infinity);
+  });
+
   it("finds a rate limit only among CodeRabbit's statuses on the requested head", () => {
     const LIMITED = "e".repeat(40);
     const OTHER_CONTEXT = "d".repeat(40);

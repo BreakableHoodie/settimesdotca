@@ -104,6 +104,8 @@ export function classifyStatus(status) {
 /**
  * Pull a wait time out of a CodeRabbit rate-limit comment, e.g.
  * "Please wait **21 minutes and 50 seconds** before requesting another review."
+ * or, since the Essentials plan (#1401), "Next included review available in
+ * 35 minutes."
  * Returns milliseconds INCLUDING slack, or null when no duration is found.
  */
 export function parseCooldownMs(text) {
@@ -111,7 +113,7 @@ export function parseCooldownMs(text) {
   const sentence = String(text)
     .replace(/\*/g, "")
     .split(/(?<=[.!\n])/)
-    .find((s) => /\bwait\b/i.test(s) && /\d+\s*(hour|minute|second)/i.test(s));
+    .find((s) => /\b(wait|available in)\b/i.test(s) && /\d+\s*(hour|minute|second)/i.test(s));
   if (!sentence) return null;
   let ms = 0;
   for (const [, n, unit] of sentence.matchAll(/(\d+)\s*(hours?|minutes?|seconds?)/gi)) {
@@ -119,6 +121,32 @@ export function parseCooldownMs(text) {
     ms += Number(n) * (u.startsWith("hour") ? 3_600_000 : u.startsWith("minute") ? 60_000 : 1000);
   }
   return Math.min(ms + COOLDOWN_SLACK_MS, MAX_COOLDOWN_MS);
+}
+
+/**
+ * Does a limit comment speak for this head now? It must be newer than the
+ * head commit, and not older than the monitor's last request, or a stale
+ * comment re-triggers its cooldown while the requested review runs (#1401).
+ * GitHub stamps comments and commits to the second, so equal seconds count: a
+ * reply cannot precede the commit it is about, and the request time is
+ * floored to the second (CodeRabbit, #1402).
+ */
+export function limitCommentApplies(commentAt, committedAt, lastRequestAt) {
+  const t = Date.parse(commentAt);
+  if (!Number.isFinite(t) || !(t >= committedAt)) return false;
+  return lastRequestAt == null || t >= Math.floor(lastRequestAt / 1000) * 1000;
+}
+
+/**
+ * What is LEFT of a cooldown a comment stated at `commentAt`: "available in
+ * 35 minutes", posted 30 minutes ago, is about 5 more (CodeRabbit, #1401).
+ * Never below `floorMs`, and never ABOVE the stated cooldown: a comment that
+ * reads as later than now is clock skew. An unreadable timestamp waits it all.
+ */
+export function remainingCooldownMs(cooldownMs, commentAt, now, floorMs) {
+  const t = Date.parse(commentAt);
+  if (!Number.isFinite(t)) return cooldownMs;
+  return Math.max(cooldownMs - Math.max(0, now - t), floorMs);
 }
 
 /**
@@ -201,10 +229,24 @@ export function ghDeps(pr) {
     getLatestRateLimitComment() {
       // Oldest first, so the newest rate-limit comment is the last match.
       const hits = ghList(`repos/{owner}/{repo}/issues/${pr}/comments`).filter(
-        (c) => c.user?.login === "coderabbitai[bot]" && /rate.?limit/i.test(c.body || ""),
+        (c) => c.user?.login === "coderabbitai[bot]" && /rate.?limit|review limit reached/i.test(c.body || ""),
       );
       const last = hits.at(-1);
       return last ? { body: last.body || "", at: last.updated_at } : null;
+    },
+    headCommittedAt(sha) {
+      // When this commit was made, so a limit comment can be told apart from
+      // one about an earlier push. Unreadable reads as "never limited": the
+      // no-status grace period still re-requests, as it did before #1401.
+      // A token that reads statuses but not commits must not stop the
+      // monitor either (CodeRabbit), so a failed read falls back the same way.
+      let t = NaN;
+      try {
+        t = Date.parse(gh(["api", `repos/{owner}/{repo}/commits/${sha}`, "--jq", ".commit.committer.date"]).trim());
+      } catch {
+        // falls through to Infinity
+      }
+      return Number.isFinite(t) ? t : Infinity;
     },
     reviewInProgressElsewhere(head) {
       // A review still running on an EARLIER commit means the head's review is
@@ -309,6 +351,7 @@ export async function awaitReview(deps, opts = {}) {
   let unknownDescription = null;
   let pausedRequestPosted = false;
   let unconfirmedSince = null;
+  let lastRequestAt = null;
   // Every piece of PER-HEAD state resets here and only here. The three
   // head-change paths each once reset it by hand, and one forgot the skip
   // timer (#1200 review), letting an old head's skip time shorten the new
@@ -324,6 +367,13 @@ export async function awaitReview(deps, opts = {}) {
     unknownDescription = null;
     pausedRequestPosted = false;
     unconfirmedSince = null;
+    lastRequestAt = null;
+  };
+  // Every review request goes through here, so a limit comment can be judged
+  // against the latest one (#1401).
+  const requestReview = () => {
+    lastRequestAt = deps.now();
+    deps.requestReview();
   };
   let lastReported = "";
 
@@ -381,6 +431,15 @@ export async function awaitReview(deps, opts = {}) {
       // all. A review of THIS SHA is what the status would have attested, and
       // re-requesting only gets "Already reviewed the last commit".
       state = "reviewed";
+    }
+    if (state === "none") {
+      // #1401: on the Essentials plan an exhausted allowance is a "Review limit
+      // reached" COMMENT with no commit status at all. It applies to this head
+      // only if it is newer than the commit and than our own last request;
+      // otherwise the stale comment would re-trigger its cooldown after every
+      // request while the requested review is still under way.
+      const c = deps.getLatestRateLimitComment();
+      if (c && limitCommentApplies(c.at, deps.headCommittedAt(head), lastRequestAt)) state = "rate_limited";
     }
     // What the head's status said, for messages; a review can now stand without one.
     const said = status ? `reads "${status.description}"` : "has no CodeRabbit status";
@@ -498,7 +557,7 @@ export async function awaitReview(deps, opts = {}) {
       // still consumed budget, and this head must not be retried endlessly.
       requests += 1;
       pausedRequestPosted = true;
-      deps.requestReview();
+      requestReview();
       deps.log(`posted @coderabbitai review (${requests}/${maxRequests}).`);
     }
 
@@ -508,8 +567,16 @@ export async function awaitReview(deps, opts = {}) {
           watchMovedHead: true,
         });
       }
-      const wait =
-        (state === "rate_limited" && parseCooldownMs(deps.getLatestRateLimitComment()?.body)) || DEFAULT_COOLDOWN_MS;
+      // A comment's stated time counts only when the comment is about THIS
+      // limit: an earlier limit's comment, cut down to almost nothing by
+      // remainingCooldownMs, would spend every request before this limit
+      // clears (CodeRabbit). Otherwise the default cooldown.
+      const limit = state === "rate_limited" ? deps.getLatestRateLimitComment() : null;
+      const stated =
+        limit && limitCommentApplies(limit.at, deps.headCommittedAt(head), lastRequestAt)
+          ? parseCooldownMs(limit.body)
+          : null;
+      const wait = stated ? remainingCooldownMs(stated, limit.at, deps.now(), pollMs) : DEFAULT_COOLDOWN_MS;
       deps.log(`head ${short} ${state}; waiting ${Math.round(wait / 60_000)} min for the cooldown.`);
       await deps.sleep(wait);
       // The author may have pushed during the wait; a review request then
@@ -524,7 +591,11 @@ export async function awaitReview(deps, opts = {}) {
       // Counted BEFORE the call: a request that posts and then throws must
       // still spend budget, or a flaky `gh` could exceed maxRequests.
       requests += 1;
-      deps.requestReview();
+      requestReview();
+      // Restart the no-status grace: a cooldown longer than the grace would
+      // otherwise draw a second request as soon as this one is 2 minutes old
+      // with no status yet (CodeRabbit, #1402).
+      headSeenAt = deps.now();
       deps.log(`posted @coderabbitai review (${requests}/${maxRequests}).`);
       // Give CodeRabbit time to replace the rate-limited status before re-reading
       // it; otherwise the old status triggers a second request at once.
@@ -547,7 +618,7 @@ export async function awaitReview(deps, opts = {}) {
         `no CodeRabbit status on ${short} after ${Math.round(noStatusGraceMs / 60_000)} min; requesting a review.`,
       );
       requests += 1;
-      deps.requestReview();
+      requestReview();
       headSeenAt = deps.now();
     } else if (state === "unknown") {
       deps.log(`unrecognised CodeRabbit status "${status.description}" on ${short}; still waiting.`);

@@ -43,6 +43,17 @@ describe('Event page ticket link (#1384)', () => {
     expect(ticketLinks()).toHaveLength(2)
   })
 
+  it('keeps the link through every day of a multi-day edition', () => {
+    // Day 2 of 3 with no set times entered for it: the label once read "Recap"
+    // here, hiding the link mid-festival (CodeRabbit, #1384).
+    renderBar(
+      { id: 42, name: 'Fest', date: '2027-02-12', end_date: '2027-02-14', ticket_url: TICKETS },
+      new Date('2027-02-13T12:00:00')
+    )
+    expect(screen.queryAllByText('Recap')).toHaveLength(0)
+    expect(ticketLinks()).toHaveLength(2)
+  })
+
   it('drops the link once the show is over, and for an archived edition', () => {
     const { unmount } = renderBar(
       { id: 42, name: 'Vol. 19', date: '2027-02-14', ticket_url: TICKETS },

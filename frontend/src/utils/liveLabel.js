@@ -92,16 +92,21 @@ function firstStartOnDay(bands, date) {
  * @param {Date|number} currentTime
  * @param {Array<{startMs:number,endMs:number}>} bands - prepared bands (prepareBands)
  * @param {string|null} [doorsJson] - raw `events.doors_json` string from the schedule payload
+ * @param {string|null} [endDate] - YYYY-MM-DD, a multi-day event's last date
  * @returns {{label:string, classes:string}}
  */
-export function getLifecycleLabel(eventDate, currentTime, bands = [], doorsJson = null) {
+export function getLifecycleLabel(eventDate, currentTime, bands = [], doorsJson = null, endDate = null) {
   const { firstStart, lastEnd } = scheduleWindow(bands)
 
   // Baseline: the event day's local end (23:59:59), matching the prior
   // date-based behavior. `new Date('YYYY-MM-DDT23:59:59')` parses as LOCAL time
   // (no offset) — same as the old getEventState path, so single-day events are
   // byte-identical.
-  const baselineEnd = eventDate ? new Date(eventDate + 'T23:59:59').getTime() : 0
+  // A multi-day event runs to its LAST date (#1384 review): on the start date
+  // alone, an edition whose later days had no set times yet read "Recap" from
+  // day 2. Lexicographic YYYY-MM-DD compare, never `new Date` on a bare date.
+  const lastDate = endDate && eventDate && endDate > eventDate ? endDate : eventDate
+  const baselineEnd = lastDate ? new Date(lastDate + 'T23:59:59').getTime() : 0
   // Live through whichever is later — the day's end, or the real last set. Only
   // after-midnight sets push this past midnight; everything else is unchanged.
   const liveEnd = Math.max(baselineEnd, lastEnd ?? 0)
@@ -133,5 +138,9 @@ export function getLifecycleLabel(eventDate, currentTime, bands = [], doorsJson 
   // multi-day event): Live once the first set has started — keeps the badge
   // Live when the local day has rolled over but the crawl is still on.
   if (firstStart != null && now >= firstStart) return LABELS.live
+  // Day 2+ with no set times at all: Live from the first day's midnight, the
+  // same no-signal fallback day 1 uses. Only reachable before liveEnd, which
+  // for a single-day event is that day's end, so it changes nothing there.
+  if (firstStart == null && eventDate && now >= new Date(eventDate + 'T00:00:00').getTime()) return LABELS.live
   return LABELS.upcoming
 }

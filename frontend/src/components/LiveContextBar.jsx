@@ -145,8 +145,8 @@ function LiveContextBar({
   const activeBands = useMemo(() => bands.filter(b => !b.is_cancelled), [bands])
 
   const lifecycle = useMemo(
-    () => getLifecycleLabel(eventData?.date, currentTime, activeBands, eventData?.doors_json),
-    [activeBands, currentTime, eventData?.date, eventData?.doors_json]
+    () => getLifecycleLabel(eventData?.date, currentTime, activeBands, eventData?.doors_json, eventData?.end_date),
+    [activeBands, currentTime, eventData?.date, eventData?.doors_json, eventData?.end_date]
   )
 
   // Running late is a show-day fact (#1249): from the event's local midnight

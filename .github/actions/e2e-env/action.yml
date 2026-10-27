@@ -74,12 +74,17 @@ runs:
 
         - name: Install dependencies
           shell: bash
-          run: npm ci
+          # --ignore-scripts: the root's only install script is better-sqlite3's
+          # implicit `node-gyp rebuild` (fsevents is macOS-only). E2E never loads
+          # it, and it ships prebuilt binaries anyway; the Playwright image has
+          # no compiler, so the rebuild failed there (#1391). playwrightImage.test.js
+          # fails if a root dependency gains an install script.
+          run: npm ci --ignore-scripts
 
         - name: Install frontend dependencies
           shell: bash
           working-directory: frontend
-          run: npm ci
+          run: npm ci --ignore-scripts
 
         - name: Cache Playwright browsers
           if: inputs.install-playwright == 'true' && steps.pw-image.outputs.preinstalled != 'true'

@@ -67,6 +67,22 @@ describe("Playwright jobs run in the lockfile's Playwright image (#1391)", () =>
     expect(pkgs["node_modules/@playwright/test"].version).toBe(pkgs["node_modules/playwright-core"].version);
   });
 
+  // The root install runs with --ignore-scripts, because the image has no
+  // compiler and better-sqlite3's implicit node-gyp rebuild failed there. That
+  // is safe only while no root dependency E2E needs has an install script.
+  it("skips root install scripts only while none matter to E2E", () => {
+    const pkgs = JSON.parse(readFileSync(join(REPO_ROOT, "package-lock.json"), "utf8")).packages;
+    const withScripts = Object.entries(pkgs)
+      .filter(([, p]) => p.hasInstallScript)
+      .map(([k]) => k)
+      .sort();
+    expect(withScripts).toEqual(["node_modules/better-sqlite3", "node_modules/fsevents"]);
+    const env = readFileSync(join(REPO_ROOT, ".github/actions/e2e-env/action.yml"), "utf8");
+    expect(env).toContain("run: npm ci --ignore-scripts");
+    const edge = readFileSync(join(WORKFLOWS, "edge-e2e.yml"), "utf8");
+    expect(edge).toContain("npm ci --ignore-scripts\n");
+  });
+
   // A tag can be re-pushed, and these jobs hold deploy and push credentials.
   // A Dependabot Playwright bump fails here until its digest is added.
   it("pins the lockfile's version to an image digest", () => {

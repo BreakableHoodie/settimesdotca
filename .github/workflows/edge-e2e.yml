@@ -105,8 +105,9 @@ jobs:
             frontend/package-lock.json
 
       - name: Install dependencies
+        # Root --ignore-scripts: see e2e-env's "Install dependencies" (#1391).
         run: |
-          npm ci
+          npm ci --ignore-scripts
           npm ci --prefix frontend
 
       - name: Check the image's browsers match the lockfile

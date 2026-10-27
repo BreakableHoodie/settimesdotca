@@ -16,6 +16,7 @@ on:
             - 'playwright.config.js'
             - '.github/actions/e2e-env/**'
             - '.github/actions/apt-deb-cache/**'
+            - '.github/actions/playwright-image/**'
             - '.github/workflows/e2e-a11y-visual.yml'
     schedule:
         - cron: '0 7 * * 1'
@@ -28,9 +29,35 @@ permissions:
     contents: read
 
 jobs:
+    # Names the Playwright image for the lockfile's version (#1391). A job
+    # output, because a `container:` image cannot be read from a file.
+    playwright-image:
+        name: Playwright image
+        runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+        timeout-minutes: 5
+        outputs:
+            image: ${{ steps.image.outputs.image }}
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  fetch-depth: 1
+                  persist-credentials: false
+                  sparse-checkout: |
+                      package-lock.json
+                      .github/actions/playwright-image
+                  sparse-checkout-cone-mode: false
+            - id: image
+              uses: ./.github/actions/playwright-image
+
     e2e-a11y-visual:
         name: e2e-a11y-visual
         runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+        needs: playwright-image
+        # Browsers and their system packages come preinstalled: no apt (#1391).
+        # --ipc=host: Chromium runs out of shared memory in Docker's default 64 MB.
+        container:
+            image: ${{ needs.playwright-image.outputs.image }}
+            options: --ipc=host
         timeout-minutes: 35
         # Fork PRs cannot access repo secrets. Although the a11y/visual tests don't currently
         # use credentials.js, guard the job defensively so fork PRs don't break if that changes.

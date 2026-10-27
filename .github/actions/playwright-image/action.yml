@@ -1,0 +1,37 @@
+name: Playwright container image
+description: >-
+    Names the official Playwright image for the Playwright version pinned in
+    the root package-lock.json, for a job's `container:` (#1391).
+
+# Why: on hosted runners Playwright's system packages came from apt on every
+# run, and a slow mirror failed jobs before any test ran (#1391). The image
+# ships the browsers and their packages preinstalled. The tag is read from the
+# lockfile, never typed into a workflow: Dependabot bumps Playwright in the
+# lockfile but cannot bump a `container:` image, so a hand-pinned tag would
+# drift from the browsers the tests expect.
+
+outputs:
+    image:
+        description: The image reference, e.g. mcr.microsoft.com/playwright:v1.64.1-noble
+        value: ${{ steps.image.outputs.image }}
+
+runs:
+    using: composite
+    steps:
+        - name: Read the Playwright version from the lockfile
+          id: image
+          shell: bash
+          # playwright-core decides which browser builds a run needs.
+          run: |
+              version=$(node -e '
+                  const pkgs = require(process.argv[1]).packages ?? {};
+                  process.stdout.write(pkgs["node_modules/playwright-core"]?.version ?? "");
+              ' "$GITHUB_WORKSPACE/package-lock.json")
+              # Fail closed: an empty or odd value would name an image that
+              # does not exist, and the job would fail later with a pull error.
+              if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                  echo "✗ No playwright-core version in package-lock.json (got '$version')." >&2
+                  exit 1
+              fi
+              echo "image=mcr.microsoft.com/playwright:v$version-noble" >> "$GITHUB_OUTPUT"
+              echo "Playwright image: mcr.microsoft.com/playwright:v$version-noble"

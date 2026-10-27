@@ -16,7 +16,9 @@ import {
   confirmsCleanReview,
   countBodyFindings,
   ghDeps,
+  limitCommentApplies,
   parseCooldownMs,
+  remainingCooldownMs,
 } from "../coderabbit-await-review.mjs";
 
 const RATE_LIMITED = { state: "success", description: "Review rate limited" };
@@ -594,8 +596,8 @@ describe("awaitReview: a review-limit comment with no status (#1401)", () => {
     const deps = fakeDeps({
       statuses: [null, null, COMPLETED],
       comment: LIMIT_REACHED_1400,
-      commentAt: at(1),
-      committedAt: 0,
+      commentAt: at(0),
+      committedAt: -ms(1),
     });
     expect(await awaitReview(deps, { pollMs: 60_000, noStatusGraceMs: ms(60) })).toBe(0);
     expect(deps.calls.requests).toBe(1);
@@ -615,18 +617,48 @@ describe("awaitReview: a review-limit comment with no status (#1401)", () => {
     expect(deps.calls.sleeps.every((s) => s === 60_000)).toBe(true);
   });
 
+  it("waits only what is LEFT of a cooldown stated before the monitor started", async () => {
+    // "Available in 35 minutes", posted 30 minutes ago: about 5 more (CodeRabbit).
+    const deps = fakeDeps({
+      statuses: [null, null, COMPLETED],
+      comment: LIMIT_REACHED_1400,
+      commentAt: at(-30),
+      committedAt: -ms(60),
+    });
+    expect(await awaitReview(deps, { pollMs: 60_000, noStatusGraceMs: ms(60) })).toBe(0);
+    expect(deps.calls.sleeps[0]).toBe(ms(5) + COOLDOWN_SLACK_MS);
+  });
+
   it("does not wait the same stale cooldown again after its own request", async () => {
     // After the request, the old comment is still the newest: it must not
     // read as a fresh limit while the requested review is under way.
     const deps = fakeDeps({
       statuses: [null, null, null, null, null, COMPLETED],
       comment: LIMIT_REACHED_1400,
-      commentAt: at(1),
-      committedAt: 0,
+      commentAt: at(0),
+      committedAt: -ms(1),
     });
     expect(await awaitReview(deps, { pollMs: 60_000, noStatusGraceMs: ms(60) })).toBe(0);
     expect(deps.calls.requests).toBe(1);
     expect(deps.calls.sleeps.filter((s) => s === ms(35) + COOLDOWN_SLACK_MS)).toHaveLength(1);
+  });
+
+  // GitHub stamps comments to the second; the monitor's request time has
+  // milliseconds. A limit reply in the same second as the request is new.
+  it("counts a limit comment from the same second as the request as new", () => {
+    const requestAt = Date.parse("2026-10-27T10:00:00.500Z");
+    expect(limitCommentApplies("2026-10-27T10:00:00Z", 0, requestAt)).toBe(true);
+    expect(limitCommentApplies("2026-10-27T09:59:59Z", 0, requestAt)).toBe(false);
+    expect(limitCommentApplies("2026-10-27T10:00:00Z", Date.parse("2026-10-27T10:00:01Z"), null)).toBe(false);
+    expect(limitCommentApplies("2026-10-27T10:00:01Z", Date.parse("2026-10-27T10:00:00Z"), null)).toBe(true);
+  });
+
+  it("subtracts the time already waited, and never returns less than the floor", () => {
+    expect(remainingCooldownMs(ms(35), "1970-01-01T00:00:00Z", ms(30), 1000)).toBe(ms(5));
+    expect(remainingCooldownMs(ms(35), "1970-01-01T00:00:00Z", ms(50), 1000)).toBe(1000);
+    expect(remainingCooldownMs(ms(35), "not a date", ms(30), 1000)).toBe(ms(35));
+    // A comment stamped after "now" is clock skew, never extra waiting.
+    expect(remainingCooldownMs(ms(35), "1970-01-01T00:00:05Z", 0, 1000)).toBe(ms(35));
   });
 });
 

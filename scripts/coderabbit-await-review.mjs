@@ -124,6 +124,31 @@ export function parseCooldownMs(text) {
 }
 
 /**
+ * Does a limit comment speak for this head now? It must be newer than the
+ * head commit, and not older than the monitor's last request, or a stale
+ * comment re-triggers its cooldown while the requested review runs (#1401).
+ * GitHub stamps comments to the second, so the request time is floored to the
+ * second: a limit reply in the same second as the request is new (CodeRabbit).
+ */
+export function limitCommentApplies(commentAt, committedAt, lastRequestAt) {
+  const t = Date.parse(commentAt);
+  if (!Number.isFinite(t) || !(t > committedAt)) return false;
+  return lastRequestAt == null || t >= Math.floor(lastRequestAt / 1000) * 1000;
+}
+
+/**
+ * What is LEFT of a cooldown a comment stated at `commentAt`: "available in
+ * 35 minutes", posted 30 minutes ago, is about 5 more (CodeRabbit, #1401).
+ * Never below `floorMs`, and never ABOVE the stated cooldown: a comment that
+ * reads as later than now is clock skew. An unreadable timestamp waits it all.
+ */
+export function remainingCooldownMs(cooldownMs, commentAt, now, floorMs) {
+  const t = Date.parse(commentAt);
+  if (!Number.isFinite(t)) return cooldownMs;
+  return Math.max(cooldownMs - Math.max(0, now - t), floorMs);
+}
+
+/**
  * Count the findings a CodeRabbit review keeps in its BODY, which no thread
  * query sees. Across the last 40 merged PRs (2026-10-24) only two section
  * wordings appear: "Outside diff range comments (2)" and "Nitpick comments: 1".
@@ -406,8 +431,7 @@ export async function awaitReview(deps, opts = {}) {
       // otherwise the stale comment would re-trigger its cooldown after every
       // request while the requested review is still under way.
       const c = deps.getLatestRateLimitComment();
-      const since = Math.max(deps.headCommittedAt(head), lastRequestAt ?? -Infinity);
-      if (c && Date.parse(c.at) > since) state = "rate_limited";
+      if (c && limitCommentApplies(c.at, deps.headCommittedAt(head), lastRequestAt)) state = "rate_limited";
     }
     // What the head's status said, for messages; a review can now stand without one.
     const said = status ? `reads "${status.description}"` : "has no CodeRabbit status";
@@ -535,8 +559,9 @@ export async function awaitReview(deps, opts = {}) {
           watchMovedHead: true,
         });
       }
-      const wait =
-        (state === "rate_limited" && parseCooldownMs(deps.getLatestRateLimitComment()?.body)) || DEFAULT_COOLDOWN_MS;
+      const limit = state === "rate_limited" ? deps.getLatestRateLimitComment() : null;
+      const stated = parseCooldownMs(limit?.body);
+      const wait = stated ? remainingCooldownMs(stated, limit.at, deps.now(), pollMs) : DEFAULT_COOLDOWN_MS;
       deps.log(`head ${short} ${state}; waiting ${Math.round(wait / 60_000)} min for the cooldown.`);
       await deps.sleep(wait);
       // The author may have pushed during the wait; a review request then

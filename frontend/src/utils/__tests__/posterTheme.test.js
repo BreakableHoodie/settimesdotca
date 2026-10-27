@@ -60,6 +60,19 @@ describe('posterThemeVariables: accent text reads on its tints as painted (#1396
   for (const [name, variant] of Object.entries(MEASURED_VARIANTS)) {
     it(name, () => expectAccentTextReadable(posterThemeVariables(variant)))
   }
+
+  // No text colour reads on both a mid-grey ground and its 30% black tint
+  // (CodeRabbit, #1396). The ground wins: tuning toward the tint once picked
+  // white, 2.6:1 on the ground. The resting tint still reads; only the
+  // hover tint, which no colour can satisfy here, falls short.
+  it('keeps text readable on the ground when no colour can also clear the hover tint', () => {
+    const v = posterThemeVariables({ ground: '#a0a0a0', ink: '#000000', accent: '#000000', nowFill: '#ffffff' })
+    const ground = v['--color-bg-navy']
+    expect(contrastRatio(v['--color-accent-400'], ground)).toBeGreaterThanOrEqual(AA_TEXT)
+    expect(
+      contrastRatio(v['--color-accent-400'], composite(v['--color-accent-500'], ground, 0.2))
+    ).toBeGreaterThanOrEqual(AA_TEXT)
+  })
 })
 
 describe('posterThemeVariables: the page stays readable for any poster', () => {

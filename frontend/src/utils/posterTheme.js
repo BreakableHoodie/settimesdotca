@@ -7,7 +7,7 @@
 // Every colour reaching CSS is a #rrggbb that passed isValidThemeColours, then
 // readableThemeColours, then the contrast rules below, so a stored palette can
 // neither inject CSS nor make text unreadable.
-import { AA_TEXT, composite, ensureContrast, mix } from './colour'
+import { AA_TEXT, composite, ensureContrast, mix, relativeLuminance } from './colour'
 
 // The strongest accent-500 tint that carries accent-400 text: hover:bg-accent-500/30.
 const MAX_TEXT_TINT_ALPHA = 0.3
@@ -49,13 +49,16 @@ export function posterThemeVariables({ ground, ink, accent, nowFill }) {
   // accent-400 is TEXT on the ground and on accent-500 tints, up to /30 on
   // hover. Checked against the strongest tint AS PAINTED: accent-500 at that
   // alpha composited over the ground in sRGB. The old check mixed the raw
-  // accent in OKLab and let tints render at 3.9-4.4:1 (#1396). Passing on the
-  // strongest tint passes on the weaker ones and on the ground, which sit
-  // further from the text.
+  // accent in OKLab and let tints render at 3.9-4.4:1 (#1396).
+  // The direction comes from the GROUND: text moved away from the ground
+  // passes on the ground and on every weaker tint once it passes the
+  // strongest. Choosing it from the tint picked white on a mid-grey ground
+  // (2.6:1 there) when no colour could pass both (CodeRabbit, #1396).
   const accentText = ensureContrast(
     accent,
     composite(accentFill, ground, MAX_TEXT_TINT_ALPHA),
-    AA_TEXT + TINT_CONTRAST_MARGIN
+    AA_TEXT + TINT_CONTRAST_MARGIN,
+    relativeLuminance(ground) > 0.18
   )
   const accentFillDeep = ensureContrast(mix(accentFill, ink, 0.25), ground, AA_TEXT)
   const card = [tone(0.04), tone(0.08)]

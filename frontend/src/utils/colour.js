@@ -134,11 +134,14 @@ export function mix(a, b, t) {
  * white on a dark one) to the nearest passing step. If even pure black/white
  * cannot reach the target, return whichever of the two has higher contrast.
  */
-export function ensureContrast(colour, against, minRatio) {
+export function ensureContrast(colour, against, minRatio, towardBlackOverride) {
   if (contrastRatio(colour, against) >= minRatio) return colour
-  const towardBlack = relativeLuminance(against) > 0.18
+  // A caller may fix the direction (see posterThemeVariables); then an end
+  // that cannot reach the target is still the answer, never the opposite end.
+  const towardBlack = towardBlackOverride ?? relativeLuminance(against) > 0.18
   const end = towardBlack ? '#000000' : '#ffffff'
   if (contrastRatio(end, against) < minRatio) {
+    if (towardBlackOverride !== undefined) return end
     return contrastRatio('#000000', against) >= contrastRatio('#ffffff', against) ? '#000000' : '#ffffff'
   }
   const { L, C, h } = toOklch(colour)

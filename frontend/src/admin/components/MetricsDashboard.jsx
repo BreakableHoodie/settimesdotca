@@ -1,6 +1,89 @@
 import { useState, useEffect, useCallback } from 'react'
 import { eventsApi } from '../../utils/adminApi'
 import LoadError from './LoadError'
+import { AFTER_MIDNIGHT_THRESHOLD_HOUR } from '../../utils/festivalDays'
+
+// "6 PM", "12 AM", "1 AM": whole hours only, so formatTime's ":00" would be noise.
+function hourLabel(hour) {
+  return `${hour % 12 || 12} ${hour >= 12 ? 'PM' : 'AM'}`
+}
+
+// Position of an hour in the festival night: 6 AM first ... 11 PM, then 12-5 AM.
+const festivalKey = hour => (hour + 24 - AFTER_MIDNIGHT_THRESHOLD_HOUR) % 24
+
+// One date's rows from its first recorded hour to its last, with the quiet
+// hours in between as 0. Only hours with views are stored, and a missing row
+// would read as "no data" rather than "nobody came".
+function fillNight(dateRows) {
+  const byKey = new Map(dateRows.map(r => [festivalKey(r.hour), r]))
+  const keys = [...byKey.keys()]
+  const filled = []
+  for (let k = Math.min(...keys); k <= Math.max(...keys); k++) {
+    const hour = (k + AFTER_MIDNIGHT_THRESHOLD_HOUR) % 24
+    filled.push(byKey.get(k) ?? { festival_date: dateRows[0].festival_date, hour, views: 0 })
+  }
+  return filled
+}
+
+// Show-night usage curve (#1246 Q1). Rows arrive in festival order (6 AM ... 11 PM,
+// then 12-5 AM). A date heading appears only on a multi-day edition.
+function ShowNightCurve({ curve }) {
+  // null is the server saying the read failed, and an absent field is a payload
+  // this component does not understand: never show either as "no views".
+  if (curve == null) {
+    return (
+      <div className="bg-bg-purple rounded-lg p-4">
+        <h4 className="text-white font-semibold mb-3">Show-night traffic</h4>
+        <p className="text-gray-400 text-sm">Show-night traffic could not be loaded.</p>
+      </div>
+    )
+  }
+  const rows = curve
+  const max = Math.max(1, ...rows.map(r => r.views))
+  const dates = [...new Set(rows.map(r => r.festival_date))]
+  const multiDay = dates.length > 1
+
+  const renderRow = row => (
+    <li key={`${row.festival_date}-${row.hour}`} className="flex items-center gap-3 text-sm">
+      <span className="text-white w-14 shrink-0">{hourLabel(row.hour)}</span>
+      <div className="flex-1 bg-black/20 rounded h-3" aria-hidden="true">
+        <div className="bg-accent-500 h-3 rounded" style={{ width: `${(row.views / max) * 100}%` }} />
+      </div>
+      <span className="text-gray-400 w-24 text-right shrink-0">
+        {row.views} {row.views === 1 ? 'view' : 'views'}
+      </span>
+    </li>
+  )
+
+  return (
+    <div className="bg-bg-purple rounded-lg p-4">
+      <h4 className="text-white font-semibold mb-3">Show-night traffic</h4>
+      {rows.length === 0 ? (
+        <p className="text-gray-400 text-sm">
+          No show-night views recorded yet. Hourly counts started in October 2026, so earlier editions have none.
+        </p>
+      ) : (
+        <>
+          {dates.map(date => (
+            <div key={date} className="mb-3 last:mb-0">
+              {multiDay && <h5 className="text-white text-sm font-medium mb-2">{date}</h5>}
+              <ul
+                className="space-y-1"
+                aria-label={multiDay ? `Event page views by hour, ${date}` : 'Event page views by hour'}
+              >
+                {fillNight(rows.filter(r => r.festival_date === date)).map(renderRow)}
+              </ul>
+            </div>
+          ))}
+          <p className="text-gray-400 text-xs mt-3">
+            Event-page views per Toronto hour on show days. After-midnight hours count toward the previous evening.
+            Counts only, no visitor information.
+          </p>
+        </>
+      )}
+    </div>
+  )
+}
 
 export default function MetricsDashboard({ eventId }) {
   const [metrics, setMetrics] = useState(null)
@@ -106,6 +189,8 @@ export default function MetricsDashboard({ eventId }) {
           ))}
         </div>
       </div>
+
+      <ShowNightCurve curve={metrics.showNightCurve} />
 
       {/* Popular Bands */}
       <div className="bg-bg-purple rounded-lg p-4">

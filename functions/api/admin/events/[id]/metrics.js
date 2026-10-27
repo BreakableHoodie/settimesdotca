@@ -2,6 +2,7 @@ import { checkPermission } from "../../_middleware.js";
 import { validateId } from "../../../../utils/validation.js";
 import { sortableName } from "../../../../utils/sortableName.js";
 import { claimIsLiveSql } from "../../../../utils/bandFollowNotify.js";
+import { AFTER_MIDNIGHT_THRESHOLD_HOUR } from "../../../../utils/eventDay.js";
 
 export async function onRequestGet(context) {
   const { env, params } = context;
@@ -131,6 +132,30 @@ export async function onRequestGet(context) {
       ).bind(eventId),
     ]);
 
+    // Show-night usage curve (#1246 Q1): event-page views per festival date and
+    // Toronto hour. Counts only, no visitor key. Read on its own, not in the
+    // batch above: as one statement there, a missing or broken table turned
+    // every metric into a 500 (CodeRabbit). A failure is null ("unavailable"),
+    // never [], which the dashboard would show as "no views recorded".
+    // Festival order within a date: 6 AM first ... 11 PM, then 12-5 AM, because
+    // after-midnight hours belong to the END of the night, not the start.
+    const festivalHourKey = (hour) => (hour + 24 - AFTER_MIDNIGHT_THRESHOLD_HOUR) % 24;
+    let showNightCurve = null;
+    try {
+      const hourlyViewsRes = await DB.prepare(
+        `SELECT festival_date, hour, views FROM event_hourly_views WHERE event_id = ?`,
+      )
+        .bind(eventId)
+        .all();
+      showNightCurve = (hourlyViewsRes.results || [])
+        .map(({ festival_date, hour, views }) => ({ festival_date, hour, views }))
+        .sort(
+          (a, b) => a.festival_date.localeCompare(b.festival_date) || festivalHourKey(a.hour) - festivalHourKey(b.hour),
+        );
+    } catch (error) {
+      console.error("Show-night curve read failed:", { eventId, error });
+    }
+
     const metrics = metricsRes.results?.[0];
     const routeBuilders = metrics?.route_builders || 0;
     const totalEventViews = telemetryStatsRes.results?.[0]?.total_event_views || 0;
@@ -195,6 +220,7 @@ export async function onRequestGet(context) {
           announcementPlanning: announcementPlanning,
           totalEventViews: telemetryStats?.total_event_views || 0,
           totalTicketClicks: telemetryStats?.total_ticket_clicks || 0,
+          showNightCurve,
         },
       }),
       {

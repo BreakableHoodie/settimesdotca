@@ -1,7 +1,7 @@
 // Tests for POST /api/metrics
 // Covers: event_view/ticket_click no longer written to page_views_daily (#445 fix),
 // page_view events still written as real path keys, catch-logging (swallowed
-// page_views_daily failure now emits logger.warn), and event_view/ticket_click
+// page_views_daily failure now emits logger.error), and event_view/ticket_click
 // now aggregating per event_id into event_daily_stats (#706 — previously
 // allowlisted, validated, and rate-limited but silently dropped).
 import { describe, expect, test, vi, afterEach } from "vitest";
@@ -83,7 +83,7 @@ describe("POST /api/metrics", () => {
       throw new Error("simulated page_views_daily write failure");
     };
 
-    const warnSpy = vi.spyOn(loggerModule.logger, "warn");
+    const warnSpy = vi.spyOn(loggerModule.logger, "error");
 
     // page_view events populate pvStmts only (no artist_daily_stats batch).
     const events = [{ event: "page_view", props: { page: "/home" } }];
@@ -228,7 +228,7 @@ describe("POST /api/metrics — event_view and ticket_click write to event_daily
       throw new Error("simulated event_daily_stats write failure");
     };
 
-    const warnSpy = vi.spyOn(loggerModule.logger, "warn");
+    const warnSpy = vi.spyOn(loggerModule.logger, "error");
 
     const events = [{ event: "ticket_click", props: { event_id: event.id } }];
     const res = await onRequestPost({ request: makeRequest(events), env });
@@ -366,5 +366,110 @@ describe("POST /api/metrics — prop values are bounded before Analytics Engine"
     expect(blobs[0]).toContain("x".repeat(200));
     expect(blobs[0].every((b) => b.length <= 200)).toBe(true);
     expect(blobs[1]).not.toContain("[object Object]");
+  });
+});
+
+// Show-night usage curve (#1246 Q1): event_view -> event_hourly_views, keyed by
+// FESTIVAL date and Toronto hour, only inside the event's own [date, end_date].
+// Oct 2026 is EDT (UTC-4), so instants are written with an explicit -04:00.
+describe("POST /api/metrics — show-night curve (event_hourly_views, #1246 Q1)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const view = (eventId) => ({ event: "event_view", props: { event_id: eventId } });
+  const post = (env, events) => onRequestPost({ request: makeRequest(events), env });
+  const at = (iso) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(iso));
+  };
+  const hourly = (rawDb) =>
+    rawDb
+      .prepare("SELECT event_id, festival_date, hour, views FROM event_hourly_views ORDER BY festival_date, hour")
+      .all();
+
+  test("a show-night view lands at its (festival_date, hour); two views in the hour sum", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { slug: "lwbc18", date: "2026-10-11" });
+    at("2026-10-11T21:10:00-04:00");
+
+    await post(env, [view(event.id), view(event.id)]);
+    await post(env, [view(event.id)]);
+
+    expect(hourly(rawDb)).toEqual([{ event_id: event.id, festival_date: "2026-10-11", hour: 21, views: 3 }]);
+  });
+
+  test("a 01:30 view after the show counts on the previous festival date at hour 1", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { slug: "lwbc18", date: "2026-10-11" });
+    at("2026-10-12T01:30:00-04:00");
+
+    await post(env, [view(event.id)]);
+
+    expect(hourly(rawDb)).toEqual([{ event_id: event.id, festival_date: "2026-10-11", hour: 1, views: 1 }]);
+  });
+
+  test("views outside the window write no hourly row, but the daily stats are still written", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { slug: "lwbc18", date: "2026-10-11" });
+
+    // Day before (evening), 03:00 on the morning of show day (festival date is
+    // still the day before), and the day after (afternoon, past 06:00).
+    for (const iso of ["2026-10-10T20:00:00-04:00", "2026-10-11T03:00:00-04:00", "2026-10-12T14:00:00-04:00"]) {
+      at(iso);
+      const res = await post(env, [view(event.id)]);
+      expect(res.status).toBe(200);
+    }
+
+    expect(hourly(rawDb)).toEqual([]);
+    const daily = rawDb.prepare("SELECT SUM(event_views) AS n FROM event_daily_stats WHERE event_id = ?").get(event.id);
+    expect(daily.n).toBe(3);
+  });
+
+  test("multi-day: day 2 counts, the day after end_date does not", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { slug: "blr3", date: "2026-07-10", end_date: "2026-07-12" });
+
+    at("2026-07-11T19:00:00-04:00");
+    await post(env, [view(event.id)]);
+    at("2026-07-13T19:00:00-04:00");
+    await post(env, [view(event.id)]);
+
+    expect(hourly(rawDb)).toEqual([{ event_id: event.id, festival_date: "2026-07-11", hour: 19, views: 1 }]);
+  });
+
+  test("ticket clicks do not count toward the curve", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { slug: "lwbc18", date: "2026-10-11" });
+    at("2026-10-11T20:00:00-04:00");
+
+    await post(env, [{ event: "ticket_click", props: { event_id: event.id } }]);
+
+    expect(hourly(rawDb)).toEqual([]);
+  });
+
+  test("an unknown event_id writes nothing and does not throw", async () => {
+    const { env, rawDb } = createTestEnv();
+    at("2026-10-11T20:00:00-04:00");
+
+    const res = await post(env, [view(9999)]);
+
+    expect(res.status).toBe(200);
+    expect(hourly(rawDb)).toEqual([]);
+  });
+
+  test("a broken hourly table still leaves event_daily_stats written and answers 200", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { slug: "lwbc18", date: "2026-10-11" });
+    rawDb.exec("DROP TABLE event_hourly_views");
+    at("2026-10-11T20:00:00-04:00");
+    const warn = vi.spyOn(loggerModule.logger, "error").mockImplementation(() => {});
+
+    const res = await post(env, [view(event.id)]);
+
+    expect(res.status).toBe(200);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("event_hourly_views"), expect.anything());
+    const daily = rawDb.prepare("SELECT event_views FROM event_daily_stats WHERE event_id = ?").get(event.id);
+    expect(daily.event_views).toBe(1);
   });
 });

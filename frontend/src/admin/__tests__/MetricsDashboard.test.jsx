@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import MetricsDashboard from '../components/MetricsDashboard'
 
@@ -193,5 +193,109 @@ describe('MetricsDashboard', () => {
     expect(screen.getByText('100.0%')).toBeInTheDocument()
     // The uncapped figure must not reach the page.
     expect(screen.queryByText('1000.0%')).not.toBeInTheDocument()
+  })
+
+  describe('show-night traffic (#1246 Q1)', () => {
+    const base = {
+      totalScheduleBuilds: 0,
+      routeBuilders: 0,
+      routeSizeDistribution: [],
+      popularBands: [],
+      topSharedRoutes: [],
+    }
+
+    it('renders hour labels and counts in festival order, with no date heading for one day', async () => {
+      eventsApi.getMetrics.mockResolvedValue({
+        metrics: {
+          ...base,
+          showNightCurve: [
+            { festival_date: '2026-10-11', hour: 18, views: 12 },
+            { festival_date: '2026-10-11', hour: 0, views: 1 },
+            { festival_date: '2026-10-11', hour: 1, views: 5 },
+          ],
+        },
+      })
+
+      render(<MetricsDashboard eventId={1} />)
+
+      expect(await screen.findByText('Show-night traffic')).toBeInTheDocument()
+      const list = screen.getByRole('list', { name: 'Event page views by hour' })
+      const rows = within(list)
+        .getAllByRole('listitem')
+        .map(li => li.textContent)
+      // A quiet hour inside the night is a 0, not a missing row: a gap would
+      // read as "no data" rather than "nobody came".
+      expect(rows).toEqual([
+        '6 PM12 views',
+        '7 PM0 views',
+        '8 PM0 views',
+        '9 PM0 views',
+        '10 PM0 views',
+        '11 PM0 views',
+        '12 AM1 view',
+        '1 AM5 views',
+      ])
+      expect(screen.queryByText('2026-10-11')).not.toBeInTheDocument()
+      expect(screen.queryByText(/Day 1/)).not.toBeInTheDocument()
+    })
+
+    it('scales bar width to views over the busiest hour', async () => {
+      eventsApi.getMetrics.mockResolvedValue({
+        metrics: {
+          ...base,
+          showNightCurve: [
+            { festival_date: '2026-10-11', hour: 20, views: 50 },
+            { festival_date: '2026-10-11', hour: 21, views: 25 },
+          ],
+        },
+      })
+
+      const { container } = render(<MetricsDashboard eventId={1} />)
+      await screen.findByText('Show-night traffic')
+
+      const widths = [...container.querySelectorAll('li div > div')].map(el => el.style.width)
+      expect(widths).toEqual(['100%', '50%'])
+    })
+
+    it('groups a multi-day curve under a heading per date', async () => {
+      eventsApi.getMetrics.mockResolvedValue({
+        metrics: {
+          ...base,
+          showNightCurve: [
+            { festival_date: '2026-07-10', hour: 19, views: 3 },
+            { festival_date: '2026-07-11', hour: 19, views: 4 },
+          ],
+        },
+      })
+
+      render(<MetricsDashboard eventId={1} />)
+
+      expect(await screen.findByRole('heading', { name: '2026-07-10' })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: '2026-07-11' })).toBeInTheDocument()
+    })
+
+    it.each([
+      ['null (the read failed)', null],
+      ['absent (a payload this version does not know)', undefined],
+    ])('says the chart is unavailable, not empty, when the curve is %s', async (_, curve) => {
+      eventsApi.getMetrics.mockResolvedValue({ metrics: { ...base, showNightCurve: curve } })
+
+      render(<MetricsDashboard eventId={1} />)
+
+      expect(await screen.findByText('Show-night traffic could not be loaded.')).toBeInTheDocument()
+      expect(screen.queryByText(/No show-night views recorded yet/)).not.toBeInTheDocument()
+    })
+
+    it('shows the empty state when there are no rows', async () => {
+      eventsApi.getMetrics.mockResolvedValue({ metrics: { ...base, showNightCurve: [] } })
+
+      render(<MetricsDashboard eventId={1} />)
+
+      expect(
+        await screen.findByText(
+          'No show-night views recorded yet. Hourly counts started in October 2026, so earlier editions have none.'
+        )
+      ).toBeInTheDocument()
+    })
   })
 })

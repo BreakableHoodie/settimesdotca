@@ -517,3 +517,67 @@ describe("GET /api/admin/events/[id]/metrics", () => {
     });
   });
 });
+
+describe("GET /api/admin/events/[id]/metrics — showNightCurve (#1246 Q1)", () => {
+  function call(env, eventId) {
+    return onRequestGet({
+      request: new Request(`https://example.test/api/admin/events/${eventId}/metrics`, {
+        headers: { "x-test-role": "viewer" },
+      }),
+      params: { id: String(eventId) },
+      env,
+      data: { user: { userId: 1, role: "viewer" } },
+    });
+  }
+
+  test("returns rows in festival order: 6 AM first, after-midnight hours last, dates ascending", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { slug: "blr3", date: "2026-07-10", end_date: "2026-07-11" });
+    const insert = rawDb.prepare(
+      "INSERT INTO event_hourly_views (event_id, festival_date, hour, views) VALUES (?, ?, ?, ?)",
+    );
+    insert.run(event.id, "2026-07-11", 1, 9);
+    insert.run(event.id, "2026-07-10", 1, 4);
+    insert.run(event.id, "2026-07-10", 23, 3);
+    insert.run(event.id, "2026-07-10", 0, 2);
+    insert.run(event.id, "2026-07-10", 18, 1);
+
+    const body = await (await call(env, event.id)).json();
+
+    expect(body.metrics.showNightCurve).toEqual([
+      { festival_date: "2026-07-10", hour: 18, views: 1 },
+      { festival_date: "2026-07-10", hour: 23, views: 3 },
+      { festival_date: "2026-07-10", hour: 0, views: 2 },
+      { festival_date: "2026-07-10", hour: 1, views: 4 },
+      { festival_date: "2026-07-11", hour: 1, views: 9 },
+    ]);
+  });
+
+  // CodeRabbit: as one statement in the dashboard's DB.batch, a missing or
+  // broken hourly table took EVERY metric down with a 500. It is read on its
+  // own now, and a failure is null (unavailable), never [] (a false "no views").
+  test("a failed hourly read leaves the other metrics and reports the curve as null", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { slug: "broken", date: "2026-10-11" });
+    rawDb.exec("DROP TABLE event_hourly_views");
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await call(env, event.id);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.metrics.totalScheduleBuilds).toBe(0);
+    expect(body.metrics.showNightCurve).toBeNull();
+    expect(errors).toHaveBeenCalled();
+    errors.mockRestore();
+  });
+
+  test("an event with no hourly rows gets []", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { slug: "quiet", date: "2026-10-11" });
+
+    const body = await (await call(env, event.id)).json();
+
+    expect(body.metrics.showNightCurve).toEqual([]);
+  });
+});

@@ -3,7 +3,7 @@
 // Privacy-first: no PII, aggregated only
 
 import { logger } from "../utils/logger.js";
-import { eventLocalToday } from "../utils/eventDay.js";
+import { eventLocalToday, eventLocalFestivalToday, eventLocalClock } from "../utils/eventDay.js";
 import { parseJsonObjectBody } from "../utils/request.js";
 
 const MAX_BATCH_STATEMENTS = 20;
@@ -201,7 +201,7 @@ export async function onRequestPost(context) {
         try {
           await executeInChunks(env.DB, pvStmts);
         } catch (err) {
-          logger.warn("page_views_daily upsert failed (table may be missing or write error)", {
+          logger.error("page_views_daily upsert failed; this batch's page views are lost", {
             error: err,
             statementCount: pvStmts.length,
           });
@@ -224,15 +224,21 @@ export async function onRequestPost(context) {
       // against events first and keep only ids that exist.
       const candidateIds = [...new Set([...eventViewCounts.keys(), ...ticketClickCounts.keys()])];
       let allEventIds = [];
+      let resolvedEvents = [];
       if (candidateIds.length > 0) {
         try {
           const placeholders = candidateIds.map(() => "?").join(",");
-          const { results } = await env.DB.prepare(`SELECT id FROM events WHERE id IN (${placeholders})`)
+          const { results } = await env.DB.prepare(
+            `SELECT id, date, end_date FROM events WHERE id IN (${placeholders})`,
+          )
             .bind(...candidateIds)
             .all();
-          allEventIds = (results || []).map((row) => row.id);
+          resolvedEvents = results || [];
+          allEventIds = resolvedEvents.map((row) => row.id);
         } catch (err) {
-          logger.warn("event_daily_stats id resolution failed; skipping event stats for this batch", { error: err });
+          logger.error("event id resolution failed; skipping event_daily_stats and event_hourly_views for this batch", {
+            error: err,
+          });
         }
       }
 
@@ -255,9 +261,55 @@ export async function onRequestPost(context) {
         try {
           await executeInChunks(env.DB, eventStmts);
         } catch (err) {
-          logger.warn("event_daily_stats upsert failed (table may be missing or write error)", {
+          logger.error("event_daily_stats upsert failed; this batch's event views and ticket clicks are lost", {
             error: err,
             statementCount: eventStmts.length,
+          });
+        }
+      }
+
+      // Show-night usage curve (#1246 Q1): "when do fans use the site on show
+      // night?" One count per (event, FESTIVAL date, Toronto hour), from
+      // event_view only, and only while the festival date falls inside the
+      // event's own [date, end_date]. Festival date, not calendar date: a 01:00
+      // view after the show belongs to the previous evening at hour 1, and a
+      // 03:00 view on the morning of day 1 (festival date = the day before) is
+      // outside the window and not counted. One `now` feeds both values so they
+      // can never straddle a boundary. Aggregate counts, no visitor key.
+      // Isolated in its own batch/try-catch, like event_daily_stats above, so
+      // a failure here can never break the daily stats and vice versa.
+      const now = new Date();
+      const festivalDate = eventLocalFestivalToday(now);
+      const hour = Number(eventLocalClock(now).time.slice(0, 2));
+      const hourlyDue = resolvedEvents.filter(
+        (row) =>
+          (eventViewCounts.get(row.id) || 0) > 0 &&
+          festivalDate >= row.date &&
+          festivalDate <= (row.end_date || row.date),
+      );
+
+      if (hourlyDue.length > 0) {
+        try {
+          // Statements are built inside the try: prepare() can throw on a
+          // missing table (better-sqlite3 validates eagerly).
+          const hourlyStmts = hourlyDue.map((row) => {
+            const views = eventViewCounts.get(row.id);
+            return env.DB.prepare(
+              `INSERT INTO event_hourly_views (event_id, festival_date, hour, views)
+               VALUES (?, ?, ?, ?)
+               ON CONFLICT (event_id, festival_date, hour)
+               DO UPDATE SET views = views + ?`,
+            ).bind(row.id, festivalDate, hour, views, views);
+          });
+          await executeInChunks(env.DB, hourlyStmts);
+        } catch (err) {
+          // error, not warn: this table fills only on show nights and cannot be
+          // rebuilt from anywhere else, so a lost hour is a lost edition's curve.
+          logger.error("event_hourly_views upsert failed; this show-night hour's views are lost", {
+            error: err,
+            statementCount: hourlyDue.length,
+            festivalDate,
+            hour,
           });
         }
       }

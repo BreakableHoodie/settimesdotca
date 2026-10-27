@@ -40,12 +40,15 @@ function fakeDeps({
   comment = RL_COMMENT,
   commentAt = "1970-01-01T00:00:00Z",
   busy = () => false,
-  findings = () => ({ confirmed: true, outsideDiff: 0, nitpicks: 0, duplicates: 0, other: 0, url: null }),
+  // By default a review exists exactly when a status does, the shape before
+  // #1393; tests of a review with no status pass their own.
+  findings = null,
   rateLimitedHeads = [],
 }) {
   let t = 0;
   let si = 0;
   let hi = 0;
+  let last;
   const calls = { requests: 0, sleeps: [], statusShas: [], findingShas: [], logs: [] };
   return {
     calls,
@@ -57,6 +60,7 @@ function fakeDeps({
       calls.statusShas.push(sha);
       const s = statuses[Math.min(si++, statuses.length - 1)];
       if (s instanceof Error) throw s;
+      last = s;
       return s;
     },
     getLatestRateLimitComment: () => (comment === null ? null : { body: comment, at: commentAt }),
@@ -64,7 +68,8 @@ function fakeDeps({
     headWasRateLimited: (sha) => rateLimitedHeads.includes(sha),
     getHeadReviewFindings: (sha) => {
       calls.findingShas.push(sha);
-      return findings(sha);
+      if (findings) return findings(sha);
+      return { confirmed: last != null, outsideDiff: 0, nitpicks: 0, duplicates: 0, other: 0, url: null };
     },
     requestReview: () => {
       calls.requests += 1;
@@ -576,6 +581,39 @@ describe("confirmsCleanReview", () => {
 
   it("rejects a comment naming the head that does not say the review was clean", () => {
     expect(confirmsCleanReview(`Reviewing files ... between abc and ${HEAD}.`, HEAD)).toBe(false);
+  });
+});
+
+// #1393: CodeRabbit reviewed the head and posted no commit status at all.
+// The monitor re-requested five times ("Already reviewed the last commit")
+// and timed out, and the review's nitpick never reached exit 5.
+describe("awaitReview: a review of the head with no status (#1393)", () => {
+  it("judges the review's findings instead of re-requesting", async () => {
+    const deps = fakeDeps({ statuses: [null], findings: () => FOUND });
+    expect(await awaitReview(deps, { pollMs: 60_000, noStatusGraceMs: 90_000 })).toBe(5);
+    expect(deps.calls.requests).toBe(0);
+  });
+
+  it("exits 0 on a clean review of the head, also with --once", async () => {
+    const clean = { ...UNCONFIRMED, confirmed: true };
+    expect(await awaitReview(fakeDeps({ statuses: [null], findings: () => clean }), {})).toBe(0);
+    expect(await awaitReview(fakeDeps({ statuses: [null], findings: () => clean }), { once: true })).toBe(0);
+  });
+
+  it("asks about THIS head's review, never an earlier commit's", async () => {
+    const deps = fakeDeps({
+      statuses: [null],
+      heads: ["new-head"],
+      findings: (sha) => ({ ...UNCONFIRMED, confirmed: sha === "new-head" }),
+    });
+    expect(await awaitReview(deps, {})).toBe(0);
+    expect(new Set(deps.calls.findingShas)).toEqual(new Set(["new-head"]));
+  });
+
+  it("still requests a review when the head has neither a status nor a review", async () => {
+    const deps = fakeDeps({ statuses: [null], findings: () => UNCONFIRMED });
+    expect(await awaitReview(deps, { pollMs: 60_000, noStatusGraceMs: 90_000, maxRequests: 1 })).toBe(1);
+    expect(deps.calls.requests).toBe(1);
   });
 });
 

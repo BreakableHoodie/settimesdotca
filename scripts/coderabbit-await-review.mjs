@@ -19,6 +19,12 @@
  * 2026-09-24, 13 had a completed review with no review object on the head
  * (a clean review posts only the summary comment).
  *
+ * The converse does not hold (#1393): from 2026-10-27, on the Essentials plan,
+ * CodeRabbit reviewed a head and posted NO commit status at all. A head with
+ * no status but a review of its own SHA (a review object, or the clean-review
+ * summary naming it) is therefore treated as reviewed and judged on its body;
+ * re-requesting it only gets "Already reviewed the last commit".
+ *
  * "Reviewed" is not "clean" either (#1365). Outside-diff and nitpick findings
  * live only in the review BODY, never as threads, so an unresolved-threads
  * check cannot see them: #1362 merged with three, one a vacuous test. Once the
@@ -370,6 +376,14 @@ export async function awaitReview(deps, opts = {}) {
       unknownSince = null;
       unknownDescription = null;
     }
+    if (state === "none" && deps.getHeadReviewFindings(head).confirmed) {
+      // #1393: CodeRabbit reviewed the head and posted no commit status at
+      // all. A review of THIS SHA is what the status would have attested, and
+      // re-requesting only gets "Already reviewed the last commit".
+      state = "reviewed";
+    }
+    // What the head's status said, for messages; a review can now stand without one.
+    const said = status ? `reads "${status.description}"` : "has no CodeRabbit status";
     const short = head.slice(0, 8);
     // Report each state change once, so a long wait is visibly alive rather
     // than indistinguishable from a hang, without a line per poll.
@@ -395,13 +409,13 @@ export async function awaitReview(deps, opts = {}) {
       if (!f.confirmed) {
         // Reviewed by status, but nothing yet shows WHAT the review found.
         if (once) {
-          deps.log(`head ${short} reads "${status.description}", but no review or clean-review comment for it yet.`);
+          deps.log(`head ${short} ${said}, but no review or clean-review comment for it yet.`);
           return 2;
         }
         unconfirmedSince ??= deps.now();
         if (deps.now() - unconfirmedSince >= CONFIRM_SETTLE_MS) {
           deps.log(
-            `head ${short} reads "${status.description}", but after ${Math.round(CONFIRM_SETTLE_MS / 60_000)} min ` +
+            `head ${short} ${said}, but after ${Math.round(CONFIRM_SETTLE_MS / 60_000)} min ` +
               "there is still no review object or clean-review comment for it; read the PR before merging.",
           );
           return 1;
@@ -420,7 +434,7 @@ export async function awaitReview(deps, opts = {}) {
         return 5;
       }
       deps.log(
-        `head ${short} reviewed ("${status.description}")${found > 0 ? `; ${found} body finding(s) allowed` : ""}.`,
+        `head ${short} reviewed (${status ? `"${status.description}"` : "by its review; no status"})${found > 0 ? `; ${found} body finding(s) allowed` : ""}.`,
       );
       return 0;
     }

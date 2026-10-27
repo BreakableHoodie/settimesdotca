@@ -127,12 +127,13 @@ export function parseCooldownMs(text) {
  * Does a limit comment speak for this head now? It must be newer than the
  * head commit, and not older than the monitor's last request, or a stale
  * comment re-triggers its cooldown while the requested review runs (#1401).
- * GitHub stamps comments to the second, so the request time is floored to the
- * second: a limit reply in the same second as the request is new (CodeRabbit).
+ * GitHub stamps comments and commits to the second, so equal seconds count: a
+ * reply cannot precede the commit it is about, and the request time is
+ * floored to the second (CodeRabbit, #1402).
  */
 export function limitCommentApplies(commentAt, committedAt, lastRequestAt) {
   const t = Date.parse(commentAt);
-  if (!Number.isFinite(t) || !(t > committedAt)) return false;
+  if (!Number.isFinite(t) || !(t >= committedAt)) return false;
   return lastRequestAt == null || t >= Math.floor(lastRequestAt / 1000) * 1000;
 }
 
@@ -591,6 +592,10 @@ export async function awaitReview(deps, opts = {}) {
       // still spend budget, or a flaky `gh` could exceed maxRequests.
       requests += 1;
       requestReview();
+      // Restart the no-status grace: a cooldown longer than the grace would
+      // otherwise draw a second request as soon as this one is 2 minutes old
+      // with no status yet (CodeRabbit, #1402).
+      headSeenAt = deps.now();
       deps.log(`posted @coderabbitai review (${requests}/${maxRequests}).`);
       // Give CodeRabbit time to replace the rate-limited status before re-reading
       // it; otherwise the old status triggers a second request at once.

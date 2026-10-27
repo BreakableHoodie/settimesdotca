@@ -54,7 +54,9 @@ function fakeDeps({
   // #1393; tests of a review with no status pass their own.
   findings = null,
   rateLimitedHeads = [],
-  committedAt = 0,
+  // After the default comment: unless a test says otherwise, the stock
+  // rate-limit comment is about an EARLIER push (#1401).
+  committedAt = 1000,
 }) {
   let t = 0;
   let si = 0;
@@ -638,6 +640,20 @@ describe("awaitReview: a review-limit comment with no status (#1401)", () => {
     expect(deps.calls.sleeps[0]).toBe(ms(5) + COOLDOWN_SLACK_MS);
   });
 
+  it("restarts the no-status grace after its request, under the DEFAULT grace", async () => {
+    // A 35-minute limit outlasts the default 30-minute grace: without a
+    // restart, a review still running 2 minutes after the request drew a
+    // second request at once (CodeRabbit on #1402).
+    const deps = fakeDeps({
+      statuses: [null, null, null, null, null, null, COMPLETED],
+      comment: LIMIT_REACHED_1400,
+      commentAt: at(0),
+      committedAt: -ms(1),
+    });
+    expect(await awaitReview(deps, { pollMs: 60_000 })).toBe(0);
+    expect(deps.calls.requests).toBe(1);
+  });
+
   it("does not wait the same stale cooldown again after its own request", async () => {
     // After the request, the old comment is still the newest: it must not
     // read as a fresh limit while the requested review is under way.
@@ -659,6 +675,9 @@ describe("awaitReview: a review-limit comment with no status (#1401)", () => {
     expect(limitCommentApplies("2026-10-27T10:00:00Z", 0, requestAt)).toBe(true);
     expect(limitCommentApplies("2026-10-27T09:59:59Z", 0, requestAt)).toBe(false);
     expect(limitCommentApplies("2026-10-27T10:00:00Z", Date.parse("2026-10-27T10:00:01Z"), null)).toBe(false);
+    // Same second as the commit: a reply cannot precede the commit it is
+    // about, so it counts (CodeRabbit on #1402).
+    expect(limitCommentApplies("2026-10-27T10:00:00Z", Date.parse("2026-10-27T10:00:00Z"), null)).toBe(true);
     expect(limitCommentApplies("2026-10-27T10:00:01Z", Date.parse("2026-10-27T10:00:00Z"), null)).toBe(true);
   });
 

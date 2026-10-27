@@ -553,6 +553,25 @@ describe("GET /api/admin/events/[id]/metrics — showNightCurve (#1246 Q1)", () 
     ]);
   });
 
+  // CodeRabbit: as one statement in the dashboard's DB.batch, a missing or
+  // broken hourly table took EVERY metric down with a 500. It is read on its
+  // own now, and a failure is null (unavailable), never [] (a false "no views").
+  test("a failed hourly read leaves the other metrics and reports the curve as null", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { slug: "broken", date: "2026-10-11" });
+    rawDb.exec("DROP TABLE event_hourly_views");
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await call(env, event.id);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.metrics.totalScheduleBuilds).toBe(0);
+    expect(body.metrics.showNightCurve).toBeNull();
+    expect(errors).toHaveBeenCalled();
+    errors.mockRestore();
+  });
+
   test("an event with no hourly rows gets []", async () => {
     const { env, rawDb } = createTestEnv();
     const event = insertEvent(rawDb, { slug: "quiet", date: "2026-10-11" });

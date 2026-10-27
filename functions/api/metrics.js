@@ -201,7 +201,7 @@ export async function onRequestPost(context) {
         try {
           await executeInChunks(env.DB, pvStmts);
         } catch (err) {
-          logger.warn("page_views_daily upsert failed (table may be missing or write error)", {
+          logger.error("page_views_daily upsert failed; this batch's page views are lost", {
             error: err,
             statementCount: pvStmts.length,
           });
@@ -236,7 +236,9 @@ export async function onRequestPost(context) {
           resolvedEvents = results || [];
           allEventIds = resolvedEvents.map((row) => row.id);
         } catch (err) {
-          logger.warn("event_daily_stats id resolution failed; skipping event stats for this batch", { error: err });
+          logger.error("event id resolution failed; skipping event_daily_stats and event_hourly_views for this batch", {
+            error: err,
+          });
         }
       }
 
@@ -259,7 +261,7 @@ export async function onRequestPost(context) {
         try {
           await executeInChunks(env.DB, eventStmts);
         } catch (err) {
-          logger.warn("event_daily_stats upsert failed (table may be missing or write error)", {
+          logger.error("event_daily_stats upsert failed; this batch's event views and ticket clicks are lost", {
             error: err,
             statementCount: eventStmts.length,
           });
@@ -301,9 +303,13 @@ export async function onRequestPost(context) {
           });
           await executeInChunks(env.DB, hourlyStmts);
         } catch (err) {
-          logger.warn("event_hourly_views upsert failed (table may be missing or write error)", {
+          // error, not warn: this table fills only on show nights and cannot be
+          // rebuilt from anywhere else, so a lost hour is a lost edition's curve.
+          logger.error("event_hourly_views upsert failed; this show-night hour's views are lost", {
             error: err,
             statementCount: hourlyDue.length,
+            festivalDate,
+            hour,
           });
         }
       }

@@ -274,6 +274,18 @@ describe('MetricsDashboard', () => {
       expect(screen.getByRole('heading', { name: '2026-07-11' })).toBeInTheDocument()
     })
 
+    it.each([
+      ['null (the read failed)', null],
+      ['absent (a payload this version does not know)', undefined],
+    ])('says the chart is unavailable, not empty, when the curve is %s', async (_, curve) => {
+      eventsApi.getMetrics.mockResolvedValue({ metrics: { ...base, showNightCurve: curve } })
+
+      render(<MetricsDashboard eventId={1} />)
+
+      expect(await screen.findByText('Show-night traffic could not be loaded.')).toBeInTheDocument()
+      expect(screen.queryByText(/No show-night views recorded yet/)).not.toBeInTheDocument()
+    })
+
     it('shows the empty state when there are no rows', async () => {
       eventsApi.getMetrics.mockResolvedValue({ metrics: { ...base, showNightCurve: [] } })
 

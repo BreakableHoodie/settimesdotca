@@ -1,7 +1,7 @@
 // Tests for POST /api/metrics
 // Covers: event_view/ticket_click no longer written to page_views_daily (#445 fix),
 // page_view events still written as real path keys, catch-logging (swallowed
-// page_views_daily failure now emits logger.warn), and event_view/ticket_click
+// page_views_daily failure now emits logger.error), and event_view/ticket_click
 // now aggregating per event_id into event_daily_stats (#706 — previously
 // allowlisted, validated, and rate-limited but silently dropped).
 import { describe, expect, test, vi, afterEach } from "vitest";
@@ -83,7 +83,7 @@ describe("POST /api/metrics", () => {
       throw new Error("simulated page_views_daily write failure");
     };
 
-    const warnSpy = vi.spyOn(loggerModule.logger, "warn");
+    const warnSpy = vi.spyOn(loggerModule.logger, "error");
 
     // page_view events populate pvStmts only (no artist_daily_stats batch).
     const events = [{ event: "page_view", props: { page: "/home" } }];
@@ -228,7 +228,7 @@ describe("POST /api/metrics — event_view and ticket_click write to event_daily
       throw new Error("simulated event_daily_stats write failure");
     };
 
-    const warnSpy = vi.spyOn(loggerModule.logger, "warn");
+    const warnSpy = vi.spyOn(loggerModule.logger, "error");
 
     const events = [{ event: "ticket_click", props: { event_id: event.id } }];
     const res = await onRequestPost({ request: makeRequest(events), env });
@@ -463,7 +463,7 @@ describe("POST /api/metrics — show-night curve (event_hourly_views, #1246 Q1)"
     const event = insertEvent(rawDb, { slug: "lwbc18", date: "2026-10-11" });
     rawDb.exec("DROP TABLE event_hourly_views");
     at("2026-10-11T20:00:00-04:00");
-    const warn = vi.spyOn(loggerModule.logger, "warn").mockImplementation(() => {});
+    const warn = vi.spyOn(loggerModule.logger, "error").mockImplementation(() => {});
 
     const res = await post(env, [view(event.id)]);
 

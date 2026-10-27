@@ -28,7 +28,17 @@ function fillNight(dateRows) {
 // Show-night usage curve (#1246 Q1). Rows arrive in festival order (6 AM ... 11 PM,
 // then 12-5 AM). A date heading appears only on a multi-day edition.
 function ShowNightCurve({ curve }) {
-  const rows = curve || []
+  // null is the server saying the read failed, and an absent field is a payload
+  // this component does not understand: never show either as "no views".
+  if (curve == null) {
+    return (
+      <div className="bg-bg-purple rounded-lg p-4">
+        <h4 className="text-white font-semibold mb-3">Show-night traffic</h4>
+        <p className="text-gray-400 text-sm">Show-night traffic could not be loaded.</p>
+      </div>
+    )
+  }
+  const rows = curve
   const max = Math.max(1, ...rows.map(r => r.views))
   const dates = [...new Set(rows.map(r => r.festival_date))]
   const multiDay = dates.length > 1

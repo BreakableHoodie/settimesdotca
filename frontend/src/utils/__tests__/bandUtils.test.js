@@ -167,8 +167,8 @@ describe('prepareBands — multi-day festival-day support (#538)', () => {
   })
 })
 
-// #768: prepareBands' after-midnight offset must advance the LOCAL CALENDAR
-// DATE (via addLocalDays in festivalDays.js), not a fixed 24h/86,400,000ms —
+// #768: prepareBands' after-midnight offset must advance the TORONTO CALENDAR
+// DATE (via addTorontoDays in festivalDays.js, #1398), not a fixed 24h/86,400,000ms —
 // a local day is 23h/25h across a DST transition, so a flat millisecond add
 // lands on the wrong wall-clock time, and sometimes the wrong calendar date,
 // for a transition-night after-midnight set. Ground-truth values below were
@@ -235,8 +235,8 @@ describe('prepareBands — DST-safe after-midnight offset (#768)', () => {
     // A 02:30 set belonging to the 2027-03-13 evening lineup (hour 2 < the
     // AFTER_MIDNIGHT_THRESHOLD_HOUR of 6) is offset forward one calendar day
     // to 2027-03-14 — but 02:00-02:59 does not exist that day, because
-    // Toronto's clocks jump straight from 02:00 to 03:00. `addLocalDays`
-    // (via `Date#setDate`) normalizes this forward by the size of the gap
+    // Toronto's clocks jump straight from 02:00 to 03:00. `torontoWallClockMs`
+    // normalizes this forward by the size of the gap
     // (to 03:30 EDT) rather than throwing, the same way the wall clock
     // itself behaves that night. This is pinned as deliberate, not left as
     // incidental engine behavior (#768).
@@ -252,7 +252,7 @@ describe('prepareBands — DST-safe after-midnight offset (#768)', () => {
     // after midnight (00:20, parsed on the same calendar date so it is
     // BEFORE startMs) triggers the `endMs < startMs` wrap at the bottom of
     // prepareBands — a genuine sibling of the after-midnight offset above,
-    // using the same addLocalDays helper. Verified via `TZ=America/Toronto
+    // using the same addTorontoDays helper. Verified via `TZ=America/Toronto
     // node`: the broken `+= MS_PER_DAY` implementation produces "Mon Mar 15
     // 2027 01:20:00 GMT-0400" — one hour late.
     const [band] = prepareBands([makeBand('23:30', '00:20', '2027-03-14')])

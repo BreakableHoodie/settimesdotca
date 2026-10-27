@@ -1,4 +1,4 @@
-import { AFTER_MIDNIGHT_THRESHOLD_HOUR, addLocalDays } from './festivalDays'
+import { AFTER_MIDNIGHT_THRESHOLD_HOUR, addTorontoDays, torontoWallClockMs } from './festivalDays'
 
 // Times starting before AFTER_MIDNIGHT_THRESHOLD_HOUR are treated as after-midnight sets
 // of the event night, so they sort after same-day evening sets rather than appearing at
@@ -24,23 +24,24 @@ export const DEFAULT_SET_DURATION_MS = 60 * 60 * 1000
 
 export function prepareBands(list) {
   return list.map(band => {
-    let startMs = Date.parse(`${band.date}T${band.startTime}:00`)
-    let endMs = Date.parse(`${band.date}T${band.endTime}:00`)
+    let startDate = band.date
+    let endDate = band.date
+    let startMs = typeof band.startTime === 'string' ? torontoWallClockMs(startDate, band.startTime) : NaN
+    let endMs = typeof band.endTime === 'string' ? torontoWallClockMs(endDate, band.endTime) : NaN
 
     if (!Number.isNaN(startMs)) {
       const startHour = parseInt(String(band.startTime ?? '').split(':')[0], 10)
       if (Number.isFinite(startHour) && startHour < AFTER_MIDNIGHT_THRESHOLD_HOUR) {
-        // Advance the LOCAL CALENDAR DATE, not a fixed 24h — a local day is
-        // 23h/25h across a DST transition, so a flat millisecond add lands on
-        // the wrong wall-clock time (and sometimes the wrong calendar date)
-        // for an after-midnight set on a transition night (#768).
-        startMs = addLocalDays(startMs, 1)
-        if (!Number.isNaN(endMs)) endMs = addLocalDays(endMs, 1)
+        startDate = addTorontoDays(startDate, 1)
+        endDate = addTorontoDays(endDate, 1)
+        startMs = torontoWallClockMs(startDate, band.startTime)
+        if (!Number.isNaN(endMs)) endMs = torontoWallClockMs(endDate, band.endTime)
       }
     }
 
     if (!Number.isNaN(startMs) && !Number.isNaN(endMs) && endMs < startMs) {
-      endMs = addLocalDays(endMs, 1)
+      endDate = addTorontoDays(endDate, 1)
+      endMs = torontoWallClockMs(endDate, band.endTime)
     }
 
     // A set with a start but no end (a closing act billed "12:25 - END") is a

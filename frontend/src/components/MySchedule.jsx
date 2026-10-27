@@ -26,6 +26,7 @@ import { dayNumberMapFromDays, formatFestivalDate, orderedFestivalDays } from '.
 import { prepareBands } from '../utils/bandUtils'
 import { suggestGapFillers } from '../utils/gapSuggestions'
 import { formatTime, formatTimeRange } from '../utils/timeFormat'
+import { torontoClock } from '../utils/festivalDays'
 import { buildRouteIcs } from '../utils/routeIcs'
 import { useFestivalDayFilter } from '../hooks/useFestivalDayFilter'
 import BandCard from './BandCard'
@@ -467,7 +468,7 @@ function MySchedule({
     if (sortedBands.length === 0) return null
 
     const now = effectiveNow
-    const currentHour = now.getHours()
+    const currentHour = torontoClock(now.getTime()).hour
 
     // Find longest break in schedule
     let longestBreak = 0

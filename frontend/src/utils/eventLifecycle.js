@@ -10,6 +10,8 @@
  * - archived: 48h+ after event end (restricted editing)
  */
 
+import { torontoDate, torontoWallClockMs } from './festivalDays'
+
 /**
  * Grace period in milliseconds (48 hours)
  */
@@ -27,12 +29,12 @@ export function getEventState(eventDate, referenceTime = new Date()) {
 
   const now = referenceTime instanceof Date ? referenceTime : new Date(referenceTime)
   // Event ends at 23:59:59 on the event date
-  const eventEnd = new Date(eventDate + 'T23:59:59')
-  const gracePeriodEnd = new Date(eventEnd.getTime() + GRACE_PERIOD_MS)
+  const eventEnd = torontoWallClockMs(eventDate, '23:59') + 59999
+  const gracePeriodEnd = eventEnd + GRACE_PERIOD_MS
 
-  if (now < eventEnd) {
+  if (now.getTime() < eventEnd) {
     return 'upcoming'
-  } else if (now < gracePeriodEnd) {
+  } else if (now.getTime() < gracePeriodEnd) {
     return 'recently_completed'
   } else {
     return 'archived'
@@ -83,7 +85,8 @@ export function getDaysSinceEvent(eventDate, referenceTime = new Date()) {
   // but is worse — it rounds 12h up, so an event reads "1 day ago" at noon
   // the morning after, and a future event yields -0 instead of a negative.
   const eventDayUtc = Date.UTC(year, month - 1, day)
-  const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
+  const [todayYear, todayMonth, todayDay] = torontoDate(now).split('-').map(Number)
+  const todayUtc = Date.UTC(todayYear, todayMonth - 1, todayDay)
 
   return Math.round((todayUtc - eventDayUtc) / (1000 * 60 * 60 * 24))
 }
@@ -98,9 +101,9 @@ export function getGracePeriodHoursRemaining(eventDate) {
   if (!eventDate || !isEventInGracePeriod(eventDate)) return 0
 
   const now = new Date()
-  const eventEnd = new Date(eventDate + 'T23:59:59')
-  const gracePeriodEnd = new Date(eventEnd.getTime() + GRACE_PERIOD_MS)
-  const remainingMs = gracePeriodEnd.getTime() - now.getTime()
+  const eventEnd = torontoWallClockMs(eventDate, '23:59') + 59999
+  const gracePeriodEnd = eventEnd + GRACE_PERIOD_MS
+  const remainingMs = gracePeriodEnd - now.getTime()
   const remainingHours = Math.ceil(remainingMs / (1000 * 60 * 60))
 
   return Math.max(0, remainingHours)

@@ -2,7 +2,13 @@
  * Time filtering utilities for concert performances
  */
 
-import { AFTER_MIDNIGHT_THRESHOLD_HOUR } from './festivalDays'
+import {
+  AFTER_MIDNIGHT_THRESHOLD_HOUR,
+  AFTER_MIDNIGHT_THRESHOLD_TIME,
+  addTorontoDays,
+  torontoClock,
+  torontoWallClockMs,
+} from './festivalDays'
 
 const DEBUG_TIME_KEY = '__debugScheduleTime'
 
@@ -20,6 +26,30 @@ export function getCurrentDateTime() {
   return new Date()
 }
 
+// The festival date (YYYY-MM-DD) an instant belongs to: its Toronto date, one
+// day earlier before AFTER_MIDNIGHT_THRESHOLD_HOUR.
+function festivalDateOf(ms) {
+  const clock = torontoClock(ms)
+  return clock.hour < AFTER_MIDNIGHT_THRESHOLD_HOUR ? addTorontoDays(clock.date, -1) : clock.date
+}
+
+const festivalDayStartMs = festivalDate => torontoWallClockMs(festivalDate, AFTER_MIDNIGHT_THRESHOLD_TIME)
+
+// The Monday of a festival date's week. The weekday comes from a UTC-built
+// date, so it never depends on the viewer's zone.
+function mondayOf(festivalDate) {
+  const [year, month, day] = festivalDate.split('-').map(Number)
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay()
+  return addTorontoDays(festivalDate, weekday === 0 ? -6 : 1 - weekday)
+}
+
+// The first of the month `offset` months after `date`'s month, as YYYY-MM-DD.
+function firstOfMonth(date, offset) {
+  const [year, month] = date.split('-').map(Number)
+  const first = new Date(Date.UTC(year, month - 1 + offset, 1))
+  return `${first.getUTCFullYear()}-${String(first.getUTCMonth() + 1).padStart(2, '0')}-01`
+}
+
 /**
  * A "festival day" runs AFTER_MIDNIGHT_THRESHOLD_HOUR -> AFTER_MIDNIGHT_THRESHOLD_HOUR
  * (6 AM -> 6 AM), not calendar midnight -> midnight (#542). A set starting at
@@ -33,12 +63,7 @@ export function getCurrentDateTime() {
  * on the same festival-day boundary.
  */
 function festivalDayStart(date) {
-  const d = new Date(date)
-  if (d.getHours() < AFTER_MIDNIGHT_THRESHOLD_HOUR) {
-    d.setDate(d.getDate() - 1)
-  }
-  d.setHours(AFTER_MIDNIGHT_THRESHOLD_HOUR, 0, 0, 0)
-  return d
+  return new Date(festivalDayStartMs(festivalDateOf(new Date(date).getTime())))
 }
 
 /**
@@ -57,10 +82,8 @@ export function getStartOfDay(date) {
  * belongs to exactly one day, never both.
  */
 export function getEndOfDay(date) {
-  const d = festivalDayStart(date)
-  d.setDate(d.getDate() + 1)
-  d.setMilliseconds(d.getMilliseconds() - 1)
-  return d
+  const festivalDate = festivalDateOf(new Date(date).getTime())
+  return new Date(festivalDayStartMs(addTorontoDays(festivalDate, 1)) - 1)
 }
 
 /**
@@ -73,11 +96,7 @@ export function getEndOfDay(date) {
  * previous Sunday), landing on the wrong week (#542).
  */
 export function getStartOfWeek(date) {
-  const d = festivalDayStart(date)
-  const day = d.getDay()
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1) // Adjust when day is Sunday
-  d.setDate(diff)
-  return d
+  return new Date(festivalDayStartMs(mondayOf(festivalDateOf(new Date(date).getTime()))))
 }
 
 /**
@@ -85,29 +104,51 @@ export function getStartOfWeek(date) {
  * getEndOfDay's approach so the two week boundaries never overlap.
  */
 export function getEndOfWeek(date) {
-  const d = getStartOfWeek(date)
-  d.setDate(d.getDate() + 7)
-  d.setMilliseconds(d.getMilliseconds() - 1)
-  return d
+  const monday = mondayOf(festivalDateOf(new Date(date).getTime()))
+  return new Date(festivalDayStartMs(addTorontoDays(monday, 7)) - 1)
 }
 
 /**
  * Get start of next week (Monday of next week)
  */
 export function getStartOfNextWeek(date) {
-  const startOfThisWeek = getStartOfWeek(date)
-  const nextWeek = new Date(startOfThisWeek)
-  nextWeek.setDate(nextWeek.getDate() + 7)
-  return nextWeek
+  const monday = mondayOf(festivalDateOf(new Date(date).getTime()))
+  return new Date(festivalDayStartMs(addTorontoDays(monday, 7)))
 }
 
 /**
  * Get end of next week (Sunday of next week)
  */
 export function getEndOfNextWeek(date) {
-  const startOfNextWeek = getStartOfNextWeek(date)
-  return getEndOfWeek(startOfNextWeek)
+  const monday = mondayOf(festivalDateOf(new Date(date).getTime()))
+  return new Date(festivalDayStartMs(addTorontoDays(monday, 14)) - 1)
 }
+
+// Every window below starts and ends on a whole minute, so within one minute
+// of "now" none can change. Computing them once per minute keeps a lineup's
+// worth of cards to a handful of Intl calls instead of ~70 per card (#1398
+// review: ~33 ms per 100 cards on desktop, re-run on every 60 s tick).
+let cachedWindows = { minute: NaN, windows: null }
+function nowWindows() {
+  const now = getCurrentDateTime().getTime()
+  const minute = Math.floor(now / 60000)
+  if (cachedWindows.minute === minute) return cachedWindows.windows
+  const today = festivalDateOf(now)
+  const monday = mondayOf(today)
+  const { date } = torontoClock(now)
+  const windows = {
+    today: [festivalDayStartMs(today), festivalDayStartMs(addTorontoDays(today, 1)) - 1],
+    thisWeek: [festivalDayStartMs(monday), festivalDayStartMs(addTorontoDays(monday, 7)) - 1],
+    nextWeek: [festivalDayStartMs(addTorontoDays(monday, 7)), festivalDayStartMs(addTorontoDays(monday, 14)) - 1],
+    thisMonth: [torontoWallClockMs(firstOfMonth(date, 0)), torontoWallClockMs(firstOfMonth(date, 1)) - 1],
+    nextMonth: [torontoWallClockMs(firstOfMonth(date, 1)), torontoWallClockMs(firstOfMonth(date, 2)) - 1],
+  }
+  cachedWindows = { minute, windows }
+  return windows
+}
+
+const startsWithin = (performance, [start, end]) =>
+  Boolean(performance.startMs) && performance.startMs >= start && performance.startMs <= end
 
 /**
  * Check if a performance is happening now (within the last 30 minutes and next 30 minutes)
@@ -125,65 +166,35 @@ export function isHappeningNow(performance) {
  * Check if a performance is happening today
  */
 export function isHappeningToday(performance) {
-  if (!performance.startMs) return false
-
-  const today = getCurrentDateTime()
-  const startOfToday = getStartOfDay(today).getTime()
-  const endOfToday = getEndOfDay(today).getTime()
-
-  return performance.startMs >= startOfToday && performance.startMs <= endOfToday
+  return startsWithin(performance, nowWindows().today)
 }
 
 /**
  * Check if a performance is happening this week
  */
 export function isHappeningThisWeek(performance) {
-  if (!performance.startMs) return false
-
-  const today = getCurrentDateTime()
-  const startOfWeek = getStartOfWeek(today).getTime()
-  const endOfWeek = getEndOfWeek(today).getTime()
-
-  return performance.startMs >= startOfWeek && performance.startMs <= endOfWeek
+  return startsWithin(performance, nowWindows().thisWeek)
 }
 
 /**
  * Check if a performance is happening next week
  */
 export function isHappeningNextWeek(performance) {
-  if (!performance.startMs) return false
-
-  const today = getCurrentDateTime()
-  const startOfNextWeek = getStartOfNextWeek(today).getTime()
-  const endOfNextWeek = getEndOfNextWeek(today).getTime()
-
-  return performance.startMs >= startOfNextWeek && performance.startMs <= endOfNextWeek
+  return startsWithin(performance, nowWindows().nextWeek)
 }
 
 /**
  * Check if a performance is happening this month
  */
 export function isHappeningThisMonth(performance) {
-  if (!performance.startMs) return false
-
-  const today = getCurrentDateTime()
-  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).getTime()
-  const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999).getTime()
-
-  return performance.startMs >= startOfMonth && performance.startMs <= endOfMonth
+  return startsWithin(performance, nowWindows().thisMonth)
 }
 
 /**
  * Check if a performance is happening next month
  */
 export function isHappeningNextMonth(performance) {
-  if (!performance.startMs) return false
-
-  const today = getCurrentDateTime()
-  const startOfNextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1).getTime()
-  const endOfNextMonth = new Date(today.getFullYear(), today.getMonth() + 2, 0, 23, 59, 59, 999).getTime()
-
-  return performance.startMs >= startOfNextMonth && performance.startMs <= endOfNextMonth
+  return startsWithin(performance, nowWindows().nextMonth)
 }
 
 /**
@@ -291,7 +302,7 @@ export function getTimeDescription(performance) {
   // If performance is today
   if (isHappeningToday(performance)) {
     const startDate = new Date(startTime)
-    return `Today at ${startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}${durationStr}`
+    return `Today at ${startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Toronto' })}${durationStr}`
   }
 
   // If performance is this week
@@ -304,13 +315,13 @@ export function getTimeDescription(performance) {
   // ambiguous day label rather than show one that's sometimes wrong.
   if (isHappeningThisWeek(performance)) {
     const startDate = new Date(startTime)
-    return `${startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}${durationStr}`
+    return `${startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Toronto' })}${durationStr}`
   }
 
   // If performance is next week — same no-weekday rationale as above.
   if (isHappeningNextWeek(performance)) {
     const startDate = new Date(startTime)
-    return `Next week at ${startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}${durationStr}`
+    return `Next week at ${startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Toronto' })}${durationStr}`
   }
 
   // Default to formatted date and time
@@ -331,5 +342,6 @@ export function getTimeDescription(performance) {
   return `${festivalDay.toLocaleDateString([], {
     month: 'short',
     day: 'numeric',
-  })} ${rawStart.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}${durationStr}`
+    timeZone: 'America/Toronto',
+  })} ${rawStart.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Toronto' })}${durationStr}`
 }

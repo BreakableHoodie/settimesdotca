@@ -2,7 +2,7 @@ import { Check, ChevronDown, Copy, Music } from 'lucide-react'
 import { Fragment, memo, useMemo, useState } from 'react'
 import { copyToClipboard } from '../utils/clipboard'
 import { compareByName } from '../utils/sortableName'
-import { dayNumberByDate, orderedFestivalDays } from '../utils/festivalDays'
+import { dayNumberByDate, orderedFestivalDays, torontoWallClockMs } from '../utils/festivalDays'
 import { formatTime, formatTimeRange } from '../utils/timeFormat'
 import { UNSCHEDULED, currentTimeMs, deriveLineup } from '../utils/lineupFilter'
 import { useFestivalDayFilter } from '../hooks/useFestivalDayFilter'
@@ -131,8 +131,8 @@ function ScheduleView({
         if (aTBD && !bTBD) return 1
         if (!aTBD && bTBD) return -1
         if (aTBD && bTBD) return compareByName(a, b)
-        const aTime = typeof a.startMs === 'number' ? a.startMs : Date.parse(`${a.date}T${a.startTime}:00`)
-        const bTime = typeof b.startMs === 'number' ? b.startMs : Date.parse(`${b.date}T${b.startTime}:00`)
+        const aTime = typeof a.startMs === 'number' ? a.startMs : torontoWallClockMs(a.date, a.startTime)
+        const bTime = typeof b.startMs === 'number' ? b.startMs : torontoWallClockMs(b.date, b.startTime)
         return aTime === bTime ? (a.venue ?? '').localeCompare(b.venue ?? '') : aTime - bTime
       }),
     [visibleBands]

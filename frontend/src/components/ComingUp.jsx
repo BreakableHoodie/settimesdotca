@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { torontoWallClockMs } from '../utils/festivalDays'
 
 function ComingUp({ bands, currentTime }) {
   const [nextBand, setNextBand] = useState(null)
@@ -12,7 +13,7 @@ function ComingUp({ bands, currentTime }) {
       const upcomingBands = bands
         .map(band => {
           const startMs =
-            typeof band.startMs === 'number' ? band.startMs : Date.parse(`${band.date}T${band.startTime}:00`)
+            typeof band.startMs === 'number' ? band.startMs : torontoWallClockMs(band.date, band.startTime)
           return {
             ...band,
             startMs,

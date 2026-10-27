@@ -1,4 +1,5 @@
 import { getDoorsTimeForDate } from './doorsTime'
+import { torontoClock, torontoWallClockMs } from './festivalDays'
 
 /**
  * Fan-facing event lifecycle label (the badge in LiveContextBar).
@@ -37,17 +38,12 @@ const LABELS = {
 const toMs = value => (value instanceof Date ? value : new Date(value)).getTime()
 
 /**
- * True when `currentTime` falls on the same local calendar day as the
- * YYYY-MM-DD `eventDate`. Local components on purpose — the badge is for the
- * viewer's own clock.
+ * True when `currentTime` falls on the same Toronto calendar day as the
+ * YYYY-MM-DD `eventDate`.
  */
 export function isSameLocalDay(eventDate, currentTime) {
   if (!eventDate) return false
-  const current = currentTime instanceof Date ? currentTime : new Date(currentTime)
-  const year = current.getFullYear()
-  const month = String(current.getMonth() + 1).padStart(2, '0')
-  const day = String(current.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}` === eventDate
+  return torontoClock(toMs(currentTime)).date === eventDate
 }
 
 /**
@@ -98,15 +94,13 @@ function firstStartOnDay(bands, date) {
 export function getLifecycleLabel(eventDate, currentTime, bands = [], doorsJson = null, endDate) {
   const { firstStart, lastEnd } = scheduleWindow(bands)
 
-  // Baseline: the event day's local end (23:59:59), matching the prior
-  // date-based behavior. `new Date('YYYY-MM-DDT23:59:59')` parses as LOCAL time
-  // (no offset) — same as the old getEventState path, so single-day events are
-  // byte-identical.
+  // Baseline: the event day's Toronto end (23:59:59), matching the prior
+  // date-based behavior while keeping the badge independent of the viewer's zone.
   // A multi-day event runs to its LAST date (#1384 review): on the start date
   // alone, an edition whose later days had no set times yet read "Recap" from
   // day 2. Lexicographic YYYY-MM-DD compare, never `new Date` on a bare date.
   const lastDate = endDate && eventDate && endDate > eventDate ? endDate : eventDate
-  const baselineEnd = lastDate ? new Date(lastDate + 'T23:59:59').getTime() : 0
+  const baselineEnd = lastDate ? torontoWallClockMs(lastDate, '23:59') + 59999 : 0
   // Live through whichever is later — the day's end, or the real last set. Only
   // after-midnight sets push this past midnight; everything else is unchanged.
   const liveEnd = Math.max(baselineEnd, lastEnd ?? 0)
@@ -126,9 +120,7 @@ export function getLifecycleLabel(eventDate, currentTime, bands = [], doorsJson 
   // Live from local midnight, exactly the pre-#569 behaviour.
   if (isSameLocalDay(eventDate, currentTime)) {
     const doorsTime = getDoorsTimeForDate(doorsJson, eventDate)
-    // LOCAL-time construction, same pattern as baselineEnd above — never
-    // bare `new Date('YYYY-MM-DD')` (see CLAUDE.md).
-    const doorsMs = doorsTime ? new Date(eventDate + 'T' + doorsTime + ':00').getTime() : null
+    const doorsMs = doorsTime ? torontoWallClockMs(eventDate, doorsTime) : null
     // Day-1 sets only — a later day's first set must never gate day 1.
     const signals = [doorsMs, firstStartOnDay(bands, eventDate)].filter(value => value != null)
     if (signals.length > 0 && now < Math.min(...signals)) return LABELS.upcoming
@@ -142,6 +134,6 @@ export function getLifecycleLabel(eventDate, currentTime, bands = [], doorsJson 
   // way, even on a middle day whose sets are all on a later day or have no
   // times yet (#1384 review). Multi-day only: a single-day event's
   // after-midnight window stays Upcoming until its first set starts.
-  if (lastDate !== eventDate && now >= new Date(eventDate + 'T00:00:00').getTime()) return LABELS.live
+  if (lastDate !== eventDate && now >= torontoWallClockMs(eventDate)) return LABELS.live
   return LABELS.upcoming
 }

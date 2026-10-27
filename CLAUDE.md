@@ -255,6 +255,8 @@ Incident history and the #803 review traps: `docs/field-notes/event-visibility.m
 
 Server-side event-day classification (timeline now/upcoming/past, any "is it today?" check) must use `eventLocalToday()` / `eventLocalClock()` from `functions/utils/eventDay.js` — never `new Date().toISOString().slice(0, 10)`, which flips to tomorrow at 8 PM Eastern and marked events "Happening Now" the evening before (bug class fixed in PR #568).
 
+**The public frontend follows the same rule (#1398).** Build set and event instants with `torontoWallClockMs`/`addTorontoDays` (`frontend/src/utils/festivalDays.js`), never ``Date.parse(`${date}T${time}`)``, which is the viewer's zone. `torontoClockGuard.test.js` scans for it; `torontoClock.test.js` runs under four `TZ`s.
+
 ### `events.doors_json` + the "started" start edge (#569)
 
 `events.doors_json` (TEXT, nullable) is a JSON map of festival date → 24h time, e.g. `{"2026-07-10":"16:00","2026-07-11":"10:00"}`. Absent/malformed = no doors info. On an event's **first day only**, the "started" edge (timeline "Happening Now", fan "Live Tonight") is, in precedence order: **doors time → first set start → local midnight**; the earliest available signal wins, so an already-playing set is never "upcoming". Day 2+ of a multi-day event is never re-gated, and sets before 6 AM never define the day-1 edge (after-midnight convention above). Validation is `validateDoorsJson()` in `functions/utils/validation.js` (keys within `[date, end_date]`, values `HH:MM`); event duplication deliberately drops `doors_json` (stale date keys).
@@ -355,8 +357,6 @@ This env var bypasses the invite-code requirement for signup. It must never be s
 Use `document.title = pageTitle` directly in a `useEffect` within the page component. Do NOT remove the direct assignment in favour of `<Helmet>` until react-helmet-async ships a React 19 compatible release.
 
 Example: `frontend/src/pages/EventRecapPage.jsx` — uses both `<Helmet>` (for other meta) and `document.title = ...` for the title.
-
-`BandProfilePage.jsx` was this example until #797 removed its `<meta name="keywords">` — the tag was its `<Helmet>`'s only child, so the wrapper and the `react-helmet-async` import went with it. That page now assigns `document.title` directly and declares no Helmet at all, which is why it no longer illustrates the pairing.
 
 ### SSR owns identity meta and JSON-LD where it emits either; the client `<Helmet>` owns only what SSR does not emit
 

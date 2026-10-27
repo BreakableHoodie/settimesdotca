@@ -22,7 +22,7 @@
  * This is the single canonical definition (#550) — every consumer imports
  * it rather than re-encoding `6`:
  * - `frontend/src/utils/bandUtils.js` (`prepareBands`) offsets sub-6-AM
- *   start times by one local calendar day (`addLocalDays`, below) so they
+ *   start times by one Toronto calendar day (`addTorontoDays`, below) so they
  *   sort after the same evening's earlier sets rather than at the top of
  *   the schedule.
  * - `frontend/src/admin/utils/timeUtils.js` derives
@@ -35,6 +35,9 @@
  * end).
  */
 export const AFTER_MIDNIGHT_THRESHOLD_HOUR = 6
+// The same threshold as "HH:MM", derived rather than typed (as on the server,
+// functions/utils/eventDay.js), for building festival-day boundaries.
+export const AFTER_MIDNIGHT_THRESHOLD_TIME = `${String(AFTER_MIDNIGHT_THRESHOLD_HOUR).padStart(2, '0')}:00`
 
 const parseDateParts = dateStr => {
   const [year, month, day] = dateStr.split('-').map(Number)
@@ -157,40 +160,6 @@ export function resolveActiveFestivalDay({ days, dayParam, todayStr, startDate =
   return 1
 }
 
-/**
- * Advances a LOCAL epoch-ms timestamp by `days` local calendar days — NOT a
- * fixed `days * 86_400_000`. A local day is 23h or 25h across a DST
- * transition (spring-forward / fall-back), so a flat millisecond add lands
- * on the wrong wall-clock time, and sometimes the wrong calendar date, for
- * any after-midnight set on a transition night (#768).
- *
- * `setDate()` walks the calendar and re-resolves the UTC offset for the
- * landing date, so it is DST-correct by construction. This is the same
- * technique `SharePreviewPage.jsx`'s `sortKey()` already uses (stepping
- * backward across the boundary) — see the comment there for the reasoning;
- * this is that pattern's forward-stepping, shared home so `bandUtils.js`
- * and `MySchedule.jsx` don't each re-derive it.
- *
- * Spring-forward edge case: advancing into the 2:00–2:59 AM hour on the
- * night clocks jump forward lands on a local time that does not exist.
- * `setDate()` normalizes it forward by the size of the gap (e.g. 2:30 AM ->
- * 3:30 AM) rather than throwing — the same normalization a wall clock
- * itself performs on that night. That is treated as correct here, not an
- * accident of the engine: an after-midnight set is deliberately re-anchored
- * to the previous evening's day, and the exact minute a non-existent
- * wall-clock time resolves to is a one-night-a-year edge no fan-facing
- * surface distinguishes. Pinned by a test in `bandUtils.test.js`.
- *
- * @param {number} ms - epoch milliseconds
- * @param {number} days - number of local calendar days to advance (may be negative)
- * @returns {number} new epoch milliseconds
- */
-export function addLocalDays(ms, days) {
-  const d = new Date(ms)
-  d.setDate(d.getDate() + days)
-  return d.getTime()
-}
-
 // The calendar date in Toronto, the event's time zone, as YYYY-MM-DD,
 // whatever the viewer's own zone is (#1249: a fan in Vancouver must see a
 // Toronto show's running-late banner from Toronto midnight, not their own).
@@ -207,6 +176,99 @@ const TORONTO_DATE_PARTS = new Intl.DateTimeFormat('en-US', {
 export const torontoDate = now => {
   const parts = Object.fromEntries(TORONTO_DATE_PARTS.formatToParts(new Date(now)).map(part => [part.type, part.value]))
   return `${parts.year}-${parts.month}-${parts.day}`
+}
+
+const TORONTO_CLOCK_PARTS = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/Toronto',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+})
+
+const torontoParts = ms =>
+  Object.fromEntries(TORONTO_CLOCK_PARTS.formatToParts(new Date(ms)).map(part => [part.type, part.value]))
+
+const isValidDateParts = (year, month, day) => {
+  const date = new Date(Date.UTC(year, month - 1, day))
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+}
+
+/**
+ * Resolve a Toronto wall-clock date and time to an instant, independent of the
+ * viewer's zone. A spring-forward time in the missing 02:00 hour is normalized
+ * forward to the first real wall-clock time after the gap.
+ */
+export function torontoWallClockMs(dateStr, timeStr = '00:00') {
+  if (typeof dateStr !== 'string' || typeof timeStr !== 'string') return NaN
+  const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr)
+  const timeMatch = /^(\d{2}):(\d{2})$/.exec(timeStr)
+  if (!dateMatch || !timeMatch) return NaN
+
+  const [, yearText, monthText, dayText] = dateMatch
+  const [, hourText, minuteText] = timeMatch
+  const year = Number(yearText)
+  const month = Number(monthText)
+  const day = Number(dayText)
+  const hour = Number(hourText)
+  const minute = Number(minuteText)
+  if (!isValidDateParts(year, month, day) || hour > 23 || minute > 59) return NaN
+
+  const wallClockGuess = Date.UTC(year, month - 1, day, hour, minute)
+  const offsetAt = instant => {
+    const parts = torontoParts(instant)
+    return (
+      Date.UTC(
+        Number(parts.year),
+        Number(parts.month) - 1,
+        Number(parts.day),
+        Number(parts.hour),
+        Number(parts.minute)
+      ) - instant
+    )
+  }
+  const first = wallClockGuess - offsetAt(wallClockGuess)
+  const second = wallClockGuess - offsetAt(first)
+  const resolved = torontoParts(second)
+  const requested = `${dateStr}T${timeStr}`
+  return `${resolved.year}-${resolved.month}-${resolved.day}T${resolved.hour}:${resolved.minute}` === requested
+    ? second
+    : first
+}
+
+/** Returns Toronto's calendar date and clock fields for an instant. */
+export function torontoClock(ms) {
+  const parts = torontoParts(ms)
+  return {
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    hour: Number(parts.hour),
+    minute: Number(parts.minute),
+  }
+}
+
+// A `datetime-local` input's value ("YYYY-MM-DDTHH:MM") read and written as
+// Toronto wall-clock time, so the debug clock round-trips in any viewer zone.
+// A value with a zone (an ISO string ending in Z) is an instant already.
+const DATETIME_LOCAL = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})$/
+
+export function torontoDateTimeLocal(ms) {
+  const { date, hour, minute } = torontoClock(ms)
+  return `${date}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+}
+
+export function parseTorontoDateTime(value) {
+  const match = DATETIME_LOCAL.exec(value)
+  return match ? torontoWallClockMs(match[1], match[2]) : new Date(value).getTime()
+}
+
+/** Advances a YYYY-MM-DD date by calendar days, never by elapsed milliseconds. */
+export function addTorontoDays(dateStr, days) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr)
+  if (!match || !Number.isFinite(days)) return ''
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]) + days))
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`
 }
 
 // The DEVICE's local calendar date as YYYY-MM-DD, from the date's own fields

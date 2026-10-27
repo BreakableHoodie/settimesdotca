@@ -21,7 +21,7 @@ import { validateBandsData } from './utils/validation'
 import { prepareBands } from './utils/bandUtils'
 import { currentTimeMs, deriveLineup } from './utils/lineupFilter'
 import { useFestivalDayFilter } from './hooks/useFestivalDayFilter'
-import { orderedFestivalDays } from './utils/festivalDays'
+import { orderedFestivalDays, parseTorontoDateTime, torontoDateTimeLocal } from './utils/festivalDays'
 import { saveSelectedBands } from './utils/scheduleStorage'
 import { resolveRouteDiff } from './utils/routeDiff'
 import RouteDiffSection from './components/RouteDiffSection'
@@ -128,8 +128,8 @@ const getScheduleSessionId = () => {
 
 const parseDebugTime = value => {
   if (!value) return null
-  const parsed = new Date(value)
-  return Number.isNaN(parsed.getTime()) ? null : parsed
+  const ms = parseTorontoDateTime(value)
+  return Number.isNaN(ms) ? null : new Date(ms)
 }
 
 const getInitialDebugTime = () => {
@@ -152,13 +152,7 @@ const getInitialDebugTime = () => {
 
 const formatDebugInputValue = dateValue => {
   if (!(dateValue instanceof Date)) return ''
-  const pad = value => String(value).padStart(2, '0')
-  const year = dateValue.getFullYear()
-  const month = pad(dateValue.getMonth() + 1)
-  const day = pad(dateValue.getDate())
-  const hours = pad(dateValue.getHours())
-  const minutes = pad(dateValue.getMinutes())
-  return `${year}-${month}-${day}T${hours}:${minutes}`
+  return torontoDateTimeLocal(dateValue.getTime())
 }
 
 function App() {
@@ -979,7 +973,7 @@ function App() {
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <label className="text-text-secondary text-sm" htmlFor="debug-time">
-                  Time override
+                  Time override (Toronto)
                 </label>
                 <input
                   id="debug-time"

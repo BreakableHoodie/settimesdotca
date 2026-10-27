@@ -95,7 +95,7 @@ function firstStartOnDay(bands, date) {
  * @param {string|null} [endDate] - YYYY-MM-DD, a multi-day event's last date
  * @returns {{label:string, classes:string}}
  */
-export function getLifecycleLabel(eventDate, currentTime, bands = [], doorsJson = null, endDate = null) {
+export function getLifecycleLabel(eventDate, currentTime, bands = [], doorsJson = null, endDate) {
   const { firstStart, lastEnd } = scheduleWindow(bands)
 
   // Baseline: the event day's local end (23:59:59), matching the prior

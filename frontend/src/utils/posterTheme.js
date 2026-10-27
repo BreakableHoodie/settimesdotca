@@ -7,7 +7,14 @@
 // Every colour reaching CSS is a #rrggbb that passed isValidThemeColours, then
 // readableThemeColours, then the contrast rules below, so a stored palette can
 // neither inject CSS nor make text unreadable.
-import { AA_TEXT, ensureContrast, mix } from './colour'
+import { AA_TEXT, composite, ensureContrast, mix, relativeLuminance } from './colour'
+
+// The strongest accent-500 tint that carries accent-400 text: hover:bg-accent-500/30.
+const MAX_TEXT_TINT_ALPHA = 0.3
+// Chrome paints Tailwind's color-mix(in oklab, ..., transparent) tint about two
+// sRGB units darker than the exact composite, so a 4.5 target measured 4.47 on
+// screen (#1396). The margin keeps the painted result at AA.
+const TINT_CONTRAST_MARGIN = 0.15
 import { readableThemeColours } from './posterPalette'
 
 /**
@@ -35,13 +42,44 @@ export function applicablePalette(eventData) {
  * Derived tones are mixed between ink and ground and re-checked, because the
  * theme's own tokens were tuned per theme and these must hold for any poster.
  */
+/**
+ * `colour`, moved only in one direction (toward black when `towardBlack`),
+ * until it reads at `ratio` on every surface. The direction comes from the
+ * caller's ground: choosing it per surface once picked white on a mid-grey
+ * ground (2.6:1 there), and checking one surface left a white accent at 2.7:1
+ * on a mid-grey ground once darkened past its lighter tint (CodeRabbit, #1399).
+ * One pass suffices: across 686 random valid palettes it reached every surface
+ * whenever any colour could (measured 2026-10-27). Where none can, the moves
+ * end at black or white, the best that direction offers.
+ */
+function readableOnAll(colour, surfaces, ratio, towardBlack) {
+  return surfaces.reduce((out, surface) => ensureContrast(out, surface, ratio, towardBlack), colour)
+}
+
 export function posterThemeVariables({ ground, ink, accent, nowFill }) {
   const tone = t => mix(ground, ink, t)
-  // accent-400 is TEXT on a 20% accent tint (bg-accent-500/20) as well as on
-  // the ground, so it must pass on the tint, the harder of the two.
-  const accentText = ensureContrast(accent, mix(ground, accent, 0.2), AA_TEXT)
   // accent-500/600 are FILLS under ground-coloured text (text-bg-navy).
   const accentFill = ensureContrast(accent, ground, AA_TEXT)
+  // accent-400 is TEXT on the ground and card surfaces, and on accent-500
+  // tints (up to /30 on hover) painted over the ground, bg-surface and
+  // bg-purple (ScheduleView, MySchedule, App.jsx; none sit on bg-darker). It
+  // must read on all of them AS PAINTED: a tint is accent-500 composited over
+  // its surface in sRGB. The old check mixed the raw accent in OKLab over the
+  // ground alone and let tints render at 3.9-4.4:1 (#1396). bg-surface lies
+  // between the ground and bg-purple, and weaker tints between those checked.
+  const textSurfaces = [
+    ground,
+    tone(0.06),
+    tone(0.12),
+    composite(accentFill, ground, MAX_TEXT_TINT_ALPHA),
+    composite(accentFill, tone(0.06), MAX_TEXT_TINT_ALPHA),
+  ]
+  const accentText = readableOnAll(
+    accent,
+    textSurfaces,
+    AA_TEXT + TINT_CONTRAST_MARGIN,
+    relativeLuminance(ground) > 0.18
+  )
   const accentFillDeep = ensureContrast(mix(accentFill, ink, 0.25), ground, AA_TEXT)
   const card = [tone(0.04), tone(0.08)]
   // Text sits on the tinted surfaces as well as the ground, so derived tones are

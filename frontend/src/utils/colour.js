@@ -109,6 +109,18 @@ export function withLightness(hex, L) {
   return fromOklch(Math.min(1, Math.max(0, L)), C, h)
 }
 
+/**
+ * `fg` at `alpha` painted over an opaque `bg`: how a browser composites a
+ * translucent fill such as Tailwind's bg-x/20, in sRGB. Not mix(), which
+ * interpolates in OKLab and lands on a different colour (#1396).
+ */
+export function composite(fg, bg, alpha) {
+  const f = parseHex(fg)
+  const b = parseHex(bg)
+  const a = Math.min(1, Math.max(0, alpha))
+  return toHex(f.map((c, i) => c * a + b[i] * (1 - a)))
+}
+
 export function mix(a, b, t) {
   const [L1, a1, b1] = toOklab(a)
   const [L2, a2, b2] = toOklab(b)
@@ -122,11 +134,14 @@ export function mix(a, b, t) {
  * white on a dark one) to the nearest passing step. If even pure black/white
  * cannot reach the target, return whichever of the two has higher contrast.
  */
-export function ensureContrast(colour, against, minRatio) {
+export function ensureContrast(colour, against, minRatio, towardBlackOverride) {
   if (contrastRatio(colour, against) >= minRatio) return colour
-  const towardBlack = relativeLuminance(against) > 0.18
+  // A caller may fix the direction (see posterThemeVariables); then an end
+  // that cannot reach the target is still the answer, never the opposite end.
+  const towardBlack = towardBlackOverride ?? relativeLuminance(against) > 0.18
   const end = towardBlack ? '#000000' : '#ffffff'
   if (contrastRatio(end, against) < minRatio) {
+    if (towardBlackOverride !== undefined) return end
     return contrastRatio('#000000', against) >= contrastRatio('#ffffff', against) ? '#000000' : '#ffffff'
   }
   const { L, C, h } = toOklch(colour)

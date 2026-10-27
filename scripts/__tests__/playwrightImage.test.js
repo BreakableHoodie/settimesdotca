@@ -66,4 +66,16 @@ describe("Playwright jobs run in the lockfile's Playwright image (#1391)", () =>
     expect(pkgs["node_modules/playwright-core"]?.version).toMatch(/^\d+\.\d+\.\d+$/);
     expect(pkgs["node_modules/@playwright/test"].version).toBe(pkgs["node_modules/playwright-core"].version);
   });
+
+  // A tag can be re-pushed, and these jobs hold deploy and push credentials.
+  // A Dependabot Playwright bump fails here until its digest is added.
+  it("pins the lockfile's version to an image digest", () => {
+    const digests = JSON.parse(readFileSync(join(REPO_ROOT, ".github/actions/playwright-image/digests.json"), "utf8"));
+    const version = JSON.parse(readFileSync(join(REPO_ROOT, "package-lock.json"), "utf8")).packages[
+      "node_modules/playwright-core"
+    ].version;
+    expect(digests[version], `digests.json has no entry for Playwright ${version}`).toMatch(/^sha256:[0-9a-f]{64}$/);
+    const action = readFileSync(join(REPO_ROOT, ".github/actions/playwright-image/action.yml"), "utf8");
+    expect(action).toContain('echo "image=$tag@$digest"');
+  });
 });

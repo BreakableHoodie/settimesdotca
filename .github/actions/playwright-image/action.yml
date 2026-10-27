@@ -9,10 +9,15 @@ description: >-
 # lockfile, never typed into a workflow: Dependabot bumps Playwright in the
 # lockfile but cannot bump a `container:` image, so a hand-pinned tag would
 # drift from the browsers the tests expect.
+#
+# Pinned by digest, from digests.json: these jobs hold deploy and push
+# credentials, and a tag can be re-pushed. Every action in this repo is pinned
+# to a SHA for the same reason. A Playwright bump needs one reviewed line
+# there; until it lands, the job fails closed and prints the command.
 
 outputs:
     image:
-        description: The image reference, e.g. mcr.microsoft.com/playwright:v1.64.1-noble
+        description: The image reference, e.g. mcr.microsoft.com/playwright:v1.64.1-noble@sha256:...
         value: ${{ steps.image.outputs.image }}
 
 runs:
@@ -33,5 +38,16 @@ runs:
                   echo "✗ No playwright-core version in package-lock.json (got '$version')." >&2
                   exit 1
               fi
-              echo "image=mcr.microsoft.com/playwright:v$version-noble" >> "$GITHUB_OUTPUT"
-              echo "Playwright image: mcr.microsoft.com/playwright:v$version-noble"
+              tag="mcr.microsoft.com/playwright:v$version-noble"
+              digest=$(node -e '
+                  const map = require(process.argv[1]);
+                  process.stdout.write(Object.hasOwn(map, process.argv[2]) ? map[process.argv[2]] : "");
+              ' "$GITHUB_ACTION_PATH/digests.json" "$version")
+              if ! [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+                  echo "✗ No digest for Playwright $version in .github/actions/playwright-image/digests.json." >&2
+                  echo "  Add the image index digest (Docker-Content-Digest) from:" >&2
+                  echo "  curl -sSI -H 'Accept: application/vnd.oci.image.index.v1+json' https://mcr.microsoft.com/v2/playwright/manifests/v$version-noble" >&2
+                  exit 1
+              fi
+              echo "image=$tag@$digest" >> "$GITHUB_OUTPUT"
+              echo "Playwright image: $tag@$digest"

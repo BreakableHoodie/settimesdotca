@@ -8,6 +8,7 @@ import { torontoDate } from '../utils/festivalDays'
 import { formatTime } from '../utils/timeFormat'
 import EventPosterThumbnail from './EventPosterThumbnail'
 import EventSocialLinks from './EventSocialLinks'
+import EventTicketLink from './EventTicketLink'
 import GhostEasterEgg from './GhostEasterEgg'
 import TimeFilter from './TimeFilter'
 import Modal from './ui/Modal'
@@ -159,6 +160,11 @@ function LiveContextBar({
     lifecycle.label !== 'Recap' &&
     lifecycle.label !== 'Archive' &&
     torontoDate(currentTime) >= eventData.date
+
+  // Tickets sell until the show is over (#1384), the same edge as the banner
+  // above. An archived edition is over whatever its set times say.
+  const ticketsConcluded =
+    Boolean(eventData?.is_archived) || lifecycle.label === 'Recap' || lifecycle.label === 'Archive'
 
   // Doors time for the event's FIRST date only (#569) — this header isn't
   // per-day, so it always reflects day 1's gates-open time. Later festival
@@ -405,11 +411,19 @@ function LiveContextBar({
                       {eventData.name}
                     </h2>
                   </div>
-                  <EventSocialLinks
-                    socialLinks={eventData.social_links}
-                    eventName={eventData.name}
-                    className="-ml-2 mt-0.5"
-                  />
+                  <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                    <EventSocialLinks
+                      socialLinks={eventData.social_links}
+                      eventName={eventData.name}
+                      className="-ml-2"
+                    />
+                    <EventTicketLink
+                      eventId={eventData.id}
+                      ticketUrl={eventData.ticket_url}
+                      eventName={eventData.name}
+                      concluded={ticketsConcluded}
+                    />
+                  </div>
                   {/* Was `truncate`: one line showing 43% of its own content at
                     390px, cutting "Presented by ..." every time (#1084). Two
                     lines costs ~14px and shows effectively all of it. */}
@@ -444,6 +458,12 @@ function LiveContextBar({
                   socialLinks={eventData.social_links}
                   eventName={eventData.name}
                   className="-ml-2 shrink-0"
+                />
+                <EventTicketLink
+                  eventId={eventData.id}
+                  ticketUrl={eventData.ticket_url}
+                  eventName={eventData.name}
+                  concluded={ticketsConcluded}
                 />
               </div>
               <p className="mt-1 text-sm text-text-tertiary">{mobileSummary}</p>

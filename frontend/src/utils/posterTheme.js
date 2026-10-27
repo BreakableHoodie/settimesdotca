@@ -7,7 +7,14 @@
 // Every colour reaching CSS is a #rrggbb that passed isValidThemeColours, then
 // readableThemeColours, then the contrast rules below, so a stored palette can
 // neither inject CSS nor make text unreadable.
-import { AA_TEXT, ensureContrast, mix } from './colour'
+import { AA_TEXT, composite, ensureContrast, mix } from './colour'
+
+// The strongest accent-500 tint that carries accent-400 text: hover:bg-accent-500/30.
+const MAX_TEXT_TINT_ALPHA = 0.3
+// Chrome paints Tailwind's color-mix(in oklab, ..., transparent) tint about two
+// sRGB units darker than the exact composite, so a 4.5 target measured 4.47 on
+// screen (#1396). The margin keeps the painted result at AA.
+const TINT_CONTRAST_MARGIN = 0.15
 import { readableThemeColours } from './posterPalette'
 
 /**
@@ -37,11 +44,19 @@ export function applicablePalette(eventData) {
  */
 export function posterThemeVariables({ ground, ink, accent, nowFill }) {
   const tone = t => mix(ground, ink, t)
-  // accent-400 is TEXT on a 20% accent tint (bg-accent-500/20) as well as on
-  // the ground, so it must pass on the tint, the harder of the two.
-  const accentText = ensureContrast(accent, mix(ground, accent, 0.2), AA_TEXT)
   // accent-500/600 are FILLS under ground-coloured text (text-bg-navy).
   const accentFill = ensureContrast(accent, ground, AA_TEXT)
+  // accent-400 is TEXT on the ground and on accent-500 tints, up to /30 on
+  // hover. Checked against the strongest tint AS PAINTED: accent-500 at that
+  // alpha composited over the ground in sRGB. The old check mixed the raw
+  // accent in OKLab and let tints render at 3.9-4.4:1 (#1396). Passing on the
+  // strongest tint passes on the weaker ones and on the ground, which sit
+  // further from the text.
+  const accentText = ensureContrast(
+    accent,
+    composite(accentFill, ground, MAX_TEXT_TINT_ALPHA),
+    AA_TEXT + TINT_CONTRAST_MARGIN
+  )
   const accentFillDeep = ensureContrast(mix(accentFill, ink, 0.25), ground, AA_TEXT)
   const card = [tone(0.04), tone(0.08)]
   // Text sits on the tinted surfaces as well as the ground, so derived tones are

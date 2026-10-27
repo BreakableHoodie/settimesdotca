@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AA_TEXT, contrastRatio, mix } from '../colour'
+import { AA_TEXT, composite, contrastRatio } from '../colour'
 import { mapPaletteRoles } from '../posterPalette'
 import { applicablePalette, eventPageStyle, posterThemeVariables } from '../posterTheme'
 
@@ -30,6 +30,38 @@ const SWATCHES = {
 }
 const HEX = /^#[0-9a-f]{6}$/
 
+// accent-400 is text on the ground AND on accent-500 tints: /10 to /20 at rest
+// and /30 on hover. Tailwind compiles bg-accent-500/20 to
+// color-mix(in oklab, var(--color-accent-500) 20%, transparent), which the
+// browser paints as accent-500 at 20% alpha over the ground: an sRGB
+// composite, checked exactly, no tolerance. The old check mixed in OKLab and
+// passed palettes that rendered at 3.9-4.4:1 (#1396).
+const TEXT_TINT_ALPHAS = [0.1, 0.15, 0.2, 0.25, 0.3]
+function expectAccentTextReadable(v) {
+  const ground = v['--color-bg-navy']
+  const text = v['--color-accent-400']
+  expect(contrastRatio(text, ground)).toBeGreaterThanOrEqual(AA_TEXT)
+  for (const alpha of TEXT_TINT_ALPHAS) {
+    const tint = composite(v['--color-accent-500'], ground, alpha)
+    expect(contrastRatio(text, tint), `accent-400 on accent-500/${alpha * 100}`).toBeGreaterThanOrEqual(AA_TEXT)
+  }
+}
+
+// Variants measured failing in a real browser while building #1384 (#1396).
+const MEASURED_VARIANTS = {
+  'red on cream': { ground: '#f4ead5', ink: '#1d1a17', accent: '#b3261e', nowFill: '#e9b949' },
+  'yellow on white': { ground: '#fdfbf7', ink: '#111111', accent: '#e9b949', nowFill: '#9ad0ec' },
+  'orange on white': { ground: '#ffffff', ink: '#000000', accent: '#f97316', nowFill: '#9ad0ec' },
+  'blue on near-black': { ground: '#111111', ink: '#fdfbf7', accent: '#3a7bd5', nowFill: '#e9b949' },
+  'yellow on near-black': { ground: '#1d1a17', ink: '#f4ead5', accent: '#e9b949', nowFill: '#b3261e' },
+}
+
+describe('posterThemeVariables: accent text reads on its tints as painted (#1396)', () => {
+  for (const [name, variant] of Object.entries(MEASURED_VARIANTS)) {
+    it(name, () => expectAccentTextReadable(posterThemeVariables(variant)))
+  }
+})
+
 describe('posterThemeVariables: the page stays readable for any poster', () => {
   for (const [name, swatches] of Object.entries(SWATCHES)) {
     const palette = mapPaletteRoles(swatches, POSTER)
@@ -40,13 +72,7 @@ describe('posterThemeVariables: the page stays readable for any poster', () => {
         expect(contrastRatio(v['--color-text-primary'], ground)).toBeGreaterThanOrEqual(7)
         expect(contrastRatio(v['--color-text-secondary'], ground)).toBeGreaterThanOrEqual(7)
         expect(contrastRatio(v['--color-text-tertiary'], ground)).toBeGreaterThanOrEqual(AA_TEXT)
-        // accent text on the ground AND on its own 20% tint (bg-accent-500/20)
-        expect(contrastRatio(v['--color-accent-400'], ground)).toBeGreaterThanOrEqual(AA_TEXT)
-        expect(
-          contrastRatio(v['--color-accent-400'], mix(ground, v['--color-accent-500'], 0.2))
-        ).toBeGreaterThanOrEqual(
-          AA_TEXT - 0.05 // the tint is an approximation of the composited 20% fill
-        )
+        expectAccentTextReadable(v)
         // ground-coloured text on the accent fills (text-bg-navy on bg-accent-500)
         expect(contrastRatio(ground, v['--color-accent-500'])).toBeGreaterThanOrEqual(AA_TEXT)
         expect(contrastRatio(ground, v['--color-accent-600'])).toBeGreaterThanOrEqual(AA_TEXT)

@@ -109,6 +109,18 @@ export function withLightness(hex, L) {
   return fromOklch(Math.min(1, Math.max(0, L)), C, h)
 }
 
+/**
+ * `fg` at `alpha` painted over an opaque `bg`: how a browser composites a
+ * translucent fill such as Tailwind's bg-x/20, in sRGB. Not mix(), which
+ * interpolates in OKLab and lands on a different colour (#1396).
+ */
+export function composite(fg, bg, alpha) {
+  const f = parseHex(fg)
+  const b = parseHex(bg)
+  const a = Math.min(1, Math.max(0, alpha))
+  return toHex(f.map((c, i) => c * a + b[i] * (1 - a)))
+}
+
 export function mix(a, b, t) {
   const [L1, a1, b1] = toOklab(a)
   const [L2, a2, b2] = toOklab(b)

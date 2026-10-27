@@ -42,21 +42,41 @@ export function applicablePalette(eventData) {
  * Derived tones are mixed between ink and ground and re-checked, because the
  * theme's own tokens were tuned per theme and these must hold for any poster.
  */
+/**
+ * `colour`, moved only in one direction (toward black when `towardBlack`),
+ * until it reads at `ratio` on every surface. The direction comes from the
+ * caller's ground: choosing it per surface once picked white on a mid-grey
+ * ground (2.6:1 there), and checking one surface left a white accent at 2.7:1
+ * on a mid-grey ground once darkened past its lighter tint (CodeRabbit, #1399).
+ * One pass suffices: across 686 random valid palettes it reached every surface
+ * whenever any colour could (measured 2026-10-27). Where none can, the moves
+ * end at black or white, the best that direction offers.
+ */
+function readableOnAll(colour, surfaces, ratio, towardBlack) {
+  return surfaces.reduce((out, surface) => ensureContrast(out, surface, ratio, towardBlack), colour)
+}
+
 export function posterThemeVariables({ ground, ink, accent, nowFill }) {
   const tone = t => mix(ground, ink, t)
   // accent-500/600 are FILLS under ground-coloured text (text-bg-navy).
   const accentFill = ensureContrast(accent, ground, AA_TEXT)
-  // accent-400 is TEXT on the ground and on accent-500 tints, up to /30 on
-  // hover. Checked against the strongest tint AS PAINTED: accent-500 at that
-  // alpha composited over the ground in sRGB. The old check mixed the raw
-  // accent in OKLab and let tints render at 3.9-4.4:1 (#1396).
-  // The direction comes from the GROUND: text moved away from the ground
-  // passes on the ground and on every weaker tint once it passes the
-  // strongest. Choosing it from the tint picked white on a mid-grey ground
-  // (2.6:1 there) when no colour could pass both (CodeRabbit, #1396).
-  const accentText = ensureContrast(
-    accent,
+  // accent-400 is TEXT on the ground and card surfaces, and on accent-500
+  // tints (up to /30 on hover) painted over the ground, bg-surface and
+  // bg-purple (ScheduleView, MySchedule, App.jsx; none sit on bg-darker). It
+  // must read on all of them AS PAINTED: a tint is accent-500 composited over
+  // its surface in sRGB. The old check mixed the raw accent in OKLab over the
+  // ground alone and let tints render at 3.9-4.4:1 (#1396). bg-surface lies
+  // between the ground and bg-purple, and weaker tints between those checked.
+  const textSurfaces = [
+    ground,
+    tone(0.06),
+    tone(0.12),
     composite(accentFill, ground, MAX_TEXT_TINT_ALPHA),
+    composite(accentFill, tone(0.06), MAX_TEXT_TINT_ALPHA),
+  ]
+  const accentText = readableOnAll(
+    accent,
+    textSurfaces,
     AA_TEXT + TINT_CONTRAST_MARGIN,
     relativeLuminance(ground) > 0.18
   )

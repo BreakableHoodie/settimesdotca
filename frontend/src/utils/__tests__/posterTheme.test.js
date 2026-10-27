@@ -37,13 +37,25 @@ const HEX = /^#[0-9a-f]{6}$/
 // composite, checked exactly, no tolerance. The old check mixed in OKLab and
 // passed palettes that rendered at 3.9-4.4:1 (#1396).
 const TEXT_TINT_ALPHAS = [0.1, 0.15, 0.2, 0.25, 0.3]
+// accent-400 sits bare on every surface, and on accent-500 tints painted over
+// the ground, bg-surface (ScheduleView's group-by; CodeRabbit, #1399) and
+// bg-purple (MySchedule, App.jsx). No tint sits on bg-darker.
+const TEXT_SURFACES = ['--color-bg-navy', '--color-surface', '--color-bg-purple', '--color-bg-darker']
+const TINT_SURFACES = ['--color-bg-navy', '--color-surface', '--color-bg-purple']
 function expectAccentTextReadable(v) {
-  const ground = v['--color-bg-navy']
   const text = v['--color-accent-400']
-  expect(contrastRatio(text, ground)).toBeGreaterThanOrEqual(AA_TEXT)
-  for (const alpha of TEXT_TINT_ALPHAS) {
-    const tint = composite(v['--color-accent-500'], ground, alpha)
-    expect(contrastRatio(text, tint), `accent-400 on accent-500/${alpha * 100}`).toBeGreaterThanOrEqual(AA_TEXT)
+  for (const surfaceToken of TEXT_SURFACES) {
+    expect(contrastRatio(text, v[surfaceToken]), `accent-400 on ${surfaceToken}`).toBeGreaterThanOrEqual(AA_TEXT)
+  }
+  for (const surfaceToken of TINT_SURFACES) {
+    const surface = v[surfaceToken]
+    for (const alpha of TEXT_TINT_ALPHAS) {
+      const tint = composite(v['--color-accent-500'], surface, alpha)
+      expect(
+        contrastRatio(text, tint),
+        `accent-400 on accent-500/${alpha * 100} over ${surfaceToken}`
+      ).toBeGreaterThanOrEqual(AA_TEXT)
+    }
   }
 }
 
@@ -54,6 +66,8 @@ const MEASURED_VARIANTS = {
   'orange on white': { ground: '#ffffff', ink: '#000000', accent: '#f97316', nowFill: '#9ad0ec' },
   'blue on near-black': { ground: '#111111', ink: '#fdfbf7', accent: '#3a7bd5', nowFill: '#e9b949' },
   'yellow on near-black': { ground: '#1d1a17', ink: '#f4ead5', accent: '#e9b949', nowFill: '#b3261e' },
+  // CodeRabbit on #1399: the tint over bg-surface fell to 4.29:1.
+  'gold on violet': { ground: '#490aea', ink: '#fdff2b', accent: '#ddc954', nowFill: '#fdff2b' },
 }
 
 describe('posterThemeVariables: accent text reads on its tints as painted (#1396)', () => {
@@ -65,6 +79,22 @@ describe('posterThemeVariables: accent text reads on its tints as painted (#1396
   // (CodeRabbit, #1396). The ground wins: tuning toward the tint once picked
   // white, 2.6:1 on the ground. The resting tint still reads; only the
   // hover tint, which no colour can satisfy here, falls short.
+  // A white accent's tint is LIGHTER than this ground, so darkening text just
+  // past the tint left it at 2.7:1 on the ground itself (CodeRabbit, #1399).
+  // Black reads on both. (The palette is degenerate as a whole: cards darken
+  // toward its black ink, where nothing reads on all of them, so only the
+  // ground and its tints are pinned here.)
+  it('reads on the ground as well as on a tint lighter than the ground', () => {
+    const v = posterThemeVariables({ ground: '#767676', ink: '#000000', accent: '#ffffff', nowFill: '#ffffff' })
+    const ground = v['--color-bg-navy']
+    expect(contrastRatio(v['--color-accent-400'], ground)).toBeGreaterThanOrEqual(AA_TEXT)
+    for (const alpha of TEXT_TINT_ALPHAS) {
+      expect(
+        contrastRatio(v['--color-accent-400'], composite(v['--color-accent-500'], ground, alpha))
+      ).toBeGreaterThanOrEqual(AA_TEXT)
+    }
+  })
+
   it('keeps text readable on the ground when no colour can also clear the hover tint', () => {
     const v = posterThemeVariables({ ground: '#a0a0a0', ink: '#000000', accent: '#000000', nowFill: '#ffffff' })
     const ground = v['--color-bg-navy']

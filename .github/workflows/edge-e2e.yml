@@ -24,7 +24,7 @@ on:
       - "frontend/package.json"
       - "frontend/package-lock.json"
       - "scripts/reset-e2e-db.mjs"
-      - ".github/actions/apt-deb-cache/**"
+      - ".github/actions/playwright-image/**"
       - ".github/workflows/edge-e2e.yml"
 
 # One shared scratch D1: runs must queue, never overlap or cancel mid-reset.
@@ -45,6 +45,26 @@ env:
   PREVIEW_URL: https://edge-e2e.longweekend-bandcrawl.pages.dev
 
 jobs:
+  # Names the Playwright image for the lockfile's version (#1391). A job
+  # output, because a `container:` image cannot be read from a file.
+  playwright-image:
+    name: Playwright image
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    outputs:
+      image: ${{ steps.image.outputs.image }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: |
+            package-lock.json
+            .github/actions/playwright-image
+          sparse-checkout-cone-mode: false
+      - id: image
+        uses: ./.github/actions/playwright-image
+
   not-run:
     name: Preview edge E2E (not run)
     # Keyed on the PR's AUTHOR, not github.actor: a human re-running a
@@ -61,6 +81,17 @@ jobs:
     name: Preview edge E2E
     if: github.event_name != 'pull_request' || (github.event.pull_request.user.login != 'dependabot[bot]' && !github.event.pull_request.head.repo.fork)
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    needs: playwright-image
+    # Browsers and their system packages come preinstalled: no apt (#1391).
+    # --ipc=host: Chromium runs out of shared memory in Docker's default 64 MB.
+    container:
+      image: ${{ needs.playwright-image.outputs.image }}
+      options: --ipc=host
+    # A container job's default `run` shell is sh, not bash: no pipefail,
+    # and `set -o pipefail` itself fails (#1391).
+    defaults:
+      run:
+        shell: bash
     timeout-minutes: 25
     steps:
       - name: Checkout
@@ -79,26 +110,15 @@ jobs:
             frontend/package-lock.json
 
       - name: Install dependencies
+        # Root --ignore-scripts: see e2e-env's "Install dependencies" (#1391).
         run: |
-          npm ci
+          npm ci --ignore-scripts
           npm ci --prefix frontend
 
-      - name: Restore cached apt packages for Playwright
-        id: apt-debs
-        uses: ./.github/actions/apt-deb-cache
-        with:
-          mode: restore
-
-      - name: Install Playwright Chromium
-        # Bounded: install-deps shells out to apt-get, which can hang (#881).
-        run: timeout -k 30s 300s npx playwright install chromium --with-deps
-
-      - name: Save apt packages for Playwright
-        uses: ./.github/actions/apt-deb-cache
-        with:
-          mode: save
-          key: ${{ steps.apt-debs.outputs.key }}
-          cache-hit: ${{ steps.apt-debs.outputs.cache-hit }}
+      - name: Check the image's browsers match the lockfile
+        # A no-op in the Playwright image (#1391); a mismatch downloads from
+        # Playwright's CDN, never apt. Bounded all the same (#881).
+        run: timeout -k 30s 300s npx playwright install chromium
 
       - name: Build frontend
         working-directory: frontend

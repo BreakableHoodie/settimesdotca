@@ -16,9 +16,44 @@ permissions:
     contents: write
 
 jobs:
+    # Names the Playwright image for the lockfile's version (#1391). A job
+    # output, because a `container:` image cannot be read from a file.
+    playwright-image:
+        name: Playwright image
+        runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+        # Only reads two files; the workflow's write grant is for the commit.
+        permissions:
+            contents: read
+        timeout-minutes: 5
+        outputs:
+            image: ${{ steps.image.outputs.image }}
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  ref: ${{ inputs.branch || github.ref_name }}
+                  fetch-depth: 1
+                  persist-credentials: false
+                  sparse-checkout: |
+                      package-lock.json
+                      .github/actions/playwright-image
+                  sparse-checkout-cone-mode: false
+            - id: image
+              uses: ./.github/actions/playwright-image
+
     update-snapshots:
         name: Regenerate linux snapshots and commit
         runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+        needs: playwright-image
+        # Browsers and their system packages come preinstalled: no apt (#1391).
+        # --ipc=host: Chromium runs out of shared memory in Docker's default 64 MB.
+        container:
+            image: ${{ needs.playwright-image.outputs.image }}
+            options: --ipc=host
+        # A container job's default `run` shell is sh, not bash: no pipefail,
+        # and `set -o pipefail` itself fails (#1391).
+        defaults:
+            run:
+                shell: bash
         timeout-minutes: 35
 
         steps:
@@ -47,6 +82,10 @@ jobs:
 
             - name: Commit updated snapshots
               run: |
+                  # The container runs as root over a workspace the runner user
+                  # owns, and checkout trusts it only while checkout runs, so
+                  # git refuses it here without this (#1391).
+                  git config --global --add safe.directory "$GITHUB_WORKSPACE"
                   git config user.name "github-actions[bot]"
                   git config user.email "github-actions[bot]@users.noreply.github.com"
                   git add e2e/visual-regression.spec.js-snapshots/

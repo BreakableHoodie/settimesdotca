@@ -22,7 +22,7 @@ describe("path-filtered E2E jobs run on dependency changes", () => {
         "playwright.config.js",
         "e2e/utils/**",
         "frontend/**",
-        ".github/actions/apt-deb-cache/**",
+        ".github/actions/playwright-image/**",
       ],
     ],
     [
@@ -33,7 +33,7 @@ describe("path-filtered E2E jobs run on dependency changes", () => {
         "frontend/package.json",
         "frontend/package-lock.json",
         "playwright.config.js",
-        ".github/actions/apt-deb-cache/**",
+        ".github/actions/playwright-image/**",
       ],
     ],
   ])("%s triggers on its dependencies", (workflow, required) => {
@@ -84,6 +84,7 @@ describe("dorny/paths-filter filters", () => {
       "database/**",
       ".github/actions/e2e-env/**",
       ".github/actions/apt-deb-cache/**",
+      ".github/actions/playwright-image/**",
       "package-lock.json",
       "frontend/package-lock.json",
       "playwright.config.js",

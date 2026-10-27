@@ -21,6 +21,9 @@ jobs:
     playwright-image:
         name: Playwright image
         runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+        # Only reads two files; the workflow's write grant is for the commit.
+        permissions:
+            contents: read
         timeout-minutes: 5
         outputs:
             image: ${{ steps.image.outputs.image }}

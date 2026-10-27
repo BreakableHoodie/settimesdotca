@@ -50,6 +50,11 @@ describe("Playwright jobs run in the lockfile's Playwright image (#1391)", () =>
     expect([job.needs].flat()).toContain("playwright-image");
     const steps = doc.jobs["playwright-image"]?.steps ?? [];
     expect(steps.map((s) => s.uses)).toContain("./.github/actions/playwright-image");
+    // It runs an action from the branch under test and only reads files, so it
+    // must never inherit a workflow's write grant.
+    const grant = doc.jobs["playwright-image"].permissions ?? doc.permissions;
+    expect(grant).toBeTypeOf("object");
+    expect(Object.values(grant)).not.toContain("write");
   });
 
   it("never hard-codes a Playwright image tag", () => {

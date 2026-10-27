@@ -53,6 +53,7 @@ function sortKey(band) {
   // setDate() goes through the calendar and stays correct across the transition.
   let day = UNKNOWN_DAY
   if (band.performance_date) {
+    // This instant is a sort key only; it is never compared with now or displayed as a time.
     const parsed = new Date(`${band.performance_date}T00:00:00`)
     if (!Number.isNaN(parsed.getTime())) {
       if (afterMidnight) parsed.setDate(parsed.getDate() - 1)

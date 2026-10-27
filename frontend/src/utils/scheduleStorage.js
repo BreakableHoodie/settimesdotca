@@ -1,3 +1,5 @@
+import { torontoDate } from './festivalDays'
+
 export const SELECTED_BANDS_KEY = 'selectedBandsByEvent'
 // Internal key within the stored object for event date metadata
 const DATES_KEY = '__dates__'
@@ -8,8 +10,7 @@ const DATES_KEY = '__dates__'
 function isEventStale(parsed, slug) {
   const date = parsed?.[DATES_KEY]?.[slug]
   if (!date) return false
-  const now = new Date()
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  const todayStr = torontoDate(Date.now())
   return date < todayStr
 }
 

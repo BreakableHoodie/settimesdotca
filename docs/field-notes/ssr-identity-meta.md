@@ -124,3 +124,9 @@ worth this much attention.
 Mocked unit tests cannot prove Cloudflare dispatches to a handler. Verify routing changes against `npx wrangler pages dev --port 8788` and diff per-path tag counts.
 
 Search Console evidence, the `/band/<slug>` incident and the rejected alternatives: `docs/field-notes/ssr-identity-meta.md`.
+
+## Why BandProfilePage stopped being the `document.title` example
+
+Moved verbatim from CLAUDE.md on 2026-10-27 (#1398) to free budget.
+
+`BandProfilePage.jsx` was this example until #797 removed its `<meta name="keywords">` — the tag was its `<Helmet>`'s only child, so the wrapper and the `react-helmet-async` import went with it. That page now assigns `document.title` directly and declares no Helmet at all, which is why it no longer illustrates the pairing.

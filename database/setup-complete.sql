@@ -603,6 +603,14 @@ CREATE TABLE IF NOT EXISTS event_venue_delays (
   PRIMARY KEY (event_id, venue_id)
 );
 
+CREATE TABLE IF NOT EXISTS event_hourly_views (
+  event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  festival_date TEXT NOT NULL,
+  hour INTEGER NOT NULL CHECK (hour BETWEEN 0 AND 23),
+  views INTEGER NOT NULL DEFAULT 0 CHECK (views >= 0),
+  PRIMARY KEY (event_id, festival_date, hour)
+);
+
 -- ============================================
 -- TEST ACCOUNTS (passwords set by scripts/setup-local-db.sh)
 -- ============================================

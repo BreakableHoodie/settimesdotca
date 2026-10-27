@@ -2,6 +2,7 @@ import { checkPermission } from "../../_middleware.js";
 import { validateId } from "../../../../utils/validation.js";
 import { sortableName } from "../../../../utils/sortableName.js";
 import { claimIsLiveSql } from "../../../../utils/bandFollowNotify.js";
+import { AFTER_MIDNIGHT_THRESHOLD_HOUR } from "../../../../utils/eventDay.js";
 
 export async function onRequestGet(context) {
   const { env, params } = context;
@@ -29,6 +30,7 @@ export async function onRequestGet(context) {
       topRoutesRes,
       announcementPlanningRes,
       telemetryStatsRes,
+      hourlyViewsRes,
     ] = await DB.batch([
       DB.prepare(
         `SELECT COUNT(*) as total_schedule_builds,
@@ -129,7 +131,19 @@ export async function onRequestGet(context) {
                 COALESCE(SUM(ticket_clicks), 0) AS total_ticket_clicks
          FROM event_daily_stats WHERE event_id = ?`,
       ).bind(eventId),
+      // Show-night usage curve (#1246 Q1): event-page views per festival date and
+      // Toronto hour. Counts only, no visitor key.
+      DB.prepare(`SELECT festival_date, hour, views FROM event_hourly_views WHERE event_id = ?`).bind(eventId),
     ]);
+
+    // Festival order within a date: 6 AM first ... 11 PM, then 12-5 AM, because
+    // after-midnight hours belong to the END of the night, not the start.
+    const festivalHourKey = (hour) => (hour + 24 - AFTER_MIDNIGHT_THRESHOLD_HOUR) % 24;
+    const showNightCurve = (hourlyViewsRes.results || [])
+      .map(({ festival_date, hour, views }) => ({ festival_date, hour, views }))
+      .sort(
+        (a, b) => a.festival_date.localeCompare(b.festival_date) || festivalHourKey(a.hour) - festivalHourKey(b.hour),
+      );
 
     const metrics = metricsRes.results?.[0];
     const routeBuilders = metrics?.route_builders || 0;
@@ -195,6 +209,7 @@ export async function onRequestGet(context) {
           announcementPlanning: announcementPlanning,
           totalEventViews: telemetryStats?.total_event_views || 0,
           totalTicketClicks: telemetryStats?.total_ticket_clicks || 0,
+          showNightCurve,
         },
       }),
       {

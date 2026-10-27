@@ -130,6 +130,12 @@ export default function PrivacyPage() {
                     <td className="py-2">Anonymised 30 days after the event</td>
                   </tr>
                   <tr>
+                    <td className="py-2 pr-4">
+                      Hourly event-page view counts (show days only, no visitor information)
+                    </td>
+                    <td className="py-2">Kept with the event, deleted if the event is deleted</td>
+                  </tr>
+                  <tr>
                     <td className="py-2 pr-4">Admin action log</td>
                     <td className="py-2">1 year</td>
                   </tr>

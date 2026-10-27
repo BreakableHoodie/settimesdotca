@@ -450,6 +450,8 @@ as RFC 5545 `STATUS:CANCELLED`), and `events/[id]/recap.js` (gated by
 
 Metrics write to D1 daily-aggregate tables (`page_views_daily`, `artist_daily_stats`) via `POST /api/metrics`, plus an optional Cloudflare Analytics Engine sink (`env.ANALYTICS`, configured in `wrangler.toml`). Ingestion is best-effort and fire-and-forget; failures must not surface to users.
 
+**Show-night curve (#1246 Q1).** `event_hourly_views` (festival date + Toronto hour -> count) answers "when do fans use the site on show night?". `POST /api/metrics` writes it from `event_view` only, and only while the festival date (`eventLocalFestivalToday`) is inside the event's `[date, end_date]`; no visitor key, in its own try/catch. First-party because Cloudflare's zone keeps hourly data only about 3 days, and Pages Functions invocation counts are crawler-dominated (a normal Sunday had more than Vol 18's show day). In the mutation gate.
+
 **Share metrics come from `share_links`, not telemetry.** A share _create_ is a `share_links` row. The admin event metrics endpoint reads these directly. Do **not** wire the allowlisted-but-unused `share_event` / `filter_use` events into `/api/metrics` for share counts — they would be redundant with `share_links`.
 
 **`view_count` is unique visitors per link, all-time — not fetches (#705).** It is a _derived_ value: `GET /api/schedule/share/[slug]` writes one `share_link_views(slug, visitor_hash)` row per visitor and recomputes `view_count` as `COUNT(*)` over that ledger, both in a single `DB.batch()`. Do not "optimise" it back to `view_count = view_count + 1`: the ledger row claims the slot permanently, so if a separate increment were lost the visitor could never be counted again, whereas a recomputed count self-heals on the next visit.

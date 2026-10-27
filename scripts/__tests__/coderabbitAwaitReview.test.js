@@ -205,12 +205,21 @@ describe("awaitReview", () => {
   });
 
   it("waits out a rate limit, re-requests exactly once, then succeeds on the completed review", async () => {
-    const deps = fakeDeps({ statuses: [RATE_LIMITED, IN_PROGRESS, COMPLETED] });
+    // The limit comment came after the head commit, as a real one does.
+    const deps = fakeDeps({ statuses: [RATE_LIMITED, IN_PROGRESS, COMPLETED], committedAt: -1000 });
     const code = await awaitReview(deps, { pollMs: 1000 });
     expect(code).toBe(0);
     expect(deps.calls.requests).toBe(1);
     // The first sleep is the parsed cooldown, not the poll interval.
     expect(deps.calls.sleeps[0]).toBe(parseCooldownMs(RL_COMMENT));
+  });
+
+  it("uses the default cooldown, not an earlier limit's leftover, when the comment predates the head", async () => {
+    // A stale comment's remaining time can be near zero: trusting it would
+    // spend every request before this limit clears (CodeRabbit, #1401).
+    const deps = fakeDeps({ statuses: [RATE_LIMITED, IN_PROGRESS, COMPLETED], committedAt: 60_000 });
+    expect(await awaitReview(deps, { pollMs: 1000 })).toBe(0);
+    expect(deps.calls.sleeps[0]).toBe(DEFAULT_COOLDOWN_MS);
   });
 
   it("falls back to the default cooldown when the comment has no duration", async () => {
@@ -834,6 +843,13 @@ process.stdout.write(JSON.stringify([fixtures[args[1]] ?? []]));
 
   it("reads an unreadable commit date as 'never limited', the pre-#1401 fallback", () => {
     stubGh({});
+    expect(ghDeps(7).headCommittedAt("f".repeat(40))).toBe(Infinity);
+  });
+
+  it("falls back the same way when gh cannot read the commit at all", () => {
+    // A token that reads statuses but not commits must not stop the monitor.
+    writeFileSync(join(dir, "gh"), "#!/usr/bin/env node\nprocess.exit(1)\n");
+    chmodSync(join(dir, "gh"), 0o755);
     expect(ghDeps(7).headCommittedAt("f".repeat(40))).toBe(Infinity);
   });
 

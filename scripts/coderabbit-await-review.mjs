@@ -237,7 +237,14 @@ export function ghDeps(pr) {
       // When this commit was made, so a limit comment can be told apart from
       // one about an earlier push. Unreadable reads as "never limited": the
       // no-status grace period still re-requests, as it did before #1401.
-      const t = Date.parse(gh(["api", `repos/{owner}/{repo}/commits/${sha}`, "--jq", ".commit.committer.date"]).trim());
+      // A token that reads statuses but not commits must not stop the
+      // monitor either (CodeRabbit), so a failed read falls back the same way.
+      let t = NaN;
+      try {
+        t = Date.parse(gh(["api", `repos/{owner}/{repo}/commits/${sha}`, "--jq", ".commit.committer.date"]).trim());
+      } catch {
+        // falls through to Infinity
+      }
       return Number.isFinite(t) ? t : Infinity;
     },
     reviewInProgressElsewhere(head) {
@@ -559,8 +566,15 @@ export async function awaitReview(deps, opts = {}) {
           watchMovedHead: true,
         });
       }
+      // A comment's stated time counts only when the comment is about THIS
+      // limit: an earlier limit's comment, cut down to almost nothing by
+      // remainingCooldownMs, would spend every request before this limit
+      // clears (CodeRabbit). Otherwise the default cooldown.
       const limit = state === "rate_limited" ? deps.getLatestRateLimitComment() : null;
-      const stated = parseCooldownMs(limit?.body);
+      const stated =
+        limit && limitCommentApplies(limit.at, deps.headCommittedAt(head), lastRequestAt)
+          ? parseCooldownMs(limit.body)
+          : null;
       const wait = stated ? remainingCooldownMs(stated, limit.at, deps.now(), pollMs) : DEFAULT_COOLDOWN_MS;
       deps.log(`head ${short} ${state}; waiting ${Math.round(wait / 60_000)} min for the cooldown.`);
       await deps.sleep(wait);

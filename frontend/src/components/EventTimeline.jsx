@@ -772,7 +772,9 @@ function EventCard({
                 Recap
               </Button>
             )}
-            {ticketHref !== '#' && (
+            {/* Not once the edition is over (#1384): a ticket button on a
+                concluded show sends fans to a sale that has closed. */}
+            {ticketHref !== '#' && !(isPast || event.status === 'archived') && (
               <Button
                 as="a"
                 href={ticketHref}

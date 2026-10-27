@@ -8,7 +8,8 @@ import { safeExternalHref, safeInstagramHref, safeTikTokHref, safeXHref } from '
 // already sent to the client and simply have no entry here.
 //
 // Keeping them out is deliberate. `website` duplicates `ticket_url`, which
-// already renders and is the link that actually sells a ticket; `youtube` and
+// renders beside this row as EventTicketLink (#1384) and on the homepage card,
+// and is the link that actually sells a ticket; `youtube` and
 // `bandcamp` are artist-shaped, and the lineup already links per-artist.
 // Facebook earns its place because a Facebook event page is event-shaped
 // infrastructure for a show.

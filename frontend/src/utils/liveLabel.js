@@ -92,16 +92,21 @@ function firstStartOnDay(bands, date) {
  * @param {Date|number} currentTime
  * @param {Array<{startMs:number,endMs:number}>} bands - prepared bands (prepareBands)
  * @param {string|null} [doorsJson] - raw `events.doors_json` string from the schedule payload
+ * @param {string|null} [endDate] - YYYY-MM-DD, a multi-day event's last date
  * @returns {{label:string, classes:string}}
  */
-export function getLifecycleLabel(eventDate, currentTime, bands = [], doorsJson = null) {
+export function getLifecycleLabel(eventDate, currentTime, bands = [], doorsJson = null, endDate) {
   const { firstStart, lastEnd } = scheduleWindow(bands)
 
   // Baseline: the event day's local end (23:59:59), matching the prior
   // date-based behavior. `new Date('YYYY-MM-DDT23:59:59')` parses as LOCAL time
   // (no offset) — same as the old getEventState path, so single-day events are
   // byte-identical.
-  const baselineEnd = eventDate ? new Date(eventDate + 'T23:59:59').getTime() : 0
+  // A multi-day event runs to its LAST date (#1384 review): on the start date
+  // alone, an edition whose later days had no set times yet read "Recap" from
+  // day 2. Lexicographic YYYY-MM-DD compare, never `new Date` on a bare date.
+  const lastDate = endDate && eventDate && endDate > eventDate ? endDate : eventDate
+  const baselineEnd = lastDate ? new Date(lastDate + 'T23:59:59').getTime() : 0
   // Live through whichever is later — the day's end, or the real last set. Only
   // after-midnight sets push this past midnight; everything else is unchanged.
   const liveEnd = Math.max(baselineEnd, lastEnd ?? 0)
@@ -133,5 +138,10 @@ export function getLifecycleLabel(eventDate, currentTime, bands = [], doorsJson 
   // multi-day event): Live once the first set has started — keeps the badge
   // Live when the local day has rolled over but the crawl is still on.
   if (firstStart != null && now >= firstStart) return LABELS.live
+  // A multi-day festival past day 1's midnight and before liveEnd is under
+  // way, even on a middle day whose sets are all on a later day or have no
+  // times yet (#1384 review). Multi-day only: a single-day event's
+  // after-midnight window stays Upcoming until its first set starts.
+  if (lastDate !== eventDate && now >= new Date(eventDate + 'T00:00:00').getTime()) return LABELS.live
   return LABELS.upcoming
 }

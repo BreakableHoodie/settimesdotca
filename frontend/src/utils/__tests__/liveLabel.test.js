@@ -142,6 +142,47 @@ describe('getLifecycleLabel — start-edge gate (#569): doors → first set → 
   })
 })
 
+// Found in #1384 review: the label took only the START date, so a multi-day
+// edition whose later days had no set times yet read "Recap" from day 2, which
+// also hid its ticket link and running-late banner mid-festival.
+describe('getLifecycleLabel — the festival runs to its last date (#1384)', () => {
+  // Aug 1-3; only day 1 has set times so far.
+  const bands = [band(at(2026, 8, 1, 20), at(2026, 8, 1, 21))]
+  const label = when => labelOf('2026-08-01', when, bands, null, '2026-08-03')
+
+  it('is Live on day 2 and on the last evening, not Recap', () => {
+    expect(label(at(2026, 8, 2, 12))).toBe('Live Tonight')
+    expect(label(at(2026, 8, 3, 22))).toBe('Live Tonight')
+  })
+
+  it('is Recap after the last date, and Upcoming before the first', () => {
+    expect(label(at(2026, 8, 4, 12))).toBe('Recap')
+    expect(label(at(2026, 7, 31, 12))).toBe('Upcoming')
+  })
+
+  it('is Live on day 2 even before any set has a time', () => {
+    expect(labelOf('2026-08-01', at(2026, 8, 2, 9), [], null, '2026-08-03')).toBe('Live Tonight')
+  })
+
+  it('is Live on a middle day whose sets are all on a later day', () => {
+    // Feb 12-14, set times only on the 14th (CodeRabbit, #1384).
+    const lastDayOnly = [{ ...band(at(2027, 2, 14, 20), at(2027, 2, 14, 21)), date: '2027-02-14' }]
+    expect(labelOf('2027-02-12', at(2027, 2, 13, 12), lastDayOnly, null, '2027-02-14')).toBe('Live Tonight')
+  })
+
+  it("keeps a single-day event's after-midnight wait Upcoming until its first set", () => {
+    // Only set: 02:00, prepared onto the next calendar day (CodeRabbit, #1384).
+    const lateOnly = [band(at(2026, 8, 2, 2), at(2026, 8, 2, 3))]
+    expect(labelOf('2026-08-01', at(2026, 8, 2, 0, 30), lateOnly)).toBe('Upcoming')
+    expect(labelOf('2026-08-01', at(2026, 8, 2, 2, 30), lateOnly)).toBe('Live Tonight')
+  })
+
+  it('leaves a single-day event exactly as before', () => {
+    expect(labelOf('2026-08-01', at(2026, 8, 2, 12), bands, null, null)).toBe('Recap')
+    expect(labelOf('2026-08-01', at(2026, 8, 2, 12), bands, null, '2026-08-01')).toBe('Recap')
+  })
+})
+
 describe('isSameLocalDay', () => {
   it('matches the event calendar day', () => {
     expect(isSameLocalDay('2026-08-02', new Date(2026, 7, 2, 23, 0))).toBe(true)

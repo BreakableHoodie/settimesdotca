@@ -46,6 +46,11 @@ jobs:
         container:
             image: ${{ needs.playwright-image.outputs.image }}
             options: --ipc=host
+        # A container job's default `run` shell is sh, not bash: no pipefail,
+        # and `set -o pipefail` itself fails (#1391).
+        defaults:
+            run:
+                shell: bash
         timeout-minutes: 35
 
         steps:

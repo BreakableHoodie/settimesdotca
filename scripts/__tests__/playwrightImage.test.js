@@ -44,6 +44,9 @@ describe("Playwright jobs run in the lockfile's Playwright image (#1391)", () =>
 
   it.each(playwrightJobs.map((j) => [`${j.file}:${j.id}`, j]))("%s", (_, { doc, job }) => {
     expect(job.container?.image).toBe(IMAGE_FROM_JOB);
+    // In a container the default shell is sh: bash-only steps fail outright
+    // and pipelines lose pipefail, so a failing command can pass silently.
+    expect(job.defaults?.run?.shell).toBe("bash");
     expect([job.needs].flat()).toContain("playwright-image");
     const steps = doc.jobs["playwright-image"]?.steps ?? [];
     expect(steps.map((s) => s.uses)).toContain("./.github/actions/playwright-image");

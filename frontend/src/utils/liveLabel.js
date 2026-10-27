@@ -138,10 +138,10 @@ export function getLifecycleLabel(eventDate, currentTime, bands = [], doorsJson 
   // multi-day event): Live once the first set has started — keeps the badge
   // Live when the local day has rolled over but the crawl is still on.
   if (firstStart != null && now >= firstStart) return LABELS.live
-  // Past day 1's midnight and before liveEnd, the festival is under way, even
-  // on a middle day whose sets are all on a later day or have no times yet
-  // (#1384 review). For a single-day event liveEnd is that day's end, so this
-  // is only the after-midnight window, already Live by the rule above.
-  if (eventDate && now >= new Date(eventDate + 'T00:00:00').getTime()) return LABELS.live
+  // A multi-day festival past day 1's midnight and before liveEnd is under
+  // way, even on a middle day whose sets are all on a later day or have no
+  // times yet (#1384 review). Multi-day only: a single-day event's
+  // after-midnight window stays Upcoming until its first set starts.
+  if (lastDate !== eventDate && now >= new Date(eventDate + 'T00:00:00').getTime()) return LABELS.live
   return LABELS.upcoming
 }

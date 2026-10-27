@@ -170,6 +170,13 @@ describe('getLifecycleLabel — the festival runs to its last date (#1384)', () 
     expect(labelOf('2027-02-12', at(2027, 2, 13, 12), lastDayOnly, null, '2027-02-14')).toBe('Live Tonight')
   })
 
+  it("keeps a single-day event's after-midnight wait Upcoming until its first set", () => {
+    // Only set: 02:00, prepared onto the next calendar day (CodeRabbit, #1384).
+    const lateOnly = [band(at(2026, 8, 2, 2), at(2026, 8, 2, 3))]
+    expect(labelOf('2026-08-01', at(2026, 8, 2, 0, 30), lateOnly)).toBe('Upcoming')
+    expect(labelOf('2026-08-01', at(2026, 8, 2, 2, 30), lateOnly)).toBe('Live Tonight')
+  })
+
   it('leaves a single-day event exactly as before', () => {
     expect(labelOf('2026-08-01', at(2026, 8, 2, 12), bands, null, null)).toBe('Recap')
     expect(labelOf('2026-08-01', at(2026, 8, 2, 12), bands, null, '2026-08-01')).toBe('Recap')

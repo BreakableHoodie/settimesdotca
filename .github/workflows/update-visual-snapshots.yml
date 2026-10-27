@@ -79,6 +79,10 @@ jobs:
 
             - name: Commit updated snapshots
               run: |
+                  # The container runs as root over a workspace the runner user
+                  # owns, and checkout trusts it only while checkout runs, so
+                  # git refuses it here without this (#1391).
+                  git config --global --add safe.directory "$GITHUB_WORKSPACE"
                   git config user.name "github-actions[bot]"
                   git config user.email "github-actions[bot]@users.noreply.github.com"
                   git add e2e/visual-regression.spec.js-snapshots/

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 import { posterImageUrl, posterImageSrcSet } from '../utils/posterImage'
 
@@ -30,23 +30,19 @@ export default function PosterImage({
   onUnavailable,
   ...rest
 }) {
-  const [fellBack, setFellBack] = useState(false)
-  const fellBackRef = useRef(false)
-  const unavailableRef = useRef(false)
+  // A fallback belongs to the URL that failed, not to the component instance,
+  // so each guard records WHICH src it is for: a PosterImage re-rendered with a
+  // new poster starts clean without a reset. A reset effect keyed on src (the
+  // old design) also ran on mount, and an error arriving before that effect
+  // flushed was wiped by it, so the original's failure was taken for the
+  // transform's and the broken image stayed (#1404).
+  const [fellBackSrc, setFellBackSrc] = useState(null)
+  const fellBackRef = useRef(null)
+  const unavailableRef = useRef(null)
+  const fellBack = fellBackSrc === src
   // A URL off the poster host has no transform: its FIRST error is already the
   // original failing, so there is nothing to fall back to (CodeRabbit, #1368).
   const hasTransform = posterImageUrl(src, width) !== src
-
-  // A fallback belongs to the URL that failed, not to the component instance.
-  // Without this reset, a PosterImage reused for a different poster (the same
-  // element re-rendered with a new src rather than remounted) would stay
-  // pinned to untransformed originals for the rest of its life because of one
-  // earlier failure.
-  useEffect(() => {
-    fellBackRef.current = false
-    unavailableRef.current = false
-    setFellBack(false)
-  }, [src])
 
   const handleError = useCallback(
     event => {
@@ -55,21 +51,21 @@ export default function PosterImage({
       // throws, and the ref guard below only suppresses OUR fallback
       // transition, never the caller's callback.
       onError?.(event)
-      if (fellBackRef.current || !hasTransform) {
+      if (fellBackRef.current === src || !hasTransform) {
         // The untransformed original failed too: there is no poster to show.
         // A broken <img> sized by its alt text spread across the row and
         // pushed the event title off-screen (#1368), so callers hide their
         // whole wrapper instead. Reported once per src.
-        if (!unavailableRef.current) {
-          unavailableRef.current = true
+        if (unavailableRef.current !== src) {
+          unavailableRef.current = src
           onUnavailable?.()
         }
         return
       }
-      fellBackRef.current = true
-      setFellBack(true)
+      fellBackRef.current = src
+      setFellBackSrc(src)
     },
-    [onError, onUnavailable, hasTransform]
+    [onError, onUnavailable, hasTransform, src]
   )
 
   const resolvedSrc = fellBack ? src : posterImageUrl(src, width)

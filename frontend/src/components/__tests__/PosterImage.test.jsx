@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import '@testing-library/jest-dom'
+import { createRoot } from 'react-dom/client'
 import { describe, expect, it, vi } from 'vitest'
 import PosterImage from '../PosterImage'
 import { POSTER_IMAGE_HOST } from '../../utils/posterImage'
@@ -138,5 +139,44 @@ describe('PosterImage', () => {
     render(<PosterImage src="https://example.com/poster.jpg" alt="poster" width={200} onUnavailable={onUnavailable} />)
     fireEvent.error(screen.getByRole('img', { name: 'poster' }))
     expect(onUnavailable).toHaveBeenCalledTimes(1)
+  })
+
+  // #1404: the guards used to be reset by an effect keyed on src, which also ran
+  // on mount. A first error landing before that effect flushed was wiped by it,
+  // so the original's failure was taken for the transform's and the broken
+  // image stayed. Rendered outside act() so the mount effect really is pending
+  // when the first error arrives.
+  it('reports unavailable when the first error lands before the mount effect has run', async () => {
+    const previousActEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT
+    globalThis.IS_REACT_ACT_ENVIRONMENT = false
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    const onUnavailable = vi.fn()
+    try {
+      const secondErrorDone = new Promise(resolve => {
+        const observer = new window.MutationObserver(() => {
+          const img = container.querySelector('img')
+          if (!img) return
+          observer.disconnect()
+          // A MutationObserver callback is a microtask after the commit, before
+          // the passive effects' task.
+          img.dispatchEvent(new Event('error'))
+          // The original fails later, after the mount effect has flushed.
+          setTimeout(() => {
+            img.dispatchEvent(new Event('error'))
+            setTimeout(resolve, 0)
+          }, 20)
+        })
+        observer.observe(container, { childList: true, subtree: true })
+      })
+      root.render(<PosterImage src={POSTER_URL} alt="" width={200} onUnavailable={onUnavailable} />)
+      await secondErrorDone
+      expect(onUnavailable).toHaveBeenCalledTimes(1)
+    } finally {
+      root.unmount()
+      container.remove()
+      globalThis.IS_REACT_ACT_ENVIRONMENT = previousActEnvironment
+    }
   })
 })

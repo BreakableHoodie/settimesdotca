@@ -156,6 +156,26 @@ describe("POST /api/metrics — referrer buckets (#1246 Q3)", () => {
     ]);
   });
 
+  test("keys a visit by festival day: 1 AM belongs to the night before", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      // 2026-10-12 01:00 Toronto (EDT, UTC-4): still Oct 11's festival night.
+      vi.setSystemTime(new Date(Date.UTC(2026, 9, 12, 5, 0)));
+      const { env, rawDb } = createTestEnv();
+
+      await onRequestPost({
+        request: makeRequest([{ event: "visit", props: { referrer_bucket: "instagram" } }]),
+        env,
+      });
+
+      expect(rawDb.prepare("SELECT date, bucket, visits FROM referrer_daily_stats").all()).toEqual([
+        { date: "2026-10-11", bucket: "instagram", visits: 1 },
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   test("drops forged referrer labels", async () => {
     const { env, rawDb } = createTestEnv();
     env.ANALYTICS = { writeDataPoint: vi.fn() };

@@ -5089,7 +5089,8 @@ components:
                 $ref: "#/components/schemas/GenericRecord"
             referrers:
               type: array
-              description: Site-wide visit counts by coarse referrer bucket, summed from 14 days before the event through its last day.
+              nullable: true
+              description: Site-wide visit counts by coarse referrer bucket (festival-day keyed), summed from 14 days before the event through its last day. null when the read failed, so it is never shown as zero visits.
               items:
                 type: object
                 required: [bucket, visits]

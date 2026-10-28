@@ -589,7 +589,7 @@ describe("GET /api/admin/events/[id]/metrics — referrer buckets (#1246 Q3)", (
     ]);
   });
 
-  test("a failed referrer read returns an empty list and preserves the response", async () => {
+  test("a failed referrer read returns null, not an empty list, and preserves the response", async () => {
     const { env, rawDb } = createTestEnv();
     const event = insertEvent(rawDb, { name: "Quiet", slug: "quiet" });
     rawDb.exec("DROP TABLE referrer_daily_stats");
@@ -599,7 +599,7 @@ describe("GET /api/admin/events/[id]/metrics — referrer buckets (#1246 Q3)", (
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body.metrics.referrers).toEqual([]);
+    expect(body.metrics.referrers).toBeNull();
     expect(body.metrics.totalShares).toBe(0);
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("referrer metrics read"), expect.anything());
   });

@@ -34,6 +34,14 @@ export function referrerBucket(referrer, ownHost) {
   }
 
   if (!host) return 'other'
+  // Chrome on Android reports an app launch as android-app://<package>/...,
+  // so Google's search app and Discover would otherwise all read as "other".
+  if (referrer.toLowerCase().startsWith('android-app:')) {
+    if (host === 'com.google.android.googlequicksearchbox') return 'google'
+    if (host.startsWith('com.instagram.')) return 'instagram'
+    if (host.startsWith('com.facebook.')) return 'facebook'
+    return 'other'
+  }
   if (ownHost && stripWww(host) === stripWww(String(ownHost).toLowerCase())) return 'direct'
   if (hostIs(host, 'instagram.com')) return 'instagram'
   if (['facebook.com', 'fb.com', 'fb.me'].some(domain => hostIs(host, domain))) return 'facebook'

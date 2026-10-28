@@ -330,7 +330,9 @@ export async function onRequestPost(context) {
              ON CONFLICT (date, bucket)
              DO UPDATE SET visits = visits + 1`,
           )
-            .bind(today, visitBucket)
+            // Festival day, as the show-night curve uses: a 1 AM visit after the
+            // last night's sets belongs to that night, not to the next date.
+            .bind(eventLocalFestivalToday(), visitBucket)
             .run();
         } catch (err) {
           logger.error("referrer_daily_stats upsert failed; this visit is lost", {

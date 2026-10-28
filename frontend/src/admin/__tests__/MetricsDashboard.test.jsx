@@ -298,4 +298,57 @@ describe('MetricsDashboard', () => {
       ).toBeInTheDocument()
     })
   })
+
+  describe('how fans arrived (#1246 Q3)', () => {
+    const base = {
+      totalScheduleBuilds: 0,
+      routeBuilders: 0,
+      routeSizeDistribution: [],
+      popularBands: [],
+      topSharedRoutes: [],
+      showNightCurve: [],
+    }
+
+    it('lists buckets with human labels and says the counts are site-wide', async () => {
+      eventsApi.getMetrics.mockResolvedValue({
+        metrics: {
+          ...base,
+          referrers: [
+            { bucket: 'instagram', visits: 12 },
+            { bucket: 'other_search', visits: 1 },
+          ],
+        },
+      })
+
+      render(<MetricsDashboard eventId={1} />)
+
+      const list = await screen.findByRole('list', { name: 'Visits by referring site kind' })
+      expect(within(list).getByText('Instagram')).toBeInTheDocument()
+      expect(within(list).getByText('12 visits')).toBeInTheDocument()
+      expect(within(list).getByText('Other search')).toBeInTheDocument()
+      expect(within(list).getByText('1 visit')).toBeInTheDocument()
+      expect(screen.getByText(/Site-wide visits, 14 days before the event/)).toBeInTheDocument()
+    })
+
+    it.each([
+      ['null (the read failed)', null],
+      ['absent (a payload this version does not know)', undefined],
+    ])('says the sources are unavailable, not empty, when referrers is %s', async (_, referrers) => {
+      eventsApi.getMetrics.mockResolvedValue({ metrics: { ...base, referrers } })
+
+      render(<MetricsDashboard eventId={1} />)
+
+      expect(await screen.findByText('Visit sources could not be loaded.')).toBeInTheDocument()
+      expect(screen.queryByText(/No visit sources recorded yet/)).not.toBeInTheDocument()
+    })
+
+    it('shows the empty state for a successful read with no visits', async () => {
+      eventsApi.getMetrics.mockResolvedValue({ metrics: { ...base, referrers: [] } })
+
+      render(<MetricsDashboard eventId={1} />)
+
+      expect(await screen.findByText(/No visit sources recorded yet/)).toBeInTheDocument()
+      expect(screen.queryByText('Visit sources could not be loaded.')).not.toBeInTheDocument()
+    })
+  })
 })

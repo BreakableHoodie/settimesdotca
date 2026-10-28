@@ -21,7 +21,8 @@ async function loadReferrers(DB, eventId) {
     return (results || []).map((row) => ({ bucket: row.bucket, visits: row.visits }));
   } catch (error) {
     logger.error("event referrer metrics read failed", { error, eventId });
-    return [];
+    // null, not []: the dashboard must not show a failed read as "no visits".
+    return null;
   }
 }
 

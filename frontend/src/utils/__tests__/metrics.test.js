@@ -16,6 +16,10 @@ describe('referrerBucket', () => {
     ['https://notinstagram.com/', 'other'],
     ['https://instagram.com.evil.test/', 'other'],
     ['not a url at all', 'other'],
+    ['android-app://com.google.android.googlequicksearchbox/https/www.google.com', 'google'],
+    ['android-app://com.instagram.android', 'instagram'],
+    ['android-app://com.facebook.katana', 'facebook'],
+    ['android-app://com.google.android.gm', 'other'],
   ])('%s -> %s', async (referrer, expected) => {
     const { referrerBucket } = await import('../metrics')
     expect(referrerBucket(referrer, 'settimes.ca')).toBe(expected)
@@ -80,6 +84,21 @@ describe('visit emission', () => {
     trackPageView('/venues')
     const events = await flush()
     expect(events.filter(event => event.event === 'visit')).toHaveLength(1)
+  })
+
+  it('sends no second visit after a reload in the same browser session', async () => {
+    await load()
+    trackPageView('/')
+    expect((await flush()).filter(event => event.event === 'visit')).toHaveLength(1)
+
+    // A reload is a fresh module with the same sessionStorage.
+    vi.resetModules()
+    sent = []
+    await load()
+    trackPageView('/venues')
+    const events = await flush()
+    expect(events.filter(event => event.event === 'visit')).toHaveLength(0)
+    expect(events.filter(event => event.event === 'page_view')).toHaveLength(1)
   })
 
   it('does not send the referrer URL', async () => {

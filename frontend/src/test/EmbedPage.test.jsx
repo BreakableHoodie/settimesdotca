@@ -7,6 +7,14 @@ vi.mock('react-router-dom', () => ({
   useParams: vi.fn(),
 }))
 
+// Spy on every tracker so the "no visit" test does not depend on the
+// metrics queue's 5 s flush timer.
+vi.mock('../utils/metrics', () => ({
+  trackEvent: vi.fn(),
+  trackPageView: vi.fn(),
+  trackVisitOnce: vi.fn(),
+}))
+
 // Mock ScheduleView to avoid full render complexity
 vi.mock('../components/ScheduleView', () => ({
   default: () => <div>Schedule</div>,
@@ -14,6 +22,7 @@ vi.mock('../components/ScheduleView', () => ({
 
 import { useParams } from 'react-router-dom'
 import EmbedPage from '../pages/EmbedPage'
+import { trackEvent, trackPageView, trackVisitOnce } from '../utils/metrics'
 
 describe('EmbedPage', () => {
   it('shows error instead of infinite spinner when no slug in URL', async () => {
@@ -49,8 +58,6 @@ describe('EmbedPage', () => {
 
   it('does not emit a visit for an embedded schedule', async () => {
     useParams.mockReturnValue({ slug: 'my-fest-2026' })
-    const sendBeacon = vi.fn()
-    Object.defineProperty(navigator, 'sendBeacon', { value: sendBeacon, configurable: true })
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -60,6 +67,8 @@ describe('EmbedPage', () => {
 
     render(<EmbedPage />)
     await waitFor(() => expect(screen.getByText('Schedule')).toBeInTheDocument())
-    expect(sendBeacon).not.toHaveBeenCalled()
+    expect(trackVisitOnce).not.toHaveBeenCalled()
+    expect(trackPageView).not.toHaveBeenCalled()
+    expect(trackEvent).not.toHaveBeenCalled()
   })
 })

@@ -140,8 +140,7 @@ export default function PrivacyPage() {
                   </tr>
                   <tr>
                     <td className="py-2 pr-4">
-                      Visit counts by kind of referring site, and event-page views by hour (totals only, no personal
-                      data)
+                      Visit counts by kind of referring site (totals only, no personal data)
                     </td>
                     <td className="py-2">Kept indefinitely</td>
                   </tr>

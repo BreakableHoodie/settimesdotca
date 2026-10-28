@@ -1,6 +1,6 @@
 name: Edge E2E
 
-# Runs the auth E2E specs against a Pages PREVIEW deployment: the real Workers
+# Runs the auth and iCal E2E specs against a Pages PREVIEW deployment: the real Workers
 # runtime, bound only to the scratch D1 (wrangler.toml [env.preview]). Node and
 # local wrangler do not enforce the edge's limits, which is how a PBKDF2
 # iteration count the edge refuses broke signup in production for 3 months
@@ -215,7 +215,7 @@ jobs:
           PLAYWRIGHT_BASE_URL: ${{ env.PREVIEW_URL }}
           E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
           E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
-        run: npx playwright test --retries=0 --project=setup --project=chromium e2e/auth.setup.js e2e/user-management.spec.js e2e/invite-signup.spec.js e2e/share-schedule.spec.js e2e/event-creation.spec.js e2e/emailed-token-flows.spec.js
+        run: npx playwright test --retries=0 --project=setup --project=chromium e2e/auth.setup.js e2e/user-management.spec.js e2e/invite-signup.spec.js e2e/share-schedule.spec.js e2e/event-creation.spec.js e2e/emailed-token-flows.spec.js e2e/ical-feed.spec.js
 
       # Runs after a phase-1 TEST failure (success() || failure()), but never
       # when the reset, deploy or readiness failed: then there is no fresh
@@ -270,3 +270,36 @@ jobs:
       - name: Report a deploy that could not be identified
         if: always() && steps.deploy.outcome == 'failure' && steps.deploy.outputs.deployment_id == ''
         run: echo "::warning::The preview deploy step failed before recording a deployment id. If a deployment was created, delete the newest edge-e2e preview in the Pages dashboard."
+
+  report-main-failure:
+    name: Report main edge failure
+    # A failed image lookup SKIPS edge-e2e rather than failing it, but the run
+    # still fails and deploy-reconcile still holds the deploy, so report both.
+    # A cancelled run is not reported: reconcile re-dispatches it.
+    if: always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && (needs.edge-e2e.result == 'failure' || needs.playwright-image.result == 'failure')
+    needs: [playwright-image, edge-e2e]
+    timeout-minutes: 5
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update failure issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          short_sha="${COMMIT_SHA:0:8}"
+          issue_title="Edge E2E failed on main: $short_sha"
+          body="Edge E2E run: $RUN_URL
+
+          SHA: $COMMIT_SHA
+
+          The production deploy of this commit is held by deploy-reconcile until the edge suite passes. If this is the #1409 flake, re-run the failed job; the next reconcile (within 30 min) deploys."
+          issue_number=$(gh issue list --repo "$REPOSITORY" --state open --search "\"$issue_title\" in:title" --limit 100 --json number,title --jq ".[] | select(.title == \"$issue_title\") | .number" | head -n 1)
+          if [ -n "$issue_number" ]; then
+            gh issue comment "$issue_number" --repo "$REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$REPOSITORY" --title "$issue_title" --label "ci,priority:p1" --body "$body"
+          fi

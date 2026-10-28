@@ -203,6 +203,7 @@ describe("expireShareLinks (#705 ledger cleanup)", () => {
     await expect(expireShareLinks({}, env, {})).resolves.toEqual({ failures: ["expire-share-links"] });
     expect(db.prepare("SELECT COUNT(*) AS count FROM event_share_totals").get().count).toBe(0);
     expect(db.prepare("SELECT COUNT(*) AS count FROM share_links WHERE slug = 'expired1'").get().count).toBe(1);
+    expect(db.prepare("SELECT COUNT(*) AS count FROM share_link_views WHERE slug = 'expired1'").get().count).toBe(2);
 
     await expect(expireShareLinks({}, env, {})).resolves.toEqual({ failures: [] });
     expect(db.prepare("SELECT * FROM event_share_totals WHERE event_id = ?").get(event.id)).toMatchObject({

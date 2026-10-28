@@ -1656,6 +1656,26 @@ export const MUTATIONS = [
     replace: "      const festivalDate = eventLocalToday(now);",
     tests: ["functions/api/__tests__/metrics.test.js"],
   },
+  {
+    id: "share-totals-folded-before-delete",
+    invariant:
+      "CLAUDE.md 'Metrics & Analytics' — expired share links are folded into event_share_totals in the same atomic batch before deletion, so history survives expiry (#1246 Q2)",
+    file: "functions/scheduled/expire-share-links.js",
+    // The fold matches nothing while the batch stays valid and the deletes still
+    // run: the real regression (counts deleted unrecorded), not a thrown batch.
+    find: "         GROUP BY event_id",
+    replace: "         AND 0 GROUP BY event_id",
+    tests: ["functions/scheduled/__tests__/expire-share-links.test.js"],
+  },
+  {
+    id: "share-totals-admin-reader",
+    invariant:
+      "CLAUDE.md 'Metrics & Analytics' — admin share metrics report live plus folded totals after expiry (#1246 Q2)",
+    file: "functions/api/admin/events/[id]/metrics.js",
+    find: "totalShares: (shareStats?.total_shares || 0) + (shareTotals?.shares || 0),",
+    replace: "totalShares: shareStats?.total_shares || 0,",
+    tests: ["functions/api/admin/events/__tests__/metrics.test.js"],
+  },
 ];
 
 // ============================================================================

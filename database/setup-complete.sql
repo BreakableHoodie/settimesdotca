@@ -611,6 +611,14 @@ CREATE TABLE IF NOT EXISTS event_hourly_views (
   PRIMARY KEY (event_id, festival_date, hour)
 );
 
+CREATE TABLE IF NOT EXISTS event_share_totals (
+  event_id INTEGER PRIMARY KEY REFERENCES events(id) ON DELETE CASCADE,
+  shares INTEGER NOT NULL DEFAULT 0 CHECK (shares >= 0),
+  views INTEGER NOT NULL DEFAULT 0 CHECK (views >= 0),
+  views_legacy INTEGER NOT NULL DEFAULT 0 CHECK (views_legacy >= 0),
+  imports INTEGER NOT NULL DEFAULT 0 CHECK (imports >= 0)
+);
+
 -- ============================================
 -- TEST ACCOUNTS (passwords set by scripts/setup-local-db.sh)
 -- ============================================

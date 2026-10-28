@@ -262,6 +262,40 @@ describe("GET /api/admin/events/[id]/metrics", () => {
     expect(body.metrics.totalShareImports).toBe(4);
   });
 
+  test("adds folded totals to live share analytics, including an event with no live links", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { name: "Folded Fest", slug: "folded-fest" });
+    insertShareLink(rawDb, {
+      slug: "live-folded",
+      event_id: event.id,
+      event_slug: "folded-fest",
+      performance_ids: [1],
+      band_names: ["A"],
+    });
+    rawDb
+      .prepare("UPDATE share_links SET view_count = ?, view_count_legacy = ?, import_count = ? WHERE slug = ?")
+      .run(2, 3, 4, "live-folded");
+    rawDb
+      .prepare("INSERT INTO event_share_totals (event_id, shares, views, views_legacy, imports) VALUES (?, ?, ?, ?, ?)")
+      .run(event.id, 5, 7, 11, 13);
+
+    const body = await (await call(env, event.id)).json();
+    expect(body.metrics.totalShares).toBe(6);
+    expect(body.metrics.totalShareViews).toBe(9);
+    expect(body.metrics.totalShareViewsLegacy).toBe(14);
+    expect(body.metrics.totalShareImports).toBe(17);
+
+    const historyOnly = insertEvent(rawDb, { name: "History Only", slug: "history-only" });
+    rawDb
+      .prepare("INSERT INTO event_share_totals (event_id, shares, views, views_legacy, imports) VALUES (?, ?, ?, ?, ?)")
+      .run(historyOnly.id, 3, 4, 5, 6);
+    const historyBody = await (await call(env, historyOnly.id)).json();
+    expect(historyBody.metrics.totalShares).toBe(3);
+    expect(historyBody.metrics.totalShareViews).toBe(4);
+    expect(historyBody.metrics.totalShareViewsLegacy).toBe(5);
+    expect(historyBody.metrics.totalShareImports).toBe(6);
+  });
+
   test("event with no share links returns zeroed share import totals, not errors", async () => {
     const { env, rawDb } = createTestEnv();
     const event = insertEvent(rawDb, { name: "Quiet Share Fest", slug: "quiet-share-fest" });

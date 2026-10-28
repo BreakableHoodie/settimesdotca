@@ -322,7 +322,8 @@ migration 0037; `view_count` added in migration 0040.
 | `created_at`        | TEXT    | NOT NULL, DEFAULT `datetime('now')`                                                                                                                                                                                                                                               |
 | `expires_at`        | TEXT    | NOT NULL                                                                                                                                                                                                                                                                          |
 | `view_count`        | INTEGER | NOT NULL, DEFAULT 0 — **unique visitors per link, all-time** (#705). Derived: `COUNT(*)` over `share_link_views`, recomputed whenever a new visitor row is inserted. Not incremented per fetch, and not counted on the post-import refetch (see `GET /api/schedule/share/[slug]`) |
-| `view_count_legacy` | INTEGER | Nullable — each link's pre-#705 per-fetch count, preserved at the dedupe cutover (migration 0058). Nothing reads it; it keeps the cutover reversible                                                                                                                              |
+| `view_count_legacy` | INTEGER | Nullable — each link's pre-#705 per-fetch count, preserved at the dedupe cutover (migration 0058). Included in aggregate metrics as a separate unit                                                                                                                                         |
+| `import_count`      | INTEGER | NOT NULL, DEFAULT 0 — per-fetch imports, not deduplicated                                                                                                                                                                                                                                     |
 
 Indexes: `idx_share_links_slug(slug)`, `idx_share_links_expires_at(expires_at)`.
 
@@ -341,6 +342,20 @@ Index: `idx_share_link_views_slug(slug)`.
 **The `ON DELETE CASCADE` does not fire for the expiry cron.** `functions/scheduled/expire-share-links.js` runs via `_scheduled.js`, which never passes through `_middleware.js` where `PRAGMA foreign_keys = ON` is set, and D1 defaults it OFF. That cron therefore deletes ledger rows explicitly, child-first, in a `DB.batch()`. The cascade _is_ live on the event-deletion path, which is an HTTP request.
 Per `CLAUDE.md`, `share_links` — not telemetry events — is the source of truth
 for share create/view counts.
+
+#### `event_share_totals`
+
+Aggregate counts folded from expired `share_links` by the expiry cron before
+those rows and their visitor ledger are deleted. No route, band, or visitor
+identifier is retained; readers add these totals to live-link metrics.
+
+| Column          | Type    | Notes                                      |
+| --------------- | ------- | ------------------------------------------ |
+| `event_id`      | INTEGER | PK, FK -> `events(id)` ON DELETE CASCADE   |
+| `shares`        | INTEGER | NOT NULL, DEFAULT 0, CHECK >= 0            |
+| `views`         | INTEGER | NOT NULL, DEFAULT 0, CHECK >= 0            |
+| `views_legacy`  | INTEGER | NOT NULL, DEFAULT 0, CHECK >= 0            |
+| `imports`       | INTEGER | NOT NULL, DEFAULT 0, CHECK >= 0            |
 
 ### Subscriptions & schedule builds
 

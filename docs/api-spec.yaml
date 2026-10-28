@@ -462,8 +462,9 @@ paths:
         individual/PII/joinable-to-a-person data: `fans_following` is a
         `COUNT(*) WHERE verified = 1` over `band_follows` (no emails, tokens, or
         IPs are ever selected), and `routes_shared`/`route_views` are a
-        `COUNT`/`SUM(view_count)` over `share_links` (no slugs, band names, or
-        performance IDs). Gated by `PUBLIC_DATA_PUBLISH_ENABLED`. Cached 5 minutes.
+        `COUNT`/`SUM(view_count)` over live `share_links` plus aggregate totals
+        folded from expired links (no slugs, band names, or performance IDs).
+        Gated by `PUBLIC_DATA_PUBLISH_ENABLED`. Cached 5 minutes.
       responses:
         "200":
           description: Aggregate platform stats
@@ -486,10 +487,10 @@ paths:
                     description: Count of performances belonging to published events
                   routes_shared:
                     type: integer
-                    description: Count of share_links rows (schedules shared)
+                    description: Live share_links rows plus folded expired-link totals
                   route_views:
                     type: integer
-                    description: Sum of share_links.view_count
+                    description: Sum of live and folded unique-view counts
                   fans_following:
                     type: integer
                     description: Count of verified band_follows rows

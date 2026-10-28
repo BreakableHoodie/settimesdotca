@@ -27,6 +27,7 @@ export async function onRequestGet(context) {
       routeSizeRes,
       popularBandsRes,
       shareStatsRes,
+      shareTotalsRes,
       topRoutesRes,
       announcementPlanningRes,
       telemetryStatsRes,
@@ -78,6 +79,10 @@ export async function onRequestGet(context) {
                  COALESCE(SUM(view_count_legacy), 0) AS total_share_views_legacy,
                  COALESCE(SUM(import_count), 0) AS total_share_imports
          FROM share_links WHERE event_id = ?`,
+      ).bind(eventId),
+      DB.prepare(
+        `SELECT shares, views, views_legacy, imports
+         FROM event_share_totals WHERE event_id = ?`,
       ).bind(eventId),
       DB.prepare(
         `SELECT slug, view_count, view_count_legacy, band_names, created_at FROM share_links
@@ -167,6 +172,7 @@ export async function onRequestGet(context) {
     }));
     const popularBands = popularBandsRes.results || [];
     const shareStats = shareStatsRes.results?.[0];
+    const shareTotals = shareTotalsRes.results?.[0];
     const topSharedRoutes = (topRoutesRes.results || []).map((row) => {
       // band_names is the JSON snapshot stored at share time; a band playing
       // twice appears twice, so count DISTINCT names — the route size an admin
@@ -199,9 +205,8 @@ export async function onRequestGet(context) {
         sortableName(a.band_name).localeCompare(sortableName(b.band_name)),
     );
 
-    // Share-link analytics: shares created + total views + top routes by views.
-    // Derived directly from share_links (creates are rows; views are view_count),
-    // so no separate share telemetry path is needed.
+    // Share-link analytics: live rows plus aggregate totals folded when rows
+    // expired. Route detail remains live-only because it is not retained.
     return new Response(
       JSON.stringify({
         success: true,
@@ -212,10 +217,10 @@ export async function onRequestGet(context) {
           routeSizeDistribution: routeSizeDistribution,
           lastUpdated: metrics?.last_updated,
           popularBands: popularBands,
-          totalShares: shareStats?.total_shares || 0,
-          totalShareViews: shareStats?.total_share_views || 0,
-          totalShareViewsLegacy: shareStats?.total_share_views_legacy || 0,
-          totalShareImports: shareStats?.total_share_imports || 0,
+          totalShares: (shareStats?.total_shares || 0) + (shareTotals?.shares || 0),
+          totalShareViews: (shareStats?.total_share_views || 0) + (shareTotals?.views || 0),
+          totalShareViewsLegacy: (shareStats?.total_share_views_legacy || 0) + (shareTotals?.views_legacy || 0),
+          totalShareImports: (shareStats?.total_share_imports || 0) + (shareTotals?.imports || 0),
           topSharedRoutes: topSharedRoutes,
           announcementPlanning: announcementPlanning,
           totalEventViews: telemetryStats?.total_event_views || 0,

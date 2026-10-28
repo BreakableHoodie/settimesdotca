@@ -67,6 +67,107 @@ describe("expireShareLinks (#705 ledger cleanup)", () => {
     expect(link.n).toBe(1);
   });
 
+  it("folds expired link counts into per-event totals and accumulates on retry", async () => {
+    const db = createTestDB();
+    const eventA = insertEvent(db, { name: "Event A", slug: "event-a" });
+    const eventB = insertEvent(db, { name: "Event B", slug: "event-b" });
+    const insertLink = db.prepare(
+      `INSERT INTO share_links (slug, event_id, event_slug, performance_ids, band_names, expires_at)
+       VALUES (?, ?, ?, '[1]', '["Band A"]', ?)`,
+    );
+    insertLink.run("expired-a1", eventA.id, eventA.slug, EXPIRED);
+    insertLink.run("expired-a2", eventA.id, eventA.slug, EXPIRED);
+    insertLink.run("expired-b1", eventB.id, eventB.slug, EXPIRED);
+    insertLink.run("live-a1", eventA.id, eventA.slug, LIVE);
+    db.prepare(
+      `UPDATE share_links
+       SET view_count = ?, view_count_legacy = ?, import_count = ?
+       WHERE slug = ?`,
+    ).run(2, 3, 4, "expired-a1");
+    db.prepare("UPDATE share_links SET view_count = ?, import_count = ? WHERE slug = ?").run(5, 6, "expired-a2");
+    db.prepare("UPDATE share_links SET view_count = ?, view_count_legacy = ?, import_count = ? WHERE slug = ?").run(
+      7,
+      8,
+      9,
+      "expired-b1",
+    );
+    db.pragma("foreign_keys = OFF");
+
+    const env = { DB: createDBEnv(db) };
+    await expireShareLinks({}, env, {});
+
+    expect(db.prepare("SELECT * FROM event_share_totals WHERE event_id = ?").get(eventA.id)).toMatchObject({
+      shares: 2,
+      views: 7,
+      views_legacy: 3,
+      imports: 10,
+    });
+    expect(db.prepare("SELECT * FROM event_share_totals WHERE event_id = ?").get(eventB.id)).toMatchObject({
+      shares: 1,
+      views: 7,
+      views_legacy: 8,
+      imports: 9,
+    });
+    expect(db.prepare("SELECT COUNT(*) AS count FROM share_links WHERE slug = ?").get("live-a1").count).toBe(1);
+
+    insertLink.run("expired-a3", eventA.id, eventA.slug, EXPIRED);
+    db.prepare("UPDATE share_links SET view_count = ?, import_count = ? WHERE slug = ?").run(11, 12, "expired-a3");
+    await expireShareLinks({}, env, {});
+
+    expect(db.prepare("SELECT * FROM event_share_totals WHERE event_id = ?").get(eventA.id)).toMatchObject({
+      shares: 3,
+      views: 18,
+      views_legacy: 3,
+      imports: 22,
+    });
+  });
+
+  it("treats a NULL legacy view count as zero when folding", async () => {
+    const db = createTestDB();
+    const event = insertEvent(db, { slug: "null-legacy" });
+    const link = db.prepare(
+      `INSERT INTO share_links (slug, event_id, event_slug, performance_ids, band_names, expires_at)
+       VALUES ('null-legacy-link', ?, 'null-legacy', '[1]', '["Band"]', ?)`,
+    );
+    link.run(event.id, EXPIRED);
+    db.pragma("foreign_keys = OFF");
+
+    await expireShareLinks({}, { DB: createDBEnv(db) }, {});
+
+    expect(
+      db.prepare("SELECT views_legacy FROM event_share_totals WHERE event_id = ?").get(event.id).views_legacy,
+    ).toBe(0);
+  });
+
+  it("uses one bound cutoff for the fold and both deletes", async () => {
+    const db = createTestDB();
+    seed(db);
+    db.pragma("foreign_keys = OFF");
+    const realEnv = createDBEnv(db);
+    const boundValues = [];
+    const env = {
+      DB: {
+        prepare(sql) {
+          const statement = realEnv.prepare(sql);
+          return {
+            ...statement,
+            bind(...values) {
+              boundValues.push(values);
+              return statement.bind(...values);
+            },
+          };
+        },
+        batch: realEnv.batch.bind(realEnv),
+      },
+    };
+
+    await expireShareLinks({}, env, {});
+
+    expect(boundValues).toHaveLength(3);
+    expect(boundValues.every(([value]) => value === boundValues[0][0])).toBe(true);
+    expect(boundValues[0][0]).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+  });
+
   it("reports failure without a DB binding", async () => {
     await expect(expireShareLinks({}, {}, {})).resolves.toEqual({ failures: ["expire-share-links"] });
   });
@@ -78,5 +179,6 @@ describe("expireShareLinks (#705 ledger cleanup)", () => {
 
     await expect(expireShareLinks({}, env, {})).resolves.toEqual({ failures: ["expire-share-links"] });
     expect(batchSpy).toHaveBeenCalled();
+    expect(db.prepare("SELECT COUNT(*) AS count FROM event_share_totals").get().count).toBe(0);
   });
 });

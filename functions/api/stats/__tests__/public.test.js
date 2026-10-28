@@ -109,6 +109,20 @@ describe("Public aggregate stats - GET /api/stats/public", () => {
     expect(body.route_views_legacy).not.toBe(11);
   });
 
+  it("includes folded share totals after live links expire", async () => {
+    const { env, rawDb } = seedEnv();
+    const event = insertEvent(rawDb, { name: "Folded Fest", slug: "folded-fest" });
+    publish(rawDb, event.id);
+    rawDb
+      .prepare("INSERT INTO event_share_totals (event_id, shares, views, views_legacy) VALUES (?, ?, ?, ?)")
+      .run(event.id, 4, 12, 7);
+
+    const body = await (await getStats(env)).json();
+    expect(body.routes_shared).toBe(4);
+    expect(body.route_views).toBe(12);
+    expect(body.route_views_legacy).toBe(7);
+  });
+
   it("never leaks PII-shaped fields anywhere in the response body", async () => {
     const { env, rawDb } = seedEnv();
 

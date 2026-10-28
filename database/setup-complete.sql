@@ -619,6 +619,13 @@ CREATE TABLE IF NOT EXISTS event_share_totals (
   imports INTEGER NOT NULL DEFAULT 0 CHECK (imports >= 0)
 );
 
+CREATE TABLE IF NOT EXISTS referrer_daily_stats (
+  date TEXT NOT NULL,
+  bucket TEXT NOT NULL CHECK (bucket IN ('instagram', 'facebook', 'google', 'other_search', 'direct', 'other')),
+  visits INTEGER NOT NULL DEFAULT 0 CHECK (visits >= 0),
+  PRIMARY KEY (date, bucket)
+);
+
 -- ============================================
 -- TEST ACCOUNTS (passwords set by scripts/setup-local-db.sh)
 -- ============================================

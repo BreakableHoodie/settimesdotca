@@ -3,6 +3,28 @@ import { validateId } from "../../../../utils/validation.js";
 import { sortableName } from "../../../../utils/sortableName.js";
 import { claimIsLiveSql } from "../../../../utils/bandFollowNotify.js";
 import { AFTER_MIDNIGHT_THRESHOLD_HOUR } from "../../../../utils/eventDay.js";
+import { logger } from "../../../../utils/logger.js";
+
+async function loadReferrers(DB, eventId) {
+  try {
+    const { results } = await DB.prepare(
+      `SELECT r.bucket AS bucket, SUM(r.visits) AS visits
+       FROM referrer_daily_stats r
+       JOIN events e ON e.id = ?
+       WHERE r.date >= date(e.date, '-14 days')
+         AND r.date <= COALESCE(e.end_date, e.date)
+       GROUP BY r.bucket
+       ORDER BY visits DESC, r.bucket`,
+    )
+      .bind(eventId)
+      .all();
+    return (results || []).map((row) => ({ bucket: row.bucket, visits: row.visits }));
+  } catch (error) {
+    logger.error("event referrer metrics read failed", { error, eventId });
+    // null, not []: the dashboard must not show a failed read as "no visits".
+    return null;
+  }
+}
 
 export async function onRequestGet(context) {
   const { env, params } = context;
@@ -161,6 +183,8 @@ export async function onRequestGet(context) {
       console.error("Show-night curve read failed:", { eventId, error });
     }
 
+    const referrers = await loadReferrers(DB, eventId);
+
     const metrics = metricsRes.results?.[0];
     const routeBuilders = metrics?.route_builders || 0;
     const totalEventViews = telemetryStatsRes.results?.[0]?.total_event_views || 0;
@@ -226,6 +250,7 @@ export async function onRequestGet(context) {
           totalEventViews: telemetryStats?.total_event_views || 0,
           totalTicketClicks: telemetryStats?.total_ticket_clicks || 0,
           showNightCurve,
+          referrers,
         },
       }),
       {

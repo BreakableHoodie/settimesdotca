@@ -98,6 +98,140 @@ describe("POST /api/metrics", () => {
       expect.objectContaining({ statementCount: expect.any(Number) }),
     );
   });
+
+  test("drops retired filter_use events without storing or sending them", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.ANALYTICS = { writeDataPoint: vi.fn() };
+
+    const res = await onRequestPost({
+      request: makeRequest([{ event: "filter_use", props: { page: "/x" } }]),
+      env,
+    });
+
+    expect(res.status).toBe(200);
+    expect(env.ANALYTICS.writeDataPoint).not.toHaveBeenCalled();
+    expect(rawDb.prepare("SELECT COUNT(*) AS count FROM page_views_daily").get().count).toBe(0);
+  });
+});
+
+describe("POST /api/metrics — referrer buckets (#1246 Q3)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  test("counts one visit per request and accumulates across requests", async () => {
+    const { env, rawDb } = createTestEnv();
+
+    await onRequestPost({
+      request: makeRequest([
+        { event: "visit", props: { referrer_bucket: "instagram" } },
+        { event: "visit", props: { referrer_bucket: "instagram" } },
+      ]),
+      env,
+    });
+    await onRequestPost({
+      request: makeRequest([{ event: "visit", props: { referrer_bucket: "instagram" } }]),
+      env,
+    });
+
+    expect(rawDb.prepare("SELECT bucket, visits FROM referrer_daily_stats").all()).toEqual([
+      { bucket: "instagram", visits: 2 },
+    ]);
+  });
+
+  test("a request flooded with visit events still counts one, for its first valid bucket", async () => {
+    const { env, rawDb } = createTestEnv();
+    const flood = [
+      { event: "visit", props: { referrer_bucket: "evil" } },
+      ...Array.from({ length: 49 }, (_, i) => ({
+        event: "visit",
+        props: { referrer_bucket: i === 0 ? "google" : "instagram" },
+      })),
+    ];
+
+    await onRequestPost({ request: makeRequest(flood), env });
+
+    expect(rawDb.prepare("SELECT bucket, visits FROM referrer_daily_stats").all()).toEqual([
+      { bucket: "google", visits: 1 },
+    ]);
+  });
+
+  test("keys a visit by festival day: 1 AM belongs to the night before", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      // 2026-10-12 01:00 Toronto (EDT, UTC-4): still Oct 11's festival night.
+      vi.setSystemTime(new Date(Date.UTC(2026, 9, 12, 5, 0)));
+      const { env, rawDb } = createTestEnv();
+
+      await onRequestPost({
+        request: makeRequest([{ event: "visit", props: { referrer_bucket: "instagram" } }]),
+        env,
+      });
+
+      expect(rawDb.prepare("SELECT date, bucket, visits FROM referrer_daily_stats").all()).toEqual([
+        { date: "2026-10-11", bucket: "instagram", visits: 1 },
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("sends one visit to Analytics Engine however many a request carries", async () => {
+    const { env } = createTestEnv();
+    env.ANALYTICS = { writeDataPoint: vi.fn() };
+
+    await onRequestPost({
+      request: makeRequest([
+        { event: "visit", props: { referrer_bucket: "google" } },
+        { event: "visit", props: { referrer_bucket: "instagram" } },
+        { event: "visit", props: { referrer_bucket: "direct" } },
+      ]),
+      env,
+    });
+
+    const visits = env.ANALYTICS.writeDataPoint.mock.calls.filter(([point]) => point.blobs[0] === "visit");
+    expect(visits).toHaveLength(1);
+  });
+
+  test("drops forged referrer labels", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.ANALYTICS = { writeDataPoint: vi.fn() };
+
+    const res = await onRequestPost({
+      request: makeRequest([
+        { event: "visit", props: { referrer_bucket: "https://x" } },
+        { event: "visit", props: { referrer_bucket: "evil" } },
+      ]),
+      env,
+    });
+
+    expect(res.status).toBe(200);
+    expect(rawDb.prepare("SELECT * FROM referrer_daily_stats").all()).toEqual([]);
+    expect(env.ANALYTICS.writeDataPoint).not.toHaveBeenCalled();
+  });
+
+  test("a referrer write failure does not affect other metrics", async () => {
+    const { env, rawDb } = createTestEnv();
+    const errorSpy = vi.spyOn(loggerModule.logger, "error");
+    rawDb.exec("DROP TABLE referrer_daily_stats");
+
+    const res = await onRequestPost({
+      request: makeRequest([
+        { event: "page_view", props: { page: "/home" } },
+        { event: "visit", props: { referrer_bucket: "direct" } },
+      ]),
+      env,
+    });
+
+    expect(res.status).toBe(200);
+    expect(rawDb.prepare("SELECT page, views FROM page_views_daily").all()).toEqual([
+      expect.objectContaining({ page: "/home", views: 1 }),
+    ]);
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("referrer_daily_stats"),
+      expect.objectContaining({ bucket: "direct" }),
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------

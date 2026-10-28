@@ -60,8 +60,11 @@ export default function PrivacyPage() {
               sets once the count reaches three. It is a count only: it says how many, never who. None of this
               identifies you. We use Cloudflare Analytics Engine — a privacy-safe, aggregate, first-party metrics sink
               on our infrastructure provider (Cloudflare) — rather than third-party tracking scripts or tracking pixels.
-              Limited request metadata may be processed briefly by Cloudflare for security and abuse prevention, but
-              public browsing is not tied to a persistent account or profiling identifier in our application data.
+              We also count how each visit started by the kind of site that sent you — Instagram, Facebook, Google,
+              other search, direct, or another site — never its address. Show-night counts record only total event-page
+              views by Toronto hour; neither kind of count contains visitor information. Limited request metadata may be
+              processed briefly by Cloudflare for security and abuse prevention, but public browsing is not tied to a
+              persistent account or profiling identifier in our application data.
             </p>
 
             <h3 className="text-text-secondary font-medium mb-2 mt-4">
@@ -134,6 +137,12 @@ export default function PrivacyPage() {
                       Hourly event-page view counts (show days only, no visitor information)
                     </td>
                     <td className="py-2">Kept with the event, deleted if the event is deleted</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 pr-4">
+                      Visit counts by kind of referring site (totals only, no personal data)
+                    </td>
+                    <td className="py-2">Kept indefinitely</td>
                   </tr>
                   <tr>
                     <td className="py-2 pr-4">Admin action log</td>

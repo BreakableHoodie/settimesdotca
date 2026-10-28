@@ -3,6 +3,15 @@ import { eventsApi } from '../../utils/adminApi'
 import LoadError from './LoadError'
 import { AFTER_MIDNIGHT_THRESHOLD_HOUR } from '../../utils/festivalDays'
 
+const REFERRER_LABELS = {
+  instagram: 'Instagram',
+  facebook: 'Facebook',
+  google: 'Google',
+  other_search: 'Other search',
+  direct: 'Direct',
+  other: 'Other site',
+}
+
 // "6 PM", "12 AM", "1 AM": whole hours only, so formatTime's ":00" would be noise.
 function hourLabel(hour) {
   return `${hour % 12 || 12} ${hour >= 12 ? 'PM' : 'AM'}`
@@ -27,6 +36,47 @@ function fillNight(dateRows) {
 
 // Show-night usage curve (#1246 Q1). Rows arrive in festival order (6 AM ... 11 PM,
 // then 12-5 AM). A date heading appears only on a multi-day edition.
+// Site-wide, not this event's own: referrer_daily_stats has no event key, so
+// the window around the event is the closest honest attribution (#1246 Q3).
+function ReferrerPanel({ referrers }) {
+  const heading = (
+    <>
+      <h4 className="text-white font-semibold">How fans arrived</h4>
+      <p className="text-gray-400 text-xs mb-3">Site-wide visits, 14 days before the event through its last day</p>
+    </>
+  )
+  if (referrers == null) {
+    return (
+      <div className="bg-bg-purple rounded-lg p-4">
+        {heading}
+        <p className="text-gray-400 text-sm">Visit sources could not be loaded.</p>
+      </div>
+    )
+  }
+  return (
+    <div className="bg-bg-purple rounded-lg p-4">
+      {heading}
+      {referrers.length > 0 ? (
+        <ul className="space-y-2" aria-label="Visits by referring site kind">
+          {referrers.map(row => (
+            <li key={row.bucket} className="flex justify-between text-sm">
+              <span className="text-white">{REFERRER_LABELS[row.bucket] || 'Other site'}</span>
+              <span className="text-gray-400">
+                {row.visits} {row.visits === 1 ? 'visit' : 'visits'}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-gray-400 text-sm">
+          No visit sources recorded yet. Counting started in October 2026, so earlier editions have none.
+        </p>
+      )}
+      <p className="text-gray-400 text-xs mt-3">Totals by kind of referring site, never the referring address.</p>
+    </div>
+  )
+}
+
 function ShowNightCurve({ curve }) {
   // null is the server saying the read failed, and an absent field is a payload
   // this component does not understand: never show either as "no views".
@@ -191,6 +241,8 @@ export default function MetricsDashboard({ eventId }) {
       </div>
 
       <ShowNightCurve curve={metrics.showNightCurve} />
+
+      <ReferrerPanel referrers={metrics.referrers} />
 
       {/* Popular Bands */}
       <div className="bg-bg-purple rounded-lg p-4">

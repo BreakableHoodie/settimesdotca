@@ -450,20 +450,22 @@ as RFC 5545 `STATUS:CANCELLED`), and `events/[id]/recap.js` (gated by
 
 Metrics write to D1 daily-aggregate tables (`page_views_daily`, `artist_daily_stats`) via `POST /api/metrics`, plus an optional Cloudflare Analytics Engine sink (`env.ANALYTICS`, configured in `wrangler.toml`). Ingestion is best-effort and fire-and-forget; failures must not surface to users.
 
-**Show-night curve (#1246 Q1).** `event_hourly_views` (festival date + Toronto hour -> count) answers "when do fans use the site on show night?". `POST /api/metrics` writes it from `event_view` only, and only while the festival date (`eventLocalFestivalToday`) is inside the event's `[date, end_date]`; no visitor key, in its own try/catch. First-party because Cloudflare's zone keeps hourly data only about 3 days, and Pages Functions invocation counts are crawler-dominated (a normal Sunday had more than Vol 18's show day). In the mutation gate.
+**Show-night curve (#1246 Q1).** `event_hourly_views` (festival date + Toronto hour -> count) answers "when do fans use the site on show night?". `POST /api/metrics` writes it from `event_view` only while the festival date (`eventLocalFestivalToday`) is inside `[date, end_date]`; no visitor key, in its own try/catch. First-party: the zone keeps hourly data ~3 days, and Functions invocation counts are crawler-dominated. In the mutation gate.
 
-**Share metrics come from `share_links`, not telemetry.** A create is a `share_links` row; admin metrics reads it. Do **not** wire the allowlisted-but-unused `share_event` / `filter_use` events into `/api/metrics` — they duplicate `share_links` counts.
+**Referrer buckets (#1246 Q3).** `referrer_daily_stats` answers "how do fans find us?". The browser reduces `document.referrer` to one of six labels (`referrerBucket()`, `frontend/src/utils/metrics.js`), one `visit` per session; no URL or host is sent, and the embed page sends none. The server drops any label outside the six, counts one visit per request, keys by festival day, and writes in its own try/catch. Site-wide, no event key. Indicative: unauthenticated endpoint. In the mutation gate.
 
-Expired links are folded into `event_share_totals` by the expiry cron in the same batch, under one bound cutoff. Readers report live plus folded aggregates; per-route detail is not retained.
+**Share metrics come from `share_links`, not telemetry.** A create is a `share_links` row; add no share telemetry event.
+
+The expiry cron folds expired links into `event_share_totals` in the same batch, under one bound cutoff; readers add live and folded totals. Per-route detail is not kept.
 
 **`view_count` is unique visitors per link, all-time — not fetches (#705).** It is a _derived_ value: `GET /api/schedule/share/[slug]` writes one `share_link_views(slug, visitor_hash)` row per visitor and recomputes `view_count` as `COUNT(*)` over that ledger, both in a single `DB.batch()`. Do not "optimise" it back to `view_count = view_count + 1`: the ledger row claims the slot permanently, so if a separate increment were lost the visitor could never be counted again, whereas a recomputed count self-heals on the next visit.
 
 Two traps around this:
 
-- **`import_count` is still per-fetch and undeduped.** It sits beside `view_count` in the same metrics payload and dashboard, so the two are different units. One person importing twice can produce imports > views.
+- **`import_count` is still per-fetch and undeduped.** It sits beside `view_count` in the same payload, in a different unit. One person importing twice can produce imports > views.
 - **The expiry cron must delete ledger rows explicitly** (`functions/scheduled/expire-share-links.js`). `share_link_views` declares `ON DELETE CASCADE`, but cron handlers reach D1 via `_scheduled.js` and never pass through `_middleware.js`, where `PRAGMA foreign_keys = ON` is set — D1 defaults it OFF, so the cascade does not fire there. It _does_ fire on the event-deletion path, which is an HTTP request.
 
-`view_count_legacy` preserves each link's pre-#705 count. Nothing reads it. It keeps the cutover reversible and the old figure queryable.
+`view_count_legacy` keeps each link's pre-#705 count, so the cutover stays reversible; only the share totals sum it.
 
 ### Schedule builds are per-event pseudonyms, anonymised 30 days after the event (#1245)
 

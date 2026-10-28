@@ -283,12 +283,20 @@ describe("POST .../venues/:venueId/delay", () => {
     const { env, rawDb, event, venue, other } = setup();
     const negative = await call(onRequestPost, env, { eventId: event.id, venueId: venue.id, minutes: -15 });
     expect((await negative.json()).code).toBe("DELAY_OUT_OF_RANGE");
+    rawDb
+      .prepare(
+        "INSERT INTO event_venue_delays (event_id, venue_id, delay_minutes, revision, last_shift_id, updated_by) VALUES (?, ?, 600, 0, 'seed', ?)",
+      )
+      .run(event.id, venue.id, 3);
+    const overMaximum = await call(onRequestPost, env, { eventId: event.id, venueId: venue.id, minutes: 15 });
+    expect((await overMaximum.json()).code).toBe("DELAY_OUT_OF_RANGE");
+    expect(delayRow(rawDb, event.id, venue.id).delay_minutes).toBe(600);
     for (const minutes of [0, 1.5, "15", 181]) {
       expect((await call(onRequestPost, env, { eventId: event.id, venueId: venue.id, minutes })).status).toBe(400);
     }
     const empty = await call(onRequestPost, env, { eventId: event.id, venueId: other.id, minutes: 15 });
     expect((await empty.json()).code).toBe("NO_REMAINING_SETS");
-    expect(delayRow(rawDb, event.id, venue.id)).toBeUndefined();
+    expect(delayRow(rawDb, event.id, venue.id).delay_minutes).toBe(600);
   });
 
   it("a viewer is refused before anything is read or written", async () => {

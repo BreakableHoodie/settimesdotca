@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { HelmetProvider } from 'react-helmet-async'
 import { MemoryRouter } from 'react-router-dom'
@@ -136,9 +136,28 @@ describe('HistoryPage (#1250)', () => {
     expect(within(venues).getByText('Venues are on record from May 2023 on.')).toBeInTheDocument()
   })
 
-  it('shows the error message when the editions cannot be loaded', async () => {
-    fetchPublicJson.mockRejectedValue(new Error('Failed to load the editions'))
+  it('shows a human error with Retry and recovers when the editions can be loaded again', async () => {
+    fetchPublicJson
+      .mockRejectedValueOnce(new Error('database details should not reach fans'))
+      .mockResolvedValueOnce(DATA)
     renderPage()
-    expect(await screen.findByText('Failed to load the editions')).toBeInTheDocument()
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent("Couldn't load the editions right now.")
+    expect(alert).not.toHaveTextContent('database details')
+    fireEvent.click(within(alert).getByRole('button', { name: 'Retry' }))
+    expect(await screen.findByRole('link', { name: /Vol\. 19/ })).toHaveAttribute('href', '/event/lwbc19')
+    await waitFor(() => expect(fetchPublicJson).toHaveBeenCalledTimes(2))
+  })
+
+  it('aborts the Retry request, not just the first one, when the page is left', async () => {
+    fetchPublicJson.mockRejectedValueOnce(new Error('down')).mockImplementationOnce(() => new Promise(() => {}))
+    const { unmount } = renderPage()
+    const alert = await screen.findByRole('alert')
+    fireEvent.click(within(alert).getByRole('button', { name: 'Retry' }))
+    await waitFor(() => expect(fetchPublicJson).toHaveBeenCalledTimes(2))
+    const retrySignal = fetchPublicJson.mock.calls[1][1].signal
+    expect(retrySignal.aborted).toBe(false)
+    unmount()
+    expect(retrySignal.aborted).toBe(true)
   })
 })

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { ArrowLeft } from 'lucide-react'
@@ -79,15 +79,27 @@ export default function HistoryPage() {
     trackPageView('/history')
   }, [])
 
-  useEffect(() => {
+  // One request at a time: a Retry aborts the request it replaces, and leaving
+  // the page aborts whichever is current, not just the first.
+  const controllerRef = useRef(null)
+
+  const load = useCallback(() => {
+    controllerRef.current?.abort()
     const controller = new AbortController()
+    controllerRef.current = controller
+    setError(null)
+    setData(null)
     fetchPublicJson('/api/history', { signal: controller.signal }, 'Failed to load the editions')
       .then(setData)
       .catch(err => {
         if (err?.name !== 'AbortError') setError(err)
       })
-    return () => controller.abort()
   }, [])
+
+  useEffect(() => {
+    load()
+    return () => controllerRef.current?.abort()
+  }, [load])
 
   const editions = data?.editions ?? []
   const oldest = editions.at(-1)
@@ -125,7 +137,16 @@ export default function HistoryPage() {
 
       <main id="main-content" className="container mx-auto max-w-7xl space-y-12 px-4 py-8">
         {error ? (
-          <p className="py-16 text-center text-text-secondary">{error.message}</p>
+          <div role="alert" className="py-16 text-center text-text-secondary">
+            <p>Couldn&apos;t load the editions right now.</p>
+            <button
+              type="button"
+              onClick={load}
+              className="mt-4 min-h-[44px] rounded-lg bg-accent-500 px-4 py-2 font-semibold text-bg-navy hover:bg-accent-600 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500"
+            >
+              Retry
+            </button>
+          </div>
         ) : !data ? (
           <p className="py-16 text-center text-text-tertiary">Loading editions…</p>
         ) : (

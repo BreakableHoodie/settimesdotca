@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { afterEach, describe, it, expect, beforeEach, vi } from 'vitest'
 import { hasAnySchedule, getScheduleEventSlug, saveSelectedBands, SELECTED_BANDS_KEY } from '../scheduleStorage'
 
 const DATES_KEY = '__dates__'
@@ -16,6 +16,10 @@ function setStorage(obj) {
 
 beforeEach(() => {
   localStorage.clear()
+})
+
+afterEach(() => {
+  vi.useRealTimers()
 })
 
 describe('hasAnySchedule', () => {
@@ -140,5 +144,16 @@ describe('multi-day event staleness (#542 PR-1 regression)', () => {
     saveSelectedBands('multiday-fest-bug', ['band-1'], offsetDate(-1))
     expect(hasAnySchedule()).toBe(false)
     expect(getScheduleEventSlug()).toBeNull()
+  })
+})
+
+describe('Toronto-local staleness', () => {
+  it('does not mark a Toronto event stale before its local date ends', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-12T03:30:00.000Z'))
+    setStorage({ 'toronto-event': ['band-1'], [DATES_KEY]: { 'toronto-event': '2026-10-11' } })
+
+    expect(hasAnySchedule()).toBe(true)
+    expect(getScheduleEventSlug()).toBe('toronto-event')
   })
 })

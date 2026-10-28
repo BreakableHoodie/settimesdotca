@@ -12,7 +12,7 @@
 // point it AT the fixture tree — see runOneMutation's `vitestCwd` doc.
 
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -22,6 +22,7 @@ import {
   MUTATIONS,
   REPO_ROOT,
   outputShowsFailingTest,
+  resolveMutationPaths,
   runMutationGate,
   runOneMutation,
 } from "../mutation-gate.mjs";
@@ -376,5 +377,37 @@ describe("mutation-gate — verified against its own failure modes", () => {
     expect(gateResult.reason).toBe("dirty-working-tree");
     expect(gateResult.results).toEqual([]); // never even attempted a mutation
     expect(readFileSync(path.join(dir, "source.js"), "utf8")).toBe(SOURCE + "\n// uncommitted edit\n");
+  });
+});
+
+describe("resolveMutationPaths: the frontend stack (#1416)", () => {
+  const root = path.join(path.sep, "repo");
+  const entry = { file: "src/utils/a.js", tests: ["src/__tests__/a.test.js"] };
+
+  it("keeps a default entry at the repo root with vitest launched from there", () => {
+    const r = resolveMutationPaths(entry, root);
+    expect(r.filePath).toBe(path.join(root, "src/utils/a.js"));
+    expect(r.repoFile).toBe(path.join("src/utils/a.js"));
+    expect(r.tests).toEqual([path.join(root, "src/__tests__/a.test.js")]);
+    expect(r.vitestDir).toBe(root);
+  });
+
+  it("resolves a stack: frontend entry under frontend/ and launches vitest from there", () => {
+    const r = resolveMutationPaths({ ...entry, stack: "frontend" }, root);
+    expect(r.filePath).toBe(path.join(root, "frontend", "src/utils/a.js"));
+    expect(r.tests).toEqual([path.join(root, "frontend", "src/__tests__/a.test.js")]);
+    expect(r.vitestDir).toBe(path.join(root, "frontend"));
+    // git needs the repo-relative path, or the dirty-tree check watches nothing.
+    expect(r.repoFile).toBe(path.join("frontend", "src/utils/a.js"));
+  });
+
+  it("every frontend entry in the real table points at files that exist under frontend/", () => {
+    const frontend = [...MUTATIONS, ...KNOWN_SURVIVING].filter((m) => m.stack === "frontend");
+    expect(frontend.length).toBeGreaterThan(0);
+    for (const m of frontend) {
+      const r = resolveMutationPaths(m, REPO_ROOT);
+      expect(existsSync(r.filePath), `${m.id}: ${r.filePath}`).toBe(true);
+      for (const t of r.tests) expect(existsSync(t), `${m.id}: ${t}`).toBe(true);
+    }
   });
 });

@@ -150,7 +150,7 @@ jobs:
   mutation-gate:
     name: Mutation Gate
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -170,10 +170,16 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: package-lock.json
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
 
       - name: Install root dependencies
         run: npm ci
+
+      # `stack: "frontend"` entries run vitest from frontend/ (#1416).
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend
 
       # Converts documented CLAUDE.md invariants into executable proof: applies
       # each mutation, asserts the named test(s) go red, restores, and verifies

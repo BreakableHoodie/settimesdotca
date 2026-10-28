@@ -19,14 +19,12 @@
  * and requires them to go RED. A mutation that does not go red is a real
  * vacuous-test gap — reported loudly, not swallowed.
  *
- * Scope (v1): backend (`functions/`) only. The frontend after-midnight
- * threshold (`frontend/src/utils/festivalDays.js`) runs under a SEPARATE
- * vitest project (`cd frontend && npm test`) with its own config, module
- * resolution, and jsdom environment — wiring it in here would mean either a
- * second vitest invocation with different flags/cwd or duplicating the
- * frontend config's `include`/environment, either of which is more moving
- * parts than this file's job warrants. Worth a v2 with its own
- * `frontend/scripts/mutation-gate.mjs`, not a branch in this one.
+ * Scope: `functions/` by default, `frontend/` with `stack: "frontend"`. A
+ * frontend entry's `file` and `tests` are relative to `frontend/`, and vitest
+ * is launched from there, so the frontend's own config (jsdom, resolution,
+ * `include`) applies unchanged. Everything else (find-exactly-once, require
+ * red, verified restore, dirty-tree refusal, KNOWN_SURVIVING) is the same
+ * engine and the same table, not a second script (#1416).
  *
  * Algorithm, per mutation:
  *   1. Read the target file.
@@ -82,7 +80,8 @@ export const REPO_ROOT = path.join(__dirname, "..");
 // `.`, `?`, all of which appear below).
 // ============================================================================
 
-/** @typedef {{ id: string, invariant: string, file: string, find: string, replace: string, tests: string[] }} Mutation */
+/** @typedef {{ id: string, invariant: string, file: string, find: string, replace: string, tests: string[], stack?: "frontend" }} Mutation
+ * `stack: "frontend"` makes `file` and `tests` relative to `frontend/` and runs vitest from there. */
 
 /** @type {Mutation[]} */
 export const MUTATIONS = [
@@ -1703,6 +1702,130 @@ export const MUTATIONS = [
     replace: "       WHERE 1",
     tests: ["functions/api/admin/events/__tests__/metrics.test.js"],
   },
+  // ==========================================================================
+  // Frontend entries (#1416). `stack: "frontend"`: file and tests are relative
+  // to frontend/, and vitest runs from there with the frontend's own config.
+  // ==========================================================================
+  {
+    id: "fe-after-midnight-threshold",
+    invariant:
+      "CLAUDE.md 'After-midnight band sorting' — the frontend threshold is 6 AM and is never removed or lowered",
+    stack: "frontend",
+    file: "src/utils/festivalDays.js",
+    find: "export const AFTER_MIDNIGHT_THRESHOLD_HOUR = 6",
+    replace: "export const AFTER_MIDNIGHT_THRESHOLD_HOUR = 0",
+    tests: ["src/utils/__tests__/bandUtils.test.js", "src/utils/__tests__/festivalDays.test.js"],
+  },
+  {
+    id: "fe-prepare-bands-after-midnight-offset",
+    invariant:
+      "CLAUDE.md 'After-midnight band sorting' — prepareBands moves a sub-6 AM set one Toronto calendar day on so it sorts after the evening lineup",
+    stack: "frontend",
+    file: "src/utils/bandUtils.js",
+    find: "startHour < AFTER_MIDNIGHT_THRESHOLD_HOUR) {",
+    replace: "false) {",
+    tests: ["src/utils/__tests__/bandUtils.test.js"],
+  },
+  {
+    id: "fe-toronto-wall-clock-second-pass",
+    invariant:
+      "CLAUDE.md 'Server-side' (today/now is Toronto-local) — torontoWallClockMs resolves a Toronto wall-clock time with a second offset pass, so it is right on DST nights in any viewer zone (#1398)",
+    stack: "frontend",
+    file: "src/utils/festivalDays.js",
+    find: "const second = wallClockGuess - offsetAt(first)",
+    replace: "const second = first",
+    tests: ["src/utils/__tests__/torontoClock.test.js", "src/utils/__tests__/festivalDays.test.js"],
+  },
+  {
+    id: "fe-add-toronto-days-calendar-not-elapsed",
+    invariant:
+      "CLAUDE.md 'Server-side' (today/now is Toronto-local) — addTorontoDays advances by calendar days, never by 24 elapsed hours (a DST night is 23 or 25) (#1398)",
+    stack: "frontend",
+    file: "src/utils/festivalDays.js",
+    find: "  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]) + days))\n  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`",
+    replace: "  return torontoDate(torontoWallClockMs(dateStr) + days * 24 * 60 * 60 * 1000)",
+    tests: ["src/utils/__tests__/torontoClock.test.js", "src/utils/__tests__/festivalDays.test.js"],
+  },
+  {
+    id: "fe-schedule-storage-toronto-today",
+    invariant:
+      "CLAUDE.md 'Schedule Storage' — stale detection compares against Toronto's calendar date, never the UTC day, which flips at 8 PM Eastern",
+    stack: "frontend",
+    file: "src/utils/scheduleStorage.js",
+    find: "const todayStr = torontoDate(Date.now())",
+    replace: "const todayStr = new Date().toISOString().slice(0, 10)",
+    tests: ["src/utils/__tests__/scheduleStorage.test.js"],
+  },
+  {
+    id: "fe-schedule-storage-stale-boundary",
+    invariant:
+      "CLAUDE.md 'Schedule Storage' — a saved schedule is stale only when its stored date is BEFORE today, so an event is not stale on its own (last) day",
+    stack: "frontend",
+    file: "src/utils/scheduleStorage.js",
+    find: "return date < todayStr",
+    replace: "return date <= todayStr",
+    tests: ["src/utils/__tests__/scheduleStorage.test.js"],
+  },
+  {
+    id: "fe-poster-now-fill-contrast-repair",
+    invariant:
+      "CLAUDE.md 'Poster-led event palettes' — contrast is enforced at render (readableThemeColours): a hand-edited on-now fill that is unreadable under the ink is repaired",
+    stack: "frontend",
+    file: "src/utils/posterPalette.js",
+    find: "nowFill: ensureContrast(nowFill, fixedInk, AA_TEXT),",
+    replace: "nowFill,",
+    tests: ["src/utils/__tests__/posterPalette.test.js"],
+  },
+  {
+    id: "fe-poster-tint-checked-as-painted",
+    invariant:
+      "CLAUDE.md 'Poster-led event palettes' — a tint is checked as painted (composite(): sRGB alpha over the ground), never with mix(), which interpolates in OKLab (#1396)",
+    stack: "frontend",
+    file: "src/utils/posterTheme.js",
+    find: "composite(accentFill, ground, MAX_TEXT_TINT_ALPHA),\n    composite(accentFill, tone(0.06), MAX_TEXT_TINT_ALPHA),",
+    replace: "mix(ground, accentFill, MAX_TEXT_TINT_ALPHA),\n    mix(tone(0.06), accentFill, MAX_TEXT_TINT_ALPHA),",
+    tests: ["src/utils/__tests__/posterTheme.test.js"],
+  },
+  {
+    id: "fe-metrics-visit-once-per-load",
+    invariant:
+      "CLAUDE.md 'Metrics & Analytics' — one visit per page load: the in-memory flag still limits it to one when sessionStorage is blocked (#1246 Q3)",
+    stack: "frontend",
+    file: "src/utils/metrics.js",
+    find: "  if (visitSentThisLoad) return\n",
+    replace: "",
+    tests: ["src/utils/__tests__/metrics.test.js"],
+  },
+  {
+    id: "fe-referrer-bucket-host-boundary",
+    invariant:
+      "CLAUDE.md 'Metrics & Analytics' — referrerBucket matches a host or its subdomains only, so a look-alike such as notinstagram.com is 'other' (#1246 Q3)",
+    stack: "frontend",
+    file: "src/utils/metrics.js",
+    find: "const hostIs = (host, domain) => host === domain || host.endsWith(`.${domain}`)",
+    replace: "const hostIs = (host, domain) => host.endsWith(domain)",
+    tests: ["src/utils/__tests__/metrics.test.js"],
+  },
+  {
+    id: "fe-route-ics-after-midnight-date",
+    invariant:
+      "CLAUDE.md 'Pulling a band from a live lineup' — calendar surfaces date an after-midnight set on the next calendar day (My Route export, #1251)",
+    stack: "frontend",
+    file: "src/utils/routeIcs.js",
+    find: "return hour < AFTER_MIDNIGHT_THRESHOLD_HOUR ? nextCalendarDay(date) : date",
+    replace: "return date",
+    tests: ["src/utils/__tests__/routeIcs.test.js"],
+  },
+  {
+    id: "fe-route-ics-no-fabricated-end",
+    invariant:
+      "CLAUDE.md 'Pulling a band from a live lineup' — a missing end is DURATION:PT1H, never a constant wall-clock DTEND that can precede the start (My Route export, #1251)",
+    stack: "frontend",
+    file: "src/utils/routeIcs.js",
+    find: "      : `DURATION:PT${DEFAULT_SET_DURATION_MS / 60000}M`",
+    replace: "      : `DTEND;TZID=${TORONTO_TZID}:${startDate.replace(/-/g, '')}T210000`",
+    tests: ["src/utils/__tests__/routeIcs.test.js"],
+  },
 ];
 
 // ============================================================================
@@ -1738,6 +1861,27 @@ export const KNOWN_SURVIVING = [];
 // Core mechanics — exported so scripts/__tests__/mutationGate.test.js can
 // drive them against temp fixtures instead of the real table.
 // ============================================================================
+
+/** Where an entry's paths live. Default stack is the repo root; a
+ * `stack: "frontend"` entry resolves `file` and `tests` under `frontend/` and
+ * runs vitest from there. Pure, so it is testable without spawning anything.
+ *
+ * @param {Mutation} mutation
+ * @param {string} cwd - Repo root.
+ * @param {string} [vitestCwd=cwd] - Repo-level vitest launch directory.
+ * @returns {{ base: string, repoFile: string, filePath: string, tests: string[], vitestDir: string }}
+ *   `repoFile` is the repo-relative path git needs. */
+export function resolveMutationPaths(mutation, cwd, vitestCwd = cwd) {
+  const sub = mutation.stack === "frontend" ? "frontend" : "";
+  const base = path.join(cwd, sub);
+  return {
+    base,
+    repoFile: path.join(sub, mutation.file),
+    filePath: path.join(base, mutation.file),
+    tests: mutation.tests.map((t) => (path.isAbsolute(t) ? t : path.join(base, t))),
+    vitestDir: path.join(vitestCwd, sub),
+  };
+}
 
 /** Byte-exact occurrence count. Deliberately not a regex/grep count: `find`
  * strings here contain `(`, `)`, `.`, `?`, `$` — all regex metacharacters —
@@ -1967,7 +2111,7 @@ export function installExitSafetyNet() {
  * @param {{ cwd?: string, vitestCwd?: string, vitestExtraArgs?: string[] }} [options]
  */
 export function runOneMutation(mutation, { cwd = REPO_ROOT, vitestCwd = cwd, vitestExtraArgs = [] } = {}) {
-  const filePath = path.join(cwd, mutation.file);
+  const { filePath, tests: absoluteTests, vitestDir } = resolveMutationPaths(mutation, cwd, vitestCwd);
 
   if (!existsSync(filePath)) {
     return {
@@ -1998,8 +2142,6 @@ export function runOneMutation(mutation, { cwd = REPO_ROOT, vitestCwd = cwd, vit
     };
   }
 
-  const absoluteTests = mutation.tests.map((t) => (path.isAbsolute(t) ? t : path.join(cwd, t)));
-
   // A missing test path is the same class of failure as an absent `find`
   // string: a silent no-op that would otherwise report "caught" for the
   // wrong reason (vitest exits non-zero for "no test files found" too --
@@ -2021,7 +2163,7 @@ export function runOneMutation(mutation, { cwd = REPO_ROOT, vitestCwd = cwd, vit
   try {
     writeFileSync(filePath, mutated);
     currentMutation = { filePath, original };
-    testResult = runVitestFiles(absoluteTests, { cwd: vitestCwd, extraArgs: vitestExtraArgs });
+    testResult = runVitestFiles(absoluteTests, { cwd: vitestDir, extraArgs: vitestExtraArgs });
   } finally {
     // Restore happens even if runVitestFiles somehow throws.
     writeFileSync(filePath, original);
@@ -2247,7 +2389,7 @@ export function runMutationGate({
   installExitSafetyNet();
 
   const all = [...mutations, ...knownSurviving];
-  const targetFiles = [...new Set(all.map((m) => m.file))];
+  const targetFiles = [...new Set(all.map((m) => resolveMutationPaths(m, cwd).repoFile))];
   const dirty = dirtyFiles(targetFiles, cwd);
   if (dirty.length > 0) {
     const message = [

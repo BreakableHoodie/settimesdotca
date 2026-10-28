@@ -69,12 +69,40 @@ export function isLikelyCrawler(userAgent) {
   return CRAWLER_MARKERS.some((marker) => ua.includes(marker));
 }
 
+const DERIVATION_INFO = new TextEncoder().encode("settimes share-link visitor code v1");
+const derivedKeys = new Map();
+
+async function getDerivedKey(secret) {
+  let keyPromise = derivedKeys.get(secret);
+  if (!keyPromise) {
+    const keyMaterial = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), "HKDF", false, [
+      "deriveKey",
+    ]);
+    keyPromise = crypto.subtle.deriveKey(
+      { name: "HKDF", hash: "SHA-256", salt: new Uint8Array(0), info: DERIVATION_INFO },
+      keyMaterial,
+      { name: "HMAC", hash: "SHA-256", length: 256 },
+      false,
+      ["sign"],
+    );
+    // A failed derivation is not cached: the next request tries again.
+    keyPromise.catch(() => derivedKeys.delete(secret));
+    derivedKeys.set(secret, keyPromise);
+  }
+  return keyPromise;
+}
+
 /**
  * Stable, non-reversible key identifying one visitor of one share link.
  *
- * SHA-256 over `ip|user-agent|slug` via the platform's Web Crypto — the same
- * "use the runtime's primitive, add no crypto dependency" rule that governs
- * password hashing and TOTP in this codebase.
+ * HMAC-SHA-256 over `ip|user-agent|slug`, keyed with an HKDF-SHA-256-derived
+ * key from CSRF_SECRET, via the platform's Web Crypto. A plain hash of an IP
+ * is reversible by brute force, so the stored code cannot be reversed without
+ * the server key. The key derivation keeps the raw CSRF secret out of HMAC and
+ * uses a fixed purpose label.
+ *
+ * Existing plain-hash rows do not match the new codes, so a returning visitor
+ * can count twice for at most the 30-day life of a share link.
  *
  * The raw IP is never stored; only this digest reaches D1. Including the slug
  * salts each link separately, so the ledger cannot be used to correlate one
@@ -89,12 +117,18 @@ export function isLikelyCrawler(userAgent) {
  *
  * @param {Request} request
  * @param {string} slug
- * @returns {Promise<string>} lowercase hex digest
+ * @param {{ CSRF_SECRET?: string }} env
+ * @returns {Promise<string|undefined>} lowercase hex digest, or undefined when
+ * the server key is unavailable
  */
-export async function visitorHash(request, slug) {
+export async function visitorHash(request, slug, env) {
+  const secret = env?.CSRF_SECRET;
+  if (typeof secret !== "string" || secret.length === 0) return undefined;
+
   const ip = getClientIP(request);
   const userAgent = request.headers.get("User-Agent") || "";
   const material = `${ip}|${userAgent}|${slug}`;
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(material));
+  const key = await getDerivedKey(secret);
+  const digest = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(material));
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }

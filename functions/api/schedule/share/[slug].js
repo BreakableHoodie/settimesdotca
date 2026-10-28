@@ -58,34 +58,38 @@ export async function onRequestGet(context) {
       // See functions/utils/visitorDedupe.js for the full reasoning.
       if (!isLikelyCrawler(request.headers.get("User-Agent"))) {
         try {
-          const hash = await visitorHash(request, slug);
-          // One atomic batch, and view_count is DERIVED from the ledger rather
-          // than incremented alongside it. Two separate writes would leave a
-          // permanent, unrecoverable hole: if the insert landed and the update
-          // did not (D1 hiccup, isolate eviction between awaits), that
-          // visitor's row already claims the slot, so no later visit could
-          // ever count them. Recomputing from COUNT(*) makes a dropped write
-          // self-healing — the next visitor repairs it — and removes any
-          // dependence on D1's `meta.changes` shape, where an undefined `meta`
-          // would silently stop the counter forever.
-          await DB.batch([
-            // The WHERE EXISTS is the FK guard this route cannot get for free.
-            // `_middleware.js` skips `PRAGMA foreign_keys = ON` for GET, so the
-            // declared FK is NOT enforced here — and the parent was SELECTed
-            // earlier in this request, so an expiry sweep landing in between
-            // would let an orphan commit. The cron cannot clean that up either:
-            // it deletes ledger rows by joining to slugs that still exist, so
-            // an orphan would be invisible to it forever. Re-checking the parent
-            // inside the same atomic batch closes the window without widening
-            // the middleware guard for every read path.
-            DB.prepare(
-              `INSERT OR IGNORE INTO share_link_views (slug, visitor_hash)
+          const hash = await visitorHash(request, slug, env);
+          if (!hash) {
+            console.error("Share view ledger skipped: CSRF_SECRET is missing", slug.slice(0, 8));
+          } else {
+            // One atomic batch, and view_count is DERIVED from the ledger rather
+            // than incremented alongside it. Two separate writes would leave a
+            // permanent, unrecoverable hole: if the insert landed and the update
+            // did not (D1 hiccup, isolate eviction between awaits), that
+            // visitor's row already claims the slot, so no later visit could
+            // ever count them. Recomputing from COUNT(*) makes a dropped write
+            // self-healing — the next visitor repairs it — and removes any
+            // dependence on D1's `meta.changes` shape, where an undefined `meta`
+            // would silently stop the counter forever.
+            await DB.batch([
+              // The WHERE EXISTS is the FK guard this route cannot get for free.
+              // `_middleware.js` skips `PRAGMA foreign_keys = ON` for GET, so the
+              // declared FK is NOT enforced here — and the parent was SELECTed
+              // earlier in this request, so an expiry sweep landing in between
+              // would let an orphan commit. The cron cannot clean that up either:
+              // it deletes ledger rows by joining to slugs that still exist, so
+              // an orphan would be invisible to it forever. Re-checking the parent
+              // inside the same atomic batch closes the window without widening
+              // the middleware guard for every read path.
+              DB.prepare(
+                `INSERT OR IGNORE INTO share_link_views (slug, visitor_hash)
                SELECT ?, ? WHERE EXISTS (SELECT 1 FROM share_links WHERE slug = ?)`,
-            ).bind(slug, hash, slug),
-            DB.prepare(
-              "UPDATE share_links SET view_count = (SELECT COUNT(*) FROM share_link_views WHERE slug = ?) WHERE slug = ?",
-            ).bind(slug, slug),
-          ]);
+              ).bind(slug, hash, slug),
+              DB.prepare(
+                "UPDATE share_links SET view_count = (SELECT COUNT(*) FROM share_link_views WHERE slug = ?) WHERE slug = ?",
+              ).bind(slug, slug),
+            ]);
+          }
         } catch (err) {
           // Best-effort: a counter failure must never break share retrieval.
           // Named for the ledger, not the increment — during migration lag the

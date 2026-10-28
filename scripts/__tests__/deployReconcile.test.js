@@ -16,25 +16,29 @@ function run(overrides = {}) {
   };
 }
 
+function edgeRun(overrides = {}) {
+  return run({ event: "workflow_dispatch", run_number: 1, ...overrides });
+}
+
 function choose(runs, overrides = {}) {
   return decide({ headSha: HEAD, headUpdatedAt: OLD_COMMIT, now: NOW, runs, ...overrides });
 }
 
 describe("decide", () => {
   it("dispatches with no runs and an old commit", () => {
-    expect(choose([])).toEqual({ action: "dispatch", reason: "no deploy run for main HEAD" });
+    expect(choose([])).toEqual({ action: "dispatch-edge", reason: "no edge E2E run for main HEAD" });
   });
 
   it("dispatches when only cancelled runs remain", () => {
-    expect(choose([run()]).action).toBe("dispatch");
+    expect(choose([run()]).action).toBe("dispatch-edge");
   });
 
   it("ignores pull request runs", () => {
-    expect(choose([run({ event: "pull_request" })]).action).toBe("dispatch");
+    expect(choose([run({ event: "pull_request" })]).action).toBe("dispatch-edge");
   });
 
   it("ignores runs for a different sha", () => {
-    expect(choose([run({ head_sha: "other-sha" })]).action).toBe("dispatch");
+    expect(choose([run({ head_sha: "other-sha" })]).action).toBe("dispatch-edge");
   });
 
   it.each(["in_progress", "queued"])("skips a %s run", (status) => {
@@ -65,6 +69,57 @@ describe("decide", () => {
   it("warns rather than dispatching after an old commit's failure", () => {
     expect(choose([run({ conclusion: "failure" })]).action).toBe("warn");
   });
+
+  it("dispatches the deploy after the latest edge run succeeds", () => {
+    expect(choose([], { edgeRuns: [edgeRun({ conclusion: "success" })] })).toEqual({
+      action: "dispatch",
+      reason: "edge suite passed; no deploy run for main HEAD",
+    });
+  });
+
+  it("skips while the edge suite is in flight", () => {
+    expect(choose([], { edgeRuns: [edgeRun({ status: "in_progress" })] })).toEqual({
+      action: "skip",
+      reason: "edge suite in flight",
+    });
+  });
+
+  it("ignores pull request edge runs and dispatches edge", () => {
+    expect(choose([], { edgeRuns: [edgeRun({ event: "pull_request", conclusion: "success" })] }).action).toBe(
+      "dispatch-edge",
+    );
+  });
+
+  it("warns and never deploys after the latest edge run fails", () => {
+    const result = choose([], { edgeRuns: [edgeRun({ conclusion: "failure", html_url: "edge-url" })] });
+    expect(result).toEqual({ action: "warn", reason: "edge suite failed: edge-url" });
+  });
+
+  it("treats a cancelled edge run as no run", () => {
+    expect(choose([], { edgeRuns: [edgeRun({ conclusion: "cancelled" })] }).action).toBe("dispatch-edge");
+  });
+
+  it("uses the latest edge run by run number", () => {
+    expect(
+      choose([], {
+        edgeRuns: [
+          edgeRun({ run_number: 2, conclusion: "failure" }),
+          edgeRun({ run_number: 3, conclusion: "success" }),
+        ],
+      }).action,
+    ).toBe("dispatch");
+  });
+
+  it("uses the newest edge run by created time when run numbers are absent", () => {
+    expect(
+      choose([], {
+        edgeRuns: [
+          edgeRun({ run_number: undefined, created_at: "2026-01-01T00:00:00Z", conclusion: "success" }),
+          edgeRun({ run_number: undefined, created_at: "2026-01-02T00:00:00Z", conclusion: "failure" }),
+        ],
+      }).action,
+    ).toBe("warn");
+  });
 });
 
 describe("headUpdatedAt", () => {
@@ -93,16 +148,48 @@ describe("headUpdatedAt", () => {
 });
 
 describe("main", () => {
+  it("dispatches edge on first sight of an old main commit", () => {
+    const calls = [];
+    const code = main([], {
+      getHead: () => ({ sha: HEAD, updatedAt: OLD_COMMIT }),
+      getRuns: () => [],
+      getEdgeRuns: () => [],
+      dispatch: () => calls.push("dispatch"),
+      dispatchEdge: () => calls.push("dispatch-edge"),
+      log: (message) => calls.push(message),
+    });
+    expect(code).toBe(0);
+    expect(calls).toContain("dispatch-edge");
+    expect(calls).not.toContain("dispatch");
+  });
+
   it("dispatches through injected dependencies", () => {
     const calls = [];
     const code = main([], {
       getHead: () => ({ sha: HEAD, updatedAt: OLD_COMMIT }),
       getRuns: () => [],
+      getEdgeRuns: () => [{ ...edgeRun(), conclusion: "success" }],
       dispatch: () => calls.push("dispatch"),
+      dispatchEdge: () => calls.push("dispatch-edge"),
       log: (message) => calls.push(message),
     });
     expect(code).toBe(0);
     expect(calls).toContain("dispatch");
+  });
+
+  it("warns and dispatches nothing after an edge failure", () => {
+    const calls = [];
+    const code = main([], {
+      getHead: () => ({ sha: HEAD, updatedAt: OLD_COMMIT }),
+      getRuns: () => [],
+      getEdgeRuns: () => [edgeRun({ conclusion: "failure", html_url: "edge-url" })],
+      dispatch: () => calls.push("dispatch"),
+      dispatchEdge: () => calls.push("dispatch-edge"),
+      log: (message) => calls.push(message),
+    });
+    expect(code).toBe(0);
+    expect(calls).not.toContain("dispatch");
+    expect(calls).toContain("warn: edge suite failed: edge-url");
   });
 
   it("does not dispatch when main moved between the decision and the dispatch", () => {
@@ -111,7 +198,9 @@ describe("main", () => {
     const code = main([], {
       getHead: () => ({ sha: heads.shift(), updatedAt: OLD_COMMIT }),
       getRuns: () => [],
+      getEdgeRuns: () => [],
       dispatch: () => calls.push("dispatch"),
+      dispatchEdge: () => calls.push("dispatch-edge"),
       log: (message) => calls.push(message),
     });
     expect(code).toBe(0);
@@ -124,11 +213,12 @@ describe("main", () => {
     const code = main(["--dry-run"], {
       getHead: () => ({ sha: HEAD, updatedAt: OLD_COMMIT }),
       getRuns: () => [],
+      getEdgeRuns: () => [],
       dispatch: () => calls.push("dispatch"),
       log: (message) => calls.push(message),
     });
     expect(code).toBe(0);
-    expect(calls).toContain("dispatch: no deploy run for main HEAD");
+    expect(calls).toContain("dispatch-edge: no edge E2E run for main HEAD");
     expect(calls).not.toContain("dispatch");
   });
 
@@ -144,6 +234,7 @@ describe("main", () => {
         getRuns: () => {
           throw Object.assign(new Error("HTTP 502"), { stderr: "HTTP 502" });
         },
+        getEdgeRuns: () => [],
         dispatch: () => calls.push("dispatch"),
         log: (message) => calls.push(message),
       });

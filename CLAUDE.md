@@ -156,7 +156,7 @@ Edition details, the between-seasons table and the 2026-09 private-repo period: 
 - **Tests**: Vitest (unit, frontend), Playwright (E2E + a11y + visual regression)
 - **CI/CD**: GitHub Actions, Dependabot, Snyk, GitGuardian, CodeRabbit
   - **Runners are GitHub-hosted.** Jobs read `runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}`, except two that pin `ubuntu-latest` on purpose: `zap-baseline.yml` (needs Docker) and `quality.yml`'s **Lighthouse CI** (its floor was calibrated on hosted hardware). **Never set the `RUNS_ON` repo variable while this repo is public:** any fork PR would execute on Dre's homelab runner (setup in the private `BreakableHoodie/gh-runner` repo), and the runner sync stops runners for public repos, so every job would queue forever.
-  - **Dependabot merges do not deploy on their own** (#1209): GitHub starts no push workflows for a push made with `GITHUB_TOKEN`. `deploy-reconcile.yml` runs every 30 minutes and dispatches the production deploy for any `main` HEAD without one. It waits 10 minutes so it cannot race (and cancel) a human merge's deploy, and **never re-dispatches after a real failure**, so a broken deploy cannot loop. Push-only scans still do not run for bot merges; the PR runs covered the same content.
+  - **Dependabot merges do not deploy on their own** (#1209): GitHub starts no push workflows for a push made with `GITHUB_TOKEN`. `deploy-reconcile.yml` runs every 30 minutes, runs edge E2E on the merge commit first, and dispatches production only after it passes. A failed edge run opens an issue and holds deploy until a human re-runs it; deploy failures are never retried automatically.
 
 ---
 
@@ -727,7 +727,7 @@ Node and local `wrangler` do not enforce the Workers runtime's limits (the PBKDF
 - **Production rate limits apply**, so the run is two phases with no retries.
 - Emailed tokens are read from D1 (`e2e/utils/d1.js`); remote mode (`E2E_D1_REMOTE=1`) can name only the scratch D1. Every confirmation is clicked in a real browser. **`invite-signup.spec` is the PBKDF2 canary**; its invitee context passes an empty `storageState` explicitly, or it inherits the signed-in admin.
 - **Ready means the alias serves THIS RUN'S deployment** (`scripts/wait-for-preview.mjs`, #1340). Only the `edge-e2e-deployment.txt` marker proves it (Vite hashes repeat across runs). A missing chunk is `200 text/html` on Pages, so check content-type.
-- Runs queue (`cancel-in-progress: false`); every run deletes its deployment and a failed delete fails the job. Fork and Dependabot PRs get no secrets and are skipped loudly.
+- Runs queue (`cancel-in-progress: false`); every run deletes its deployment and a failed delete fails the job. Fork and Dependabot PRs get no secrets and are skipped loudly. The request-only `ical-feed.spec.js` also exercises the feed on the edge.
 
 Full text: `docs/field-notes/testing-gates.md`.
 

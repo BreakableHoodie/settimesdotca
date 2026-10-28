@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 /**
- * deploy-reconcile — dispatch the production deploy when a main commit has no
- * deploy run.
+ * deploy-reconcile — run edge E2E before dispatching the production deploy for
+ * a main commit with no deploy run.
  *
  * Why this exists
  * ---------------
  * Dependabot auto-merges use GITHUB_TOKEN, and GitHub deliberately does not
  * start push-triggered workflows for those pushes. That leaves main merged
  * without the Cloudflare Pages deploy, D1 migration, or smoke checks. The
- * scheduled reconciler can use the same token to dispatch the workflow, while
- * the grace period avoids racing a human-triggered push deploy. A failed deploy
- * is reported for human attention and is never retried automatically.
+ * scheduled reconciler can use the same token to dispatch the workflows, while
+ * the grace period avoids racing human-triggered workflows. Failed deploys and
+ * edge runs are reported for human attention and are never retried automatically.
  */
 import { execFileSync } from "node:child_process";
 
@@ -40,8 +40,20 @@ function realDeps(repository) {
       );
       return response.workflow_runs;
     },
+    getEdgeRuns(headSha) {
+      const response = JSON.parse(
+        gh([
+          "api",
+          `repos/${repository}/actions/workflows/edge-e2e.yml/runs?branch=main&head_sha=${headSha}&per_page=50`,
+        ]),
+      );
+      return response.workflow_runs;
+    },
     dispatch() {
       gh(["workflow", "run", "cloudflare-pages.yml", "--repo", repository, "--ref", "main"]);
+    },
+    dispatchEdge() {
+      gh(["workflow", "run", "edge-e2e.yml", "--repo", repository, "--ref", "main"]);
     },
     log(message) {
       process.stderr.write(`[deploy-reconcile] ${message}\n`);
@@ -62,7 +74,14 @@ export function headUpdatedAt(sha, committedAt, activity = []) {
   return Date.parse(pushed) > Date.parse(committedAt) ? pushed : committedAt;
 }
 
-export function decide({ headSha, headUpdatedAt: updatedAt, now, runs, graceMs = GRACE_MS }) {
+function latestRun(runs) {
+  return [...runs].sort((left, right) => {
+    if (left.run_number != null && right.run_number != null) return right.run_number - left.run_number;
+    return Date.parse(right.created_at || 0) - Date.parse(left.created_at || 0);
+  })[0];
+}
+
+export function decide({ headSha, headUpdatedAt: updatedAt, now, runs, edgeRuns = [], graceMs = GRACE_MS }) {
   const relevantRuns = runs.filter((run) => run.event !== "pull_request" && run.head_sha === headSha);
 
   if (relevantRuns.some((run) => run.status !== "completed")) {
@@ -82,7 +101,25 @@ export function decide({ headSha, headUpdatedAt: updatedAt, now, runs, graceMs =
     return { action: "skip", reason: "too new; its own push deploy may not have started" };
   }
 
-  return { action: "dispatch", reason: "no deploy run for main HEAD" };
+  const relevantEdgeRuns = edgeRuns.filter(
+    (run) => run.head_sha === headSha && ["workflow_dispatch", "push"].includes(run.event),
+  );
+  if (relevantEdgeRuns.some((run) => run.status !== "completed")) {
+    return { action: "skip", reason: "edge suite in flight" };
+  }
+
+  const latestEdgeRun = latestRun(relevantEdgeRuns.filter((run) => run.conclusion !== "cancelled"));
+  if (!latestEdgeRun) {
+    return { action: "dispatch-edge", reason: "no edge E2E run for main HEAD" };
+  }
+  if (latestEdgeRun.conclusion === "success") {
+    return { action: "dispatch", reason: "edge suite passed; no deploy run for main HEAD" };
+  }
+  if (REAL_FAILURES.has(latestEdgeRun.conclusion)) {
+    return { action: "warn", reason: `edge suite failed: ${latestEdgeRun.html_url}` };
+  }
+
+  return { action: "dispatch-edge", reason: "no completed edge E2E run for main HEAD" };
 }
 
 export function main(argv, deps) {
@@ -93,10 +130,11 @@ export function main(argv, deps) {
   try {
     const head = runtime.getHead();
     const runs = runtime.getRuns(head.sha);
-    const decision = decide({ headSha: head.sha, headUpdatedAt: head.updatedAt, now: Date.now(), runs });
+    const edgeRuns = runtime.getEdgeRuns(head.sha);
+    const decision = decide({ headSha: head.sha, headUpdatedAt: head.updatedAt, now: Date.now(), runs, edgeRuns });
     runtime.log(`${decision.action}: ${decision.reason}`);
 
-    if (decision.action === "dispatch" && !dryRun) {
+    if (["dispatch", "dispatch-edge"].includes(decision.action) && !dryRun) {
       // `--ref main` deploys whatever main is NOW. If main moved since the
       // decision, the new commit's own push deploy may be running, and a
       // dispatch would cancel it (cancel-in-progress). Leave it to the next run.
@@ -105,8 +143,13 @@ export function main(argv, deps) {
         runtime.log(`skip: main moved ${head.sha.slice(0, 8)} -> ${current.slice(0, 8)} before dispatch`);
         return 0;
       }
-      runtime.dispatch();
-      runtime.log("dispatched cloudflare-pages.yml for main");
+      if (decision.action === "dispatch-edge") {
+        runtime.dispatchEdge();
+        runtime.log("dispatched edge-e2e.yml for main");
+      } else {
+        runtime.dispatch();
+        runtime.log("dispatched cloudflare-pages.yml for main");
+      }
     }
     if (decision.action === "warn") {
       process.stderr.write(`::warning::${decision.reason}\n`);

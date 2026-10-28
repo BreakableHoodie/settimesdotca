@@ -1,7 +1,7 @@
 # Fixes #1209: Dependabot merges use GITHUB_TOKEN, so their pushes do not start
 # push-triggered workflows. workflow_dispatch does work with that token, so this
-# runs every 30 minutes and dispatches the production deploy for an unhandled
-# main HEAD after a 10-minute grace period. It never retries a failed deploy.
+# runs every 30 minutes, gates an unhandled main HEAD on edge E2E, then dispatches
+# the production deploy after a 10-minute grace period. It never retries failures.
 name: Deploy Reconcile
 
 on:

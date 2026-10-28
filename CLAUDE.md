@@ -130,11 +130,11 @@ A third implementer on a separate subscription, via the `opencode-delegate` skil
 
 settimes.ca is the multi-venue/multi-artist event platform for **Waterloo Region** (Kitchener-Waterloo, ON). The most recent edition, **Long Weekend Band Crawl Vol. 18** (event 37, `lwbc18`, single-day, October 11, 2026), was **archived 2026-10-13**. No edition is published now; the next is expected in February 2027.
 
-- **Focus:** Waterloo Region governs **product language** (marketing copy, meta descriptions, SEO targeting), not fact: an out-of-region event (Buddies Fest 2, Tillsonburg) stays accurate wherever it appears. Never describe the site as serving Ottawa.
+- **Focus:** Waterloo Region governs **product language** (copy, meta descriptions, SEO), not fact: an out-of-region event (Buddies Fest 2, Tillsonburg) stays accurate wherever it appears. Never describe the site as serving Ottawa.
 - **Brand:** settimes.ca, no rebranding. Fan-facing and admin tooling are equal priority. SEO is a priority (band, event and venue pages, structured data).
 - **Colour themes:** 4 user-selectable (see Theming). **Single photo per band** (`photo_url` / R2); no video embeds.
 
-**Shipped editions** (all `status = 'archived'`): Vol. 18 (event 37), Vol. 17 (event 21) and Buddies Fest 2 (event 36, the first multi-day production event). Read their lineups and venues from D1, not from this file.
+**Shipped editions** (all `status = 'archived'`): Vol. 18 (event 37), Vol. 17 (event 21), Buddies Fest 2 (event 36, 2026-08-07 to 08-09) and BLR3 (event 35, 2026-07-10 to 07-12, the first multi-day production event). Read lineups and venues from D1.
 
 **Between seasons is a supported state, not a bug.** Right now `/api/events/public` and the timeline's `now`/`upcoming` return 0 and the iCal feed has 0 `VEVENT`s, while `/api/stats/public` and `sitemap.xml` stay populated from archived editions. `EventTimeline` has a dedicated empty state for it and auto-expands Past.
 
@@ -142,7 +142,7 @@ settimes.ca is the multi-venue/multi-artist event platform for **Waterloo Region
 
 Canonical roadmap: `docs/ROADMAP.md`. **Track remaining/deferred work as GitHub issues** (`gh issue create`) and reference them from PRs (`Closes #N`).
 
-Edition details and the measured between-seasons table: `docs/field-notes/project-history.md`.
+Edition details, the between-seasons table and the 2026-09 private-repo period: `docs/field-notes/project-history.md`.
 
 ---
 
@@ -157,8 +157,6 @@ Edition details and the measured between-seasons table: `docs/field-notes/projec
 - **CI/CD**: GitHub Actions, Dependabot, Snyk, GitGuardian, CodeRabbit
   - **Runners are GitHub-hosted.** Jobs read `runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}`, except two that pin `ubuntu-latest` on purpose: `zap-baseline.yml` (needs Docker) and `quality.yml`'s **Lighthouse CI** (its floor was calibrated on hosted hardware). **Never set the `RUNS_ON` repo variable while this repo is public:** any fork PR would execute on Dre's homelab runner (setup in the private `BreakableHoodie/gh-runner` repo), and the runner sync stops runners for public repos, so every job would queue forever.
   - **Dependabot merges do not deploy on their own** (#1209): GitHub starts no push workflows for a push made with `GITHUB_TOKEN`. `deploy-reconcile.yml` runs every 30 minutes and dispatches the production deploy for any `main` HEAD without one. It waits 10 minutes so it cannot race (and cancel) a human merge's deploy, and **never re-dispatches after a real failure**, so a broken deploy cannot loop. Push-only scans still do not run for bot merges; the PR runs covered the same content.
-
-The private-repo period (2026-09-16 to 09-25) and what it removed and restored: `docs/field-notes/project-history.md`.
 
 ---
 
@@ -247,7 +245,7 @@ An event page takes its colours from the edition's poster. `events.theme_colors`
 
 **Archiving is one-way.** Exactly four routes write `status`: `POST .../publish`, the PUT publish toggle, `POST .../archive`, and PATCH's dynamic `UPDATE events SET ${updates.join(", ")}`. Each rejects a status change on an archived event, and each `UPDATE` carries `AND status IN ('draft','published')` with a mandatory null check, so a concurrent archive yields 409, never a 500 or a silent resurrection. Grep `UPDATE events`, not `SET status`, to find all four; `edit.js`, `posters.js`, `reveal-mode.js` and `users/[id].js` also match and provably never write `status`. PATCH's predicate stays conditional: editing an archived event's description, poster or venue info is allowed.
 
-**Only `POST .../publish` checks the lineup.** Zero performances gets 400 `EMPTY_LINEUP`, overridable with `allowEmptyLineup: true`, because "Lineup TBA" is a supported state. PATCH and the toggle stay unchecked on purpose. The client closes the UX gap (#821): `EventFormModal` sends a draft → published transition through `POST .../publish`, sharing `frontend/src/admin/utils/publishWithLineupConfirm.js` with the list toggle. Only the transition is rerouted, and the rejection is detected by `code`, never by message. **Creating an event as `published` is refused** (400 `CREATE_AS_PUBLISHED`, #804); `draft` and `archived` (historical back-fill) stay allowed. That create `INSERT` is a fifth status writer, which the `UPDATE events` grep misses.
+**Only `POST .../publish` checks the lineup.** Zero performances gets 400 `EMPTY_LINEUP`, overridable with `allowEmptyLineup: true`, because "Lineup TBA" is a supported state. PATCH and the toggle stay unchecked on purpose. The client closes the UX gap (#821): `EventFormModal` sends a draft → published transition through `POST .../publish`, sharing `frontend/src/admin/utils/publishWithLineupConfirm.js` with the list toggle. Only the transition is rerouted, and the rejection is detected by `code`, never by message. **Creating an event as `published` is refused** (400 `CREATE_AS_PUBLISHED`, #804); `draft` and `archived` (historical back-fill) stay allowed. That create `INSERT` is a fifth status writer, which the `UPDATE events` grep misses; `wizard.js` and `duplicate.js` also INSERT, but only `'draft'`.
 
 Incident history and the #803 review traps: `docs/field-notes/event-visibility.md`.
 
@@ -614,7 +612,7 @@ D1 accepts `?1`/`?2`; **better-sqlite3, which backs the unit-test harness, refus
 
 `audit_log.api_key_id` (migration 0061) records which credential acted; NULL means cookie-authenticated. Both builders in `auditLogStatement.js` take it as a trailing optional argument. Threading `api_key_id` through the ~15 per-action call sites was considered and deliberately not done. Instead the middleware writes one `api_key.request` row per key-authenticated **mutating** request, before `next()`, so it captures requests that then 403 or 404; correlate it with the per-action rows that share its `user_id`. It is the one audit row written outside a batch, because there is nothing to batch it with; it is not precedent for standalone audit rows. `retention.js` prunes it at **90 days** (`action = 'api_key.request'`) while the rest of `audit_log` keeps 1 year (`!=`); the predicates are disjoint on purpose.
 
-The API-key routes batch their audit row with the change. **That is not a repo-wide rule:** measured 2026-08-31, 5 of 26 admin handlers batch (`bands/[id].js`, `bands/bulk.js`, `events/[id].js`, `events/wizard.js`, `venues/[id].js`), and whether to tighten the rest is open. For creation, `auditLogStatementForInsertedRow()` resolves `resource_id` with `INSERT … SELECT … FROM <table> WHERE <col> = ?`, and validates the identifiers with an explicit `typeof value === "string"` (a bare `RegExp.test(undefined)` passes). `INSERT … SELECT` over zero rows inserts nothing without an error, so pass either a value the preceding INSERT wrote or **exactly** the conditional UPDATE's predicate (an array value renders `IN (…)`). A narrower predicate commits the change with no audit row (#1161 review).
+The API-key routes batch their audit row with the change. **That is not a repo-wide rule:** measured 2026-10-28, 14 of 52 admin handler files batch it via `auditLogStatement` while 32 still call `auditLog(` standalone, `events/wizard.js` among them (its batch is performances only). Tightening the rest is open. For creation, `auditLogStatementForInsertedRow()` resolves `resource_id` with `INSERT … SELECT … FROM <table> WHERE <col> = ?`, and validates the identifiers with an explicit `typeof value === "string"` (a bare `RegExp.test(undefined)` passes). `INSERT … SELECT` over zero rows inserts nothing without an error, so pass either a value the preceding INSERT wrote or **exactly** the conditional UPDATE's predicate (an array value renders `IN (…)`). A narrower predicate commits the change with no audit row (#1161 review).
 
 ---
 
@@ -622,7 +620,7 @@ The API-key routes batch their audit row with the change. **That is not a repo-w
 
 **Use the cancel toggle (`is_cancelled = 1`). Do not un-announce, and do not delete the row.**
 
-- **`is_announced = 0` hides nothing on a `reveal_mode = 0` event**, which is the normal published state. Per-performance public read paths gate with `(e.reveal_mode = 0 OR p.is_announced = 1)` (some bind it as `? = 0`), which short-circuits true. There are ten: `api/bands/[name].js`, `api/bands/[name]/stage-mates.js`, `api/bands/stats/[name].js`, `api/events/[id]/details.js`, `api/events/timeline.js`, `api/feeds/ical.js`, `api/schedule.js`, `api/schedule/share/[slug].js`, `api/venues/[id].js`, `event/[slug].js`. To sweep, grep `is_announced = 1` and then check the projection, because `follow-batch.js`, `schedule/build.js` and `s/[slug].js` match but return no per-performance rows. The `0 → 1` transition still sends follower email, so un- and re-announcing can mail people while changing nothing publicly.
+- **`is_announced = 0` hides nothing on a `reveal_mode = 0` event**, which is the normal published state. Per-performance public read paths gate with `(e.reveal_mode = 0 OR p.is_announced = 1)` (some bind it as `? = 0`), which short-circuits true. There are ten: `api/bands/[name].js`, `api/bands/[name]/stage-mates.js`, `api/bands/stats/[name].js`, `api/events/[id]/details.js`, `api/events/timeline.js`, `api/feeds/ical.js`, `api/schedule.js`, `api/schedule/share/[slug].js`, `api/venues/[id].js`, `event/[slug].js`. To sweep, grep `is_announced = 1` and then check the projection, because `follow-batch.js`, `schedule/build.js`, `s/[slug].js` and `api/history.js` (counts and distinct band/venue lists) match but return no per-performance rows. The `0 → 1` transition still sends follower email, so un- and re-announcing can mail people while changing nothing publicly.
 - **Deleting the row** hides the set, but fans get no cancellation signal, and it vanishes silently from shared routes (#733).
 - **Cancelling** (the LineupTab toggle: `PATCH /api/admin/bands/:id` with `is_cancelled: true`, editor or above, #732) keeps the set visible and struck through on every fan surface, drops it from "up next" and live time math, makes it unselectable, emits `STATUS:CANCELLED`, and blocks the announcement email. It applies to one performance: a band with two sets needs two cancels.
 - **Un-cancelling resends nothing**, since the announce path needs an `is_announced` `0 → 1` transition. **It is also the one transition that can double-book**, because a cancelled set frees its slot: the PATCH runs `checkConflicts` on `1 → 0` and 409s naming the holder, never auto-resolving.
@@ -743,7 +741,7 @@ Every Playwright upload now runs `scripts/scrub-e2e-artifacts.mjs` first, which 
 
 Playwright WebKit against `http://localhost:8788` renders a **blank page** with no error: the `/*` document CSP in `frontend/public/_headers` carries `upgrade-insecure-requests`, so WebKit rewrites every subresource to `https://`, where the dev server has no TLS. Chromium treats `localhost` as trustworthy and skips the upgrade, which is why this only shows up in Safari. **It is not HSTS** (RFC 6797 §7.2 ignores STS over http — verified by experiment). **Production is unaffected; do not weaken the directive or HSTS.**
 
-For layout/rendering tests only, strip the CSP in-flight (no URL rewriting needed) and use `waitUntil: 'domcontentloaded'`, never `'networkidle'`, which never fired in WebKit here (likely the service worker's background requests; cause inferred, not measured):
+For layout/rendering tests only, strip the CSP in-flight (no URL rewriting needed) and use `waitUntil: 'domcontentloaded'`, never `'networkidle'`, which never fired in WebKit here:
 
 ```js
 await ctx.route("**/*", async (route) => {

@@ -343,7 +343,7 @@ export async function onRequestPost(context) {
           )
             // Festival day, as the show-night curve uses: a 1 AM visit after the
             // last night's sets belongs to that night, not to the next date.
-            .bind(eventLocalFestivalToday(), visitBucket)
+            .bind(festivalDate, visitBucket)
             .run();
         } catch (err) {
           logger.error("referrer_daily_stats upsert failed; this visit is lost", {

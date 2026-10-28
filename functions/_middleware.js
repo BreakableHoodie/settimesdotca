@@ -21,21 +21,26 @@ export async function onRequest(context) {
   // we control: an allowlisted origin gets credentialed CORS, so a *.pages.dev
   // name someone else could claim must never appear here (#1310). The preview
   // alias edge E2E uses is added per environment via CORS_ALLOWED_ORIGINS.
-  const baseAllowedOrigins = [
-    "https://settimes.ca",
-    "https://www.settimes.ca",
-    "http://localhost:5173",
-    "http://localhost:3000",
-    "http://localhost:8788",
-    "http://127.0.0.1:5173",
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:8788",
-  ];
+  const baseAllowedOrigins = ["https://settimes.ca", "https://www.settimes.ca"];
+  // Loopback origins get credentialed CORS only on a known dev environment
+  // (isDevRequest): in production, or on a preview (ENVIRONMENT=preview is
+  // deliberately not a dev value), a page served from a visitor's own machine
+  // must not be able to make credentialed calls.
+  const devAllowedOrigins = isDevRequest(request, env)
+    ? [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://localhost:8788",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:8788",
+      ]
+    : [];
   const envAllowedOrigins = (env?.CORS_ALLOWED_ORIGINS || "")
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);
-  const ALLOWED_ORIGINS = Array.from(new Set([...baseAllowedOrigins, ...envAllowedOrigins]));
+  const ALLOWED_ORIGINS = Array.from(new Set([...baseAllowedOrigins, ...devAllowedOrigins, ...envAllowedOrigins]));
 
   // SECURITY: Check if origin is allowed
   const origin = request.headers.get("Origin");

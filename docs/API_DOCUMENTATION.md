@@ -70,6 +70,7 @@ SetTimes no longer uses the earlier shared-password admin flow. Admin access is 
 | `/api/schedule/share`           | `POST` | Persists a selected lineup and returns `{ slug }` reachable at `/s/{slug}`. Body: `{ event_id, event_slug, performance_ids[], band_names[] }` (`band_names` same length as `performance_ids`, up to 50). Snapshots expire after 30 days.                                                                                                                             |
 | `/api/schedule/share/{slug}`    | `GET`  | Returns a stored share snapshot `{ slug, event_slug, event_name, performance_ids, band_names }` if unexpired. Increments a best-effort view counter unless `?import=1`.                                                                                                                                                                                              |
 | `/api/stats/public`             | `GET`  | Privacy-safe aggregate platform stats: counts/sums for bands, venues, published events, performances, shared routes + views, verified band-follow count, and page views, plus up to 8 top bands by popularity. Aggregate-only — never PII. Gated by `PUBLIC_DATA_PUBLISH_ENABLED`; cached 5 minutes.                                                                 |
+| `/api/history` | `GET` | Every published or archived edition (poster, concluded flag, counted set and venue totals), the artists who have played 2 or more editions (at most 24), and every venue with its edition count. A counted set is not cancelled and passes the reveal-mode gate. Gated by `PUBLIC_DATA_PUBLISH_ENABLED`; show-critical cache tier. |
 
 ### Subscriptions and account recovery
 
@@ -99,7 +100,7 @@ Following a band is **double opt-in**: a follow is created unverified and only a
 
 ### Public request notes
 
-- `POST /api/metrics` only persists allow-listed analytics events: `page_view`, `event_view`, `artist_profile_view`, `social_link_click`, `ticket_click`, and `visit` (a coarse referrer bucket, once per browser session).
+- `POST /api/metrics` only persists allow-listed analytics events: `page_view`, `event_view`, `artist_profile_view`, `social_link_click`, `ticket_click`, `visit` (a coarse referrer bucket, once per browser session), and `turnstile_error`.
 - `POST /api/schedule/build` accepts at most 50 performance IDs and validates `user_session` against a restricted `[A-Za-z0-9_-]+` pattern.
 - All public discovery routes listed in the first table are gated by `PUBLIC_DATA_PUBLISH_ENABLED`.
 
@@ -118,7 +119,7 @@ curl "https://settimes.ca/api/schedule?event=current"
     "slug": "winter-crawl-2026",
     "ticket_url": "https://tickets.example.com/winter-crawl-2026",
     "is_archived": false,
-    "theme_colors": "{\"accent\":\"#f97316\"}",
+    "theme_colors": "{\"v\":1,\"source\":\"poster\",\"poster\":\"https://band-photos.settimes.ca/event-posters/1700000000000-winter-crawl.jpg\",\"light\":{\"ground\":\"#f6efe3\",\"ink\":\"#2a1d12\",\"accent\":\"#9a3d0c\",\"nowFill\":\"#f2c48d\"},\"dark\":{\"ground\":\"#1d1510\",\"ink\":\"#f3e9dc\",\"accent\":\"#f0a05e\",\"nowFill\":\"#5a3417\"}}",
     "venue_info": null,
     "social_links": null
   },
@@ -161,6 +162,7 @@ All admin routes require a valid session cookie. State-changing routes also requ
 | `/api/admin/mfa/enable`          | `POST`   | viewer       | Body: `{ code }`. Verifies the code, enables TOTP, and returns new backup codes.                             |
 | `/api/admin/mfa/backup-codes`    | `POST`   | viewer       | Body: `{ code }`. Regenerates backup codes after verifying a TOTP code.                                      |
 | `/api/admin/mfa/disable`         | `POST`   | viewer       | Body: `{ code }`. Accepts a TOTP or backup code and disables MFA.                                            |
+| `/api/admin/mfa/step-up` | `POST` | viewer | Body: `{ code }` (a current TOTP code or an unused backup code, which is spent). Stamps the calling session for 5 minutes so identity-changing routes stop answering `403 STEP_UP_REQUIRED`. A wrong code is `400 INVALID_MFA_CODE`. API keys are refused. |
 
 ### Content, roster, and media
 
@@ -177,6 +179,11 @@ All admin routes require a valid session cookie. State-changing routes also requ
 | `/api/admin/events/{id}/duplicate`   | `POST`   | editor       | Body: `{ name, date, slug }`. Copies the event's performances into a new unpublished draft.                                                                            |
 | `/api/admin/events/wizard`           | `POST`   | editor       | One-shot creation of a draft event, its venues (find-or-create by name), and lineup. Body: `{ event, venues[], bands[] }`; each `bands[].venueIndex` indexes `venues`. |
 | `/api/admin/events/{id}/reveal-mode` | `POST`   | editor       | Body: `{ reveal_mode: boolean }`. Toggles the lineup embargo flag for the event.                                                                                       |
+| `/api/admin/events/posters` | `POST` | editor | `multipart/form-data` upload with `poster` and optional `event_id`. Stores the image in R2 under `event-posters/` and, with `event_id`, updates `poster_url` at once. |
+| `/api/admin/events/posters` | `GET` | editor | Query: `url`. Returns the bytes of a stored `event-posters/<key>` image from this origin so the browser can read its pixels for the palette; any other URL is `400`. |
+| `/api/admin/events/{id}/venue-delays` | `GET` | viewer | Every venue with a set at the event and its cumulative running-late minutes (0 when on time), read fresh. |
+| `/api/admin/events/{id}/venues/{venueId}/delay` | `POST` | editor | Body: `{ minutes }` (non-zero, -180 to 180). Shifts every remaining, non-cancelled set at the venue and adds to its fan-banner delay, in one batch. `409 SHIFT_CROSSES_FESTIVAL_DAY` if a set would cross 06:00; `409 DELAY_CHANGED` if a concurrent shift won. |
+| `/api/admin/events/{id}/venues/{venueId}/delay` | `DELETE` | editor | Venue back on time: clears the banner and leaves the set times as they are. |
 | `/api/admin/venues`                  | `GET`    | viewer       | Lists venues with band counts. Contact details are redacted for viewers.                                                                                               |
 | `/api/admin/venues`                  | `POST`   | editor       | Creates a new venue.                                                                                                                                                   |
 | `/api/admin/venues/{id}`             | `PUT`    | admin        | Updates a venue.                                                                                                                                                       |
@@ -202,6 +209,7 @@ All admin routes require a valid session cookie. State-changing routes also requ
 | `/api/admin/users/{id}`                   | `DELETE`     | admin           | Removes a user.                                                                                                                                                                                             |
 | `/api/admin/users/{id}/reset-password`    | `POST`       | admin           | Body: `{ reason? }`. Creates a reset token, revokes sessions, clears trusted devices, and emails the reset URL.                                                                                             |
 | `/api/admin/users/{id}/toggle-status`     | `POST`       | admin           | Activates or deactivates a user account. Deactivation revokes sessions.                                                                                                                                     |
+| `/api/admin/users/{id}/reset-mfa` | `POST` | admin | Clears the target's second factor, backup codes, sessions, trusted devices and API keys (lost authenticator). Refuses the caller's own account (`400 CANNOT_RESET_OWN_MFA`). |
 | `/api/admin/invite-codes`                 | `GET`        | admin           | Lists invite codes (prefix and status only; never the code).                                                                                                                                                |
 | `/api/admin/invite-codes`                 | `POST`       | admin           | Body: `{ email?, role = "editor", expiresInDays = 7 }`. Creates an open or email-restricted invite.                                                                                                         |
 | `/api/admin/invite-codes/{id}`            | `DELETE`     | admin           | Revokes an invite code.                                                                                                                                                                                     |
@@ -218,7 +226,7 @@ All admin routes require a valid session cookie. State-changing routes also requ
 Common status codes used across the API:
 
 - `400 Bad Request`: validation failure, missing required fields, or malformed path, query, or body data
-- `401 Unauthorized`: missing or invalid credentials, invalid MFA code, expired challenge token
+- `401 Unauthorized`: missing or invalid credentials, an invalid code at the login MFA step, expired challenge token. Every other MFA endpoint (step-up, enable, disable, backup-codes) answers a wrong code with `400 INVALID_MFA_CODE`, because a 401 signs the user out
 - `403 Forbidden`: authenticated but insufficient role, failed CSRF validation, or origin validation failure
 - `404 Not Found`: missing record or unknown route segment
 - `409 Conflict`: uniqueness conflicts, invalid state transitions, or confirmation-required destructive actions

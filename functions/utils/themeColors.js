@@ -12,7 +12,7 @@
 // the public page ignores a "poster" palette whose poster is not the event's
 // current one (a hand-picked "manual" palette applies regardless).
 //
-// Every colour is lowercase-insensitive `#rrggbb`. The frontend's copy of this
+// Every colour is `#rrggbb`; either hex case is accepted. The frontend's copy of this
 // check is `isValidThemeColours` in frontend/src/utils/posterPalette.js; Pages
 // Functions cannot import from frontend/, so the two are kept in step by tests
 // on each side (the after-midnight threshold's two-homes rule). Contrast is not

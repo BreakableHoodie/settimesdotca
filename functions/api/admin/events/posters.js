@@ -25,6 +25,9 @@ import { getClientIP } from "../../../utils/request.js";
 import { detectImageMimeType, MAX_FILE_SIZE, ALLOWED_IMAGE_TYPES } from "../../../utils/imageUpload.js";
 import { normalizeHttpUrl, validateId } from "../../../utils/validation.js";
 
+// Where stored posters are served from: one bucket-level host, shared with band photos.
+const DEFAULT_POSTER_HOST = "https://band-photos.settimes.ca";
+
 export async function onRequestPost(context) {
   const { request, env } = context;
 
@@ -109,7 +112,7 @@ export async function onRequestPost(context) {
 
     // Generate the public URL for the stored object. Same base as band photos
     // (BAND_PHOTOS_PUBLIC_URL) — the domain is bucket-level, not key-prefix-level.
-    const photoBaseUrl = env.BAND_PHOTOS_PUBLIC_URL || "https://band-photos.settimes.ca";
+    const photoBaseUrl = env.BAND_PHOTOS_PUBLIC_URL || DEFAULT_POSTER_HOST;
     const publicUrl = `${photoBaseUrl}/${filename}`;
 
     // If event_id provided, persist immediately (mirrors photos.js's optional
@@ -193,7 +196,7 @@ export async function onRequestGet(context) {
 
   let key = null;
   try {
-    const posterHost = new URL(env.BAND_PHOTOS_PUBLIC_URL || "https://band-photos.settimes.ca");
+    const posterHost = new URL(env.BAND_PHOTOS_PUBLIC_URL || DEFAULT_POSTER_HOST);
     if (posterUrl.origin !== posterHost.origin || posterUrl.search || !POSTER_KEY.test(posterUrl.pathname)) {
       return notAPoster();
     }

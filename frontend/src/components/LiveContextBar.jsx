@@ -535,9 +535,8 @@ function LiveContextBar({
         </div>
         {showGhost && <GhostEasterEgg onDismiss={() => setShowGhost(false)} />}
       </section>
-      {/* Outside the <section> on purpose: its backdrop-filter makes it the
-        containing block for fixed descendants, which would pin the overlay
-        inside the bar instead of the viewport. */}
+      {/* Outside the <section> on purpose: the overlay belongs to the viewport,
+        not to the sticky bar's stacking context. */}
       <Modal
         isOpen={isFilterOpen}
         onClose={() => setIsFilterOpen(false)}

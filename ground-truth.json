@@ -24,13 +24,12 @@
     "date": "2026-10-11",
     "end_date": null,
     "status": "archived",
-    "band_count": 0,
     "reveal_mode": 0,
     "_note": "Ran 2026-10-11 and was archived 2026-10-13. No edition is published now; the next edition is expected in February 2027."
   },
   "season_state": {
     "state": "between_seasons",
-    "explanation": "Vol. 18 ran 2026-10-11 and was archived 2026-10-13. No edition is published now. Event-driven surfaces return 0 upcoming events and 10 past events; the iCal feed returns 0 VEVENTs because it joins performances. When the next edition is published with no lineup, the iCal zero reads identically but means something different: a published event whose lineup is not announced. Diagnose the two by asking which layer a surface reads, not by the number.",
+    "explanation": "Vol. 18 ran 2026-10-11 and was archived 2026-10-13. No edition is published now. Event-driven surfaces return 0 upcoming events and a first page of 10 past events (the timeline default; 20 archived editions in total); the iCal feed returns 0 VEVENTs because it joins performances. When the next edition is published with no lineup, the iCal zero reads identically but means something different: a published event whose lineup is not announced. Diagnose the two by asking which layer a surface reads, not by the number.",
     "published_count": 0,
     "performance_count_upcoming": 0,
     "between_seasons_note": "EventTimeline has a dedicated between-seasons empty state and auto-expands Past. Check both whether an event is published and whether it has performances before calling a zero a bug."

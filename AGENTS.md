@@ -45,11 +45,13 @@ masks failures (this shipped a red lint to CI once). `make` propagates failures 
 ## Top invariants (full catalogue in CLAUDE.md — these are the prod-breakers)
 
 - **After-midnight sets** (start before 06:00) belong to the previous evening. Threshold is
-  `AFTER_MIDNIGHT_THRESHOLD_HOUR = 6` in `frontend/src/utils/festivalDays.js`. Never remove,
-  lower, or re-encode it; any time-based sort/filter must apply the offset or use `prepareBands()`.
+  `AFTER_MIDNIGHT_THRESHOLD_HOUR = 6` in `frontend/src/utils/festivalDays.js` (frontend) and
+  `functions/utils/eventDay.js` (server). Never remove, lower, or re-encode it; any time-based sort/filter must apply the offset or use `prepareBands()`.
 - **Server-side "today" is Toronto-local**, never UTC: `eventLocalToday()` /
   `eventLocalClock()` from `functions/utils/eventDay.js`. `toISOString().slice(0,10)` flips
   to tomorrow at 8 PM Eastern — a recurring bug class.
+- **PBKDF2 is capped at 100,000 iterations** (`DEFAULT_ITERATIONS`): the Workers edge refuses
+  more, and local Node does not. See CLAUDE.md "PBKDF2, not bcrypt".
 - **SQLite datetimes use a space separator** (`YYYY-MM-DD HH:MM:SS`). A `T` breaks string
   comparison against `datetime('now')` silently. Exception: `lucia_sessions.expires_at` is
   INTEGER Unix seconds — compare with `unixepoch()`.
@@ -102,8 +104,8 @@ masks failures (this shipped a red lint to CI once). `make` propagates failures 
 
 ## Testing notes
 
-- Backend unit tests run from repo root (better-sqlite3-backed; may DLOPEN-fail on some
-  Apple Silicon setups — CI covers it, note it and move on).
+- Backend unit tests run from repo root (better-sqlite3-backed; loads natively on Apple
+  Silicon, so run them locally rather than waiting on CI).
 - E2E requires a live wrangler server and env credentials (`E2E_ADMIN_EMAIL`/`E2E_ADMIN_PASSWORD`
   are required for ANY Playwright invocation, including `--list`). `make e2e` handles this.
 - E2E spec files are under the same prettier/eslint scope as `functions/`/`scripts/` (#622) —

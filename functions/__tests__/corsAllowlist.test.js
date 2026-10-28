@@ -34,6 +34,20 @@ describe("CORS allowlist holds only hosts we control (#1310)", () => {
     expect(await allowOriginFor("https://www.settimes.ca")).toBe("https://www.settimes.ca");
   });
 
+  test("loopback origins are credentialed only on a known dev environment", async () => {
+    const loopback = "http://localhost:5173";
+    // Production (ENVIRONMENT unset or "production") and preview are not dev.
+    expect(await allowOriginFor(loopback)).toBeNull();
+    expect(await allowOriginFor(loopback, { ENVIRONMENT: "production" })).toBeNull();
+    expect(await allowOriginFor(loopback, { ENVIRONMENT: "preview" })).toBeNull();
+    expect(await allowOriginFor("http://127.0.0.1:8788", {})).toBeNull();
+    // Local wrangler and the test harness still work.
+    expect(await allowOriginFor(loopback, { ENVIRONMENT: "development" })).toBe(loopback);
+    expect(await allowOriginFor("http://127.0.0.1:8788", { ENVIRONMENT: "test" })).toBe("http://127.0.0.1:8788");
+    // And production origins are unaffected by the environment.
+    expect(await allowOriginFor("https://settimes.ca", { ENVIRONMENT: "production" })).toBe("https://settimes.ca");
+  });
+
   test("a preview alias is added only through CORS_ALLOWED_ORIGINS", async () => {
     const alias = "https://edge-e2e.longweekend-bandcrawl.pages.dev";
     expect(await allowOriginFor(alias)).toBeNull();

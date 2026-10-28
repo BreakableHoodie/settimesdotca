@@ -62,9 +62,18 @@ export default function PrivacyPage() {
               on our infrastructure provider (Cloudflare) — rather than third-party tracking scripts or tracking pixels.
               We also count how each visit started by the kind of site that sent you — Instagram, Facebook, Google,
               other search, direct, or another site — never its address. Show-night counts record only total event-page
-              views by Toronto hour; neither kind of count contains visitor information. Limited request metadata may be
-              processed briefly by Cloudflare for security and abuse prevention, but public browsing is not tied to a
-              persistent account or profiling identifier in our application data.
+              views by Toronto hour; neither of those two kinds of count contains visitor information. Limited request
+              metadata may be processed briefly by Cloudflare for security and abuse prevention, but public browsing is
+              not tied to a persistent account or profiling identifier in our application data.
+            </p>
+
+            <h3 className="text-text-secondary font-medium mb-2 mt-4">If you open a shared schedule link</h3>
+            <p>
+              When you open a schedule that someone shared, we store a one-way code made from your IP address and
+              browser, different for each link, only to count how many different people opened it. A link stops working
+              30 days after it is created, and our daily cleanup deletes it, with its codes, within a day after that.
+              After that cleanup, only totals (how many links were shared, opened and imported for an event) are kept,
+              with no visitor information.
             </p>
 
             <h3 className="text-text-secondary font-medium mb-2 mt-4">
@@ -77,7 +86,8 @@ export default function PrivacyPage() {
               version of the consent wording you agreed to. This consent record is held for as long as your subscription
               or follow is active and deleted when you unsubscribe. Limited request metadata may be processed
               transiently for abuse prevention and rate limiting. Your email is only used to send the updates you
-              subscribed to, and the one-click unsubscribe in every email removes the active subscription immediately.
+              subscribed to, and the unsubscribe link in every email (one click in mail apps that support it) removes
+              the active subscription immediately.
             </p>
 
             <h3 className="text-text-secondary font-medium mb-2 mt-4">If you are an organiser with admin access</h3>
@@ -127,6 +137,10 @@ export default function PrivacyPage() {
                   <tr>
                     <td className="py-2 pr-4">Security audit log (IPs, events)</td>
                     <td className="py-2">90 days</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 pr-4">Shared schedule links, and a one-way visitor code per link</td>
+                    <td className="py-2">Expire after 30 days; deleted by the daily cleanup within a day after</td>
                   </tr>
                   <tr>
                     <td className="py-2 pr-4">Schedule-build visitor codes</td>
@@ -215,9 +229,9 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-text-primary text-lg font-semibold mb-3">CASL and commercial email</h2>
             <p>
-              All email communications require your express consent (double opt-in). Every email includes a one-click
-              unsubscribe link and identifies the sender as <strong className="text-text-secondary">SetTimes</strong>.
-              You can reach us at{' '}
+              All email communications require your express consent (double opt-in). Every email includes an unsubscribe
+              link (one click in mail apps that support it) and identifies the sender as{' '}
+              <strong className="text-text-secondary">SetTimes</strong>. You can reach us at{' '}
               <a
                 href="mailto:hello@settimes.ca"
                 className="text-accent-400 underline underline-offset-2 hover:text-accent-500 transition-colors"

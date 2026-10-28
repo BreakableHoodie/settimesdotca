@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { prepareBands } from '../bandUtils'
 import { getLifecycleLabel } from '../liveLabel'
-import { parseTorontoDateTime, torontoDateTimeLocal, torontoWallClockMs } from '../festivalDays'
+import { addTorontoDays, parseTorontoDateTime, torontoDateTimeLocal, torontoWallClockMs } from '../festivalDays'
 import { filterPerformancesByTime, isHappeningNow, isHappeningToday } from '../timeFilter'
 
 const ZONES = ['America/Toronto', 'Europe/London', 'America/Vancouver', 'Asia/Tokyo']
@@ -31,6 +31,18 @@ describe.each(ZONES)('Toronto clock in %s', zone => {
     expect(torontoWallClockMs('2026-03-08', '03:30')).toBe(Date.UTC(2026, 2, 8, 7, 30))
     expect(torontoWallClockMs('2026-03-08', '05:00')).toBe(Date.UTC(2026, 2, 8, 9, 0))
     expect(torontoWallClockMs('2026-11-01', '03:00')).toBe(Date.UTC(2026, 10, 1, 8, 0))
+  })
+
+  it('advances by calendar days across DST nights, not by 24 elapsed hours', () => {
+    // Fall back: 2026-11-01 lasts 25 hours, so midnight + 24h is still Nov 1.
+    expect(addTorontoDays('2026-11-01', 1)).toBe('2026-11-02')
+    expect(addTorontoDays('2026-11-02', -1)).toBe('2026-11-01')
+    // Spring forward: 2026-03-08 lasts 23 hours.
+    expect(addTorontoDays('2026-03-08', 1)).toBe('2026-03-09')
+    expect(addTorontoDays('2026-03-07', 2)).toBe('2026-03-09')
+    // The same rule through prepareBands: an after-midnight set on the fall-back night.
+    const [set] = prepareBands([{ date: '2026-11-01', startTime: '00:30', endTime: '01:00' }])
+    expect(set.startMs).toBe(torontoWallClockMs('2026-11-02', '00:30'))
   })
 
   it('round-trips the debug clock input as Toronto time', () => {

@@ -276,7 +276,7 @@ jobs:
     # A failed image lookup SKIPS edge-e2e rather than failing it, but the run
     # still fails and deploy-reconcile still holds the deploy, so report both.
     # A cancelled run is not reported: reconcile re-dispatches it.
-    if: always() && github.event_name != 'pull_request' && (needs.edge-e2e.result == 'failure' || needs.playwright-image.result == 'failure')
+    if: always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && (needs.edge-e2e.result == 'failure' || needs.playwright-image.result == 'failure')
     needs: [playwright-image, edge-e2e]
     timeout-minutes: 5
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
@@ -297,7 +297,7 @@ jobs:
           SHA: $COMMIT_SHA
 
           The production deploy of this commit is held by deploy-reconcile until the edge suite passes. If this is the #1409 flake, re-run the failed job; the next reconcile (within 30 min) deploys."
-          issue_number=$(gh issue list --repo "$REPOSITORY" --state open --json number,title --jq ".[] | select(.title == \"$issue_title\") | .number" | tr -d '\n')
+          issue_number=$(gh issue list --repo "$REPOSITORY" --state open --search "\"$issue_title\" in:title" --limit 100 --json number,title --jq ".[] | select(.title == \"$issue_title\") | .number" | head -n 1)
           if [ -n "$issue_number" ]; then
             gh issue comment "$issue_number" --repo "$REPOSITORY" --body "$body"
           else

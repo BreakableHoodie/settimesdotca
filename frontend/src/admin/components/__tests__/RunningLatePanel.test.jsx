@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import RunningLatePanel from '../RunningLatePanel'
@@ -186,5 +186,17 @@ describe('RunningLatePanel (#1249)', () => {
     renderPanel()
     await waitFor(() => expect(eventsApi.getVenueDelays).toHaveBeenCalled())
     expect(screen.queryByRole('heading', { name: 'Running late?' })).not.toBeInTheDocument()
+  })
+
+  it('shows a load error and retries the venue delay request', async () => {
+    eventsApi.getVenueDelays.mockRejectedValueOnce(new Error('network down')).mockResolvedValueOnce({ delays: DELAYS })
+    renderPanel()
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent("Couldn't load running-late status.")
+    fireEvent.click(within(alert).getByRole('button', { name: 'Retry' }))
+
+    expect(await screen.findByText('running about 15 min late')).toBeInTheDocument()
+    expect(eventsApi.getVenueDelays).toHaveBeenCalledTimes(2)
   })
 })

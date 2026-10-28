@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { eventsApi } from '../../utils/adminApi'
+import LoadError from './LoadError'
 
 // "Venue running late" (#1249): one tap moves every remaining set at a venue
 // and shows fans a banner. Built for a phone mid-show: presets, a custom
@@ -24,6 +25,7 @@ function describeError(err) {
 
 export default function RunningLatePanel({ eventId, readOnly = false, showToast, onShifted }) {
   const [delays, setDelays] = useState([])
+  const [loadError, setLoadError] = useState(false)
   // Requests in flight, keyed by EVENT and venue. A set, not one id: tapping
   // B while A is in flight must not let A's reply re-enable B. Keyed by event
   // and never reset on an event switch: A -> B -> A while A's shift is still
@@ -52,12 +54,14 @@ export default function RunningLatePanel({ eventId, readOnly = false, showToast,
 
   const load = useCallback(async () => {
     if (!eventId) return
+    setLoadError(false)
     try {
       const res = await eventsApi.getVenueDelays(eventId)
       if (isStale(eventId)) return
       setDelays(res.delays || [])
     } catch (err) {
       if (isStale(eventId)) return
+      setLoadError(true)
       showToast?.(`Could not load running-late status: ${err.message}`, 'error')
     }
   }, [eventId, showToast])
@@ -111,6 +115,7 @@ export default function RunningLatePanel({ eventId, readOnly = false, showToast,
     }
   }
 
+  if (loadError) return <LoadError what="running-late status" onRetry={load} />
   if (delays.length === 0) return null
 
   return (

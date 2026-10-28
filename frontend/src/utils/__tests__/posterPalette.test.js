@@ -269,6 +269,20 @@ describe('readableThemeColours', () => {
     expect(edited.light.accent).toBe('#ffff00')
   })
 
+  it('repairs now-fill contrast against each variant ink', () => {
+    const edited = {
+      v: 1,
+      source: 'manual',
+      poster: POSTER,
+      light: { ground: '#ffffff', ink: '#333333', accent: '#222222', nowFill: '#333333' },
+      dark: { ground: '#111111', ink: '#333333', accent: '#eeeeee', nowFill: '#333333' },
+    }
+    const out = readableThemeColours(edited)
+
+    expect(contrastRatio(out.light.nowFill, out.light.ink)).toBeGreaterThanOrEqual(AA_TEXT)
+    expect(contrastRatio(out.dark.nowFill, out.dark.ink)).toBeGreaterThanOrEqual(AA_TEXT)
+  })
+
   it('leaves an already-readable palette unchanged', () => {
     const palette = mapPaletteRoles(CASES['Vol 17-like'], POSTER)
     expect(readableThemeColours(palette)).toEqual(palette)

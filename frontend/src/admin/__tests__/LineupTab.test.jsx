@@ -30,6 +30,7 @@ vi.mock('../../utils/adminApi', () => ({
   },
   eventsApi: {
     getMetrics: vi.fn(),
+    getVenueDelays: vi.fn(),
     updateSchedule: vi.fn(),
   },
   venuesApi: {
@@ -241,6 +242,7 @@ beforeEach(() => {
   bandsApi.getByEvent.mockResolvedValue({ bands: [] })
   bandsApi.getAll.mockResolvedValue({ bands: [] })
   eventsApi.getMetrics.mockResolvedValue({ metrics: { announcementPlanning: [] } })
+  eventsApi.getVenueDelays.mockResolvedValue({ delays: [] })
 })
 
 describe('LineupTab — no event selected', () => {

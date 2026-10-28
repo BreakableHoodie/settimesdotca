@@ -28,6 +28,9 @@ describe.each(ZONES)('Toronto clock in %s', zone => {
     expect(torontoWallClockMs('2026-11-01', '01:30')).toBe(Date.UTC(2026, 10, 1, 5, 30))
     // Spring forward: 02:30 does not exist; it moves forward to 03:30 EDT.
     expect(torontoWallClockMs('2027-03-14', '02:30')).toBe(Date.UTC(2027, 2, 14, 7, 30))
+    expect(torontoWallClockMs('2026-03-08', '03:30')).toBe(Date.UTC(2026, 2, 8, 7, 30))
+    expect(torontoWallClockMs('2026-03-08', '05:00')).toBe(Date.UTC(2026, 2, 8, 9, 0))
+    expect(torontoWallClockMs('2026-11-01', '03:00')).toBe(Date.UTC(2026, 10, 1, 8, 0))
   })
 
   it('round-trips the debug clock input as Toronto time', () => {

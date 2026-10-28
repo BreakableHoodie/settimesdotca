@@ -73,11 +73,13 @@ describe('visit emission', () => {
   })
 
   it('sends at most one visit when sessionStorage throws', async () => {
-    vi.spyOn(window.Storage.prototype, 'getItem').mockImplementation(() => {
-      throw new Error('blocked')
-    })
-    vi.spyOn(window.Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new Error('blocked')
+    vi.spyOn(window, 'sessionStorage', 'get').mockReturnValue({
+      getItem() {
+        throw new Error('blocked')
+      },
+      setItem() {
+        throw new Error('blocked')
+      },
     })
     await load()
     trackPageView('/')

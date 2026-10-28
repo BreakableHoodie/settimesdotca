@@ -86,7 +86,20 @@ export async function onRequestPost(context) {
       return new Response("OK", { status: 200 });
     }
 
-    const validEvents = rawEvents.map(sanitizeEvent).filter(Boolean).slice(0, 50);
+    // A browser sends one `visit` per session, so a request carries at most
+    // one: a hand-made POST of 50 visit events must not count 50, in D1 or in
+    // Analytics Engine (#1246 Q3).
+    let sawVisit = false;
+    const validEvents = rawEvents
+      .map(sanitizeEvent)
+      .filter(Boolean)
+      .slice(0, 50)
+      .filter((event) => {
+        if (event.event !== "visit") return true;
+        if (sawVisit) return false;
+        sawVisit = true;
+        return true;
+      });
 
     if (validEvents.length === 0) {
       return new Response("OK", { status: 200 });
@@ -118,8 +131,6 @@ export async function onRequestPost(context) {
       const bandViewCounts = new Map();
       const socialClickCounts = new Map();
       const pageCounts = new Map(); // page path → count
-      // A browser sends one `visit` per session, so a request counts at most
-      // one: a hand-made POST of 50 visit events must not add 50 (#1246 Q3).
       let visitBucket = null;
       const eventViewCounts = new Map();
       const ticketClickCounts = new Map();
@@ -151,7 +162,7 @@ export async function onRequestPost(context) {
           }
         }
 
-        if (event.event === "visit" && visitBucket === null) {
+        if (event.event === "visit") {
           visitBucket = event.props.referrer_bucket;
         }
 

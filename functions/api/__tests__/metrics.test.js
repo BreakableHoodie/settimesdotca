@@ -176,6 +176,23 @@ describe("POST /api/metrics — referrer buckets (#1246 Q3)", () => {
     }
   });
 
+  test("sends one visit to Analytics Engine however many a request carries", async () => {
+    const { env } = createTestEnv();
+    env.ANALYTICS = { writeDataPoint: vi.fn() };
+
+    await onRequestPost({
+      request: makeRequest([
+        { event: "visit", props: { referrer_bucket: "google" } },
+        { event: "visit", props: { referrer_bucket: "instagram" } },
+        { event: "visit", props: { referrer_bucket: "direct" } },
+      ]),
+      env,
+    });
+
+    const visits = env.ANALYTICS.writeDataPoint.mock.calls.filter(([point]) => point.blobs[0] === "visit");
+    expect(visits).toHaveLength(1);
+  });
+
   test("drops forged referrer labels", async () => {
     const { env, rawDb } = createTestEnv();
     env.ANALYTICS = { writeDataPoint: vi.fn() };

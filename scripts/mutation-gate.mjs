@@ -1686,6 +1686,15 @@ export const MUTATIONS = [
     tests: ["functions/api/__tests__/metrics.test.js"],
   },
   {
+    id: "referrer-one-visit-per-request",
+    invariant:
+      "CLAUDE.md 'Metrics & Analytics' — a request counts one visit, in D1 and Analytics Engine, however many it carries (#1246 Q3)",
+    file: "functions/api/metrics.js",
+    find: "        if (sawVisit) return false;",
+    replace: "        if (false) return false;",
+    tests: ["functions/api/__tests__/metrics.test.js"],
+  },
+  {
     id: "referrer-reader-window-lower-bound",
     invariant:
       "CLAUDE.md 'Metrics & Analytics' — admin referrer totals start 14 days before the event's first date (#1246 Q3)",

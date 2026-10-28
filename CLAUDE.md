@@ -456,7 +456,7 @@ Metrics write to D1 daily-aggregate tables (`page_views_daily`, `artist_daily_st
 
 The expiry cron folds expired links into `event_share_totals` in the same batch, under one bound cutoff; readers add live and folded totals. Per-route detail is not kept.
 
-**`view_count` is unique visitors per link, all-time — not fetches (#705).** It is a _derived_ value: `GET /api/schedule/share/[slug]` writes one `share_link_views(slug, visitor_hash)` row per visitor and recomputes `view_count` as `COUNT(*)` over that ledger, both in a single `DB.batch()`. Do not "optimise" it back to `view_count = view_count + 1`: the ledger row claims the slot permanently, so if a separate increment were lost the visitor could never be counted again, whereas a recomputed count self-heals on the next visit.
+**`view_count` is unique visitors per link — not fetches (#705).** It is a _derived_ value: `GET /api/schedule/share/[slug]` writes one `share_link_views(slug, visitor_hash)` row per visitor and recomputes `view_count` as `COUNT(*)` over that ledger, both in a single `DB.batch()`. The ledger uses an HKDF-derived HMAC keyed from `CSRF_SECRET`; missing keys record nothing (plain IP hashes are reversible). Never increment directly: recomputing from `COUNT(*)` self-heals dropped updates.
 
 Two traps around this:
 

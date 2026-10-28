@@ -360,7 +360,7 @@ One row per (share link, visitor). The dedupe ledger behind `share_links.view_co
 | Column         | Type | Notes                                                                                                                                                                                             |
 | -------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `slug`         | TEXT | NOT NULL, part of PK, FK → `share_links(slug)` ON DELETE CASCADE                                                                                                                                  |
-| `visitor_hash` | TEXT | NOT NULL, part of PK — SHA-256 of `ip\|user-agent\|slug` (`functions/utils/visitorDedupe.js`). The raw IP is never stored; the slug salts each link so a visitor is not correlatable across links |
+| `visitor_hash` | TEXT | NOT NULL, part of PK — HMAC-SHA-256 of `ip\|user-agent\|slug`, keyed from `CSRF_SECRET` via HKDF (`functions/utils/visitorDedupe.js`). The raw IP is never stored; the slug still separates each link |
 | `first_seen`   | TEXT | NOT NULL, DEFAULT `datetime('now')` — written only by the default, never from JS                                                                                                                  |
 
 Index: `idx_share_link_views_slug(slug)`.

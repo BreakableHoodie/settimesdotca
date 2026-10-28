@@ -161,6 +161,34 @@ export const MUTATIONS = [
     tests: ["functions/api/schedule/__tests__/build.test.js"],
   },
   {
+    id: "share-visitor-code-is-keyed",
+    invariant:
+      "CLAUDE.md 'Metrics & Analytics' — share-link visitor codes use keyed HMAC rather than a reversible plain hash",
+    file: "functions/utils/visitorDedupe.js",
+    find: '  const digest = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(material));',
+    replace: '  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(material));',
+    tests: ["functions/utils/__tests__/visitorDedupe.test.js"],
+  },
+  {
+    id: "share-visitor-code-derives-purpose-key",
+    invariant:
+      "CLAUDE.md 'Metrics & Analytics' — share-link visitor codes use an HKDF-derived key rather than the raw CSRF_SECRET",
+    file: "functions/utils/visitorDedupe.js",
+    find: "  const key = await getDerivedKey(secret);",
+    replace:
+      '  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);',
+    tests: ["functions/utils/__tests__/visitorDedupe.test.js"],
+  },
+  {
+    id: "share-visitor-code-missing-secret-no-fallback",
+    invariant:
+      "CLAUDE.md 'Metrics & Analytics' — a missing CSRF_SECRET records no share-link visitor code rather than falling back to an unkeyed value",
+    file: "functions/utils/visitorDedupe.js",
+    find: '  if (typeof secret !== "string" || secret.length === 0) return undefined;',
+    replace: '  if (typeof secret !== "string" || secret.length === 0) return "unkeyed";',
+    tests: ["functions/utils/__tests__/visitorDedupe.test.js", "functions/api/schedule/__tests__/share-get.test.js"],
+  },
+  {
     id: "schedule-builds-retention-window",
     invariant:
       "CLAUDE.md 'Schedule builds are per-event pseudonyms, anonymised 30 days after the event (#1245)' — recent events remain pseudonymous until 30 days after conclusion",

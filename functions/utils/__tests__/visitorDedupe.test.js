@@ -9,6 +9,7 @@ const CHROME =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 const SAFARI_IOS =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1";
+const ENV = { CSRF_SECRET: "test-csrf-secret" };
 
 function req(ip, userAgent) {
   const headers = new Headers();
@@ -70,27 +71,48 @@ describe("isLikelyCrawler", () => {
 
 describe("visitorHash", () => {
   it("returns a 64-char lowercase hex digest", async () => {
-    const hash = await visitorHash(req(IP_A, CHROME), "abc123");
+    const hash = await visitorHash(req(IP_A, CHROME), "abc123", ENV);
     expect(hash).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it("is stable for the same visitor and link", async () => {
-    const a = await visitorHash(req(IP_A, CHROME), "abc123");
-    const b = await visitorHash(req(IP_A, CHROME), "abc123");
+    const a = await visitorHash(req(IP_A, CHROME), "abc123", ENV);
+    const b = await visitorHash(req(IP_A, CHROME), "abc123", ENV);
     expect(a).toBe(b);
   });
 
   it("differs when the IP, the User-Agent, or the slug differs", async () => {
-    const base = await visitorHash(req(IP_A, CHROME), "abc123");
-    expect(await visitorHash(req(IP_B, CHROME), "abc123")).not.toBe(base);
-    expect(await visitorHash(req(IP_A, SAFARI_IOS), "abc123")).not.toBe(base);
+    const base = await visitorHash(req(IP_A, CHROME), "abc123", ENV);
+    expect(await visitorHash(req(IP_B, CHROME), "abc123", ENV)).not.toBe(base);
+    expect(await visitorHash(req(IP_A, SAFARI_IOS), "abc123", ENV)).not.toBe(base);
     // Per-link salting: the same person on a different link must not be
     // correlatable across the ledger.
-    expect(await visitorHash(req(IP_A, CHROME), "xyz789")).not.toBe(base);
+    expect(await visitorHash(req(IP_A, CHROME), "xyz789", ENV)).not.toBe(base);
   });
 
   it("never contains the raw IP", async () => {
-    const hash = await visitorHash(req(IP_A, CHROME), "abc123");
+    const hash = await visitorHash(req(IP_A, CHROME), "abc123", ENV);
     expect(hash).not.toContain(IP_A);
+  });
+
+  it("is keyed and not the old unkeyed SHA-256 digest", async () => {
+    const material = `${IP_A}|${CHROME}|abc123`;
+    const oldDigest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(material));
+    const oldHash = [...new Uint8Array(oldDigest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+
+    expect(await visitorHash(req(IP_A, CHROME), "abc123", ENV)).not.toBe(oldHash);
+    expect(await visitorHash(req(IP_A, CHROME), "abc123", { CSRF_SECRET: "different-secret" })).not.toBe(
+      await visitorHash(req(IP_A, CHROME), "abc123", ENV),
+    );
+  });
+
+  it("uses the HKDF-derived key and purpose label", async () => {
+    expect(await visitorHash(req(IP_A, "test-agent"), "abc123", ENV)).toBe(
+      "bf97cbeb812df9a93a382d8feb7a6a7e6b817dcd8c539a3b7923e51eb17e6b18",
+    );
+  });
+
+  it("returns no code when the server secret is missing", async () => {
+    await expect(visitorHash(req(IP_A, CHROME), "abc123", {})).resolves.toBeUndefined();
   });
 });

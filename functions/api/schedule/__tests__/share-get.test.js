@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { onRequestGet } from "../share/[slug].js";
 import { createTestEnv, insertEvent, insertShareLink } from "../../test-utils.js";
 
@@ -23,6 +23,10 @@ function callAsVisitor(env, slug, ip, userAgent) {
 }
 
 describe("GET /api/schedule/share/[slug]", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   function makeRequest(slug) {
     return new Request(`https://example.test/api/schedule/share/${slug}`);
   }
@@ -122,6 +126,28 @@ describe("GET /api/schedule/share/[slug]", () => {
     // The ledger backs the count: one row per distinct visitor.
     const ledger = rawDb.prepare("SELECT COUNT(*) AS n FROM share_link_views WHERE slug = ?").get("view1234");
     expect(ledger.n).toBe(2);
+  });
+
+  test("does not write a visitor row when CSRF_SECRET is missing", async () => {
+    const { env, rawDb } = createTestEnv();
+    delete env.CSRF_SECRET;
+    const event = insertEvent(rawDb, { name: "My Fest", slug: "my-fest" });
+    rawDb.prepare("UPDATE events SET status = 'published' WHERE id = ?").run(event.id);
+    insertShareLink(rawDb, {
+      slug: "nokey123",
+      event_id: event.id,
+      event_slug: "my-fest",
+      performance_ids: [10],
+      band_names: ["Band A"],
+    });
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await callAsVisitor(env, "nokey123", IP_A, CHROME_UA);
+
+    expect(res.status).toBe(200);
+    expect(rawDb.prepare("SELECT view_count FROM share_links WHERE slug = ?").get("nokey123").view_count).toBe(0);
+    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM share_link_views WHERE slug = ?").get("nokey123").n).toBe(0);
+    expect(error).toHaveBeenCalledWith("Share view ledger skipped: CSRF_SECRET is missing", "nokey123");
   });
 
   test("never writes an orphan ledger row when the parent link is gone (#705)", async () => {
@@ -273,8 +299,8 @@ describe("GET /api/schedule/share/[slug]", () => {
       band_names: ["Band A"],
     });
 
-    // Must present as a real visitor: since #705 a UA-less request is treated
-    // as a crawler and counts nothing.
+    // Must present as a real visitor so this test exercises the normal counter
+    // path rather than the crawler exclusion.
     await callAsVisitor(env, "normal01", IP_A, CHROME_UA);
 
     const row = rawDb.prepare("SELECT view_count, import_count FROM share_links WHERE slug = ?").get("normal01");

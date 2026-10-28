@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { ArrowLeft } from 'lucide-react'
@@ -79,8 +79,14 @@ export default function HistoryPage() {
     trackPageView('/history')
   }, [])
 
+  // One request at a time: a Retry aborts the request it replaces, and leaving
+  // the page aborts whichever is current, not just the first.
+  const controllerRef = useRef(null)
+
   const load = useCallback(() => {
+    controllerRef.current?.abort()
     const controller = new AbortController()
+    controllerRef.current = controller
     setError(null)
     setData(null)
     fetchPublicJson('/api/history', { signal: controller.signal }, 'Failed to load the editions')
@@ -88,10 +94,12 @@ export default function HistoryPage() {
       .catch(err => {
         if (err?.name !== 'AbortError') setError(err)
       })
-    return () => controller.abort()
   }, [])
 
-  useEffect(() => load(), [load])
+  useEffect(() => {
+    load()
+    return () => controllerRef.current?.abort()
+  }, [load])
 
   const editions = data?.editions ?? []
   const oldest = editions.at(-1)

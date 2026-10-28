@@ -148,4 +148,16 @@ describe('HistoryPage (#1250)', () => {
     expect(await screen.findByRole('link', { name: /Vol\. 19/ })).toHaveAttribute('href', '/event/lwbc19')
     await waitFor(() => expect(fetchPublicJson).toHaveBeenCalledTimes(2))
   })
+
+  it('aborts the Retry request, not just the first one, when the page is left', async () => {
+    fetchPublicJson.mockRejectedValueOnce(new Error('down')).mockImplementationOnce(() => new Promise(() => {}))
+    const { unmount } = renderPage()
+    const alert = await screen.findByRole('alert')
+    fireEvent.click(within(alert).getByRole('button', { name: 'Retry' }))
+    await waitFor(() => expect(fetchPublicJson).toHaveBeenCalledTimes(2))
+    const retrySignal = fetchPublicJson.mock.calls[1][1].signal
+    expect(retrySignal.aborted).toBe(false)
+    unmount()
+    expect(retrySignal.aborted).toBe(true)
+  })
 })

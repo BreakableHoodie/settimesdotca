@@ -70,9 +70,10 @@ export default function PrivacyPage() {
             <h3 className="text-text-secondary font-medium mb-2 mt-4">If you open a shared schedule link</h3>
             <p>
               When you open a schedule that someone shared, we store a one-way code made from your IP address and
-              browser, different for each link, only to count how many different people opened it. It is deleted along
-              with the link 30 days after the link is created. Once a link expires, only totals (how many links were
-              shared, opened and imported for an event) are kept, with no visitor information.
+              browser, different for each link, only to count how many different people opened it. A link stops working
+              30 days after it is created, and our daily cleanup deletes it, with its codes, within a day after that.
+              Once a link expires, only totals (how many links were shared, opened and imported for an event) are kept,
+              with no visitor information.
             </p>
 
             <h3 className="text-text-secondary font-medium mb-2 mt-4">
@@ -139,7 +140,7 @@ export default function PrivacyPage() {
                   </tr>
                   <tr>
                     <td className="py-2 pr-4">Shared schedule links, and a one-way visitor code per link</td>
-                    <td className="py-2">Deleted 30 days after the link is created</td>
+                    <td className="py-2">Expire after 30 days; deleted by the daily cleanup within a day after</td>
                   </tr>
                   <tr>
                     <td className="py-2 pr-4">Schedule-build visitor codes</td>

@@ -179,6 +179,36 @@ describe("expireShareLinks (#705 ledger cleanup)", () => {
 
     await expect(expireShareLinks({}, env, {})).resolves.toEqual({ failures: ["expire-share-links"] });
     expect(batchSpy).toHaveBeenCalled();
+  });
+
+  it("a failed sweep folds nothing, so the retry counts each link exactly once", async () => {
+    const db = createTestDB();
+    const event = seed(db);
+    db.prepare("UPDATE share_links SET view_count = 2, import_count = 3 WHERE slug = 'expired1'").run();
+    db.pragma("foreign_keys = OFF");
+    const env = { DB: createDBEnv(db) };
+
+    // Fail at EXECUTION time, inside the real transaction (a CHECK violation
+    // appended to the cron's own statements), so this proves rollback rather
+    // than a batch that never ran. A fold moved out of the batch would commit
+    // here and be counted again by the retry.
+    const realBatch = env.DB.batch.bind(env.DB);
+    vi.spyOn(env.DB, "batch").mockImplementationOnce((statements) =>
+      realBatch([
+        ...statements,
+        env.DB.prepare("INSERT INTO event_share_totals (event_id, shares) VALUES (?, -1)").bind(event.id + 1000),
+      ]),
+    );
+
+    await expect(expireShareLinks({}, env, {})).resolves.toEqual({ failures: ["expire-share-links"] });
     expect(db.prepare("SELECT COUNT(*) AS count FROM event_share_totals").get().count).toBe(0);
+    expect(db.prepare("SELECT COUNT(*) AS count FROM share_links WHERE slug = 'expired1'").get().count).toBe(1);
+
+    await expect(expireShareLinks({}, env, {})).resolves.toEqual({ failures: [] });
+    expect(db.prepare("SELECT * FROM event_share_totals WHERE event_id = ?").get(event.id)).toMatchObject({
+      shares: 1,
+      views: 2,
+      imports: 3,
+    });
   });
 });

@@ -73,7 +73,8 @@ export default function PrivacyPage() {
               from your IP address and browser, different for each link, only to count how many different people opened
               it. A link stops working 30 days after it is created, and our daily cleanup deletes it, with its codes,
               within a day after that. After that cleanup, only totals (how many links were shared, opened and imported
-              for an event) are kept, with no visitor information.
+              for an event) are kept, with no visitor information. Codes recorded before 28 October 2026 were not keyed;
+              they are deleted with their links, all of which expire by the end of November 2026.
             </p>
 
             <h3 className="text-text-secondary font-medium mb-2 mt-4">

@@ -52,15 +52,22 @@ export default function RunningLatePanel({ eventId, readOnly = false, showToast,
   }, [eventId])
   const isStale = forEventId => currentEventRef.current !== forEventId
 
+  // Only the latest load may set state. Checking the event alone is not
+  // enough: after A -> B -> A, an older A request failing late would pass
+  // isStale and leave the error up over the newer request's result.
+  const loadSeqRef = useRef(0)
+
   const load = useCallback(async () => {
     if (!eventId) return
+    const seq = ++loadSeqRef.current
+    const superseded = () => seq !== loadSeqRef.current || isStale(eventId)
     setLoadError(false)
     try {
       const res = await eventsApi.getVenueDelays(eventId)
-      if (isStale(eventId)) return
+      if (superseded()) return
       setDelays(res.delays || [])
     } catch (err) {
-      if (isStale(eventId)) return
+      if (superseded()) return
       setLoadError(true)
       showToast?.(`Could not load running-late status: ${err.message}`, 'error')
     }

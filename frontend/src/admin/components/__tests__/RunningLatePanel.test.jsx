@@ -126,6 +126,29 @@ describe('RunningLatePanel (#1249)', () => {
     expect(screen.getByText('Event B Hall')).toBeInTheDocument()
   })
 
+  it("A -> B -> A: the first A load failing late does not hide the second A load's result", async () => {
+    const rejecters = []
+    let call = 0
+    eventsApi.getVenueDelays.mockImplementation(eventId => {
+      if (eventId === 8) return Promise.resolve({ delays: [] })
+      call += 1
+      return call === 1
+        ? new Promise((_, reject) => {
+            rejecters.push(reject)
+          })
+        : Promise.resolve({ delays: DELAYS })
+    })
+    const props = { showToast: vi.fn(), onShifted: vi.fn() }
+    const { rerender } = render(<RunningLatePanel eventId={7} {...props} />)
+    rerender(<RunningLatePanel eventId={8} {...props} />)
+    rerender(<RunningLatePanel eventId={7} {...props} />)
+    expect(await screen.findByText('Blue Room')).toBeInTheDocument()
+    rejecters[0](new Error('the first A request failed late'))
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByText('Blue Room')).toBeInTheDocument()
+  })
+
   it("venue A's reply does not re-enable venue B while B's own shift is in flight", async () => {
     const resolvers = {}
     eventsApi.shiftVenue.mockImplementation(

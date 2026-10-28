@@ -72,7 +72,7 @@ export default function PrivacyPage() {
               When you open a schedule that someone shared, we store a one-way code made from your IP address and
               browser, different for each link, only to count how many different people opened it. A link stops working
               30 days after it is created, and our daily cleanup deletes it, with its codes, within a day after that.
-              Once a link expires, only totals (how many links were shared, opened and imported for an event) are kept,
+              After that cleanup, only totals (how many links were shared, opened and imported for an event) are kept,
               with no visitor information.
             </p>
 

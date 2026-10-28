@@ -8,6 +8,7 @@
 // readableThemeColours, then the contrast rules below, so a stored palette can
 // neither inject CSS nor make text unreadable.
 import { AA_TEXT, composite, ensureContrast, mix, relativeLuminance } from './colour'
+import { readableThemeColours } from './posterPalette'
 
 // The strongest accent-500 tint that carries accent-400 text: hover:bg-accent-500/30.
 const MAX_TEXT_TINT_ALPHA = 0.3
@@ -15,7 +16,6 @@ const MAX_TEXT_TINT_ALPHA = 0.3
 // sRGB units darker than the exact composite, so a 4.5 target measured 4.47 on
 // screen (#1396). The margin keeps the painted result at AA.
 const TINT_CONTRAST_MARGIN = 0.15
-import { readableThemeColours } from './posterPalette'
 
 /**
  * The palette that applies to this event, or null for the house theme:
@@ -38,11 +38,6 @@ export function applicablePalette(eventData) {
 }
 
 /**
- * CSS custom properties for one variant ({ ground, ink, accent, nowFill }).
- * Derived tones are mixed between ink and ground and re-checked, because the
- * theme's own tokens were tuned per theme and these must hold for any poster.
- */
-/**
  * `colour`, moved only in one direction (toward black when `towardBlack`),
  * until it reads at `ratio` on every surface. The direction comes from the
  * caller's ground: choosing it per surface once picked white on a mid-grey
@@ -56,6 +51,11 @@ function readableOnAll(colour, surfaces, ratio, towardBlack) {
   return surfaces.reduce((out, surface) => ensureContrast(out, surface, ratio, towardBlack), colour)
 }
 
+/**
+ * CSS custom properties for one variant ({ ground, ink, accent, nowFill }).
+ * Derived tones are mixed between ink and ground and re-checked, because the
+ * theme's own tokens were tuned per theme and these must hold for any poster.
+ */
 export function posterThemeVariables({ ground, ink, accent, nowFill }) {
   const tone = t => mix(ground, ink, t)
   // accent-500/600 are FILLS under ground-coloured text (text-bg-navy).

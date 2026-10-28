@@ -2,7 +2,7 @@
 
 Canonical active roadmap for SetTimes.ca. Use this file for handoffs between Claude, OpenCode, and humans.
 
-Last updated: 2026-10-26
+Last updated: 2026-10-28
 
 ## Mission
 
@@ -12,7 +12,7 @@ Build SetTimes.ca into the best lean, multi-venue and multi-artist event platfor
 
 - Long Weekend Band Crawl Vol. 18 (event 37, `lwbc18`, 2026-10-11) ran and was archived on 2026-10-13.
 - Vol. 17 and Buddies Fest 2 are archived editions with live historical data.
-- The site is between seasons: event-driven surfaces have 0 upcoming events and 10 past events; the iCal feed has 0 `VEVENT`s because it joins performances.
+- The site is between seasons: event-driven surfaces have 0 upcoming events and a first page of 10 past events (the timeline default; 20 archived editions in total); the iCal feed has 0 `VEVENT`s because it joins performances.
 - When the next edition is published before its lineup is announced, the same iCal zero means "published event, lineup not announced". Always check event status and performance rows separately.
 - Archived events remain visible on browse and history surfaces. Public visibility is governed by `status`, not a retired publication column.
 
@@ -35,30 +35,28 @@ Build SetTimes.ca into the best lean, multi-venue and multi-artist event platfor
 
 ## Open Work
 
-### Security and correctness
+### Privacy and security (from the 2026-10-28 report card)
 
-- #1292 — Production reality: 7 of 9 critical flows are never verified against the real edge runtime
-- #1287 — security(rbac): add a CHECK constraint to users.role
-- #1286 — Security digest: action required
-- #1273 — Production API responses send CSP as report-only, not enforced
-- #1255 — security(rbac): full review — invite double-redeem race, UI/server mismatches, 16 untested boundaries
-- #1253 — security: require 2FA for admin (and possibly editor) accounts
-- #1247 — security: 31 alerts triaged; frozen Semgrep alerts and pinned overrides hid them; add a weekly digest
-- ~~#1267~~ — postcss-selector-parser advisory fixed by a scoped override (2026-10-26)
-
-### Product and show operations
-
-- #1250 — feat(archive): poster wall + cross-edition history
-- #1249 — feat(show-night): one-tap venue running late +N min with a fan banner
-- #1248 — design: poster-led event pages and venue stamp inks
-- #1298 — Send List-Unsubscribe and List-Unsubscribe-Post headers on announcement and subscriber mail
+- #1414 — the share-link visitor code is an unsalted hash of IP + user agent
+- #1415 — CASL sender footer, a dead `sessions` table holding IPs, the last plaintext email tokens
+- #1413 — workers-mcp 0.0.13 is abandoned and fronts production D1
 
 ### Performance and metrics
 
-- #1270 — schedule + events/public drop the current event at 2 AM EDT, not at the 6 AM festival-day threshold
-- #1265 — in-app artist clicks count two page views after the client redirect
 - #1246 — question-driven metrics plan
-- #1243 — Pages Functions exceed the 10ms CPU limit; 15% of invocations are killed as 503
+- #1411 — the metrics beacon awaits six sequential D1 writes; the artist batch is not isolated
+- #1412 — the home timeline re-downloads every past edition every 60 s between seasons
+
+### CI and tests
+
+- #1410 — Dependabot merges skip the edge suite; it is not required; iCal rendering is not exercised on the edge
+- #1416 — a frontend mutation gate
+- #1395 — ci(e2e): remove the hosted-runner apt path once the Playwright image has been stable
+- #1409 — ci(edge-e2e): pages stuck on the "Loading..." shell on the preview (one occurrence)
+
+### Code health
+
+- #1417 — the event wizard's private conflict checker and UTC date cutoff
 
 ## Reference Docs
 

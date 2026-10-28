@@ -103,6 +103,9 @@ One row per band-crawl event (e.g. Vol. 16, Vol. 17).
 | `updated_by_user_id` | INTEGER | Nullable, FK → `users(id)`                                                                                                                                                  |
 | `created_at`         | TEXT    | NOT NULL, DEFAULT `datetime('now')`                                                                                                                                         |
 | `updated_at`         | TEXT    | DEFAULT `datetime('now')`, bumped on UPDATE by the `update_events_timestamp` trigger                                                                                        |
+| `doors_json` | TEXT | Nullable (JSON) — map of festival date → `HH:MM` doors time; migration 0052, validated by `validateDoorsJson()` |
+| `poster_url` | TEXT | Nullable — event poster image URL (R2); migration 0053. Edition-specific, so duplication does not copy it |
+| `age_restriction` | TEXT | Nullable — migration 0062 |
 
 Indexes: `idx_events_slug(slug)`, `idx_events_status(status)`,
 `idx_events_archived(archived_at)`,
@@ -137,6 +140,7 @@ Shared physical venues, reused across events.
 | `city`               | TEXT    | Nullable — added in migration 0021                                                    |
 | `latitude`           | REAL    | Nullable — added in migration 0043, seeded for the 6 Vol. 17 King St N venues in 0044 |
 | `longitude`          | REAL    | Nullable — same as above                                                              |
+| `ink_color` | TEXT | Nullable, `CHECK` lowercase `#rrggbb` — the venue stamp ink, fixed across editions; migration 0076 (see CLAUDE.md "Poster-led event palettes and venue stamp inks") |
 
 There is no `capacity` column (that was a phantom bootstrap-only field before
 #506). No indexes beyond the implicit one on the `UNIQUE` `name` column.
@@ -166,6 +170,8 @@ The reusable band identity — separate from any single event's schedule.
 | `total_social_clicks` | INTEGER | DEFAULT 0 — same aggregation job                                                                     |
 | `popularity_score`    | REAL    | DEFAULT 0 — `page_views*1 + social_clicks*3` (formula updated in migration 0048)                     |
 | `photo_alt_text`      | TEXT    | Nullable — added in migration 0042                                                                   |
+| `members` | TEXT | Nullable — migration 0063 |
+| `for_fans_of` | TEXT | Nullable — migration 0063 |
 
 There are no `url`, `band_name`, `bio`, `genres`, `hometown`, `formed_year`, or
 `website` columns — those were phantom bootstrap-only fields before #506.
@@ -195,6 +201,7 @@ event-specific "who's playing when/where."
 | `updated_by_user_id`   | INTEGER | Nullable, FK → `users(id)`                                                                                                                                                                                     |
 | `updated_at`           | TEXT    | DEFAULT `datetime('now')`, bumped on UPDATE by the `update_performances_timestamp` trigger (defined in `migrations/0033_restore_performances_trigger.sql`, present in `setup-complete.sql`)                    |
 | `performance_date`     | TEXT    | Nullable — festival-day calendar date the set belongs to; NULL inherits `event.date` (multi-day support — #543). The 6 AM boundary is the existing after-midnight convention (`AFTER_MIDNIGHT_THRESHOLD_HOUR`) |
+| `is_cancelled` | INTEGER | NOT NULL, DEFAULT 0 — a pulled set stays visible, struck through; migration 0056 (see CLAUDE.md "Pulling a band from a live lineup") |
 
 There are no `band_id`, `band_name`, or `stage` columns — those were phantom
 bootstrap-only fields before #506; no migration ever created them. Indexes:
@@ -206,6 +213,25 @@ bootstrap-only fields before #506; no migration ever created them. Indexes:
 The table was dropped and recreated in migration 0032 (SQLite has no
 `ALTER COLUMN`) to make `venue_id`/`start_time`/`end_time` nullable for
 schedule-first entry flows.
+
+#### `event_venue_delays`
+
+One row per (event, venue) holding that venue's cumulative "running late"
+delay for the fan banner. The set times themselves are shifted in
+`performances`; this row is the banner and the concurrency anchor for the
+shift (see CLAUDE.md "Venue running late"). Added in migration 0075.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `event_id` | INTEGER | NOT NULL, FK → `events(id)` ON DELETE CASCADE |
+| `venue_id` | INTEGER | NOT NULL, FK → `venues(id)` ON DELETE CASCADE |
+| `delay_minutes` | INTEGER | NOT NULL, DEFAULT 0, `CHECK` 0-600 |
+| `revision` | INTEGER | NOT NULL, DEFAULT 1 — compare-and-swap anchor for a shift |
+| `last_shift_id` | TEXT | NOT NULL — the nonce of the request that last claimed the row |
+| `updated_at` | TEXT | NOT NULL, DEFAULT `datetime('now')` |
+| `updated_by` | INTEGER | Nullable, FK → `users(id)` ON DELETE SET NULL |
+
+Constraint: `PRIMARY KEY(event_id, venue_id)`.
 
 ### Legacy / compatibility
 
@@ -487,6 +513,9 @@ hashes are anonymised 30 days after the event.
 | `created_at`                  | TEXT    | NOT NULL, DEFAULT `datetime('now')`                                                 |
 | `last_login`                  | TEXT    | Nullable                                                                            |
 | `updated_at`                  | TEXT    | DEFAULT `datetime('now')`, bumped on UPDATE by the `update_users_timestamp` trigger |
+| `totp_last_step` | INTEGER | Nullable — the last accepted TOTP time step; a code is accepted once per step; migration 0072 |
+| `totp_pending_secret` | TEXT | Nullable — secret for an in-progress re-enrolment; never authenticates anything; migration 0073 |
+| `totp_pending_set_at` | INTEGER | Nullable — Unix seconds when the pending secret was set; migration 0073 (enable refuses it after 15 minutes) |
 
 Indexes: `idx_users_email(email)`, `idx_users_role(role)`,
 `idx_users_activation_token(activation_token)`.
@@ -507,6 +536,7 @@ packages themselves were removed). Added in migration 0024.
 | `remember_me`      | INTEGER | DEFAULT 0                                                         |
 | `created_at`       | TEXT    | NOT NULL, DEFAULT `datetime('now')`                               |
 | `last_activity_at` | TEXT    | NOT NULL, DEFAULT `datetime('now')`                               |
+| `step_up_at` | INTEGER | Nullable — Unix seconds of the last step-up re-authentication on this session; NULL on every new session; migration 0070 |
 
 Indexes: `idx_lucia_sessions_user_id(user_id)`,
 `idx_lucia_sessions_expires_at(expires_at)`.
@@ -645,8 +675,9 @@ General admin-action audit trail (e.g. user role changes) — read by
 | `details`       | TEXT    | Nullable (JSON)                               |
 | `ip_address`    | TEXT    | Nullable                                      |
 | `created_at`    | TEXT    | DEFAULT `datetime('now')`                     |
+| `api_key_id` | INTEGER | Nullable, FK → `api_keys(id)` — which credential acted; NULL means cookie-authenticated; migration 0061 |
 
-Indexes: `idx_audit_log_user(user_id)`, `idx_audit_log_created(created_at)`,
+Indexes: `idx_audit_log_user(user_id)`, `idx_audit_log_api_key(api_key_id)`, `idx_audit_log_created(created_at)`,
 `idx_audit_log_action(action)`, `idx_audit_log_resource(resource_type, resource_id)`.
 
 #### `auth_audit`
@@ -770,6 +801,22 @@ Per-event, per-day aggregate counters.
 
 Constraint: `UNIQUE(event_id, date)`. Index: `idx_event_daily_stats_date(date)`.
 
+#### `event_hourly_views`
+
+The show-night usage curve (#1246 Q1): a count of event-page views per
+festival date and Toronto hour. Written by `POST /api/metrics` from
+`event_view` only, and only on the event's own festival dates. Aggregate
+counts only; there is no visitor key. Added in migration 0077.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `event_id` | INTEGER | NOT NULL, FK → `events(id)` ON DELETE CASCADE |
+| `festival_date` | TEXT | NOT NULL — the festival day, not the calendar day (01:30 counts as the previous evening) |
+| `hour` | INTEGER | NOT NULL, `CHECK` 0-23, Toronto-local hour |
+| `views` | INTEGER | NOT NULL, DEFAULT 0, `CHECK` >= 0 |
+
+Constraint: `PRIMARY KEY(event_id, festival_date, hour)`.
+
 #### `referrer_daily_stats`
 
 Site-wide daily counts of how visits started. Only the coarse referrer kind is
@@ -826,6 +873,17 @@ plain denormalized integers with no constraint, called out individually):
 | `subscription_unsubscribes`  | `subscription_id`    | `email_subscriptions(id)` | CASCADE   |
 | `schedule_builds`            | `event_id`           | `events(id)`              | CASCADE   |
 | `schedule_builds`            | `performance_id`     | `performances(id)`        | CASCADE   |
+| `audit_log` | `api_key_id` | `api_keys(id)` | (none) |
+| `api_keys` | `created_by` | `users(id)` | RESTRICT |
+| `event_daily_stats` | `event_id` | `events(id)` | CASCADE |
+| `share_link_views` | `slug` | `share_links(slug)` | CASCADE |
+| `subscription_notifications` | `event_id` | `events(id)` | CASCADE |
+| `subscription_notifications` | `subscription_id` | `email_subscriptions(id)` | CASCADE |
+| `event_venue_delays` | `event_id` | `events(id)` | CASCADE |
+| `event_venue_delays` | `venue_id` | `venues(id)` | CASCADE |
+| `event_venue_delays` | `updated_by` | `users(id)` | SET NULL |
+| `event_hourly_views` | `event_id` | `events(id)` | CASCADE |
+| `event_share_totals` | `event_id` | `events(id)` | CASCADE |
 
 The old "venues → bands (1:N)" world from earlier docs is gone entirely: the
 `bands` table was a hand-maintained-bootstrap-only relic (see "Legacy /

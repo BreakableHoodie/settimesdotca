@@ -13,9 +13,10 @@ import { safeExternalHref } from '../utils/urlSafety'
  * Renders nothing for a concluded event (`concluded`), or when the URL does
  * not survive safeExternalHref.
  *
- * Outlined, not tinted: the text sits on the page ground, the one surface
- * posterTheme.js checks accent-400 against for every poster palette. On a
- * 20% accent tint it measured 3.9-4.4:1 on light palettes (#1384 review).
+ * Outlined, not tinted: the text sits on the page ground, which posterTheme.js
+ * checks accent-400 against for every poster palette (along with the card
+ * surfaces and the hover tints, since #1396). On a 20% accent tint it
+ * measured 3.9-4.4:1 on light palettes (#1384 review).
  */
 function EventTicketLink({ eventId, ticketUrl, eventName, concluded = false }) {
   if (concluded) return null

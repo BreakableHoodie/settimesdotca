@@ -4,7 +4,7 @@
 // (functions/utils/__tests__/venueInk.test.js), while an outlined stamp in the
 // red ink falls to ~4.1:1 on the palest poster grounds. The name is the cue;
 // the ink is secondary, never the only one.
-import { contrastRatio } from '../utils/colour'
+import { AA_TEXT, contrastRatio } from '../utils/colour'
 
 const HEX = /^#[0-9a-f]{6}$/i
 const WHITE = '#ffffff'
@@ -27,7 +27,7 @@ export default function VenueStamp({ venue, short, ink, className = '' }) {
   const inked = typeof ink === 'string' && HEX.test(ink)
   // White on the curated inks (all pass 4.5:1); the column accepts any hex, so
   // a light ink gets black lettering instead of vanishing.
-  const lettering = inked && contrastRatio(WHITE, ink) >= 4.5 ? WHITE : BLACK
+  const lettering = inked && contrastRatio(WHITE, ink) >= AA_TEXT ? WHITE : BLACK
   return (
     <span
       title={venue && venue !== label ? venue : undefined}

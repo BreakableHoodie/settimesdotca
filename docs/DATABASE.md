@@ -770,6 +770,20 @@ Per-event, per-day aggregate counters.
 
 Constraint: `UNIQUE(event_id, date)`. Index: `idx_event_daily_stats_date(date)`.
 
+#### `referrer_daily_stats`
+
+Site-wide daily counts of how visits started. Only the coarse referrer kind is
+stored; no URL, visitor id, or other personal data is retained. Added in
+migration 0079 for the #1246 Q3 promotion question.
+
+| Column   | Type    | Notes                                                                       |
+| -------- | ------- | --------------------------------------------------------------------------- |
+| `date`   | TEXT    | NOT NULL, Toronto-local `YYYY-MM-DD`                                        |
+| `bucket` | TEXT    | One of `instagram`, `facebook`, `google`, `other_search`, `direct`, `other` |
+| `visits` | INTEGER | NOT NULL, non-negative aggregate count                                      |
+
+Constraint: `PRIMARY KEY(date, bucket)`. Kept indefinitely.
+
 ## Relationships
 
 Foreign keys as declared in `database/setup-complete.sql` (only columns with

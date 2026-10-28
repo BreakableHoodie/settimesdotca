@@ -14,12 +14,13 @@ const ALLOWED_EVENTS = new Set([
   "artist_profile_view",
   "social_link_click",
   "ticket_click",
-  "share_event",
-  "filter_use",
+  "visit",
   "turnstile_error",
 ]);
 
-const SAFE_KEYS = new Set(["band_profile_id", "event_id", "link_type", "page", "error_code"]);
+const SAFE_KEYS = new Set(["band_profile_id", "event_id", "link_type", "page", "error_code", "referrer_bucket"]);
+
+const REFERRER_BUCKETS = new Set(["instagram", "facebook", "google", "other_search", "direct", "other"]);
 
 // Props come from the browser and flow into Analytics Engine blobs, which cap
 // a datapoint at 16 KB. Every real value is a short path, link type, id or
@@ -46,6 +47,12 @@ function sanitizeEvent(raw) {
         safeProps[key] = value;
       }
     }
+  }
+
+  if (raw.event === "visit") {
+    if (!REFERRER_BUCKETS.has(safeProps.referrer_bucket)) return null;
+  } else {
+    delete safeProps.referrer_bucket;
   }
 
   return {
@@ -111,12 +118,9 @@ export async function onRequestPost(context) {
       const bandViewCounts = new Map();
       const socialClickCounts = new Map();
       const pageCounts = new Map(); // page path → count
-      // `share_event` and `filter_use` are allowlisted but deliberately have no
-      // consumer. A share CREATE is a share_links row and a share VIEW
-      // increments share_links.view_count, so persisting share_event here would
-      // double-count it — CLAUDE.md "Metrics & Analytics" forbids wiring it up.
-      // `filter_use` has no decision attached to it yet; it stays allowlisted so
-      // clients already emitting it are not rejected. Tracked in #706.
+      // A browser sends one `visit` per session, so a request counts at most
+      // one: a hand-made POST of 50 visit events must not add 50 (#1246 Q3).
+      let visitBucket = null;
       const eventViewCounts = new Map();
       const ticketClickCounts = new Map();
 
@@ -145,6 +149,10 @@ export async function onRequestPost(context) {
           if (eventId) {
             eventViewCounts.set(eventId, (eventViewCounts.get(eventId) || 0) + 1);
           }
+        }
+
+        if (event.event === "visit" && visitBucket === null) {
+          visitBucket = event.props.referrer_bucket;
         }
 
         if (event.event === "ticket_click") {
@@ -310,6 +318,24 @@ export async function onRequestPost(context) {
             statementCount: hourlyDue.length,
             festivalDate,
             hour,
+          });
+        }
+      }
+
+      if (visitBucket !== null) {
+        try {
+          await env.DB.prepare(
+            `INSERT INTO referrer_daily_stats (date, bucket, visits)
+             VALUES (?, ?, 1)
+             ON CONFLICT (date, bucket)
+             DO UPDATE SET visits = visits + 1`,
+          )
+            .bind(today, visitBucket)
+            .run();
+        } catch (err) {
+          logger.error("referrer_daily_stats upsert failed; this visit is lost", {
+            error: err,
+            bucket: visitBucket,
           });
         }
       }

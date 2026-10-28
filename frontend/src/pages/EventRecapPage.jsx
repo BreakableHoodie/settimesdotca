@@ -6,6 +6,7 @@ import { Alert, ImageLightbox, Loading } from '../components/ui'
 import PosterImage from '../components/PosterImage'
 import { buildBandProfileHref } from '../utils/bandProfileLink'
 import { fetchPublicJson } from '../utils/publicApi'
+import { trackVisitOnce } from '../utils/metrics'
 import { parseLocalDate } from '../utils/timeFormat'
 
 const SELECTED_BANDS_KEY = 'selectedBandsByEvent'
@@ -100,6 +101,10 @@ export default function EventRecapPage() {
   const savedBands = bands.filter(band => savedPerformanceIds.has(band.performance_id))
   const missedBands = bands.filter(band => !savedPerformanceIds.has(band.performance_id))
   const venueRecap = groupBandsByVenue(bands)
+
+  useEffect(() => {
+    trackVisitOnce()
+  }, [])
 
   useEffect(() => {
     let cancelled = false

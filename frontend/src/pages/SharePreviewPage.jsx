@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import LockInLineupPanel from '../components/LockInLineupPanel'
 import { Alert, BandCardSkeleton } from '../components/ui'
 import { fetchPublicJson } from '../utils/publicApi'
+import { trackVisitOnce } from '../utils/metrics'
 import { AFTER_MIDNIGHT_THRESHOLD_HOUR } from '../utils/festivalDays'
 
 /** Sentinel for an unresolvable date — sorts last, and never counts as a festival day. */
@@ -97,6 +98,10 @@ export default function SharePreviewPage() {
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [error, setError] = useState(false)
+
+  useEffect(() => {
+    trackVisitOnce()
+  }, [])
 
   useEffect(() => {
     let cancelled = false

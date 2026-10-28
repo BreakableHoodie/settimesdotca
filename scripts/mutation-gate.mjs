@@ -1676,6 +1676,24 @@ export const MUTATIONS = [
     replace: "totalShares: shareStats?.total_shares || 0,",
     tests: ["functions/api/admin/events/__tests__/metrics.test.js"],
   },
+  {
+    id: "referrer-bucket-allowlist",
+    invariant:
+      "CLAUDE.md 'Metrics & Analytics' — the server accepts only one of the six referrer buckets, never a forged client label (#1246 Q3)",
+    file: "functions/api/metrics.js",
+    find: "    if (!REFERRER_BUCKETS.has(safeProps.referrer_bucket)) return null;",
+    replace: "    if (false) return null;",
+    tests: ["functions/api/__tests__/metrics.test.js"],
+  },
+  {
+    id: "referrer-reader-window-lower-bound",
+    invariant:
+      "CLAUDE.md 'Metrics & Analytics' — admin referrer totals start 14 days before the event's first date (#1246 Q3)",
+    file: "functions/api/admin/events/[id]/metrics.js",
+    find: "       WHERE r.date >= date(e.date, '-14 days')",
+    replace: "       WHERE 1",
+    tests: ["functions/api/admin/events/__tests__/metrics.test.js"],
+  },
 ];
 
 // ============================================================================

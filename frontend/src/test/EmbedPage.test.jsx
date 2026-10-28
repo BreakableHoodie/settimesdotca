@@ -37,11 +37,29 @@ describe('EmbedPage', () => {
     useParams.mockReturnValue({ slug: 'my-fest-2026' })
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
+      status: 200,
+      headers: { get: () => 'application/json' },
       json: async () => ({ bands: [] }),
     })
 
     render(<EmbedPage />)
     // Loading text should appear initially
     expect(screen.getByText('Loading...')).toBeInTheDocument()
+  })
+
+  it('does not emit a visit for an embedded schedule', async () => {
+    useParams.mockReturnValue({ slug: 'my-fest-2026' })
+    const sendBeacon = vi.fn()
+    Object.defineProperty(navigator, 'sendBeacon', { value: sendBeacon, configurable: true })
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => 'application/json' },
+      json: async () => ({ bands: [] }),
+    })
+
+    render(<EmbedPage />)
+    await waitFor(() => expect(screen.getByText('Schedule')).toBeInTheDocument())
+    expect(sendBeacon).not.toHaveBeenCalled()
   })
 })

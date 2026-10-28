@@ -59,6 +59,7 @@ vi.mock('../../utils/metrics', () => ({
   trackSocialClick: vi.fn(),
   trackArtistView: vi.fn(),
   trackEventView: vi.fn(),
+  trackVisitOnce: vi.fn(),
 }))
 vi.mock('../../utils/publicApi', () => ({ fetchPublicJson: vi.fn() }))
 

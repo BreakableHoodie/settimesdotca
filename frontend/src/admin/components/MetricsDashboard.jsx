@@ -3,6 +3,15 @@ import { eventsApi } from '../../utils/adminApi'
 import LoadError from './LoadError'
 import { AFTER_MIDNIGHT_THRESHOLD_HOUR } from '../../utils/festivalDays'
 
+const REFERRER_LABELS = {
+  instagram: 'Instagram',
+  facebook: 'Facebook',
+  google: 'Google',
+  other_search: 'Other search',
+  direct: 'Direct',
+  other: 'Other site',
+}
+
 // "6 PM", "12 AM", "1 AM": whole hours only, so formatTime's ":00" would be noise.
 function hourLabel(hour) {
   return `${hour % 12 || 12} ${hour >= 12 ? 'PM' : 'AM'}`
@@ -191,6 +200,25 @@ export default function MetricsDashboard({ eventId }) {
       </div>
 
       <ShowNightCurve curve={metrics.showNightCurve} />
+
+      <div className="bg-bg-purple rounded-lg p-4">
+        <h4 className="text-white font-semibold mb-3">How fans arrived</h4>
+        {(metrics.referrers || []).length > 0 ? (
+          <ul className="space-y-2" aria-label="Visits by referring site kind">
+            {metrics.referrers.map(row => (
+              <li key={row.bucket} className="flex justify-between text-sm">
+                <span className="text-white">{REFERRER_LABELS[row.bucket] || 'Other site'}</span>
+                <span className="text-gray-400">
+                  {row.visits} {row.visits === 1 ? 'visit' : 'visits'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-gray-400 text-sm">No visit sources recorded yet</p>
+        )}
+        <p className="text-gray-400 text-xs mt-3">Totals by referring site kind, never the referring address.</p>
+      </div>
 
       {/* Popular Bands */}
       <div className="bg-bg-purple rounded-lg p-4">

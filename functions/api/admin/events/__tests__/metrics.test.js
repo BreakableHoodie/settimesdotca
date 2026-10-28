@@ -22,6 +22,7 @@ vi.mock("../../_middleware.js", () => ({
 
 import { onRequestGet } from "../[id]/metrics.js";
 import { createTestEnv, insertEvent, insertShareLink, insertBand } from "../../../test-utils.js";
+import * as loggerModule from "../../../../utils/logger.js";
 
 describe("GET /api/admin/events/[id]/metrics", () => {
   function call(env, eventId) {
@@ -549,6 +550,58 @@ describe("GET /api/admin/events/[id]/metrics", () => {
       expect(planning[0].recent_growth).toBe(0);
       expect(planning[0].would_notify_count).toBe(0);
     });
+  });
+});
+
+describe("GET /api/admin/events/[id]/metrics — referrer buckets (#1246 Q3)", () => {
+  function call(env, eventId) {
+    return onRequestGet({
+      request: new Request(`https://example.test/api/admin/events/${eventId}/metrics`, {
+        headers: { "x-test-role": "viewer" },
+      }),
+      params: { id: String(eventId) },
+      env,
+      data: { user: { userId: 1, role: "viewer" } },
+    });
+  }
+
+  test("sums rows from 14 days before the event through its last day", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, {
+      name: "Fest",
+      slug: "fest",
+      date: "2026-10-10",
+      end_date: "2026-10-11",
+    });
+    const insert = rawDb.prepare("INSERT INTO referrer_daily_stats (date, bucket, visits) VALUES (?, ?, ?)");
+    insert.run("2026-09-25", "google", 100);
+    insert.run("2026-09-26", "google", 4);
+    insert.run("2026-10-09", "instagram", 10);
+    insert.run("2026-10-11", "instagram", 5);
+    insert.run("2026-10-11", "direct", 1);
+    insert.run("2026-10-12", "facebook", 50);
+
+    const body = await (await call(env, event.id)).json();
+    expect(body.metrics.referrers).toEqual([
+      { bucket: "instagram", visits: 15 },
+      { bucket: "google", visits: 4 },
+      { bucket: "direct", visits: 1 },
+    ]);
+  });
+
+  test("a failed referrer read returns an empty list and preserves the response", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { name: "Quiet", slug: "quiet" });
+    rawDb.exec("DROP TABLE referrer_daily_stats");
+    const errorSpy = vi.spyOn(loggerModule.logger, "error").mockImplementation(() => {});
+
+    const res = await call(env, event.id);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.metrics.referrers).toEqual([]);
+    expect(body.metrics.totalShares).toBe(0);
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("referrer metrics read"), expect.anything());
   });
 });
 

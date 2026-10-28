@@ -4436,16 +4436,17 @@ components:
             properties:
               event:
                 type: string
+                description: Use `visit` once per browser session to record a coarse referrer kind.
                 enum:
                   - page_view
                   - event_view
                   - artist_profile_view
                   - social_link_click
                   - ticket_click
-                  - share_event
-                  - filter_use
+                  - visit
               props:
                 $ref: "#/components/schemas/GenericRecord"
+                description: For `visit`, referrer_bucket is one of instagram, facebook, google, other_search, direct, or other.
 
     ScheduleBuildRequest:
       type: object
@@ -5086,6 +5087,18 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/GenericRecord"
+            referrers:
+              type: array
+              description: Site-wide visit counts by coarse referrer bucket, summed from 14 days before the event through its last day.
+              items:
+                type: object
+                required: [bucket, visits]
+                properties:
+                  bucket:
+                    type: string
+                    enum: [instagram, facebook, google, other_search, direct, other]
+                  visits:
+                    type: integer
 
     VenueListResponse:
       type: object

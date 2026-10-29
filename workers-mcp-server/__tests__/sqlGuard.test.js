@@ -86,7 +86,7 @@ describe("assertReadOnlySelect", () => {
     });
   });
 
-describe("refuses tables holding credentials or auth material", () => {
+  describe("refuses tables holding credentials or auth material", () => {
     it("blocks the session-token read that walked around getActiveSessions", () => {
       // lucia_sessions.id IS the session token — functions/utils/auth.js binds
       // the value straight from the session cookie. getActiveSessions omits the

@@ -41,11 +41,9 @@ const KNOWN_OVERRIDE_CONFLICTS = {
   "frontend/package-lock.json|node_modules/puppeteer-core|@puppeteer/browsers":
     "drops extract-zip (#819); puppeteer-core 24.43.1 pins 2.13.2 exactly (#1208)",
   "frontend/package-lock.json|node_modules/puppeteer-core|ws": "audit alerts (#327), via the lighthouse ws override",
-  // The MCP Worker's lockfile: both edges were live before it was scanned.
+  // The MCP Worker's lockfile. Its tsx > esbuild edge left with workers-mcp (#1413).
   "workers-mcp-server/package-lock.json|node_modules/miniflare|undici":
     "GHSA-4qv8-2p9j-2685 + GHSA-f72v-6w45-q472 (undici <=7.30.0); miniflare pins 7.29.1 exactly, 7.30.1 is a patch bump (2026-10-25)",
-  "workers-mcp-server/package-lock.json|node_modules/tsx|esbuild":
-    "SNYK-JS-ESBUILD-17750815 critical (insecure-protocol downloads), via workers-mcp > tsx; build-only (#1109)",
 };
 
 const conflictKey = (v) => `${v.lockfile}|${v.dependent}|${v.dependency}`;

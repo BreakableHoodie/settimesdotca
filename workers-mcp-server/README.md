@@ -1,7 +1,7 @@
 # settimesdotca-mcp
 
 An MCP tool surface over the **production** D1 database, deployed as a Cloudflare
-Worker and consumed by the `settimesdotca` entry in `.mcp.json`.
+Worker and consumed as a remote HTTP MCP server at `<worker-url>/mcp`.
 
 ## Read this before changing anything
 
@@ -46,7 +46,7 @@ advertising read-only.
 
 This is not a remote vulnerability: `SHARED_SECRET` is required and the Worker
 returns 401 to a missing, wrong, or empty token. It is a failure of the bound
-that is supposed to contain a *token holder* — which includes any AI agent
+that is supposed to contain a _token holder_ — which includes any AI agent
 using this MCP server.
 
 `src/sqlGuard.js` replaces it, and `__tests__/sqlGuard.test.js` keeps it shut.
@@ -68,11 +68,11 @@ literal containing one of those words. That is the intended direction to err.
 
 Only two of the eleven have a vetted alternative:
 
-| table | how to read it |
-|---|---|
-| `users` | `getUsers` — omits password hashes, TOTP secrets and backup codes |
-| `lucia_sessions` | `getActiveSessions` — omits the raw session id |
-| the other nine | **no tool; deliberately unavailable through MCP** |
+| table            | how to read it                                                    |
+| ---------------- | ----------------------------------------------------------------- |
+| `users`          | `getUsers` — omits password hashes, TOTP secrets and backup codes |
+| `lucia_sessions` | `getActiveSessions` — omits the raw session id                    |
+| the other nine   | **no tool; deliberately unavailable through MCP**                 |
 
 `api_keys`, `band_follows`, `email_otp_codes`, `invite_codes`, `mfa_challenges`,
 `password_reset_tokens`, `sessions`, `trusted_devices` and `webauthn_credentials`
@@ -84,6 +84,26 @@ the guard.
 (`getRecentAuditLog`, `getRecentAuthAttempts` and `getRateLimits` cover
 `auth_audit`, `auth_attempts` and `rate_limits` — none of which is on the
 sensitive list, so `queryDB` can read them directly too.)
+
+## Connecting
+
+Clients send `Authorization: Bearer <SHARED_SECRET>` with every request to
+`https://<worker-url>/mcp`, the only path served. There is no local proxy.
+
+For Claude Code, let `headersHelper` read the secret from the gitignored
+`.dev.vars` at connect time, so it is never stored in the client config:
+
+```json
+{
+  "mcpServers": {
+    "settimesdotca": {
+      "type": "http",
+      "url": "https://<worker-url>/mcp",
+      "headersHelper": "/path/to/workers-mcp-server/mcp-headers.sh"
+    }
+  }
+}
+```
 
 ## Deploying
 
@@ -98,16 +118,16 @@ npx wrangler deploy
 First-time setup, or a deliberate rotation, only:
 
 ```bash
-npx wrangler secret put SHARED_SECRET   # 64 chars exactly; workers-mcp requires it
+npx wrangler secret put SHARED_SECRET   # at least 32 chars, no whitespace; the existing 64-char secret stays valid
 ```
 
 **Do not run `secret put` as part of a normal deploy.** It replaces the token
-and instantly breaks every configured MCP client, including the `settimesdotca`
-entry in `.mcp.json`. When you do rotate deliberately, update `.mcp.json` in the
-same pass.
+and instantly breaks every configured MCP client. When you do rotate deliberately,
+update each client's Bearer header in the same pass.
 
 `SHARED_SECRET` is never stored here. `.dev.vars` is gitignored and holds the
-local copy.
+local copy. The Worker fails closed if the secret is missing, contains whitespace, or is shorter than 32
+characters, and compares SHA-256 digests in constant time.
 
-**Rotating the secret invalidates every configured MCP client**, including the
-`settimesdotca` entry in `.mcp.json`, which must be updated in the same pass.
+**Rotating the secret invalidates every configured MCP client.** Update each
+client's Bearer header in the same pass.

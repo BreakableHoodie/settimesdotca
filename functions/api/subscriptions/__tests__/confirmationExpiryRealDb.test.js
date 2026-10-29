@@ -1,7 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createTestEnv } from "../../test-utils.js";
 import { onRequestPost as verify } from "../verify.js";
 import { onRequestPost as subscribe } from "../subscribe.js";
+import { hashStoredToken } from "../../../utils/tokens.js";
 
 // The rest of this directory runs on a hand-written MockD1Database that
 // pattern-matches SQL text, so the expiry predicate (#1291) was only ever
@@ -9,12 +10,12 @@ import { onRequestPost as subscribe } from "../subscribe.js";
 // real schema (better-sqlite3), where datetime('now', '-7 days') is evaluated
 // by SQLite itself.
 
-function seedPending(rawDb, { email, token, ageDays }) {
+async function seedPending(rawDb, { email, token, ageDays }) {
   rawDb
     .prepare(
       "INSERT INTO email_subscriptions (email, city, genre, verification_token, unsubscribe_token, verified, created_at) VALUES (?, 'portland', 'punk', ?, ?, 0, datetime('now', ?))",
     )
-    .run(email, token, `unsub-${token}`, `-${ageDays} days`);
+    .run(email, await hashStoredToken(token), `unsub-${token}`, `-${ageDays} days`);
 }
 
 const verifyRequest = (token) =>
@@ -32,7 +33,7 @@ const row = (rawDb, email) =>
 describe("subscription confirmation window, real SQLite (#1291)", () => {
   it("refuses a confirmation requested 8 days ago", async () => {
     const { env, rawDb } = createTestEnv();
-    seedPending(rawDb, { email: "old@example.com", token: "tok-old", ageDays: 8 });
+    await seedPending(rawDb, { email: "old@example.com", token: "tok-old", ageDays: 8 });
 
     const res = await verify({ request: verifyRequest("tok-old"), env });
 
@@ -42,7 +43,7 @@ describe("subscription confirmation window, real SQLite (#1291)", () => {
 
   it("accepts a confirmation requested 6 days ago", async () => {
     const { env, rawDb } = createTestEnv();
-    seedPending(rawDb, { email: "fresh@example.com", token: "tok-fresh", ageDays: 6 });
+    await seedPending(rawDb, { email: "fresh@example.com", token: "tok-fresh", ageDays: 6 });
 
     const res = await verify({ request: verifyRequest("tok-fresh"), env });
 
@@ -55,7 +56,7 @@ describe("subscription confirmation window, real SQLite (#1291)", () => {
   // re-read stand between that click and a false "already verified".
   it("a link that expires between lookup and write is neither confirmed nor called verified", async () => {
     const { env, rawDb } = createTestEnv();
-    seedPending(rawDb, { email: "race@example.com", token: "tok-race", ageDays: 8 });
+    await seedPending(rawDb, { email: "race@example.com", token: "tok-race", ageDays: 8 });
     const prepare = env.DB.prepare.bind(env.DB);
     env.DB.prepare = (sql) =>
       prepare(
@@ -76,12 +77,17 @@ describe("subscription confirmation window, real SQLite (#1291)", () => {
   // The re-send must carry the token stored NOW, not the stale one it read.
   it("a re-send after a concurrent re-subscribe carries the current token", async () => {
     const { env, rawDb } = createTestEnv();
-    seedPending(rawDb, { email: "racer@example.com", token: "tok-stale", ageDays: 8 });
+    await seedPending(rawDb, { email: "racer@example.com", token: "tok-stale", ageDays: 8 });
+    const currentHash = await hashStoredToken("tok-current");
     const prepare = env.DB.prepare.bind(env.DB);
     env.DB.prepare = (sql) => {
       if (sql.includes("DELETE FROM email_subscriptions") && sql.includes("WHERE id = ?")) {
         rawDb.prepare("DELETE FROM email_subscriptions WHERE email = 'racer@example.com'").run();
-        seedPending(rawDb, { email: "racer@example.com", token: "tok-current", ageDays: 0 });
+        rawDb
+          .prepare(
+            "INSERT INTO email_subscriptions (email, city, genre, verification_token, unsubscribe_token, verified, created_at) VALUES (?, 'portland', 'punk', ?, ?, 0, datetime('now'))",
+          )
+          .run("racer@example.com", currentHash, "unsub-tok-current");
       }
       return prepare(sql);
     };
@@ -97,7 +103,11 @@ describe("subscription confirmation window, real SQLite (#1291)", () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.verificationUrl).toContain("tok-current");
+    const currentToken = new URL(body.verificationUrl).searchParams.get("token");
+    expect(
+      rawDb.prepare("SELECT verification_token FROM email_subscriptions WHERE email = ?").get("racer@example.com")
+        .verification_token,
+    ).toBe(await hashStoredToken(currentToken));
     expect(body.verificationUrl).not.toContain("tok-stale");
   });
 
@@ -123,7 +133,7 @@ describe("subscription confirmation window, real SQLite (#1291)", () => {
 
   it("a row verified concurrently answers 'already subscribed' and is left verified", async () => {
     const { env, rawDb } = createTestEnv();
-    seedPending(rawDb, { email: "verified-race@example.com", token: "tok-stale", ageDays: 8 });
+    await seedPending(rawDb, { email: "verified-race@example.com", token: "tok-stale", ageDays: 8 });
     raceOnDelete(env, () =>
       rawDb
         .prepare(
@@ -140,7 +150,7 @@ describe("subscription confirmation window, real SQLite (#1291)", () => {
 
   it("a row deleted concurrently falls through to a fresh subscription", async () => {
     const { env, rawDb } = createTestEnv();
-    seedPending(rawDb, { email: "gone-race@example.com", token: "tok-stale", ageDays: 8 });
+    await seedPending(rawDb, { email: "gone-race@example.com", token: "tok-stale", ageDays: 8 });
     raceOnDelete(env, () =>
       rawDb.prepare("DELETE FROM email_subscriptions WHERE email = 'gone-race@example.com'").run(),
     );
@@ -158,7 +168,7 @@ describe("subscription confirmation window, real SQLite (#1291)", () => {
 
   it("re-subscribing after expiry issues a fresh token; a verified row is never replaced", async () => {
     const { env, rawDb } = createTestEnv();
-    seedPending(rawDb, { email: "again@example.com", token: "tok-stale", ageDays: 8 });
+    await seedPending(rawDb, { email: "again@example.com", token: "tok-stale", ageDays: 8 });
     rawDb
       .prepare(
         "INSERT INTO email_subscriptions (email, city, genre, verification_token, unsubscribe_token, verified, created_at) VALUES ('kept@example.com', 'portland', 'punk', NULL, 'unsub-kept', 1, datetime('now', '-400 days'))",
@@ -189,5 +199,81 @@ describe("subscription confirmation window, real SQLite (#1291)", () => {
     expect(again[0].verification_token).not.toBe("tok-stale");
 
     expect(row(rawDb, "kept@example.com").verified).toBe(1);
+  });
+
+  // A re-request inside the window (#1415). The stored token is a digest and
+  // cannot be re-sent, so the request rotates it. Each case below is a way the
+  // rotation could leave someone with no working link while being told "sent".
+  describe("re-request rotation", () => {
+    const tokenOf = async (res) => new URL((await res.json()).verificationUrl).searchParams.get("token");
+
+    it("emails a new link that confirms, kills the old one, and keeps created_at", async () => {
+      const { env, rawDb } = createTestEnv();
+      await seedPending(rawDb, { email: "rot@example.com", token: "tok-old", ageDays: 2 });
+      const before = rawDb.prepare("SELECT created_at FROM email_subscriptions WHERE email = ?").get("rot@example.com");
+
+      const res = await resubscribe("rot@example.com", env);
+      expect(res.status).toBe(200);
+      const fresh = await tokenOf(res);
+
+      expect(
+        rawDb.prepare("SELECT created_at FROM email_subscriptions WHERE email = ?").get("rot@example.com"),
+      ).toEqual(before);
+      expect((await verify({ request: verifyRequest("tok-old"), env })).status).not.toBe(303);
+      expect((await verify({ request: verifyRequest(fresh), env })).status).toBe(303);
+    });
+
+    it("rotates a pending row whose token is NULL instead of matching nothing forever", async () => {
+      const { env, rawDb } = createTestEnv();
+      await seedPending(rawDb, { email: "null@example.com", token: "tok-null", ageDays: 1 });
+      rawDb.prepare("UPDATE email_subscriptions SET verification_token = NULL WHERE email = ?").run("null@example.com");
+
+      const res = await resubscribe("null@example.com", env);
+
+      expect(res.status).toBe(200);
+      expect((await verify({ request: verifyRequest(await tokenOf(res)), env })).status).toBe(303);
+    });
+
+    it("sends the new link even when D1 omits meta on the rotation", async () => {
+      const { env, rawDb } = createTestEnv();
+      await seedPending(rawDb, { email: "meta@example.com", token: "tok-meta", ageDays: 1 });
+      const prepare = env.DB.prepare.bind(env.DB);
+      env.DB.prepare = (sql) => {
+        const stmt = prepare(sql);
+        if (!sql.includes("SET verification_token = ?")) return stmt;
+        const bind = stmt.bind.bind(stmt);
+        stmt.bind = (...args) => {
+          const bound = bind(...args);
+          const run = bound.run.bind(bound);
+          bound.run = async () => {
+            await run();
+            return { success: true };
+          };
+          return bound;
+        };
+        return stmt;
+      };
+
+      const res = await resubscribe("meta@example.com", env);
+
+      expect(res.status).toBe(200);
+      expect((await verify({ request: verifyRequest(await tokenOf(res)), env })).status).toBe(303);
+    });
+
+    it("keeps the earlier link working when the re-send fails", async () => {
+      const { env, rawDb } = createTestEnv();
+      env.EMAIL_PROVIDER = "mailchannels";
+      env.EMAIL_FROM = "no-reply@example.com";
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("provider down", { status: 500 })));
+      await seedPending(rawDb, { email: "fail@example.com", token: "tok-earlier", ageDays: 1 });
+
+      try {
+        await resubscribe("fail@example.com", env);
+      } finally {
+        vi.unstubAllGlobals();
+      }
+
+      expect((await verify({ request: verifyRequest("tok-earlier"), env })).status).toBe(303);
+    });
   });
 });

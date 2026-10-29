@@ -3,6 +3,8 @@ import { onRequestPost } from "../subscribe.js";
 import { MockD1Database } from "./mocks/d1.js";
 import { createMockRequest, createMockContext, VALID_SUBSCRIPTION, INVALID_PAYLOADS } from "./helpers.js";
 import { CONSENT_VERSION } from "../../../utils/consent.js";
+import { hashStoredToken } from "../../../utils/tokens.js";
+import { onRequestPost as verifySubscription } from "../verify.js";
 
 describe("POST /api/subscriptions/subscribe", () => {
   let mockDB;
@@ -176,7 +178,7 @@ describe("POST /api/subscriptions/subscribe", () => {
       genre: "punk",
       frequency: "weekly",
       verified: true,
-      verification_token: "existing-token-12345",
+      verification_token: await hashStoredToken("existing-token-12345"),
       unsubscribe_token: "existing-unsub-token-67890",
       created_at: new Date().toISOString(),
     });
@@ -193,6 +195,7 @@ describe("POST /api/subscriptions/subscribe", () => {
   });
 
   it("should resend verification email for unverified subscription", async () => {
+    const requestedAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     // Pre-populate with unverified subscription
     mockDB.data.email_subscriptions.push({
       id: 1,
@@ -201,9 +204,9 @@ describe("POST /api/subscriptions/subscribe", () => {
       genre: "punk",
       frequency: "weekly",
       verified: false,
-      verification_token: "existing-token-12345",
+      verification_token: await hashStoredToken("existing-token-12345"),
       unsubscribe_token: "existing-unsub-token-67890",
-      created_at: new Date().toISOString(),
+      created_at: requestedAt,
     });
 
     const request = createMockRequest("POST", "/api/subscriptions/subscribe", VALID_SUBSCRIPTION);
@@ -216,9 +219,27 @@ describe("POST /api/subscriptions/subscribe", () => {
     // When email is not configured, the response is explicit about it and
     // includes the verificationUrl instead of falsely claiming email was sent
     expect(data.message).toContain("not configured");
-    expect(data.verificationUrl).toMatch(
-      /^https:\/\/example\.com\/api\/subscriptions\/verify\?token=existing-token-12345$/,
-    );
+    expect(data.verificationUrl).toMatch(/^https:\/\/example\.com\/api\/subscriptions\/verify\?token=/);
+    expect(data.verificationUrl).not.toContain("existing-token-12345");
+    // Rotating the token must not extend the confirmation window.
+    expect(mockDB.data.email_subscriptions[0].created_at).toBe(requestedAt);
+    const newToken = new URL(data.verificationUrl).searchParams.get("token");
+    const oldResponse = await verifySubscription({
+      ...mockContext,
+      request: new Request("https://example.com/api/subscriptions/verify?token=existing-token-12345", {
+        method: "POST",
+        body: new URLSearchParams({ token: "existing-token-12345" }),
+      }),
+    });
+    expect(oldResponse.status).toBe(404);
+    const newResponse = await verifySubscription({
+      ...mockContext,
+      request: new Request(`https://example.com/api/subscriptions/verify?token=${newToken}`, {
+        method: "POST",
+        body: new URLSearchParams({ token: newToken }),
+      }),
+    });
+    expect(newResponse.status).toBe(303);
     expect(mockDB.data.email_subscriptions).toHaveLength(1);
   });
 
@@ -230,7 +251,7 @@ describe("POST /api/subscriptions/subscribe", () => {
       genre: "punk",
       frequency: "weekly",
       verified: false,
-      verification_token: "expired-token",
+      verification_token: await hashStoredToken("expired-token"),
       unsubscribe_token: "expired-unsub",
       created_at: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
     });
@@ -243,8 +264,8 @@ describe("POST /api/subscriptions/subscribe", () => {
 
     expect(response.status).toBe(201);
     expect(mockDB.data.email_subscriptions).toHaveLength(1);
-    expect(mockDB.data.email_subscriptions[0].verification_token).not.toBe("expired-token");
-    expect(data.verificationUrl).toContain(mockDB.data.email_subscriptions[0].verification_token);
+    expect(mockDB.data.email_subscriptions[0].verification_token).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(data.verificationUrl).not.toContain(mockDB.data.email_subscriptions[0].verification_token);
   });
 
   it("should generate unique verification and unsubscribe tokens", async () => {
@@ -254,7 +275,7 @@ describe("POST /api/subscriptions/subscribe", () => {
     await onRequestPost(mockContext);
 
     const subscription = mockDB.data.email_subscriptions[0];
-    expect(subscription.verification_token).toMatch(/^[0-9a-f]{64}$/);
+    expect(subscription.verification_token).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(subscription.unsubscribe_token).toMatch(/^[0-9a-f]{64}$/);
     expect(subscription.verification_token).not.toBe(subscription.unsubscribe_token);
   });

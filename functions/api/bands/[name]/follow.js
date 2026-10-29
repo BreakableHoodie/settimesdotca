@@ -1,5 +1,5 @@
 import { isValidEmail } from "../../../utils/validation.js";
-import { generateToken } from "../../../utils/tokens.js";
+import { generateToken, hashStoredToken } from "../../../utils/tokens.js";
 import { sendEmail, isEmailConfigured } from "../../../utils/email.js";
 import { verifyTurnstile } from "../../../utils/turnstile.js";
 import { normalizeBandName } from "../../../utils/bandName.js";
@@ -15,10 +15,10 @@ const MAX_EMAIL_LENGTH = 320;
 
 // A pending row whose confirmation was never mailed can never be confirmed, yet a live one
 // makes every re-request a no-op until it expires in 7 days. Delete it by its own token.
-async function dropPendingFollow(DB, verificationToken) {
+async function dropPendingFollow(DB, verificationTokenHash) {
   try {
     await DB.prepare("DELETE FROM band_follows WHERE verification_token = ? AND verified = 0")
-      .bind(verificationToken)
+      .bind(verificationTokenHash)
       .run();
   } catch (err) {
     console.error(
@@ -109,6 +109,7 @@ export async function onRequestPost(context) {
     // — it receives at most this single confirmation email it can ignore.
     const unsubscribeToken = generateToken();
     const verificationToken = generateToken();
+    const verificationTokenHash = await hashStoredToken(verificationToken);
     const consentIp = request.headers.get("CF-Connecting-IP") ?? null;
     const [, result] = await DB.batch([
       DB.prepare(
@@ -118,7 +119,7 @@ export async function onRequestPost(context) {
       DB.prepare(
         `INSERT OR IGNORE INTO band_follows (email, band_profile_id, verified, verification_token, unsubscribe_token, consent_ip, consent_method, consent_version)
          VALUES (?, ?, 0, ?, ?, ?, 'web_form', ?)`,
-      ).bind(email, band.id, verificationToken, unsubscribeToken, consentIp, CONSENT_VERSION),
+      ).bind(email, band.id, verificationTokenHash, unsubscribeToken, consentIp, CONSENT_VERSION),
     ]);
 
     // changes=0 → this email already follows the band (verified or pending). Say
@@ -139,12 +140,12 @@ export async function onRequestPost(context) {
           .then(async (emailResult) => {
             if (!emailResult?.delivered) {
               console.warn("[band-follow] Confirmation email not delivered:", emailResult?.reason);
-              await dropPendingFollow(DB, verificationToken);
+              await dropPendingFollow(DB, verificationTokenHash);
             }
           })
           .catch(async (err) => {
             console.error("[band-follow] Failed to send confirmation email:", err);
-            await dropPendingFollow(DB, verificationToken);
+            await dropPendingFollow(DB, verificationTokenHash);
           }),
       );
     }

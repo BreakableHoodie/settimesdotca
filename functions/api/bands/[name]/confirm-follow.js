@@ -4,6 +4,7 @@
 import { escapeHtml } from "../../../utils/html.js";
 import { emailActionPage, emailResultPage, readEmailActionToken } from "../../../utils/emailActionPage.js";
 import { pendingConfirmationLiveSql } from "../../../utils/consent.js";
+import { hashStoredToken } from "../../../utils/tokens.js";
 
 export async function onRequestGet(context) {
   const { request } = context;
@@ -37,6 +38,7 @@ export async function onRequestPost(context) {
         headers: { "Content-Type": "text/plain" },
       });
     }
+    const tokenHash = await hashStoredToken(token);
 
     // Resolve the pending follow by its one-time verification token.
     const row = await DB.prepare(
@@ -46,7 +48,7 @@ export async function onRequestPost(context) {
        WHERE bf.verification_token = ?
          AND (bf.verified = 1 OR (bf.verified = 0 AND ${pendingConfirmationLiveSql("bf")}))`,
     )
-      .bind(token)
+      .bind(tokenHash)
       .first();
 
     if (!row) {

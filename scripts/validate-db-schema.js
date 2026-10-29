@@ -15,7 +15,6 @@ const FILE_RULES = [
       "artist_daily_stats",
       "page_views_daily",
       "users",
-      "sessions",
       "audit_log",
     ],
     requiredColumns: {

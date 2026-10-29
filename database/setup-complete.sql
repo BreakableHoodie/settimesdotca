@@ -118,24 +118,6 @@ CREATE INDEX IF NOT EXISTS idx_auth_attempts_ip ON auth_attempts(ip_address);
 
 CREATE INDEX IF NOT EXISTS idx_auth_attempts_created ON auth_attempts(created_at);
 
-CREATE TABLE IF NOT EXISTS sessions (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  session_token TEXT UNIQUE NOT NULL,     -- UUID session token
-  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  ip_address TEXT,
-  user_agent TEXT,
-  remember_me INTEGER DEFAULT 0,          -- Long-lived session if 1
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  last_activity_at TEXT NOT NULL DEFAULT (datetime('now')),
-  expires_at TEXT NOT NULL                -- Session expiry time
-);
-
-CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
-
-CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
-
-CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(session_token);
-
 CREATE TABLE IF NOT EXISTS password_reset_tokens (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

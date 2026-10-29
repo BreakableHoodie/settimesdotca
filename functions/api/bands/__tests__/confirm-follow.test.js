@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { createTestEnv, insertBand, insertEvent } from "../../test-utils";
 import * as followHandler from "../[name]/follow.js";
 import * as confirmHandler from "../[name]/confirm-follow.js";
+import { hashStoredToken } from "../../../utils/tokens.js";
 
 const waitUntil = () => {};
 
@@ -17,12 +18,13 @@ describe("/api/bands/:name/confirm-follow", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: "fan@example.com" }),
     });
-    await followHandler.onRequestPost({
+    const followResponse = await followHandler.onRequestPost({
       request: followReq,
       env,
       params: { name: String(band.band_profile_id) },
       waitUntil,
     });
+    const { confirmUrl } = await followResponse.json();
 
     const pending = rawDb
       .prepare(
@@ -31,11 +33,10 @@ describe("/api/bands/:name/confirm-follow", () => {
       .get("fan@example.com", band.band_profile_id);
     expect(pending.verified).toBe(0);
     expect(pending.verification_token).toBeTruthy();
+    expect(pending.verification_token).toBe(await hashStoredToken(new URL(confirmUrl).searchParams.get("token")));
 
     // A scanner GET must not confirm the follow.
-    const confirmReq = new Request(
-      `https://example.test/api/bands/${band.band_profile_id}/confirm-follow?token=${pending.verification_token}`,
-    );
+    const confirmReq = new Request(confirmUrl);
     const getRes = await confirmHandler.onRequestGet({
       request: confirmReq,
       env,
@@ -49,7 +50,7 @@ describe("/api/bands/:name/confirm-follow", () => {
       request: new Request(confirmReq, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ token: pending.verification_token }),
+        body: new URLSearchParams({ token: new URL(confirmUrl).searchParams.get("token") }),
       }),
       env,
       params: { name: String(band.band_profile_id) },
@@ -76,16 +77,15 @@ describe("/api/bands/:name/confirm-follow", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: "fan@example.com" }),
     });
-    await followHandler.onRequestPost({
+    const followResponse = await followHandler.onRequestPost({
       request: followReq,
       env,
       params: { name: String(band.band_profile_id) },
       waitUntil,
     });
 
-    const { verification_token: token } = rawDb
-      .prepare("SELECT verification_token FROM band_follows WHERE email=? AND band_profile_id=?")
-      .get("fan@example.com", band.band_profile_id);
+    const { confirmUrl } = await followResponse.json();
+    const token = new URL(confirmUrl).searchParams.get("token");
 
     const url = `https://example.test/api/bands/${band.band_profile_id}/confirm-follow?token=${token}`;
     const params = { name: String(band.band_profile_id) };
@@ -106,6 +106,39 @@ describe("/api/bands/:name/confirm-follow", () => {
       .prepare("SELECT verified FROM band_follows WHERE email=? AND band_profile_id=?")
       .get("fan@example.com", band.band_profile_id);
     expect(row.verified).toBe(1);
+  });
+
+  it("does not accept the stored digest or a retired token as submitted plaintext", async () => {
+    const { env, rawDb } = createTestEnv();
+    const ev = insertEvent(rawDb, { name: "Vol6", slug: "vol6-confirm-digest" });
+    const band = insertBand(rawDb, { name: "Digest Band", event_id: ev.id });
+    const followResponse = await followHandler.onRequestPost({
+      request: new Request(`https://example.test/api/bands/${band.band_profile_id}/follow`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "digest@example.com" }),
+      }),
+      env,
+      params: { name: String(band.band_profile_id) },
+      waitUntil,
+    });
+    const { confirmUrl } = await followResponse.json();
+    const stored = rawDb
+      .prepare("SELECT verification_token FROM band_follows WHERE email = ?")
+      .get("digest@example.com");
+
+    for (const submitted of [stored.verification_token, "retired:1"]) {
+      const response = await confirmHandler.onRequestPost({
+        request: new Request(confirmUrl, {
+          method: "POST",
+          body: new URLSearchParams({ token: submitted }),
+        }),
+        env,
+        params: { name: String(band.band_profile_id) },
+      });
+      expect(response.status).toBe(200);
+      expect(await response.text()).toMatch(/invalid or has already been used/i);
+    }
   });
 
   it("returns 400 for a missing token", async () => {
@@ -129,8 +162,8 @@ describe("/api/bands/:name/confirm-follow", () => {
     const insert = rawDb.prepare(
       "INSERT INTO band_follows (email, band_profile_id, verification_token, unsubscribe_token, created_at) VALUES (?, ?, ?, ?, datetime('now', ?))",
     );
-    insert.run("old@example.com", band.band_profile_id, "old-token", "old-unsub", "-8 days");
-    insert.run("new@example.com", band.band_profile_id, "new-token", "new-unsub", "-6 days");
+    insert.run("old@example.com", band.band_profile_id, await hashStoredToken("old-token"), "old-unsub", "-8 days");
+    insert.run("new@example.com", band.band_profile_id, await hashStoredToken("new-token"), "new-unsub", "-6 days");
 
     const post = (token) =>
       confirmHandler.onRequestPost({
@@ -159,7 +192,7 @@ describe("/api/bands/:name/confirm-follow", () => {
       .prepare(
         "INSERT INTO band_follows (email, band_profile_id, verification_token, unsubscribe_token, created_at) VALUES (?, ?, ?, ?, datetime('now', '-8 days'))",
       )
-      .run("race@example.com", band.band_profile_id, "race-token", "race-unsub");
+      .run("race@example.com", band.band_profile_id, await hashStoredToken("race-token"), "race-unsub");
 
     const prepare = env.DB.prepare.bind(env.DB);
     env.DB.prepare = (sql) =>

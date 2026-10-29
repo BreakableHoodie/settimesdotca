@@ -1,7 +1,7 @@
 // Subscription endpoint
 // POST /api/subscriptions/subscribe
 
-import { generateToken } from "../../utils/tokens.js";
+import { generateToken, hashStoredToken } from "../../utils/tokens.js";
 import { sendEmail, isEmailConfigured } from "../../utils/email.js";
 import { isValidEmail } from "../../utils/validation.js";
 import { verifyTurnstile } from "../../utils/turnstile.js";
@@ -81,6 +81,7 @@ export async function onRequestPost(context) {
 
     // Generate tokens
     const verificationToken = generateToken();
+    const verificationTokenHash = await hashStoredToken(verificationToken);
     const unsubscribeToken = generateToken();
 
     // Check if subscription already exists
@@ -143,8 +144,53 @@ export async function onRequestPost(context) {
               headers: { "Content-Type": "application/json" },
             });
           }
-          // Re-send verification email
-          const emailResult = await sendVerificationEmail(env, email, current.verification_token);
+          // The stored token is a digest, so it cannot be re-sent: rotate to a
+          // fresh one, bound to the hash as read, so a concurrent confirm or
+          // re-request wins cleanly. created_at is kept: a re-request does not
+          // extend the confirmation window.
+          const newVerificationToken = generateToken();
+          const newVerificationTokenHash = await hashStoredToken(newVerificationToken);
+          // `IS ?`, not `= ?`: a NULL token must rotate too, not match nothing forever.
+          await env.DB.prepare(
+            `UPDATE email_subscriptions
+             SET verification_token = ?
+             WHERE id = ? AND verified = 0 AND verification_token IS ? AND ${pendingConfirmationLiveSql()}`,
+          )
+            .bind(newVerificationTokenHash, current.id, current.verification_token)
+            .run();
+
+          // Whether the rotation landed is read back, never taken from `meta`:
+          // an absent `meta` would otherwise send nothing for a committed
+          // rotation whose old link is already dead.
+          const rotated = await env.DB.prepare(
+            "SELECT 1 AS ok FROM email_subscriptions WHERE id = ? AND verification_token = ?",
+          )
+            .bind(current.id, newVerificationTokenHash)
+            .first();
+          if (!rotated) {
+            // Confirmed, expired, or a concurrent re-request rotated first and
+            // sent its own email. Answered like a send, as before, but logged.
+            console.warn("[Subscribe] Token rotation matched nothing; no email sent", {
+              subscriptionId: current.id,
+            });
+            return new Response(JSON.stringify({ message: "Verification email sent. Please check your inbox." }), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+
+          let emailResult;
+          try {
+            emailResult = await sendVerificationEmail(env, email, newVerificationToken);
+          } catch (sendError) {
+            await restorePreviousToken(env, current.id, current.verification_token, newVerificationTokenHash);
+            throw sendError;
+          }
+
+          if (!emailResult.delivered && emailResult.reason !== "not_configured") {
+            console.warn("[Subscribe] Verification email not delivered:", emailResult.reason);
+            await restorePreviousToken(env, current.id, current.verification_token, newVerificationTokenHash);
+          }
 
           if (!emailResult.delivered && emailResult.reason === "not_configured") {
             return subscriptionResponse(
@@ -190,7 +236,7 @@ export async function onRequestPost(context) {
         VALUES (?, ?, ?, ?, ?, ?, ?, 'web_form', ?)
       `,
       )
-        .bind(email, city, genre, frequency, verificationToken, unsubscribeToken, consentIp, CONSENT_VERSION)
+        .bind(email, city, genre, frequency, verificationTokenHash, unsubscribeToken, consentIp, CONSENT_VERSION)
         .run();
     } catch (insertError) {
       if (insertError?.message?.includes("UNIQUE constraint failed")) {
@@ -209,12 +255,12 @@ export async function onRequestPost(context) {
     try {
       emailResult = await sendVerificationEmail(env, email, verificationToken);
     } catch (sendError) {
-      await dropUnmailedSubscription(env, verificationToken);
+      await dropUnmailedSubscription(env, verificationTokenHash);
       throw sendError;
     }
     if (!emailResult.delivered && emailResult.reason !== "not_configured") {
       console.warn("[Subscribe] Verification email not delivered:", emailResult.reason);
-      await dropUnmailedSubscription(env, verificationToken);
+      await dropUnmailedSubscription(env, verificationTokenHash);
     }
 
     if (!emailResult.delivered && emailResult.reason === "not_configured") {
@@ -284,12 +330,27 @@ async function recipientMayBeEmailed(env, email) {
   return cap.allowed;
 }
 
-async function dropUnmailedSubscription(env, verificationToken) {
+// A failed re-send puts the previous token back, so the link in the earlier
+// email keeps working. Bound to the token this request installed, so a later
+// rotation or a confirmation is never undone.
+async function restorePreviousToken(env, id, previousHash, rotatedHash) {
   try {
-    await env.DB.prepare("DELETE FROM email_subscriptions WHERE verification_token = ? AND verified = 0")
-      .bind(verificationToken)
+    await env.DB.prepare(
+      "UPDATE email_subscriptions SET verification_token = ? WHERE id = ? AND verification_token = ?",
+    )
+      .bind(previousHash, id, rotatedHash)
       .run();
   } catch (err) {
-    console.error("[Subscribe] Failed to drop unmailed pending subscription; re-requests only re-send:", err);
+    console.error("[Subscribe] Failed to restore the previous verification token after a failed re-send:", err);
+  }
+}
+
+async function dropUnmailedSubscription(env, verificationTokenHash) {
+  try {
+    await env.DB.prepare("DELETE FROM email_subscriptions WHERE verification_token = ? AND verified = 0")
+      .bind(verificationTokenHash)
+      .run();
+  } catch (err) {
+    console.error("[Subscribe] Failed to drop unmailed pending subscription; a re-request rotates and re-sends:", err);
   }
 }

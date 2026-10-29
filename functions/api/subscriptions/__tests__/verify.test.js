@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { onRequestGet, onRequestPost } from "../verify.js";
 import { MockD1Database } from "./mocks/d1.js";
 import { createMockContext } from "./helpers.js";
+import { hashStoredToken } from "../../../utils/tokens.js";
 
 describe("/api/subscriptions/verify", () => {
   let mockDB;
@@ -27,7 +28,7 @@ describe("/api/subscriptions/verify", () => {
       genre: "punk",
       frequency: "weekly",
       verified: false,
-      verification_token: "valid-token-12345",
+      verification_token: await hashStoredToken("valid-token-12345"),
       unsubscribe_token: "unsub-token-67890",
       created_at: new Date().toISOString(),
     });
@@ -87,7 +88,7 @@ describe("/api/subscriptions/verify", () => {
       genre: "punk",
       frequency: "weekly",
       verified: true,
-      verification_token: "valid-token-12345",
+      verification_token: await hashStoredToken("valid-token-12345"),
       unsubscribe_token: "unsub-token-67890",
       created_at: new Date().toISOString(),
       confirmed_at: "2026-01-01 00:00:00",
@@ -112,7 +113,7 @@ describe("/api/subscriptions/verify", () => {
       genre: "punk",
       frequency: "weekly",
       verified: false,
-      verification_token: "valid-token-12345",
+      verification_token: await hashStoredToken("valid-token-12345"),
       unsubscribe_token: "unsub-token-67890",
       created_at: new Date().toISOString(),
     });
@@ -137,7 +138,7 @@ describe("/api/subscriptions/verify", () => {
       genre: "punk",
       frequency: "weekly",
       verified: false,
-      verification_token: "valid-token-12345",
+      verification_token: await hashStoredToken("valid-token-12345"),
       unsubscribe_token: "unsub-token-67890",
       created_at: new Date().toISOString(),
     });
@@ -161,7 +162,7 @@ describe("/api/subscriptions/verify", () => {
         genre: "all",
         frequency: "weekly",
         verified: false,
-        verification_token: "old-token",
+        verification_token: await hashStoredToken("old-token"),
         unsubscribe_token: "old-unsub",
         created_at: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
       },
@@ -172,7 +173,7 @@ describe("/api/subscriptions/verify", () => {
         genre: "all",
         frequency: "weekly",
         verified: false,
-        verification_token: "new-token",
+        verification_token: await hashStoredToken("new-token"),
         unsubscribe_token: "new-unsub",
         created_at: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
       },
@@ -197,7 +198,7 @@ describe("/api/subscriptions/verify", () => {
       genre: "all",
       frequency: "weekly",
       verified: false,
-      verification_token: "race-token",
+      verification_token: await hashStoredToken("race-token"),
       unsubscribe_token: "race-unsub",
       created_at: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
     });
@@ -216,5 +217,31 @@ describe("/api/subscriptions/verify", () => {
     await onRequestPost(mockContext);
 
     expect(mockDB.data.email_subscriptions[0].verified).toBe(false);
+  });
+
+  it("does not accept a stored digest or retired token as submitted plaintext", async () => {
+    const digest = await hashStoredToken("raw-token");
+    mockDB.data.email_subscriptions.push({
+      id: 1,
+      email: "digest@example.com",
+      city: "all",
+      genre: "all",
+      frequency: "weekly",
+      verified: false,
+      verification_token: digest,
+      unsubscribe_token: "unsub",
+      created_at: new Date().toISOString(),
+    });
+
+    for (const submitted of [digest, "retired:1"]) {
+      const response = await onRequestPost({
+        ...mockContext,
+        request: new Request(`http://localhost/api/subscriptions/verify?token=${encodeURIComponent(submitted)}`, {
+          method: "POST",
+          body: new URLSearchParams({ token: submitted }),
+        }),
+      });
+      expect(response.status).toBe(404);
+    }
   });
 });

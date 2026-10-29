@@ -26,10 +26,13 @@ export class MockD1Database {
       bind: (...params) => ({
         all: async () => this._executeSelect(query, params),
         run: async () => this._executeWrite(query, params),
-        // Only the rate_limits upsert-RETURNING (the per-recipient email cap, #1337) is read
-        // through first(); it counts calls per key like the real fixed-window counter.
+        // The rate_limits upsert-RETURNING (the per-recipient email cap, #1337)
+        // counts calls per key like the real fixed-window counter; any other
+        // first() is a SELECT's first row.
         first: async () => {
-          if (!query.toLowerCase().includes("rate_limits")) return null;
+          if (!query.toLowerCase().includes("rate_limits")) {
+            return (await this._executeSelect(query, params)).results?.[0] ?? null;
+          }
           const [key, now] = params;
           const count = (this.rateLimitCounts.get(key) ?? 0) + 1;
           this.rateLimitCounts.set(key, count);
@@ -51,6 +54,12 @@ export class MockD1Database {
       if (queryLower.includes("where email = ?")) {
         const [email, city, genre] = params;
         results = results.filter((sub) => sub.email === email && sub.city === city && sub.genre === genre);
+      }
+
+      // WHERE id = ? AND verification_token = ? (the rotation read-back)
+      if (queryLower.includes("where id = ? and verification_token = ?")) {
+        const [id, token] = params;
+        results = results.filter((sub) => sub.id === id && sub.verification_token === token);
       }
 
       // WHERE verification_token = ?
@@ -166,6 +175,23 @@ export class MockD1Database {
 
     // UPDATE email_subscriptions SET verified = 1
     if (queryLower.includes("update email_subscriptions")) {
+      if (queryLower.includes("set verification_token = ?")) {
+        const [newToken, id, currentToken] = params;
+        const subscription = this.data.email_subscriptions.find(
+          (sub) => sub.id === id && !sub.verified && sub.verification_token === currentToken,
+        );
+        if (
+          subscription &&
+          (!queryLower.includes("created_at >=") || this._isPendingConfirmationLive(subscription.created_at))
+        ) {
+          subscription.verification_token = newToken;
+          // Follow the SQL: only a query that sets created_at moves it.
+          if (queryLower.includes("created_at = datetime")) subscription.created_at = new Date().toISOString();
+          return { success: true, meta: { changes: 1 } };
+        }
+        return { success: true, meta: { changes: 0 } };
+      }
+
       // New atomic path: UPDATE ... WHERE verification_token = ? AND verified = 0
       if (queryLower.includes("where verification_token = ?")) {
         const [token] = params;
@@ -201,8 +227,10 @@ export class MockD1Database {
 
     // DELETE FROM email_subscriptions
     if (queryLower.includes("delete from email_subscriptions")) {
-      const [id] = params;
-      const index = this.data.email_subscriptions.findIndex((sub) => sub.id === id);
+      const [value] = params;
+      const index = queryLower.includes("where verification_token = ?")
+        ? this.data.email_subscriptions.findIndex((sub) => sub.verification_token === value)
+        : this.data.email_subscriptions.findIndex((sub) => sub.id === value);
 
       if (
         index !== -1 &&

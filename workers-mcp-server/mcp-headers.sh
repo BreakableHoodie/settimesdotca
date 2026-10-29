@@ -8,9 +8,15 @@ if [ ! -f "$dir/.dev.vars" ]; then
   echo "No .dev.vars in $dir" >&2
   exit 1
 fi
-secret="$(sed -n 's/^SHARED_SECRET=//p' "$dir/.dev.vars" | tr -d '"' | head -n 1)"
+secret="$(sed -n 's/^SHARED_SECRET=//p' "$dir/.dev.vars" | head -n 1)"
+# Strip one pair of surrounding quotes only; quotes inside the value are kept.
+if [[ "$secret" =~ ^\"(.*)\"$ || "$secret" =~ ^\'(.*)\'$ ]]; then
+  secret="${BASH_REMATCH[1]}"
+fi
 if [ -z "$secret" ]; then
   echo "SHARED_SECRET not found in $dir/.dev.vars" >&2
   exit 1
 fi
-printf '{"Authorization": "Bearer %s"}\n' "$secret"
+# JSON.stringify escapes anything JSON-significant. The secret travels by
+# environment, not argv, so it never shows in a process listing.
+MCP_SECRET="$secret" node -e 'process.stdout.write(JSON.stringify({ Authorization: "Bearer " + process.env.MCP_SECRET }) + "\n")'

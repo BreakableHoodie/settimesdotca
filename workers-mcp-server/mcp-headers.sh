@@ -8,7 +8,9 @@ if [ ! -f "$dir/.dev.vars" ]; then
   echo "No .dev.vars in $dir" >&2
   exit 1
 fi
-secret="$(sed -n 's/^SHARED_SECRET=//p' "$dir/.dev.vars" | head -n 1)"
+# Same tolerance as wrangler's dotenv parse: spaces around `=` and trailing
+# space are allowed (a valid secret contains none).
+secret="$(sed -n 's/^[[:space:]]*SHARED_SECRET[[:space:]]*=[[:space:]]*//p' "$dir/.dev.vars" | head -n 1 | sed 's/[[:space:]]*$//')"
 # Strip one pair of surrounding quotes only; quotes inside the value are kept.
 if [[ "$secret" =~ ^\"(.*)\"$ || "$secret" =~ ^\'(.*)\'$ ]]; then
   secret="${BASH_REMATCH[1]}"

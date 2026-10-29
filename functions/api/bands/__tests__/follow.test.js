@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { createTestEnv, insertBand, insertEvent } from "../../test-utils";
 import * as followHandler from "../[name]/follow.js";
 import { CONSENT_VERSION } from "../../../utils/consent.js";
+import { hashStoredToken, STORED_TOKEN_HASH_PREFIX } from "../../../utils/tokens.js";
 
 const waitUntil = () => {};
 
@@ -34,7 +35,7 @@ describe("POST /api/bands/:name/follow", () => {
     // Double opt-in: a new follow is created UNVERIFIED with a pending
     // verification token; it only becomes verified=1 after confirm-follow.
     expect(row.verified).toBe(0);
-    expect(row.verification_token).toBeTruthy();
+    expect(row.verification_token).toMatch(new RegExp(`^${STORED_TOKEN_HASH_PREFIX}[0-9a-f]{64}$`));
     expect(row.unsubscribe_token).toBeTruthy();
     // CASL/CAN-SPAM: consent fields are always recorded
     expect(row.consent_method).toBe("web_form");
@@ -144,12 +145,12 @@ describe("POST /api/bands/:name/follow", () => {
       .prepare(
         "INSERT INTO band_follows (email, band_profile_id, verified, verification_token, unsubscribe_token, created_at) VALUES (?, ?, 0, ?, ?, datetime('now', '-8 days'))",
       )
-      .run("pending@example.com", band.band_profile_id, "old-token", "old-unsub");
+      .run("pending@example.com", band.band_profile_id, await hashStoredToken("old-token"), "old-unsub");
     rawDb
       .prepare(
         "INSERT INTO band_follows (email, band_profile_id, verified, verification_token, unsubscribe_token) VALUES (?, ?, 1, ?, ?)",
       )
-      .run("verified@example.com", band.band_profile_id, "verified-token", "verified-unsub");
+      .run("verified@example.com", band.band_profile_id, await hashStoredToken("verified-token"), "verified-unsub");
 
     const makeRequest = (email) =>
       new Request(`https://example.test/api/bands/${band.band_profile_id}/follow`, {
@@ -174,7 +175,11 @@ describe("POST /api/bands/:name/follow", () => {
     expect(rows).toHaveLength(2);
     expect(rows[0].verification_token).not.toBe("old-token");
     expect(rows[0].verified).toBe(0);
-    expect(rows[1]).toMatchObject({ email: "verified@example.com", verified: 1, verification_token: "verified-token" });
+    expect(rows[1]).toMatchObject({
+      email: "verified@example.com",
+      verified: 1,
+      verification_token: await hashStoredToken("verified-token"),
+    });
   });
 
   it("returns 404 if band does not exist", async () => {

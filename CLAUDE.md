@@ -81,7 +81,7 @@ Deletion over addition. Boring over clever. Fewest files that work.
 
 Never be lazy about understanding, input validation, error handling that prevents data loss, security, accessibility, theme-token correctness, or anything explicitly asked for.
 
-> Adopted as doctrine only — the ponytail plugin itself was evaluated and **not installed** (2026-08-06). Its hard rules ("no boilerplate that wasn't asked for", "shortest working diff wins") cut against the sweep discipline above, and its benchmark is n=4 on Haiku 4.5. Take the ladder, skip the installation; don't re-litigate.
+> Adopted as doctrine only: the ponytail plugin was evaluated and **not installed** (2026-08-06), because its "shortest working diff wins" rules cut against the sweep discipline above. Don't re-litigate.
 
 ---
 
@@ -666,6 +666,8 @@ Mail scanners fetch links with GET, so confirmation and unsubscribe GETs render 
 
 When a performance is announced (`is_announced` 0→1), verified followers are emailed once, tracked per follower in `band_follow_notifications (performance_id, band_follow_id)`; `POST /api/admin/bands/:id/resend-announcement` emails only followers with no live claim (`claimIsLiveSql`), never a delivered row (see "A claim is not a delivery record"). Shared logic: `functions/utils/bandFollowNotify.js`. **Do not reintroduce a fire-once latch without per-follower tracking.**
 
+**Confirmation tokens are stored hashed (#1415)**: `verification_token`/`batch_token` hold `hashStoredToken()` digests; readers hash before binding. A digest cannot be re-sent, so a re-request rotates the token (bound to the hash as read, `created_at` kept).
+
 Follow, subscriber and single-band digest mail carries RFC 8058 one-click unsubscribe headers (`functions/utils/email.js`); multi-band digests deliberately do not, because one click must not silently remove only one of several follows.
 
 Bot protection on follow and subscribe goes through `verifyTurnstile()` (`functions/utils/turnstile.js`), which **fails closed in production**: `TURNSTILE_SECRET_KEY` must be set in the production Pages project.
@@ -859,7 +861,7 @@ git fetch origin
 git rebase origin/main      # keep branch current with main
 ```
 
-Do this **every time you push**, not just when opening the PR. Dependabot merges deps bumps to `main` frequently — if you push without rebasing, GitHub will require an "Update branch" click before merging, which adds round-trips. Rebasing before each push eliminates this entirely.
+Do this **every time you push**, not just when opening the PR: Dependabot moves `main` often, and a stale branch needs an "Update branch" round-trip before it can merge.
 
 ### Opening a pull request
 

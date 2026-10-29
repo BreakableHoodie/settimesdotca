@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createTestEnv, insertEvent, insertBand, insertVenue, insertShareLink } from "../../test-utils";
 import * as stats from "../public.js";
+import { hashStoredToken } from "../../../utils/tokens.js";
 
 function seedEnv() {
   const { env, rawDb } = createTestEnv({ role: "editor" });
@@ -57,7 +58,7 @@ describe("Public aggregate stats - GET /api/stats/public", () => {
       .prepare(
         "INSERT INTO band_follows (email, band_profile_id, verified, verification_token, unsubscribe_token) VALUES (?, ?, 0, ?, ?)",
       )
-      .run("unverified@example.test", bandARow.id, "verify-token-1", "unsub-token-2");
+      .run("unverified@example.test", bandARow.id, await hashStoredToken("verify-token-1"), "unsub-token-2");
 
     rawDb.prepare("INSERT INTO page_views_daily (page, date, views) VALUES (?, ?, ?)").run("/", "2026-07-01", 100);
     rawDb.prepare("INSERT INTO page_views_daily (page, date, views) VALUES (?, ?, ?)").run("/about", "2026-07-01", 25);
@@ -142,7 +143,13 @@ describe("Public aggregate stats - GET /api/stats/public", () => {
       .prepare(
         "INSERT INTO band_follows (email, band_profile_id, verified, verification_token, unsubscribe_token, consent_ip) VALUES (?, ?, 0, ?, ?, ?)",
       )
-      .run("pending.fan@example.test", perf.band_profile_id, "verify-xyz", "unsub-def", "203.0.113.8");
+      .run(
+        "pending.fan@example.test",
+        perf.band_profile_id,
+        await hashStoredToken("verify-xyz"),
+        "unsub-def",
+        "203.0.113.8",
+      );
 
     const res = await getStats(env);
     expect(res.status).toBe(200);

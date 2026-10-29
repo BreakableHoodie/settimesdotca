@@ -18,19 +18,6 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TEXT DEFAULT (datetime('now'))
 );
 
-CREATE TABLE IF NOT EXISTS sessions (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id INTEGER NOT NULL,
-  session_token TEXT UNIQUE NOT NULL,
-  ip_address TEXT,
-  user_agent TEXT,
-  remember_me INTEGER DEFAULT 0,
-  last_activity_at TEXT NOT NULL DEFAULT (datetime('now')),
-  expires_at TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-
 CREATE TABLE IF NOT EXISTS lucia_sessions (
   id TEXT PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -59,8 +46,6 @@ CREATE TABLE IF NOT EXISTS auth_attempts (
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_activation_token ON users(activation_token);
-CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(session_token);
-CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_auth_attempts_email ON auth_attempts(email);
 CREATE INDEX IF NOT EXISTS idx_auth_attempts_ip ON auth_attempts(ip_address);
 

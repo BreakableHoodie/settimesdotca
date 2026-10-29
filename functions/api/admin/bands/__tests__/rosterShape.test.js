@@ -7,6 +7,7 @@ vi.mock("../../_middleware.js", () => ({
 
 import * as bandsHandler from "../../bands.js";
 import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../../test-utils.js";
+import { hashStoredToken } from "../../../../utils/tokens.js";
 
 /**
  * Pins the EXACT roster response so the query behind it can be rewritten and
@@ -29,7 +30,7 @@ import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../../te
  * future, one with none at all, and one with followers (verified and not).
  */
 
-function seedRoster(rawDb) {
+async function seedRoster(rawDb) {
   // Dates chosen relative to nothing — the handler compares against Toronto's
   // festival "today", so these are far enough either side to stay stable.
   const past = insertEvent(rawDb, { name: "Past Fest", slug: "past-fest", date: "2020-01-15" });
@@ -60,7 +61,7 @@ function seedRoster(rawDb) {
     .prepare(
       "INSERT INTO band_follows (email, band_profile_id, verified, verification_token, unsubscribe_token) VALUES (?, ?, 0, ?, ?)",
     )
-    .run("no@x.co", both.band_profile_id, "pending", "tok-2");
+    .run("no@x.co", both.band_profile_id, await hashStoredToken("pending"), "tok-2");
 
   return { both, pastOnly, futureOnly };
 }
@@ -132,7 +133,7 @@ describe("admin roster response shape (#907 rewrite guard)", () => {
     // The LIMIT+JOIN truncation class: a join-multiplied roster once hid 47 of
     // 218 bands. "Both Sides" has four performances and must appear once.
     const { env, rawDb } = createTestEnv({ role: "editor" });
-    seedRoster(rawDb);
+    await seedRoster(rawDb);
     const body = await fetchRoster(env);
     const names = body.bands.map((b) => b.name);
     expect(names.filter((n) => n === "Both Sides")).toHaveLength(1);
@@ -140,7 +141,7 @@ describe("admin roster response shape (#907 rewrite guard)", () => {
 
   it("projects exactly the expected columns", async () => {
     const { env, rawDb } = createTestEnv({ role: "editor" });
-    seedRoster(rawDb);
+    await seedRoster(rawDb);
     const body = await fetchRoster(env);
     const row = body.bands.find((b) => b.name === "Both Sides");
 
@@ -190,7 +191,7 @@ describe("admin roster response shape (#907 rewrite guard)", () => {
 
   it("picks the EARLIEST future event and the LATEST past event", async () => {
     const { env, rawDb } = createTestEnv({ role: "editor" });
-    seedRoster(rawDb);
+    await seedRoster(rawDb);
     const body = await fetchRoster(env);
     const row = body.bands.find((b) => b.name === "Both Sides");
 
@@ -204,7 +205,7 @@ describe("admin roster response shape (#907 rewrite guard)", () => {
 
   it("leaves the unused side NULL rather than falling back to the other", async () => {
     const { env, rawDb } = createTestEnv({ role: "editor" });
-    seedRoster(rawDb);
+    await seedRoster(rawDb);
     const body = await fetchRoster(env);
 
     const pastOnly = body.bands.find((b) => b.name === "Past Only");
@@ -218,7 +219,7 @@ describe("admin roster response shape (#907 rewrite guard)", () => {
 
   it("gives a band with no performances nulls and a zero follower count", async () => {
     const { env, rawDb } = createTestEnv({ role: "editor" });
-    seedRoster(rawDb);
+    await seedRoster(rawDb);
     const body = await fetchRoster(env);
     const none = body.bands.find((b) => b.name === "No Events");
 
@@ -233,14 +234,14 @@ describe("admin roster response shape (#907 rewrite guard)", () => {
     // The double opt-in gate. An unverified follower must not appear in a count
     // an operator reads as "people who will be emailed".
     const { env, rawDb } = createTestEnv({ role: "editor" });
-    seedRoster(rawDb);
+    await seedRoster(rawDb);
     const body = await fetchRoster(env);
     expect(body.bands.find((b) => b.name === "Both Sides").follower_count).toBe(1);
   });
 
   it("lists every event the band played in event_ids", async () => {
     const { env, rawDb } = createTestEnv({ role: "editor" });
-    seedRoster(rawDb);
+    await seedRoster(rawDb);
     const body = await fetchRoster(env);
     const row = body.bands.find((b) => b.name === "Both Sides");
     expect(String(row.event_ids).split(",").sort()).toHaveLength(4);

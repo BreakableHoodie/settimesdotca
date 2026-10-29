@@ -166,6 +166,23 @@ export class MockD1Database {
 
     // UPDATE email_subscriptions SET verified = 1
     if (queryLower.includes("update email_subscriptions")) {
+      if (queryLower.includes("set verification_token = ?")) {
+        const [newToken, id, currentToken] = params;
+        const subscription = this.data.email_subscriptions.find(
+          (sub) => sub.id === id && !sub.verified && sub.verification_token === currentToken,
+        );
+        if (
+          subscription &&
+          (!queryLower.includes("created_at >=") || this._isPendingConfirmationLive(subscription.created_at))
+        ) {
+          subscription.verification_token = newToken;
+          // Follow the SQL: only a query that sets created_at moves it.
+          if (queryLower.includes("created_at = datetime")) subscription.created_at = new Date().toISOString();
+          return { success: true, meta: { changes: 1 } };
+        }
+        return { success: true, meta: { changes: 0 } };
+      }
+
       // New atomic path: UPDATE ... WHERE verification_token = ? AND verified = 0
       if (queryLower.includes("where verification_token = ?")) {
         const [token] = params;
@@ -201,8 +218,10 @@ export class MockD1Database {
 
     // DELETE FROM email_subscriptions
     if (queryLower.includes("delete from email_subscriptions")) {
-      const [id] = params;
-      const index = this.data.email_subscriptions.findIndex((sub) => sub.id === id);
+      const [value] = params;
+      const index = queryLower.includes("where verification_token = ?")
+        ? this.data.email_subscriptions.findIndex((sub) => sub.verification_token === value)
+        : this.data.email_subscriptions.findIndex((sub) => sub.id === value);
 
       if (
         index !== -1 &&

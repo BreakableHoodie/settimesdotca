@@ -3,6 +3,7 @@ import { createTestEnv, insertBand, insertEvent } from "../../test-utils";
 import * as followBatchHandler from "../follow-batch.js";
 import * as confirmBatchHandler from "../confirm-follow-batch.js";
 import { CONSENT_VERSION } from "../../../utils/consent.js";
+import { hashStoredToken } from "../../../utils/tokens.js";
 
 // waitUntil in tests: run the promise synchronously so email side-effects
 // execute before assertions (mirrors follow.test.js pattern).
@@ -54,7 +55,7 @@ describe("POST /api/bands/follow-batch", () => {
     // Security invariant: every row must be unverified
     for (const row of rows) {
       expect(row.verified).toBe(0);
-      expect(row.verification_token).toBeTruthy();
+      expect(row.verification_token).toMatch(/^sha256:[0-9a-f]{64}$/);
       expect(row.unsubscribe_token).toBeTruthy();
       expect(row.consent_method).toBe("web_form");
       expect(row.consent_version).toBe(CONSENT_VERSION);
@@ -63,7 +64,7 @@ describe("POST /api/bands/follow-batch", () => {
     // All three rows share the same batch_token
     const tokens = new Set(rows.map((r) => r.batch_token));
     expect(tokens.size).toBe(1);
-    expect([...tokens][0]).toBeTruthy();
+    expect([...tokens][0]).toMatch(/^sha256:[0-9a-f]{64}$/);
   });
 
   it("returns confirmUrl in dev (email unconfigured) instead of sending email", async () => {
@@ -148,12 +149,23 @@ describe("POST /api/bands/follow-batch", () => {
       .prepare(
         "INSERT INTO band_follows (email, band_profile_id, verified, verification_token, unsubscribe_token, batch_token, created_at) VALUES (?, ?, 0, ?, ?, ?, datetime('now', '-8 days'))",
       )
-      .run("pending-batch@example.com", band.band_profile_id, "old-batch-token", "old-batch-unsub", "old-batch");
+      .run(
+        "pending-batch@example.com",
+        band.band_profile_id,
+        await hashStoredToken("old-batch-token"),
+        "old-batch-unsub",
+        await hashStoredToken("old-batch"),
+      );
     rawDb
       .prepare(
         "INSERT INTO band_follows (email, band_profile_id, verified, verification_token, unsubscribe_token) VALUES (?, ?, 1, ?, ?)",
       )
-      .run("verified-batch@example.com", band.band_profile_id, "verified-batch-token", "verified-batch-unsub");
+      .run(
+        "verified-batch@example.com",
+        band.band_profile_id,
+        await hashStoredToken("verified-batch-token"),
+        "verified-batch-unsub",
+      );
 
     const post = (email) =>
       followBatchHandler.onRequestPost({
@@ -175,7 +187,7 @@ describe("POST /api/bands/follow-batch", () => {
     expect(rows[1]).toMatchObject({
       email: "verified-batch@example.com",
       verified: 1,
-      verification_token: "verified-batch-token",
+      verification_token: await hashStoredToken("verified-batch-token"),
     });
   });
 
@@ -466,6 +478,39 @@ describe("/api/bands/confirm-follow-batch", () => {
     expect(html).toMatch(/confirm your lineup/i);
   });
 
+  it("does not accept the stored batch digest or a retired token as submitted plaintext", async () => {
+    const { env, rawDb } = createTestEnv();
+    const ev = insertEvent(rawDb, { name: "Vol17", slug: "vol17-confirm-batch-digest", status: "published" });
+    const band = insertBand(rawDb, { name: "Digest Band", event_id: ev.id });
+    const followRes = await followBatchHandler.onRequestPost({
+      request: new Request("https://example.test/api/bands/follow-batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "digest-batch@example.com", performance_ids: [band.id] }),
+      }),
+      env,
+      waitUntil,
+    });
+    const { confirmUrl } = await followRes.json();
+    const plaintext = new URL(confirmUrl).searchParams.get("token");
+    const stored = rawDb
+      .prepare("SELECT batch_token FROM band_follows WHERE email = ?")
+      .get("digest-batch@example.com");
+
+    for (const submitted of [stored.batch_token, "retired:1"]) {
+      const response = await confirmBatchHandler.onRequestPost({
+        request: new Request("https://example.test/api/bands/confirm-follow-batch", {
+          method: "POST",
+          body: new URLSearchParams({ token: submitted }),
+        }),
+        env,
+      });
+      expect(response.status).toBe(200);
+      expect(await response.text()).toMatch(/invalid or has already been used/i);
+    }
+    expect(plaintext).not.toBe(stored.batch_token);
+  });
+
   // The button is a deliberate press now (#1291), so a POST that confirmed
   // nothing must not claim success. Same generic wording as the single route.
   it("POST with an unknown token does not claim the follows were confirmed", async () => {
@@ -493,12 +538,24 @@ describe("/api/bands/confirm-follow-batch", () => {
       .prepare(
         "INSERT INTO band_follows (email, band_profile_id, verified, batch_token, unsubscribe_token, created_at) VALUES (?, ?, 0, ?, ?, datetime('now', ?))",
       )
-      .run("old-batch-confirm@example.com", oldBand.band_profile_id, "old-confirm-batch", "old-unsub", "-8 days");
+      .run(
+        "old-batch-confirm@example.com",
+        oldBand.band_profile_id,
+        await hashStoredToken("old-confirm-batch"),
+        "old-unsub",
+        "-8 days",
+      );
     rawDb
       .prepare(
         "INSERT INTO band_follows (email, band_profile_id, verified, batch_token, unsubscribe_token, created_at) VALUES (?, ?, 0, ?, ?, datetime('now', ?))",
       )
-      .run("new-batch-confirm@example.com", newBand.band_profile_id, "new-confirm-batch", "new-unsub", "-6 days");
+      .run(
+        "new-batch-confirm@example.com",
+        newBand.band_profile_id,
+        await hashStoredToken("new-confirm-batch"),
+        "new-unsub",
+        "-6 days",
+      );
 
     const post = (token) =>
       confirmBatchHandler.onRequestPost({

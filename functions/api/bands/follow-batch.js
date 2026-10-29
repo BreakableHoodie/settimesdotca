@@ -21,7 +21,7 @@
 //     global middleware — no explicit call needed here.
 
 import { isValidEmail } from "../../utils/validation.js";
-import { generateToken } from "../../utils/tokens.js";
+import { generateToken, hashStoredToken } from "../../utils/tokens.js";
 import { sendEmail, isEmailConfigured } from "../../utils/email.js";
 import { verifyTurnstile } from "../../utils/turnstile.js";
 import { escapeHtml } from "../../utils/html.js";
@@ -37,9 +37,9 @@ const MAX_BATCH_SIZE = 30;
 
 // Rows whose confirmation was never mailed can never be confirmed, yet live ones make every
 // re-request a no-op until they expire in 7 days. Delete this request's by its own batch token.
-async function dropPendingBatch(DB, batchToken) {
+async function dropPendingBatch(DB, batchTokenHash) {
   try {
-    await DB.prepare("DELETE FROM band_follows WHERE batch_token = ? AND verified = 0").bind(batchToken).run();
+    await DB.prepare("DELETE FROM band_follows WHERE batch_token = ? AND verified = 0").bind(batchTokenHash).run();
   } catch (err) {
     console.error(
       "[band-follow-batch] Failed to drop unmailed pending follows; re-requests are blocked until they expire:",
@@ -133,6 +133,7 @@ export async function onRequestPost(context) {
     // One shared batch_token ties all the rows together so a single confirm link
     // can flip all of them to verified=1.
     const batchToken = generateToken();
+    const batchTokenHash = await hashStoredToken(batchToken);
     const publicUrl = getPublicBaseUrl(env);
     const confirmUrl = `${publicUrl}/api/bands/confirm-follow-batch?token=${batchToken}`;
 
@@ -173,10 +174,12 @@ export async function onRequestPost(context) {
     // by INSERT OR IGNORE, so it is NOT adopted into this batch_token — it stays
     // confirmable via its own earlier email. This errs toward not-verifying, never
     // toward over-verifying, so it carries no email-amplification or consent risk.
-    const stmts = bands.results.flatMap(({ band_profile_id }) => {
+    const stmts = [];
+    for (const { band_profile_id } of bands.results) {
       const verificationToken = generateToken();
+      const verificationTokenHash = await hashStoredToken(verificationToken);
       const unsubscribeToken = generateToken();
-      return [
+      stmts.push(
         DB.prepare(
           `DELETE FROM band_follows
            WHERE email = ? AND band_profile_id = ? AND verified = 0 AND NOT (${pendingConfirmationLiveSql()})`,
@@ -186,9 +189,17 @@ export async function onRequestPost(context) {
              (email, band_profile_id, verified, verification_token, unsubscribe_token,
                consent_ip, consent_method, consent_version, batch_token)
             VALUES (?, ?, 0, ?, ?, ?, 'web_form', ?, ?)`,
-        ).bind(email, band_profile_id, verificationToken, unsubscribeToken, consentIp, CONSENT_VERSION, batchToken),
-      ];
-    });
+        ).bind(
+          email,
+          band_profile_id,
+          verificationTokenHash,
+          unsubscribeToken,
+          consentIp,
+          CONSENT_VERSION,
+          batchTokenHash,
+        ),
+      );
+    }
 
     const results = await DB.batch(stmts);
     // Every pair is delete-then-insert; only insert results count as new follows.
@@ -222,12 +233,12 @@ export async function onRequestPost(context) {
           .then(async (emailResult) => {
             if (!emailResult?.delivered) {
               console.warn("[band-follow-batch] Confirmation email not delivered:", emailResult?.reason);
-              await dropPendingBatch(DB, batchToken);
+              await dropPendingBatch(DB, batchTokenHash);
             }
           })
           .catch(async (err) => {
             console.error("[band-follow-batch] Failed to send confirmation email:", err);
-            await dropPendingBatch(DB, batchToken);
+            await dropPendingBatch(DB, batchTokenHash);
           }),
       );
     }

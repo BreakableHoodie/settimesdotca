@@ -245,34 +245,15 @@ have them, and no code reads or writes them. They were removed from
 `database/setup-complete.sql` when it was regenerated from the migrations
 replay (#506).
 
-#### `sessions`
-
-A pre-Lucia-migration session table. Still created by `setup-complete.sql`
-but no current endpoint reads from or writes to it — session management now
-goes entirely through `lucia_sessions` (see below and
-`functions/utils/auth.js`).
-
-| Column             | Type    | Notes                                        |
-| ------------------ | ------- | -------------------------------------------- |
-| `id`               | INTEGER | PK, autoincrement                            |
-| `session_token`    | TEXT    | UNIQUE, NOT NULL                             |
-| `user_id`          | INTEGER | NOT NULL, FK → `users(id)` ON DELETE CASCADE |
-| `ip_address`       | TEXT    | Nullable                                     |
-| `user_agent`       | TEXT    | Nullable                                     |
-| `remember_me`      | INTEGER | DEFAULT 0                                    |
-| `created_at`       | TEXT    | NOT NULL, DEFAULT `datetime('now')`          |
-| `last_activity_at` | TEXT    | NOT NULL, DEFAULT `datetime('now')`          |
-| `expires_at`       | TEXT    | NOT NULL                                     |
-
-Indexes: `idx_sessions_token(session_token)`, `idx_sessions_user_id(user_id)`,
-`idx_sessions_expires(expires_at)`.
-
 ### Fan engagement
 
 #### `band_follows`
 
 A fan's follow of a band (double opt-in — see `CLAUDE.md` "Band Announcements").
 Added in migration 0035.
+
+`verification_token` and `batch_token` are stored as `sha256:` plus lowercase
+SHA-256 hex; plaintext values exist only in confirmation links.
 
 | Column               | Type    | Notes                                                                                                                                                                    |
 | -------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -397,6 +378,9 @@ their final form after later ALTERs (migrations 0027 and 0045).
 
 City/genre email digest subscriptions, double opt-in via a verification link.
 Created by `POST /api/subscriptions/subscribe`.
+
+`verification_token` is stored as `sha256:` plus lowercase SHA-256 hex; the
+plaintext exists only in the confirmation link and is rotated on re-request.
 
 | Column               | Type    | Notes                                                                  |
 | -------------------- | ------- | ---------------------------------------------------------------------- |
@@ -851,7 +835,6 @@ plain denormalized integers with no constraint, called out individually):
 | `performances`               | `updated_by_user_id` | `users(id)`               | (none)    |
 | `artist_daily_stats`         | `band_profile_id`    | `band_profiles(id)`       | CASCADE   |
 | `users`                      | `deactivated_by`     | `users(id)` (self)        | (none)    |
-| `sessions`                   | `user_id`            | `users(id)`               | CASCADE   |
 | `lucia_sessions`             | `user_id`            | `users(id)`               | CASCADE   |
 | `mfa_challenges`             | `user_id`            | `users(id)`               | CASCADE   |
 | `invite_codes`               | `created_by_user_id` | `users(id)`               | SET NULL  |

@@ -13,19 +13,21 @@ export function generateToken(length = 32) {
   return Array.from(array, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-// Reset tokens are stored hashed (#1354), like invite codes (inviteCodes.js,
-// #1334) and API keys: the plaintext exists only in the emailed link. Same
-// scheme and reasoning: the token is crypto.randomUUID() (122 random bits), so
-// an unsalted SHA-256 has no dictionary to fear, and lookup stays `WHERE token
-// = ?`. A submitted value is always hashed first, so a caller who sends a
-// stored `sha256:...` or `retired:<id>` value matches nothing.
-export const RESET_TOKEN_HASH_PREFIX = "sha256:";
+// Bearer tokens are stored hashed (#1354, #1415), like invite codes and API
+// keys: the plaintext exists only in the emailed link. Random tokens have no
+// useful dictionary, so an unsalted SHA-256 keeps lookup simple. A submitted
+// value is always hashed first, so stored digests and retired values cannot be
+// replayed as input.
+export const STORED_TOKEN_HASH_PREFIX = "sha256:";
+export const RESET_TOKEN_HASH_PREFIX = STORED_TOKEN_HASH_PREFIX;
 
-export async function hashResetToken(plaintext) {
+export async function hashStoredToken(plaintext) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(plaintext)));
   const hex = Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
-  return `${RESET_TOKEN_HASH_PREFIX}${hex}`;
+  return `${STORED_TOKEN_HASH_PREFIX}${hex}`;
 }
+
+export const hashResetToken = hashStoredToken;
 
 /**
  * Generate a password reset token with metadata

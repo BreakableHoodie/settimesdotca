@@ -4,6 +4,7 @@
 import { getPublicBaseUrl } from "../../utils/publicUrl.js";
 import { emailActionPage, readEmailActionToken } from "../../utils/emailActionPage.js";
 import { pendingConfirmationLiveSql } from "../../utils/consent.js";
+import { hashStoredToken } from "../../utils/tokens.js";
 
 export async function onRequestGet(context) {
   const { request } = context;
@@ -25,6 +26,7 @@ export async function onRequestPost(context) {
   if (!token) {
     return new Response("Missing verification token", { status: 400 });
   }
+  const tokenHash = await hashStoredToken(token);
 
   try {
     // Find subscription
@@ -36,7 +38,7 @@ export async function onRequestPost(context) {
         AND (verified = 1 OR (verified = 0 AND ${pendingConfirmationLiveSql()}))
     `,
     )
-      .bind(token)
+      .bind(tokenHash)
       .all();
 
     if (results.length === 0) {
@@ -59,14 +61,14 @@ export async function onRequestPost(context) {
         AND ${pendingConfirmationLiveSql()}
     `,
     )
-      .bind(token)
+      .bind(tokenHash)
       .run();
 
     if (!verifyResult?.meta?.changes) {
       // Either a concurrent click verified it, or the link expired between the
       // lookup and this write. Only the first is "already verified".
       const current = await env.DB.prepare("SELECT verified FROM email_subscriptions WHERE verification_token = ?")
-        .bind(token)
+        .bind(tokenHash)
         .first();
       if (!current?.verified) {
         return new Response("This verification link has expired. Please subscribe again.", { status: 410 });

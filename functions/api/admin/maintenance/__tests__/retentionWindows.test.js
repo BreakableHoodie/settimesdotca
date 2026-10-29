@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import { createTestEnv } from "../../../test-utils.js";
 import { runRetentionCleanup } from "../retention.js";
+import { hashStoredToken } from "../../../../utils/tokens.js";
 
 // The privacy policy publishes these windows. Until this file, deleting or
 // widening either of them left every backend test green: the cross-table test
@@ -22,21 +23,28 @@ function seedAudit(rawDb, action, ageDays) {
     .run(action, `-${ageDays} days`);
 }
 
-function seedFollow(rawDb, email, ageDays, verified = 0) {
+async function seedFollow(rawDb, email, ageDays, verified = 0) {
   const band = rawDb.prepare("SELECT id FROM band_profiles LIMIT 1").get();
   rawDb
     .prepare(
       "INSERT INTO band_follows (email, band_profile_id, verified, verification_token, unsubscribe_token, created_at) VALUES (?, ?, ?, ?, ?, datetime('now', ?))",
     )
-    .run(email, band.id, verified, `${email}-verify`, `${email}-unsubscribe`, `-${ageDays} days`);
+    .run(
+      email,
+      band.id,
+      verified,
+      await hashStoredToken(`${email}-verify`),
+      `${email}-unsubscribe`,
+      `-${ageDays} days`,
+    );
 }
 
-function seedSubscription(rawDb, email, ageDays, verified = 0) {
+async function seedSubscription(rawDb, email, ageDays, verified = 0) {
   rawDb
     .prepare(
       "INSERT INTO email_subscriptions (email, city, genre, verification_token, unsubscribe_token, verified, created_at) VALUES (?, 'all', 'all', ?, ?, ?, datetime('now', ?))",
     )
-    .run(email, `${email}-verify`, `${email}-unsubscribe`, verified, `-${ageDays} days`);
+    .run(email, await hashStoredToken(`${email}-verify`), `${email}-unsubscribe`, verified, `-${ageDays} days`);
 }
 
 describe("retention windows published in the privacy policy", () => {
@@ -83,12 +91,12 @@ describe("retention windows published in the privacy policy", () => {
       .prepare("INSERT INTO band_profiles (name, name_normalized) VALUES ('Retention Band', 'retention-band')")
       .run();
     expect(band.lastInsertRowid).toBeTruthy();
-    seedFollow(rawDb, "old-follow@example.test", 8);
-    seedFollow(rawDb, "recent-follow@example.test", 6);
-    seedFollow(rawDb, "verified-follow@example.test", 365, 1);
-    seedSubscription(rawDb, "old-subscription@example.test", 8);
-    seedSubscription(rawDb, "recent-subscription@example.test", 6);
-    seedSubscription(rawDb, "verified-subscription@example.test", 365, 1);
+    await seedFollow(rawDb, "old-follow@example.test", 8);
+    await seedFollow(rawDb, "recent-follow@example.test", 6);
+    await seedFollow(rawDb, "verified-follow@example.test", 365, 1);
+    await seedSubscription(rawDb, "old-subscription@example.test", 8);
+    await seedSubscription(rawDb, "recent-subscription@example.test", 6);
+    await seedSubscription(rawDb, "verified-subscription@example.test", 365, 1);
 
     const result = await runRetentionCleanup(env);
 

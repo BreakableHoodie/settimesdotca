@@ -1118,6 +1118,33 @@ export const MUTATIONS = [
     tests: ["functions/api/admin/mfa/__tests__/mfa-settings.test.js"],
   },
   {
+    id: "confirmation-reader-hashes-token",
+    invariant:
+      "CLAUDE.md 'Band Announcements' — confirmation readers hash submitted bearer tokens before lookup, so stored digests and retired values cannot be replayed",
+    file: "functions/api/bands/[name]/confirm-follow.js",
+    find: ".bind(tokenHash)",
+    replace: ".bind(token)",
+    tests: ["functions/api/bands/__tests__/confirm-follow.test.js"],
+  },
+  {
+    id: "confirmation-writer-stores-token-hash",
+    invariant:
+      "CLAUDE.md 'Band Announcements' — new confirmation links store only the SHA-256 token digest, never the emailed plaintext",
+    file: "functions/api/bands/[name]/follow.js",
+    find: ".bind(email, band.id, verificationTokenHash, unsubscribeToken, consentIp, CONSENT_VERSION)",
+    replace: ".bind(email, band.id, verificationToken, unsubscribeToken, consentIp, CONSENT_VERSION)",
+    tests: ["functions/api/bands/__tests__/follow.test.js"],
+  },
+  {
+    id: "subscription-rerequest-rotates-token",
+    invariant:
+      "CLAUDE.md 'Band Announcements' — a re-request emails a fresh token, because the stored value is a digest that can never confirm",
+    file: "functions/api/subscriptions/subscribe.js",
+    find: "emailResult = await sendVerificationEmail(env, email, newVerificationToken);",
+    replace: "emailResult = await sendVerificationEmail(env, email, current.verification_token);",
+    tests: ["functions/api/subscriptions/__tests__/subscribe.test.js"],
+  },
+  {
     id: "mfa-login-backup-code-spend-not-restored",
     invariant:
       "CLAUDE.md 'RBAC Roles' — a login writes backup codes only over the list it verified, so a concurrent login cannot restore a spent code (#1253 review)",

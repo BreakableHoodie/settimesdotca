@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { onRequestGet, onRequestPost } from "../unsubscribe.js";
 import { MockD1Database } from "./mocks/d1.js";
 import { createMockContext } from "./helpers.js";
+import { hashStoredToken } from "../../../utils/tokens.js";
 
 describe("/api/subscriptions/unsubscribe", () => {
   let mockDB;
@@ -27,7 +28,7 @@ describe("/api/subscriptions/unsubscribe", () => {
       genre: "punk",
       frequency: "weekly",
       verified: true,
-      verification_token: "verify-token-12345",
+      verification_token: await hashStoredToken("verify-token-12345"),
       unsubscribe_token: "valid-token-67890",
       created_at: new Date().toISOString(),
     });
@@ -62,7 +63,7 @@ describe("/api/subscriptions/unsubscribe", () => {
       genre: "punk",
       frequency: "weekly",
       verified: true,
-      verification_token: "verify-token-12345",
+      verification_token: await hashStoredToken("verify-token-12345"),
       unsubscribe_token: "one-click-token",
       created_at: new Date().toISOString(),
     });
@@ -108,7 +109,7 @@ describe("/api/subscriptions/unsubscribe", () => {
       genre: "punk",
       frequency: "weekly",
       verified: true,
-      verification_token: "verify-token-12345",
+      verification_token: await hashStoredToken("verify-token-12345"),
       unsubscribe_token: "valid-token-67890",
       created_at: new Date().toISOString(),
     });
@@ -133,7 +134,7 @@ describe("/api/subscriptions/unsubscribe", () => {
       genre: "punk",
       frequency: "weekly",
       verified: true,
-      verification_token: "verify-token-12345",
+      verification_token: await hashStoredToken("verify-token-12345"),
       unsubscribe_token: "valid-token-67890",
       created_at: new Date().toISOString(),
     });

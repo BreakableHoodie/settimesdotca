@@ -1,4 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
+import { hashStoredToken } from "../../../../utils/tokens.js";
 
 vi.mock("../../_middleware.js", () => ({
   checkPermission: async (context) => {
@@ -61,7 +62,12 @@ describe("double opt-in gate — unverified followers are never enrolled in anno
       .prepare(
         "INSERT INTO band_follows (email, band_profile_id, verified, verification_token, unsubscribe_token) VALUES (?, ?, 0, ?, ?)",
       )
-      .run("not-mine@example.com", perf.band_profile_id, "pending-token", "unsub-unverified").lastInsertRowid;
+      .run(
+        "not-mine@example.com",
+        perf.band_profile_id,
+        await hashStoredToken("pending-token"),
+        "unsub-unverified",
+      ).lastInsertRowid;
 
     const res = await bandIdHandler.onRequestPatch({
       request: new Request(`https://example.test/api/admin/bands/${perf.id}`, {
@@ -103,7 +109,12 @@ describe("double opt-in gate — unverified followers are never enrolled in anno
       .prepare(
         "INSERT INTO band_follows (email, band_profile_id, verified, verification_token, unsubscribe_token) VALUES (?, ?, 0, ?, ?)",
       )
-      .run("not-mine@example.com", perf.band_profile_id, "pending-token", "unsub-unverified").lastInsertRowid;
+      .run(
+        "not-mine@example.com",
+        perf.band_profile_id,
+        await hashStoredToken("pending-token"),
+        "unsub-unverified",
+      ).lastInsertRowid;
 
     await bandIdHandler.onRequestPatch({
       request: new Request(`https://example.test/api/admin/bands/${perf.id}`, {
@@ -138,7 +149,12 @@ describe("double opt-in gate — unverified followers are never enrolled in anno
       .prepare(
         "INSERT INTO band_follows (email, band_profile_id, verified, verification_token, unsubscribe_token) VALUES (?, ?, 0, ?, ?)",
       )
-      .run("not-mine@example.com", perf.band_profile_id, "pending-token", "unsub-unverified").lastInsertRowid;
+      .run(
+        "not-mine@example.com",
+        perf.band_profile_id,
+        await hashStoredToken("pending-token"),
+        "unsub-unverified",
+      ).lastInsertRowid;
 
     const res = await resendAnnouncement({
       request: new Request(`https://example.test/api/admin/bands/${perf.id}/resend-announcement`, {

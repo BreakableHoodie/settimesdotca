@@ -11,6 +11,10 @@ import { assertReadOnlySelect } from "./sqlGuard.js";
  * Every tool here reads production data, including sessions and the auth
  * audit log. Treat the descriptions below as the tool contract.
  */
+// Every tool only reads the bound D1, and queryDB's guard refuses anything but
+// one SELECT. Without these hints MCP clients assume destructive and open-world.
+const READ_ONLY = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
+
 function createServer() {
   const server = new McpServer({ name: "settimesdotca", version: "1.0.0" });
 
@@ -19,6 +23,7 @@ function createServer() {
     {
       description:
         "Run a read-only SQL query against the settimesdotca D1 database. Only a single SELECT statement is permitted. Use for ad-hoc data inspection.",
+      annotations: READ_ONLY,
       inputSchema: z.object({ sql: z.string().describe("SQL SELECT statement to execute") }),
     },
     async ({ sql }) => {
@@ -34,6 +39,7 @@ function createServer() {
     "getRecentAuditLog",
     {
       description: "Get recent auth audit log entries.",
+      annotations: READ_ONLY,
       inputSchema: z.object({
         limit: z.number().int().optional().describe("Max rows to return (default 20, max 100)"),
       }),
@@ -51,6 +57,7 @@ function createServer() {
     "getActiveSessions",
     {
       description: "Get active sessions. Omits raw session IDs.",
+      annotations: READ_ONLY,
       inputSchema: z.object({ userId: z.string().optional().describe("Optional user ID to filter by") }),
     },
     async ({ userId }) => {
@@ -73,6 +80,7 @@ function createServer() {
     "getRecentAuthAttempts",
     {
       description: "Get recent authentication attempts.",
+      annotations: READ_ONLY,
       inputSchema: z.object({
         limit: z.number().int().optional().describe("Max rows to return (default 20, max 100)"),
       }),
@@ -90,6 +98,7 @@ function createServer() {
     "getUsers",
     {
       description: "List all admin users. Never returns password hashes, TOTP secrets, or backup codes.",
+      annotations: READ_ONLY,
     },
     async () => {
       const result = await workerEnv.DB.prepare(
@@ -99,15 +108,20 @@ function createServer() {
     },
   );
 
-  server.registerTool("getRateLimits", { description: "Get current rate limit state for all keys." }, async () => {
-    const result = await workerEnv.DB.prepare("SELECT * FROM rate_limits ORDER BY updated_at DESC").all();
-    return { content: [{ type: "text", text: JSON.stringify(result.results) }] };
-  });
+  server.registerTool(
+    "getRateLimits",
+    { description: "Get current rate limit state for all keys.", annotations: READ_ONLY },
+    async () => {
+      const result = await workerEnv.DB.prepare("SELECT * FROM rate_limits ORDER BY updated_at DESC").all();
+      return { content: [{ type: "text", text: JSON.stringify(result.results) }] };
+    },
+  );
 
   server.registerTool(
     "getTableSchema",
     {
       description: "Get schema info for a table (column names, types, nullability).",
+      annotations: READ_ONLY,
       inputSchema: z.object({ table: z.string().describe("Table name to inspect") }),
     },
     async ({ table }) => {

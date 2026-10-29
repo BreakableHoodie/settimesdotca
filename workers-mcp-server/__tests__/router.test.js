@@ -59,4 +59,12 @@ describe("src/index.ts", () => {
   it("serves no CORS headers", () => {
     expect(source).toMatch(/createMcpHandler\(createServer, \{[^}]*corsOptions: false[^}]*\}\)/);
   });
+
+  it("marks every tool read-only and closed-world", () => {
+    const tools = source.match(/registerTool\(/g) ?? [];
+    expect(tools.length).toBe(7);
+    expect(source.match(/annotations: READ_ONLY/g) ?? []).toHaveLength(tools.length);
+    expect(source).toMatch(/const READ_ONLY = \{ readOnlyHint: true, destructiveHint: false, openWorldHint: false \};/);
+  });
 });
+

@@ -381,6 +381,8 @@ Created by `POST /api/subscriptions/subscribe`.
 
 `verification_token` is stored as `sha256:` plus lowercase SHA-256 hex; the
 plaintext exists only in the confirmation link and is rotated on re-request.
+Verifying does not clear it, so a subscription confirmed before migration 0080
+holds `retired:<id>` instead: expected, and never redeemable.
 
 | Column               | Type    | Notes                                                                  |
 | -------------------- | ------- | ---------------------------------------------------------------------- |

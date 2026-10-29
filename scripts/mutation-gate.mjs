@@ -1136,6 +1136,31 @@ export const MUTATIONS = [
     tests: ["functions/api/bands/__tests__/follow.test.js"],
   },
   {
+    id: "batch-confirmation-reader-hashes-token",
+    invariant: "CLAUDE.md 'Band Announcements' — the multi-band confirm hashes the submitted batch token before lookup",
+    file: "functions/api/bands/confirm-follow-batch.js",
+    find: "const tokenHash = await hashStoredToken(token);",
+    replace: "const tokenHash = token;",
+    tests: ["functions/api/bands/__tests__/follow-batch.test.js"],
+  },
+  {
+    id: "batch-confirmation-writer-stores-token-hash",
+    invariant: "CLAUDE.md 'Band Announcements' — a multi-band follow stores only the digest of its shared batch token",
+    file: "functions/api/bands/follow-batch.js",
+    find: "          batchTokenHash,\n",
+    replace: "          batchToken,\n",
+    tests: ["functions/api/bands/__tests__/follow-batch.test.js"],
+  },
+  {
+    id: "subscription-verify-hashes-token",
+    invariant:
+      "CLAUDE.md 'Band Announcements' — subscription verification hashes the submitted token before every lookup",
+    file: "functions/api/subscriptions/verify.js",
+    find: "const tokenHash = await hashStoredToken(token);",
+    replace: "const tokenHash = token;",
+    tests: ["functions/api/subscriptions/__tests__/verify.test.js"],
+  },
+  {
     id: "subscription-rerequest-rotates-token",
     invariant:
       "CLAUDE.md 'Band Announcements' — a re-request emails a fresh token, because the stored value is a digest that can never confirm",

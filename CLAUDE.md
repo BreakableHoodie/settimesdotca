@@ -666,7 +666,7 @@ Mail scanners fetch links with GET, so confirmation and unsubscribe GETs render 
 
 When a performance is announced (`is_announced` 0→1), verified followers are emailed once, tracked per follower in `band_follow_notifications (performance_id, band_follow_id)`; `POST /api/admin/bands/:id/resend-announcement` emails only followers with no live claim (`claimIsLiveSql`), never a delivered row (see "A claim is not a delivery record"). Shared logic: `functions/utils/bandFollowNotify.js`. **Do not reintroduce a fire-once latch without per-follower tracking.**
 
-**Confirmation tokens are stored hashed (#1415)**: `verification_token`/`batch_token` hold `hashStoredToken()` digests; readers hash before binding. A digest cannot be re-sent, so a re-request rotates the token (bound to the hash as read, `created_at` kept).
+**Confirmation tokens are stored hashed (#1415)**: `verification_token`/`batch_token` hold `hashStoredToken()` digests; readers hash before binding. A digest cannot be re-sent, so a subscription re-request rotates it (bound to the hash as read, `created_at` kept); re-requesting a live pending follow sends nothing.
 
 Follow, subscriber and single-band digest mail carries RFC 8058 one-click unsubscribe headers (`functions/utils/email.js`); multi-band digests deliberately do not, because one click must not silently remove only one of several follows.
 

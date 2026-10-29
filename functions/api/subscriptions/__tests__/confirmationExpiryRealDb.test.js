@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createTestEnv } from "../../test-utils.js";
 import { onRequestPost as verify } from "../verify.js";
 import { onRequestPost as subscribe } from "../subscribe.js";
@@ -199,5 +199,81 @@ describe("subscription confirmation window, real SQLite (#1291)", () => {
     expect(again[0].verification_token).not.toBe("tok-stale");
 
     expect(row(rawDb, "kept@example.com").verified).toBe(1);
+  });
+
+  // A re-request inside the window (#1415). The stored token is a digest and
+  // cannot be re-sent, so the request rotates it. Each case below is a way the
+  // rotation could leave someone with no working link while being told "sent".
+  describe("re-request rotation", () => {
+    const tokenOf = async (res) => new URL((await res.json()).verificationUrl).searchParams.get("token");
+
+    it("emails a new link that confirms, kills the old one, and keeps created_at", async () => {
+      const { env, rawDb } = createTestEnv();
+      await seedPending(rawDb, { email: "rot@example.com", token: "tok-old", ageDays: 2 });
+      const before = rawDb.prepare("SELECT created_at FROM email_subscriptions WHERE email = ?").get("rot@example.com");
+
+      const res = await resubscribe("rot@example.com", env);
+      expect(res.status).toBe(200);
+      const fresh = await tokenOf(res);
+
+      expect(
+        rawDb.prepare("SELECT created_at FROM email_subscriptions WHERE email = ?").get("rot@example.com"),
+      ).toEqual(before);
+      expect((await verify({ request: verifyRequest("tok-old"), env })).status).not.toBe(303);
+      expect((await verify({ request: verifyRequest(fresh), env })).status).toBe(303);
+    });
+
+    it("rotates a pending row whose token is NULL instead of matching nothing forever", async () => {
+      const { env, rawDb } = createTestEnv();
+      await seedPending(rawDb, { email: "null@example.com", token: "tok-null", ageDays: 1 });
+      rawDb.prepare("UPDATE email_subscriptions SET verification_token = NULL WHERE email = ?").run("null@example.com");
+
+      const res = await resubscribe("null@example.com", env);
+
+      expect(res.status).toBe(200);
+      expect((await verify({ request: verifyRequest(await tokenOf(res)), env })).status).toBe(303);
+    });
+
+    it("sends the new link even when D1 omits meta on the rotation", async () => {
+      const { env, rawDb } = createTestEnv();
+      await seedPending(rawDb, { email: "meta@example.com", token: "tok-meta", ageDays: 1 });
+      const prepare = env.DB.prepare.bind(env.DB);
+      env.DB.prepare = (sql) => {
+        const stmt = prepare(sql);
+        if (!sql.includes("SET verification_token = ?")) return stmt;
+        const bind = stmt.bind.bind(stmt);
+        stmt.bind = (...args) => {
+          const bound = bind(...args);
+          const run = bound.run.bind(bound);
+          bound.run = async () => {
+            await run();
+            return { success: true };
+          };
+          return bound;
+        };
+        return stmt;
+      };
+
+      const res = await resubscribe("meta@example.com", env);
+
+      expect(res.status).toBe(200);
+      expect((await verify({ request: verifyRequest(await tokenOf(res)), env })).status).toBe(303);
+    });
+
+    it("keeps the earlier link working when the re-send fails", async () => {
+      const { env, rawDb } = createTestEnv();
+      env.EMAIL_PROVIDER = "mailchannels";
+      env.EMAIL_FROM = "no-reply@example.com";
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("provider down", { status: 500 })));
+      await seedPending(rawDb, { email: "fail@example.com", token: "tok-earlier", ageDays: 1 });
+
+      try {
+        await resubscribe("fail@example.com", env);
+      } finally {
+        vi.unstubAllGlobals();
+      }
+
+      expect((await verify({ request: verifyRequest("tok-earlier"), env })).status).toBe(303);
+    });
   });
 });

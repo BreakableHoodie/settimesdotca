@@ -1145,6 +1145,25 @@ export const MUTATIONS = [
     tests: ["functions/api/subscriptions/__tests__/subscribe.test.js"],
   },
   {
+    id: "subscription-rotation-matches-null-token",
+    invariant:
+      "CLAUDE.md 'Band Announcements' — a re-request rotates a pending row even when its token is NULL, so it can never match nothing forever",
+    file: "functions/api/subscriptions/subscribe.js",
+    find: "verification_token IS ? AND",
+    replace: "verification_token = ? AND",
+    tests: ["functions/api/subscriptions/__tests__/confirmationExpiryRealDb.test.js"],
+  },
+  {
+    id: "subscription-failed-resend-restores-link",
+    invariant:
+      "CLAUDE.md 'Band Announcements' — a failed re-send puts the previous token back, so the link in the earlier email keeps working",
+    file: "functions/api/subscriptions/subscribe.js",
+    find: '            console.warn("[Subscribe] Verification email not delivered:", emailResult.reason);\n            await restorePreviousToken(env, current.id, current.verification_token, newVerificationTokenHash);',
+    replace:
+      '            console.warn("[Subscribe] Verification email not delivered:", emailResult.reason);\n            await dropUnmailedSubscription(env, newVerificationTokenHash);',
+    tests: ["functions/api/subscriptions/__tests__/confirmationExpiryRealDb.test.js"],
+  },
+  {
     id: "mfa-login-backup-code-spend-not-restored",
     invariant:
       "CLAUDE.md 'RBAC Roles' — a login writes backup codes only over the list it verified, so a concurrent login cannot restore a spent code (#1253 review)",

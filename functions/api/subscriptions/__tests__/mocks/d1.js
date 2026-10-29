@@ -26,10 +26,13 @@ export class MockD1Database {
       bind: (...params) => ({
         all: async () => this._executeSelect(query, params),
         run: async () => this._executeWrite(query, params),
-        // Only the rate_limits upsert-RETURNING (the per-recipient email cap, #1337) is read
-        // through first(); it counts calls per key like the real fixed-window counter.
+        // The rate_limits upsert-RETURNING (the per-recipient email cap, #1337)
+        // counts calls per key like the real fixed-window counter; any other
+        // first() is a SELECT's first row.
         first: async () => {
-          if (!query.toLowerCase().includes("rate_limits")) return null;
+          if (!query.toLowerCase().includes("rate_limits")) {
+            return (await this._executeSelect(query, params)).results?.[0] ?? null;
+          }
           const [key, now] = params;
           const count = (this.rateLimitCounts.get(key) ?? 0) + 1;
           this.rateLimitCounts.set(key, count);
@@ -51,6 +54,12 @@ export class MockD1Database {
       if (queryLower.includes("where email = ?")) {
         const [email, city, genre] = params;
         results = results.filter((sub) => sub.email === email && sub.city === city && sub.genre === genre);
+      }
+
+      // WHERE id = ? AND verification_token = ? (the rotation read-back)
+      if (queryLower.includes("where id = ? and verification_token = ?")) {
+        const [id, token] = params;
+        results = results.filter((sub) => sub.id === id && sub.verification_token === token);
       }
 
       // WHERE verification_token = ?

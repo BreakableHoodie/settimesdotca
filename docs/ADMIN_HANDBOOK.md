@@ -577,10 +577,10 @@ Service Worker    → no-cache
 **Indexes:**
 
 ```sql
--- Ensure indexes exist
-CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
-CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
-CREATE INDEX IF NOT EXISTS idx_bands_event_id ON bands(event_id);
+-- Ensure indexes exist (all are created by the migrations; see database/setup-complete.sql)
+CREATE INDEX IF NOT EXISTS idx_lucia_sessions_user_id ON lucia_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_lucia_sessions_expires_at ON lucia_sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_performances_event ON performances(event_id);
 CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log(user_id);
 ```
 

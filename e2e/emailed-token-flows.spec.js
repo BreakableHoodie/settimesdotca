@@ -1,13 +1,15 @@
 import { test, expect } from "@playwright/test";
 import { randomBytes } from "node:crypto";
 import { verifyPassword } from "../functions/utils/crypto.js";
-import { hashResetToken } from "../functions/utils/tokens.js";
+import { hashResetToken, hashStoredToken } from "../functions/utils/tokens.js";
 import { d1, sqlString } from "./utils/d1";
 
 // The three flows whose token is only ever emailed: password-reset completion,
 // follow confirmation and subscription verification (#1292). Previews and local
-// E2E have no email provider, so the token is read from (or, for a reset,
-// seeded into) the database the app under test uses (e2e/utils/d1.js).
+// E2E have no email provider, and every one of these tokens is stored hashed
+// (#1354, #1415), so the database never holds a usable link. Each test seeds the
+// digest of a token it generated into the database the app under test uses
+// (e2e/utils/d1.js) and clicks a link carrying the plaintext.
 //
 // Each confirmation is CLICKED in a real browser, never POSTed with curl:
 // CLAUDE.md "Emailed links never act on a GET" records a Referrer-Policy bug
@@ -20,6 +22,17 @@ const TURNSTILE_TEST_TOKEN = "XXXX.DUMMY.TOKEN.XXXX";
 // From crypto, not Math.random: one of these goes into a password, and
 // CodeQL (rightly) refuses weak randomness anywhere near a credential.
 const unique = () => `${Date.now()}-${randomBytes(4).toString("hex")}`;
+
+// The app stored the digest of a token that only exists in an email nobody can
+// read here, so replace it with the digest of one this test knows. Asserting
+// the `sha256:` shape first proves the app never stored the plaintext.
+const seedKnownToken = async (table, column, email) => {
+  const [row] = d1(`SELECT ${column} AS stored FROM ${table} WHERE email = ${sqlString(email)}`);
+  expect(row?.stored, `${table}.${column} is stored hashed`).toMatch(/^sha256:[0-9a-f]{64}$/);
+  const token = randomBytes(32).toString("hex");
+  d1(`UPDATE ${table} SET ${column} = ${sqlString(await hashStoredToken(token))} WHERE email = ${sqlString(email)}`);
+  return token;
+};
 
 // POST from inside the page: same origin, so the real Origin header is sent.
 const postJson = (page, path, body) =>
@@ -80,12 +93,11 @@ test("a follow confirmation link confirms the follow", async ({ page }) => {
   const followed = await postJson(page, "/api/bands/1/follow", { email, turnstileToken: TURNSTILE_TEST_TOKEN });
   expect(followed.status, followed.text).toBe(200);
 
-  const [pending] = d1(
-    `SELECT verified, verification_token AS token FROM band_follows WHERE email = ${sqlString(email)}`,
-  );
+  const [pending] = d1(`SELECT verified FROM band_follows WHERE email = ${sqlString(email)}`);
   expect(pending?.verified, "double opt-in: pending until confirmed").toBe(0);
+  const token = await seedKnownToken("band_follows", "verification_token", email);
 
-  await page.goto(`/api/bands/1/confirm-follow?token=${encodeURIComponent(pending.token)}`);
+  await page.goto(`/api/bands/1/confirm-follow?token=${encodeURIComponent(token)}`);
   // Mail scanners fetch links with GET, so loading the page must change nothing
   // (CLAUDE.md "Emailed links never act on a GET"). Only the click confirms.
   expect(d1(`SELECT verified FROM band_follows WHERE email = ${sqlString(email)}`)).toEqual([{ verified: 0 }]);
@@ -106,12 +118,11 @@ test("a subscription verification link verifies the subscription", async ({ page
   });
   expect(subscribed.status, subscribed.text).toBeLessThan(300);
 
-  const [pending] = d1(
-    `SELECT verified, verification_token AS token FROM email_subscriptions WHERE email = ${sqlString(email)}`,
-  );
+  const [pending] = d1(`SELECT verified FROM email_subscriptions WHERE email = ${sqlString(email)}`);
   expect(pending?.verified, "double opt-in: pending until verified").toBe(0);
+  const token = await seedKnownToken("email_subscriptions", "verification_token", email);
 
-  await page.goto(`/api/subscriptions/verify?token=${encodeURIComponent(pending.token)}`);
+  await page.goto(`/api/subscriptions/verify?token=${encodeURIComponent(token)}`);
   // As for follows: the GET a mail scanner makes must not verify anything.
   expect(d1(`SELECT verified FROM email_subscriptions WHERE email = ${sqlString(email)}`)).toEqual([{ verified: 0 }]);
   // Success is a 303 to /subscribe?verified=true on the PUBLIC host, so assert

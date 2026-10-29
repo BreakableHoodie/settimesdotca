@@ -26,9 +26,9 @@ export async function onRequestPost(context) {
   if (!token) {
     return new Response("Missing verification token", { status: 400 });
   }
-  const tokenHash = await hashStoredToken(token);
 
   try {
+    const tokenHash = await hashStoredToken(token);
     // Find subscription
     const { results } = await env.DB.prepare(
       `

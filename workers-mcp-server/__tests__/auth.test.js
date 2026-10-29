@@ -28,6 +28,20 @@ describe("isAuthorized", () => {
     await expect(isAuthorized(request(`Bearer ${short}`), { SHARED_SECRET: short })).resolves.toBe(false);
   });
 
+  it("refuses a secret containing whitespace and says so in the log", async () => {
+    // The header match already rejects a spaced token, so the result alone
+    // cannot tell this check apart from its absence: the log line is what an
+    // operator debugging a 401 on every request needs, so that is asserted.
+    const error = vi.spyOn(globalThis.console, "error").mockImplementation(() => {});
+    const spaced = `${"a".repeat(20)} ${"a".repeat(20)}`;
+    try {
+      await expect(isAuthorized(request(`Bearer ${spaced}`), { SHARED_SECRET: spaced })).resolves.toBe(false);
+      expect(error).toHaveBeenCalledWith(expect.stringContaining("contains whitespace"));
+    } finally {
+      error.mockRestore();
+    }
+  });
+
   it("accepts the exact token", async () => {
     await expect(isAuthorized(request(`Bearer ${secret}`), { SHARED_SECRET: secret })).resolves.toBe(true);
   });

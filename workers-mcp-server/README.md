@@ -118,7 +118,7 @@ npx wrangler deploy
 First-time setup, or a deliberate rotation, only:
 
 ```bash
-npx wrangler secret put SHARED_SECRET   # at least 32 chars; the existing 64-char secret stays valid
+npx wrangler secret put SHARED_SECRET   # at least 32 chars, no whitespace; the existing 64-char secret stays valid
 ```
 
 **Do not run `secret put` as part of a normal deploy.** It replaces the token
@@ -126,7 +126,7 @@ and instantly breaks every configured MCP client. When you do rotate deliberatel
 update each client's Bearer header in the same pass.
 
 `SHARED_SECRET` is never stored here. `.dev.vars` is gitignored and holds the
-local copy. The Worker fails closed if the secret is missing or shorter than 32
+local copy. The Worker fails closed if the secret is missing, contains whitespace, or is shorter than 32
 characters, and compares SHA-256 digests in constant time.
 
 **Rotating the secret invalidates every configured MCP client.** Update each

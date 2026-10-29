@@ -12,8 +12,13 @@ function constantTimeEqual(left, right) {
 
 export async function isAuthorized(request, env) {
   const secret = env?.SHARED_SECRET;
-  if (typeof secret !== "string" || secret.length < MIN_SECRET_LENGTH) {
-    globalThis.console.error("MCP authorization is unavailable: SHARED_SECRET is missing or too short");
+  // A secret with whitespace can never arrive as a Bearer token (the header
+  // match below stops at whitespace), so refuse it loudly rather than 401
+  // every request with nothing in the log to say why.
+  if (typeof secret !== "string" || secret.length < MIN_SECRET_LENGTH || /\s/.test(secret)) {
+    globalThis.console.error(
+      "MCP authorization is unavailable: SHARED_SECRET is missing, too short, or contains whitespace",
+    );
     return false;
   }
 

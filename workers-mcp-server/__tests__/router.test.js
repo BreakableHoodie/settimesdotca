@@ -67,4 +67,3 @@ describe("src/index.ts", () => {
     expect(source).toMatch(/const READ_ONLY = \{ readOnlyHint: true, destructiveHint: false, openWorldHint: false \};/);
   });
 });
-

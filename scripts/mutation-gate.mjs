@@ -1925,6 +1925,33 @@ export const MUTATIONS = [
     replace: "      : `DTEND;TZID=${TORONTO_TZID}:${startDate.replace(/-/g, '')}T210000`",
     tests: ["src/utils/__tests__/routeIcs.test.js"],
   },
+  {
+    id: "mcp-router-authorizes-first",
+    invariant:
+      "CLAUDE.md 'The MCP Worker authorizes before anything' — no request reaches the production-data MCP handler without the shared secret",
+    file: "workers-mcp-server/src/router.js",
+    find: "if (!(await isAuthorized(request, env))) {",
+    replace: "if (false) {",
+    tests: ["workers-mcp-server/__tests__/router.test.js"],
+  },
+  {
+    id: "mcp-fetch-delegates-to-router",
+    invariant:
+      "CLAUDE.md 'The MCP Worker authorizes before anything' — the Worker's fetch hands every request to routeRequest, never straight to the handler",
+    file: "workers-mcp-server/src/index.ts",
+    find: "return routeRequest(request, env, ctx, handler);",
+    replace: "return handler(request, env, ctx);",
+    tests: ["workers-mcp-server/__tests__/router.test.js"],
+  },
+  {
+    id: "mcp-auth-workers-compare-branch",
+    invariant:
+      "CLAUDE.md 'The MCP Worker authorizes before anything' — on Workers the timingSafeEqual verdict decides, not a constant",
+    file: "workers-mcp-server/src/auth.js",
+    find: "return globalThis.crypto.subtle.timingSafeEqual(tokenBytes, secretBytes);",
+    replace: "return true;",
+    tests: ["workers-mcp-server/__tests__/auth.test.js"],
+  },
 ];
 
 // ============================================================================

@@ -38,7 +38,6 @@ Build SetTimes.ca into the best lean, multi-venue and multi-artist event platfor
 ### Privacy and security (from the 2026-10-28 report card)
 
 - #1415 — CASL sender footer, a dead `sessions` table holding IPs, the last plaintext email tokens
-- #1413 — workers-mcp 0.0.13 is abandoned and fronts production D1
 
 ### Performance and metrics
 

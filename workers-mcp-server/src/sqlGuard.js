@@ -111,9 +111,7 @@ export function assertReadOnlySelect(sql) {
   // ANYWHERE in the statement — subquery, join or CTE — because a table cannot
   // be read without being named. It over-blocks a string literal that happens
   // to contain one of these words; that is the intended direction to err.
-  const named = SENSITIVE_TABLES.filter((table) =>
-    new RegExp(`\\b${table}\\b`, "i").test(statement),
-  );
+  const named = SENSITIVE_TABLES.filter((table) => new RegExp(`\\b${table}\\b`, "i").test(statement));
   if (named.length > 0) {
     throw new Error(`${SENSITIVE_TABLE_ERROR} (matched: ${named.join(", ")})`);
   }

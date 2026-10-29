@@ -3,8 +3,8 @@
 # configuration — no source or config existed in any repository.
 #
 # SHARED_SECRET is a Cloudflare secret and is deliberately absent here. Set it
-# with `npx wrangler secret put SHARED_SECRET`. `workers-mcp` requires it to be
-# exactly 64 characters and compares it against the Bearer token.
+# with `npx wrangler secret put SHARED_SECRET`. It must be at least 32 characters;
+# the existing 64-character secret remains valid.
 name = "settimesdotca-mcp"
 main = "src/index.ts"
 compatibility_date = "2025-10-08"

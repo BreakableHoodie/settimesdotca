@@ -122,7 +122,6 @@ A third implementer on a separate subscription, via the `opencode-delegate` skil
 - **The relay does NOT commit.** It edits the tree and stops; the dispatcher reads the diff, re-runs `make gate`, and commits. So **dispatch only from a CLEAN tree on its own branch** (or a separate `git worktree`) — verify with `git status --porcelain` first.
 - **Rules:** (1) always go through `relay.mjs`, never raw `opencode run`; (2) always pass `--model` explicitly, from the flat-rate provider — which prefix is flat-rate is a _lookup_ (`opencode models`, vendor docs), never inferred from a name; (3) the brief goes in a file (`--brief`), never argv; (4) `opencode.json`'s `instructions` array is a cost floor on every run — invariants only, every path tracked in git (`functions/__tests__/opencodeInstructions.test.js` enforces it). A task needing a domain instruction file names it in the brief.
 - **Read cost with `make delegate-stats`, not `result.json`** — a free model reports `$0.0000` while consuming millions of tokens. A $0 model is free _for now_, not by contract.
-- **Model names, prices and caps go stale** — re-derive them; compare models only by the same brief on the same repo state.
 
 ---
 

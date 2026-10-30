@@ -111,10 +111,10 @@ export function assertReadOnlySelect(sql) {
   // ANYWHERE in the statement — subquery, join or CTE — because a table cannot
   // be read without being named. It over-blocks a string literal that happens
   // to contain one of these words; that is the intended direction to err.
-  // `table` is each entry of the hard-coded SENSITIVE_TABLES list, never input:
-  // plain identifiers, so the pattern is a fixed word match with no ReDoS shape.
-  // nosemgrep: detect-non-literal-regexp
-  const named = SENSITIVE_TABLES.filter((table) => new RegExp(`\\b${table}\\b`, "i").test(statement));
+  // The statement's words are its maximal runs of [A-Za-z0-9_], exactly what
+  // `\b<name>\b` would bound, so no pattern is built from a variable.
+  const words = new Set(statement.toLowerCase().match(/\w+/g) ?? []);
+  const named = SENSITIVE_TABLES.filter((table) => words.has(table));
   if (named.length > 0) {
     throw new Error(`${SENSITIVE_TABLE_ERROR} (matched: ${named.join(", ")})`);
   }

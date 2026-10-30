@@ -1961,6 +1961,15 @@ export const MUTATIONS = [
     tests: ["src/utils/__tests__/routeIcs.test.js"],
   },
   {
+    id: "mcp-sql-guard-whole-word-tables",
+    invariant:
+      "CLAUDE.md 'The MCP Worker authorizes before anything' — the read-only tools refuse credential tables by whole word, not substring",
+    file: "workers-mcp-server/src/sqlGuard.js",
+    find: "SENSITIVE_TABLES.filter((table) => words.has(table))",
+    replace: "SENSITIVE_TABLES.filter((table) => statement.toLowerCase().includes(table))",
+    tests: ["workers-mcp-server/__tests__/sqlGuard.test.js"],
+  },
+  {
     id: "mcp-router-authorizes-first",
     invariant:
       "CLAUDE.md 'The MCP Worker authorizes before anything' — no request reaches the production-data MCP handler without the shared secret",

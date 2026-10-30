@@ -113,7 +113,9 @@ export function assertReadOnlySelect(sql) {
   // to contain one of these words; that is the intended direction to err.
   // The statement's words are its maximal runs of [A-Za-z0-9_], exactly what
   // `\b<name>\b` would bound, so no pattern is built from a variable.
-  const words = new Set(statement.toLowerCase().match(/\w+/g) ?? []);
+  // Lowercase after splitting, as the `i` flag did: lowercasing first would
+  // fold a non-ASCII letter (the Kelvin sign) into a word.
+  const words = new Set((statement.match(/\w+/g) ?? []).map((word) => word.toLowerCase()));
   const named = SENSITIVE_TABLES.filter((table) => words.has(table));
   if (named.length > 0) {
     throw new Error(`${SENSITIVE_TABLE_ERROR} (matched: ${named.join(", ")})`);

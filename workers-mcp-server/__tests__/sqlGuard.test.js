@@ -108,6 +108,14 @@ describe("assertReadOnlySelect", () => {
       for (const sql of shapes) expect(() => assertReadOnlySelect(sql)).toThrow(/credentials/);
     });
 
+    it("matches whole words in any case, never a substring of a longer name", () => {
+      expect(() => assertReadOnlySelect("SELECT * FROM USERS")).toThrow(/credentials/);
+      expect(() => assertReadOnlySelect('SELECT * FROM "Api_Keys"')).toThrow(/credentials/);
+      for (const sql of ["SELECT * FROM band_users_view", "SELECT users2 FROM venues"]) {
+        expect(() => assertReadOnlySelect(sql)).not.toThrow();
+      }
+    });
+
     it("names which table matched, so the refusal is actionable", () => {
       expect(() => assertReadOnlySelect("SELECT * FROM lucia_sessions")).toThrow(/lucia_sessions/);
     });

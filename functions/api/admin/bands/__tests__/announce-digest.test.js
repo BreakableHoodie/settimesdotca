@@ -4,6 +4,7 @@ import { buildAnnounceDigestIdempotencyKey, flushAnnounceDigest } from "../../..
 import { getPublicBaseUrl } from "../../../../utils/publicUrl.js";
 import { logger } from "../../../../utils/logger.js";
 import { toSqliteDateTime } from "../../../../utils/authAttempts.js";
+import { unsubscribeToken, UNSUBSCRIBE_KINDS } from "../../../../utils/unsubscribeLinks.js";
 
 vi.mock("../../../../utils/email.js", async (importOriginal) => ({
   // The real header builder, so these tests cannot drift from its format.
@@ -73,6 +74,14 @@ describe("flushAnnounceDigest", () => {
     expect(text).not.toContain(wrongEventUrl);
     expect(html).not.toContain(wrongEventUrl);
     const bodyUrl = text.match(/Unfollow The Band: (\S+)/)[1];
+    expect(bodyUrl).toBe(
+      `${publicUrl}/api/bands/${perf.band_profile_id}/unfollow?token=${await unsubscribeToken(
+        env,
+        UNSUBSCRIBE_KINDS.bandFollow,
+        followId,
+      )}`,
+    );
+    expect(text).not.toContain("tok-unsub");
     expect(sendEmail.mock.calls[0][1].headers["List-Unsubscribe"]).toBe(`<${bodyUrl}>`);
 
     // Queue entry consumed

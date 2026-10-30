@@ -88,3 +88,9 @@ The durable part is the method:
 > Also environment-specific and dated to this same day, both measured on **raw `opencode run`**, not through the relay: a ~1.5 KB brief passed in argv hung past 180s, while the identical text attached with `opencode run -f <file>` returned in 11s; and `opencode.json` named `anthropic/*` models while only OpenCode's own providers were authenticated, so every run falling back to the config default failed (rule 4).
 >
 > Note the flags belong to different tools and are not interchangeable: `-f` is a raw `opencode run` flag, whereas the relay takes `--brief <file>` and feeds it over **stdin**. So the 11s figure shows that *getting the brief out of argv* fixes the hang — it is not a measurement of the relay's own path, which was never argv-based. Rule 3 holds either way; only the mechanism differs. Re-verify rather than assume.
+
+## Why `delegate-verify.mjs` exits 2 on a silent no-op
+
+Moved verbatim from CLAUDE.md (#1415, to stay inside its character budget):
+
+> Code `2` is the one that pays for the script. Measured 2026-08-13: an agy delegation returned exit `0` and `AGY_USAGE {"status":"SUCCESS"}` having touched **zero files** — headless agy had no `write_file` grant, so it described the work instead of doing it and still "succeeded". 96,825 tokens, nothing on disk, and nothing in its own output said so. The tool behaved exactly as its README documents ("ungranted writes leave the workspace untouched but report success"); the mistake was trusting the status field.

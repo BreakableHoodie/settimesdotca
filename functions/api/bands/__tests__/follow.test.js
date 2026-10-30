@@ -36,7 +36,7 @@ describe("POST /api/bands/:name/follow", () => {
     // verification token; it only becomes verified=1 after confirm-follow.
     expect(row.verified).toBe(0);
     expect(row.verification_token).toMatch(new RegExp(`^${STORED_TOKEN_HASH_PREFIX}[0-9a-f]{64}$`));
-    expect(row.unsubscribe_token).toBeTruthy();
+    expect(row.unsubscribe_token).toMatch(/^sha256:[0-9a-f]{64}$/);
     // CASL/CAN-SPAM: consent fields are always recorded
     expect(row.consent_method).toBe("web_form");
     expect(row.consent_version).toBe(CONSENT_VERSION);

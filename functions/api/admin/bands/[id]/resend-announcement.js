@@ -61,7 +61,7 @@ export async function onRequestPost(context) {
   // resend that skips someone the sender would still mail is the same bug in
   // different clothes.
   const { results: followers = [] } = await DB.prepare(
-    `SELECT bf.id, bf.email, bf.unsubscribe_token
+    `SELECT bf.id, bf.email
      FROM band_follows bf
      LEFT JOIN band_follow_notifications bfn
        ON bfn.band_follow_id = bf.id AND bfn.performance_id = ?

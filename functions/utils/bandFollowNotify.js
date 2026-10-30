@@ -11,6 +11,7 @@ import { logger } from "./logger.js";
 import { getPublicBaseUrl } from "./publicUrl.js";
 import { escapeHtml } from "./html.js";
 import { toSqliteDateTime } from "./authAttempts.js";
+import { unsubscribeToken, UNSUBSCRIBE_KINDS } from "./unsubscribeLinks.js";
 
 // A claim is not a delivery record (#1152).
 //
@@ -40,6 +41,14 @@ export async function notifyBandFollowers(env, DB, { performanceId, bandProfileI
   const results = await Promise.allSettled(
     followers.map(async (follower) => {
       const claimedAt = toSqliteDateTime(new Date());
+      let unsubUrl;
+      try {
+        const token = await unsubscribeToken(env, UNSUBSCRIBE_KINDS.bandFollow, follower.id);
+        unsubUrl = `${publicUrl}/api/bands/${bandProfileId}/unfollow?token=${token}`;
+      } catch (error) {
+        logger.error("band follow: cannot build an unsubscribe link, not sent", { error });
+        return false;
+      }
       // Claim the follower atomically before delivery. INSERT OR IGNORE
       // returns changes=0 if a row already exists for this follower, which
       // prevents concurrent resends from double-sending to the same person.
@@ -72,7 +81,6 @@ export async function notifyBandFollowers(env, DB, { performanceId, bandProfileI
         }
       }
 
-      const unsubUrl = `${publicUrl}/api/bands/${bandProfileId}/unfollow?token=${follower.unsubscribe_token}`;
       const result = await sendEmail(env, {
         to: follower.email,
         subject: `${bandName} just joined the lineup for ${eventName}!`,

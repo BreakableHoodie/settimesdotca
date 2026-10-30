@@ -4,6 +4,12 @@
 
 import { escapeHtml } from "../../../utils/html.js";
 import { emailActionPage, readEmailActionToken } from "../../../utils/emailActionPage.js";
+import { hashStoredToken } from "../../../utils/tokens.js";
+import {
+  isDerivedUnsubscribeToken,
+  UNSUBSCRIBE_KINDS,
+  verifyUnsubscribeToken,
+} from "../../../utils/unsubscribeLinks.js";
 
 export async function onRequestGet(context) {
   const { request } = context;
@@ -37,16 +43,34 @@ export async function onRequestPost(context) {
     // Resolve the band name BEFORE deleting so the page can name it. An unknown
     // token yields no row → a generic message (still 200), so the response never
     // reveals whether a token was valid.
-    const follow = await DB.prepare(
-      `SELECT bp.name AS band_name
-       FROM band_follows bf
-       JOIN band_profiles bp ON bp.id = bf.band_profile_id
-       WHERE bf.unsubscribe_token = ?`,
-    )
-      .bind(token)
-      .first();
+    let follow = null;
+    if (isDerivedUnsubscribeToken(token)) {
+      const id = await verifyUnsubscribeToken(env, UNSUBSCRIBE_KINDS.bandFollow, token);
+      if (id !== null) {
+        follow = await DB.prepare(
+          `SELECT bf.id, bp.name AS band_name
+           FROM band_follows bf
+           JOIN band_profiles bp ON bp.id = bf.band_profile_id
+           WHERE bf.id = ?`,
+        )
+          .bind(id)
+          .first();
+      }
+    } else {
+      const tokenHash = await hashStoredToken(token);
+      follow = await DB.prepare(
+        `SELECT bf.id, bp.name AS band_name
+         FROM band_follows bf
+         JOIN band_profiles bp ON bp.id = bf.band_profile_id
+         WHERE bf.unsubscribe_token = ?`,
+      )
+        .bind(tokenHash)
+        .first();
+    }
 
-    await DB.prepare("DELETE FROM band_follows WHERE unsubscribe_token = ?").bind(token).run();
+    if (follow) {
+      await DB.prepare("DELETE FROM band_follows WHERE id = ?").bind(follow.id).run();
+    }
 
     const bandName = follow?.band_name ? escapeHtml(follow.band_name) : null;
     const heading = bandName ? `Unfollowed ${bandName}` : "Unfollowed";

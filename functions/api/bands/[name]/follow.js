@@ -107,7 +107,9 @@ export async function onRequestPost(context) {
     // only (see admin/bands/[id].js + resend-announcement.js), so an address the
     // submitter doesn't control can never be enrolled in the announcement stream
     // — it receives at most this single confirmation email it can ignore.
-    const unsubscribeToken = generateToken();
+    // Unsubscribe links are derived from the row id (unsubscribeLinks.js, #1415);
+    // this hashed random value only fills the NOT NULL UNIQUE column.
+    const unsubscribePlaceholder = await hashStoredToken(generateToken());
     const verificationToken = generateToken();
     const verificationTokenHash = await hashStoredToken(verificationToken);
     const consentIp = request.headers.get("CF-Connecting-IP") ?? null;
@@ -119,7 +121,7 @@ export async function onRequestPost(context) {
       DB.prepare(
         `INSERT OR IGNORE INTO band_follows (email, band_profile_id, verified, verification_token, unsubscribe_token, consent_ip, consent_method, consent_version)
          VALUES (?, ?, 0, ?, ?, ?, 'web_form', ?)`,
-      ).bind(email, band.id, verificationTokenHash, unsubscribeToken, consentIp, CONSENT_VERSION),
+      ).bind(email, band.id, verificationTokenHash, unsubscribePlaceholder, consentIp, CONSENT_VERSION),
     ]);
 
     // changes=0 → this email already follows the band (verified or pending). Say

@@ -1,6 +1,11 @@
 // Unsubscribe links are derived from the row id, which is an AUTOINCREMENT
 // primary key and is never reused. They therefore need no expiry: a link must
-// keep working for the life of its follow.
+// keep working for the life of its follow. (A D1 Time Travel restore rolls the
+// id counter back, so ids can be reissued after one.)
+//
+// Rotating CSRF_SECRET invalidates every link already sent (#1427).
+
+import { logger } from "./logger.js";
 
 const DERIVATION_INFO = new TextEncoder().encode("settimes unsubscribe link v1");
 const derivedKeys = new Map();
@@ -75,6 +80,9 @@ export async function unsubscribeToken(env, kind, id) {
   return `u1.${value}.${base64Url(new Uint8Array(signature))}`;
 }
 
+// Returns the row id, or null for a token that is malformed or does not
+// verify. Throws when it cannot verify at all (no key, a failed derivation), so
+// the handler answers 500 instead of treating a valid link as a forged one.
 export async function verifyUnsubscribeToken(env, kind, token) {
   const match = typeof token === "string" && /^u1\.([1-9]\d{0,15})\.([A-Za-z0-9_-]{43})$/.exec(token);
   if (!match) return null;
@@ -85,17 +93,18 @@ export async function verifyUnsubscribeToken(env, kind, token) {
 
   const secret = env?.CSRF_SECRET;
   if (typeof secret !== "string" || secret.length === 0) {
-    console.error("[unsubscribe-links] Cannot verify unsubscribe token: CSRF_SECRET is missing");
-    return null;
+    throw new Error("CSRF_SECRET is required to verify unsubscribe links");
   }
 
-  try {
-    const key = await getDerivedKey(secret);
-    const valid = await crypto.subtle.verify("HMAC", key, signature, macInput(kind, id));
-    return valid ? id : null;
-  } catch {
+  const key = await getDerivedKey(secret);
+  const valid = await crypto.subtle.verify("HMAC", key, signature, macInput(kind, id));
+  if (!valid) {
+    // Well-formed but wrong: a forgery, or a link signed before a key rotation.
+    // The id alone, never the token.
+    logger.warn("unsubscribe MAC mismatch", { kind, id });
     return null;
   }
+  return id;
 }
 
 export function isDerivedUnsubscribeToken(token) {

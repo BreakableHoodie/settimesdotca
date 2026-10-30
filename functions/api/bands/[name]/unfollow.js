@@ -1,6 +1,7 @@
 // GET /api/bands/:name/unfollow?token=...
 // Deletes the band follow associated with the unsubscribe token.
-// Returns 200 regardless of whether the token exists (avoid enumeration).
+// Answers 200 whether or not the token matched. Links are keyed (#1415), so
+// saying which reveals nothing an attacker could use.
 
 import { escapeHtml } from "../../../utils/html.js";
 import { emailActionPage, readEmailActionToken } from "../../../utils/emailActionPage.js";
@@ -41,8 +42,8 @@ export async function onRequestPost(context) {
     }
 
     // Resolve the band name BEFORE deleting so the page can name it. An unknown
-    // token yields no row → a generic message (still 200), so the response never
-    // reveals whether a token was valid.
+    // token yields no row and a "nothing to unfollow" page (still 200). A link
+    // that cannot be checked at all (no key) throws into the 500 below.
     let follow = null;
     if (isDerivedUnsubscribeToken(token)) {
       const id = await verifyUnsubscribeToken(env, UNSUBSCRIBE_KINDS.bandFollow, token);
@@ -72,11 +73,15 @@ export async function onRequestPost(context) {
       await DB.prepare("DELETE FROM band_follows WHERE id = ?").bind(follow.id).run();
     }
 
+    // No row: the link is not valid, or this follow was already removed. Say
+    // so honestly; never claim a removal that did not happen (#1415).
     const bandName = follow?.band_name ? escapeHtml(follow.band_name) : null;
-    const heading = bandName ? `Unfollowed ${bandName}` : "Unfollowed";
-    const message = bandName
-      ? `You've been removed from ${bandName}'s follower list — you won't get any more emails about them.`
-      : `You have been removed from this band's follower list.`;
+    const heading = follow ? (bandName ? `Unfollowed ${bandName}` : "Unfollowed") : "Nothing to unfollow";
+    const message = follow
+      ? bandName
+        ? `You've been removed from ${bandName}'s follower list — you won't get any more emails about them.`
+        : `You have been removed from this band's follower list.`
+      : "This link isn't valid, or you've already unfollowed this band.";
 
     return new Response(
       `<html><head><meta charset="utf-8"></head><body style="font-family:sans-serif;padding:2rem"><h2>${heading}</h2><p>${message}</p></body></html>`,

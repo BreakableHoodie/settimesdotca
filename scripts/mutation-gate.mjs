@@ -1153,6 +1153,15 @@ export const MUTATIONS = [
     tests: ["functions/api/subscriptions/__tests__/unsubscribe.test.js"],
   },
   {
+    id: "unsubscribe-verify-throws-without-key",
+    invariant:
+      "CLAUDE.md 'Band Announcements' — an unsubscribe link that cannot be checked (no key) is a 500, never a false 'removed' page",
+    file: "functions/utils/unsubscribeLinks.js",
+    find: 'throw new Error("CSRF_SECRET is required to verify unsubscribe links");',
+    replace: "return null;",
+    tests: ["functions/api/bands/__tests__/unfollow.test.js"],
+  },
+  {
     id: "unsubscribe-token-binds-kind-to-mac",
     invariant:
       "CLAUDE.md 'Band Announcements' — unsubscribe MACs bind the token kind so links cannot cross resource types",

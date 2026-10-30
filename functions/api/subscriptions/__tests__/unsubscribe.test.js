@@ -186,4 +186,21 @@ describe("/api/subscriptions/unsubscribe", () => {
     }
     expect(mockDB.data.email_subscriptions).toHaveLength(1);
   });
+
+  it("answers 500 and keeps the subscription when the link key is missing (#1415)", async () => {
+    mockDB.data.email_subscriptions.push({
+      id: 1,
+      email: "one@example.com",
+      city: "all",
+      genre: "all",
+      unsubscribe_token: "sha256:stored",
+    });
+    const token = await unsubscribeToken(mockContext.env, UNSUBSCRIBE_KINDS.subscription, 1);
+    delete mockContext.env.CSRF_SECRET;
+    mockContext.request = new Request(`http://localhost/api/subscriptions/unsubscribe?token=${token}`, {
+      method: "POST",
+    });
+    expect((await onRequestPost(mockContext)).status).toBe(500);
+    expect(mockDB.data.email_subscriptions).toHaveLength(1);
+  });
 });

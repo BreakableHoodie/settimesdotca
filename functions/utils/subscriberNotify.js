@@ -136,7 +136,12 @@ export async function notifySubscribers(env, DB, { eventId, kind, eventName, eve
       const token = await unsubscribeToken(env, UNSUBSCRIBE_KINDS.subscription, sub.id);
       unsubUrl = `${publicUrl}/api/subscriptions/unsubscribe?token=${token}`;
     } catch (error) {
-      logger.error("subscriber notify: cannot build an unsubscribe link, not sent", { error });
+      logger.error("subscriber notify: cannot build an unsubscribe link, not sent", {
+        eventId,
+        kind,
+        subscriptionId: sub.id,
+        error,
+      });
       return "failed";
     }
     // Claim BEFORE delivery, so two concurrent runs cannot mail one person

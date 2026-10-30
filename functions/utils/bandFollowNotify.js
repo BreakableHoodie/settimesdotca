@@ -46,7 +46,11 @@ export async function notifyBandFollowers(env, DB, { performanceId, bandProfileI
         const token = await unsubscribeToken(env, UNSUBSCRIBE_KINDS.bandFollow, follower.id);
         unsubUrl = `${publicUrl}/api/bands/${bandProfileId}/unfollow?token=${token}`;
       } catch (error) {
-        logger.error("band follow: cannot build an unsubscribe link, not sent", { error });
+        logger.error("band follow: cannot build an unsubscribe link, not sent", {
+          performanceId,
+          bandFollowId: follower.id,
+          error,
+        });
         return false;
       }
       // Claim the follower atomically before delivery. INSERT OR IGNORE

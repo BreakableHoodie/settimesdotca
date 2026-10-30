@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createTestEnv, insertBand, insertEvent } from "../../test-utils";
 import { onRequestGet, onRequestPost } from "../[name]/unfollow.js";
 import { hashStoredToken } from "../../../utils/tokens.js";
@@ -108,6 +108,40 @@ describe("/api/bands/:name/unfollow", () => {
       env,
     });
     expect(rawDb.prepare("SELECT id FROM band_follows WHERE id=?").get(id)).toBeUndefined();
+  });
+
+  it("never claims a removal when no follow matched (#1415)", async () => {
+    const { env } = createTestEnv();
+    const res = await onRequestPost({
+      request: new Request("https://example.test/api/bands/1/unfollow?token=nonexistent-token", { method: "POST" }),
+      env,
+    });
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain("Nothing to unfollow");
+    expect(body).not.toContain("removed");
+  });
+
+  it("answers 500 and keeps the follow when the link key is missing (#1415)", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { name: "Keyless Event" });
+    const band = insertBand(rawDb, { name: "Keyless Band", event_id: event.id });
+    const id = rawDb
+      .prepare("INSERT INTO band_follows (email, band_profile_id, unsubscribe_token) VALUES (?, ?, ?)")
+      .run("fan@example.com", band.band_profile_id, "sha256:keyless").lastInsertRowid;
+    const token = await unsubscribeToken(env, UNSUBSCRIBE_KINDS.bandFollow, id);
+    delete env.CSRF_SECRET;
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await onRequestPost({
+      request: new Request(`https://example.test/api/bands/1/unfollow?token=${token}`, { method: "POST" }),
+      env,
+    });
+    expect(res.status).toBe(500);
+    expect(await res.text()).not.toContain("Unfollowed");
+    expect(rawDb.prepare("SELECT id FROM band_follows WHERE id=?").get(id)).toBeTruthy();
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
   });
 
   it("returns 200 even when the token does not exist (avoids enumeration)", async () => {

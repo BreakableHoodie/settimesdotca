@@ -5,6 +5,7 @@ import {
   UNSUBSCRIBE_KINDS,
   verifyUnsubscribeToken,
 } from "../unsubscribeLinks.js";
+import { logger } from "../logger.js";
 
 const env = { CSRF_SECRET: "test-csrf-secret-for-unit-tests" };
 
@@ -34,19 +35,21 @@ describe("unsubscribeLinks", () => {
     expect(await verifyUnsubscribeToken(env, UNSUBSCRIBE_KINDS.bandFollow, token)).toBeNull();
   });
 
-  it("fails closed when the secret is missing", async () => {
+  it("fails closed when the secret is missing: build and verify both throw", async () => {
     await expect(unsubscribeToken({}, UNSUBSCRIBE_KINDS.bandFollow, 5)).rejects.toThrow(
       "CSRF_SECRET is required to build unsubscribe links",
     );
-    const error = vi.spyOn(console, "error").mockImplementation(() => {});
-    expect(
-      await verifyUnsubscribeToken(
-        {},
-        UNSUBSCRIBE_KINDS.bandFollow,
-        "u1.5.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-      ),
-    ).toBeNull();
-    expect(error).toHaveBeenCalledTimes(1);
-    error.mockRestore();
+    await expect(
+      verifyUnsubscribeToken({}, UNSUBSCRIBE_KINDS.bandFollow, "u1.5.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
+    ).rejects.toThrow("CSRF_SECRET is required to verify unsubscribe links");
+  });
+
+  it("logs a MAC mismatch with the id only, never the token", async () => {
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const token = await unsubscribeToken({ CSRF_SECRET: "rotated-away" }, UNSUBSCRIBE_KINDS.bandFollow, 7);
+    expect(await verifyUnsubscribeToken(env, UNSUBSCRIBE_KINDS.bandFollow, token)).toBeNull();
+    expect(warn).toHaveBeenCalledWith("unsubscribe MAC mismatch", { kind: UNSUBSCRIBE_KINDS.bandFollow, id: 7 });
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(token.split(".")[2]);
+    warn.mockRestore();
   });
 });

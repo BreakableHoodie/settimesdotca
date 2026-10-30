@@ -3,6 +3,7 @@ import { onRequestGet, onRequestPost } from "../unsubscribe.js";
 import { MockD1Database } from "./mocks/d1.js";
 import { createMockContext } from "./helpers.js";
 import { hashStoredToken } from "../../../utils/tokens.js";
+import { unsubscribeToken, UNSUBSCRIBE_KINDS } from "../../../utils/unsubscribeLinks.js";
 
 describe("/api/subscriptions/unsubscribe", () => {
   let mockDB;
@@ -29,7 +30,7 @@ describe("/api/subscriptions/unsubscribe", () => {
       frequency: "weekly",
       verified: true,
       verification_token: await hashStoredToken("verify-token-12345"),
-      unsubscribe_token: "valid-token-67890",
+      unsubscribe_token: await hashStoredToken("valid-token-67890"),
       created_at: new Date().toISOString(),
     });
 
@@ -64,7 +65,7 @@ describe("/api/subscriptions/unsubscribe", () => {
       frequency: "weekly",
       verified: true,
       verification_token: await hashStoredToken("verify-token-12345"),
-      unsubscribe_token: "one-click-token",
+      unsubscribe_token: await hashStoredToken("one-click-token"),
       created_at: new Date().toISOString(),
     });
 
@@ -110,7 +111,7 @@ describe("/api/subscriptions/unsubscribe", () => {
       frequency: "weekly",
       verified: true,
       verification_token: await hashStoredToken("verify-token-12345"),
-      unsubscribe_token: "valid-token-67890",
+      unsubscribe_token: await hashStoredToken("valid-token-67890"),
       created_at: new Date().toISOString(),
     });
 
@@ -135,7 +136,7 @@ describe("/api/subscriptions/unsubscribe", () => {
       frequency: "weekly",
       verified: true,
       verification_token: await hashStoredToken("verify-token-12345"),
-      unsubscribe_token: "valid-token-67890",
+      unsubscribe_token: await hashStoredToken("valid-token-67890"),
       created_at: new Date().toISOString(),
     });
 
@@ -152,5 +153,54 @@ describe("/api/subscriptions/unsubscribe", () => {
     expect(html).toContain("unsubscribed from SetTimes show announcements");
     expect(html).not.toContain("all all");
     expect(html).toContain("example.com/subscribe");
+  });
+  it("unsubscribes only the row named by a derived token", async () => {
+    mockDB.data.email_subscriptions.push(
+      { id: 1, email: "one@example.com", city: "all", genre: "all", unsubscribe_token: "sha256:one" },
+      { id: 2, email: "two@example.com", city: "all", genre: "all", unsubscribe_token: "sha256:two" },
+    );
+    const token = await unsubscribeToken(mockContext.env, UNSUBSCRIBE_KINDS.subscription, 1);
+    mockContext.request = new Request(`http://localhost/api/subscriptions/unsubscribe?token=${token}`, {
+      method: "POST",
+    });
+
+    expect((await onRequestPost(mockContext)).status).toBe(200);
+    expect(mockDB.data.email_subscriptions.map((sub) => sub.id)).toEqual([2]);
+  });
+
+  it("does not redeem a stored digest or a token for another kind", async () => {
+    mockDB.data.email_subscriptions.push({
+      id: 1,
+      email: "one@example.com",
+      city: "all",
+      genre: "all",
+      unsubscribe_token: "sha256:stored",
+    });
+    const otherKind = await unsubscribeToken(mockContext.env, UNSUBSCRIBE_KINDS.bandFollow, 1);
+    for (const token of ["sha256:stored", otherKind]) {
+      mockContext.request = new Request(
+        `http://localhost/api/subscriptions/unsubscribe?token=${encodeURIComponent(token)}`,
+        { method: "POST" },
+      );
+      expect((await onRequestPost(mockContext)).status).toBe(404);
+    }
+    expect(mockDB.data.email_subscriptions).toHaveLength(1);
+  });
+
+  it("answers 500 and keeps the subscription when the link key is missing (#1415)", async () => {
+    mockDB.data.email_subscriptions.push({
+      id: 1,
+      email: "one@example.com",
+      city: "all",
+      genre: "all",
+      unsubscribe_token: "sha256:stored",
+    });
+    const token = await unsubscribeToken(mockContext.env, UNSUBSCRIBE_KINDS.subscription, 1);
+    delete mockContext.env.CSRF_SECRET;
+    mockContext.request = new Request(`http://localhost/api/subscriptions/unsubscribe?token=${token}`, {
+      method: "POST",
+    });
+    expect((await onRequestPost(mockContext)).status).toBe(500);
+    expect(mockDB.data.email_subscriptions).toHaveLength(1);
   });
 });

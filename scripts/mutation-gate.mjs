@@ -1131,9 +1131,44 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'Band Announcements' — new confirmation links store only the SHA-256 token digest, never the emailed plaintext",
     file: "functions/api/bands/[name]/follow.js",
-    find: ".bind(email, band.id, verificationTokenHash, unsubscribeToken, consentIp, CONSENT_VERSION)",
-    replace: ".bind(email, band.id, verificationToken, unsubscribeToken, consentIp, CONSENT_VERSION)",
+    find: ".bind(email, band.id, verificationTokenHash, unsubscribePlaceholder, consentIp, CONSENT_VERSION)",
+    replace: ".bind(email, band.id, verificationToken, unsubscribePlaceholder, consentIp, CONSENT_VERSION)",
     tests: ["functions/api/bands/__tests__/follow.test.js"],
+  },
+  {
+    id: "unfollow-legacy-reader-hashes-token",
+    invariant: "CLAUDE.md 'Band Announcements' — legacy unsubscribe readers hash submitted bearer tokens before lookup",
+    file: "functions/api/bands/[name]/unfollow.js",
+    find: ".bind(tokenHash)",
+    replace: ".bind(token)",
+    tests: ["functions/api/bands/__tests__/unfollow.test.js"],
+  },
+  {
+    id: "subscription-unsubscribe-legacy-reader-hashes-token",
+    invariant:
+      "CLAUDE.md 'Band Announcements' — legacy subscription unsubscribe readers hash submitted bearer tokens before lookup",
+    file: "functions/api/subscriptions/unsubscribe.js",
+    find: ".bind(tokenHash)",
+    replace: ".bind(token)",
+    tests: ["functions/api/subscriptions/__tests__/unsubscribe.test.js"],
+  },
+  {
+    id: "unsubscribe-verify-throws-without-key",
+    invariant:
+      "CLAUDE.md 'Band Announcements' — an unsubscribe link that cannot be checked (no key) is a 500, never a false 'removed' page",
+    file: "functions/utils/unsubscribeLinks.js",
+    find: 'throw new Error("CSRF_SECRET is required to verify unsubscribe links");',
+    replace: "return null;",
+    tests: ["functions/api/bands/__tests__/unfollow.test.js"],
+  },
+  {
+    id: "unsubscribe-token-binds-kind-to-mac",
+    invariant:
+      "CLAUDE.md 'Band Announcements' — unsubscribe MACs bind the token kind so links cannot cross resource types",
+    file: "functions/utils/unsubscribeLinks.js",
+    find: "`unsubscribe|${kind}|${id}`",
+    replace: "`unsubscribe|${id}`",
+    tests: ["functions/utils/__tests__/unsubscribeLinks.test.js"],
   },
   {
     id: "batch-confirmation-reader-hashes-token",

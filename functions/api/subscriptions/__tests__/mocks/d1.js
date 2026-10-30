@@ -56,6 +56,11 @@ export class MockD1Database {
         results = results.filter((sub) => sub.email === email && sub.city === city && sub.genre === genre);
       }
 
+      if (queryLower.includes("where id = ?")) {
+        const [id] = params;
+        results = results.filter((sub) => sub.id === id);
+      }
+
       // WHERE id = ? AND verification_token = ? (the rotation read-back)
       if (queryLower.includes("where id = ? and verification_token = ?")) {
         const [id, token] = params;

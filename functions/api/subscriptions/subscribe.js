@@ -82,7 +82,9 @@ export async function onRequestPost(context) {
     // Generate tokens
     const verificationToken = generateToken();
     const verificationTokenHash = await hashStoredToken(verificationToken);
-    const unsubscribeToken = generateToken();
+    // Unsubscribe links are derived from the row id (unsubscribeLinks.js, #1415);
+    // this hashed random value only fills the NOT NULL UNIQUE column.
+    const unsubscribePlaceholder = await hashStoredToken(generateToken());
 
     // Check if subscription already exists
     const { results: existing } = await env.DB.prepare(
@@ -236,7 +238,7 @@ export async function onRequestPost(context) {
         VALUES (?, ?, ?, ?, ?, ?, ?, 'web_form', ?)
       `,
       )
-        .bind(email, city, genre, frequency, verificationTokenHash, unsubscribeToken, consentIp, CONSENT_VERSION)
+        .bind(email, city, genre, frequency, verificationTokenHash, unsubscribePlaceholder, consentIp, CONSENT_VERSION)
         .run();
     } catch (insertError) {
       if (insertError?.message?.includes("UNIQUE constraint failed")) {

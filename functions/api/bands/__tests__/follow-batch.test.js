@@ -56,7 +56,7 @@ describe("POST /api/bands/follow-batch", () => {
     for (const row of rows) {
       expect(row.verified).toBe(0);
       expect(row.verification_token).toMatch(/^sha256:[0-9a-f]{64}$/);
-      expect(row.unsubscribe_token).toBeTruthy();
+      expect(row.unsubscribe_token).toMatch(/^sha256:[0-9a-f]{64}$/);
       expect(row.consent_method).toBe("web_form");
       expect(row.consent_version).toBe(CONSENT_VERSION);
     }

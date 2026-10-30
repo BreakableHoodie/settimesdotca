@@ -27,6 +27,7 @@ import { logger } from "./logger.js";
 import { escapeHtml } from "./html.js";
 import { getPublicBaseUrl } from "./publicUrl.js";
 import { toSqliteDateTime } from "./authAttempts.js";
+import { unsubscribeToken, UNSUBSCRIBE_KINDS } from "./unsubscribeLinks.js";
 
 const SEND_CONCURRENCY = 8;
 
@@ -54,7 +55,7 @@ export async function buildAnnounceDigestIdempotencyKey(email, performanceIds) {
 export async function flushAnnounceDigest(env, DB) {
   const publicUrl = getPublicBaseUrl(env);
 
-  // Fetch every pending entry, joining band_follows for email + unsubscribe_token
+  // Fetch every pending entry, joining band_follows for email
   // and performances for a fresh is_cancelled read. The performance can be
   // cancelled AFTER it was queued but BEFORE this flush runs — admin/bands/[id].js
   // sweeps its own queue rows on cancel, but that's a separate request from
@@ -67,7 +68,7 @@ export async function flushAnnounceDigest(env, DB) {
   const { results: queue } = await DB.prepare(
     `SELECT q.id, q.band_follow_id, q.performance_id, q.event_id,
             q.band_name, q.event_name, q.event_slug, q.band_profile_id,
-            bf.email, bf.unsubscribe_token, p.is_cancelled
+            bf.email, p.is_cancelled
      FROM band_announce_queue q
      JOIN band_follows bf ON bf.id = q.band_follow_id
      JOIN performances p ON p.id = q.performance_id
@@ -107,6 +108,28 @@ export async function flushAnnounceDigest(env, DB) {
     // would permanently hide them from resend-announcement's recovery query.
     const liveItems = items.filter((item) => !item.is_cancelled);
     const cancelledCount = items.length - liveItems.length;
+    // Unfollow links are derived from the follow id (#1415), built before any
+    // claim so a missing key can never strand one.
+    let unsubUrlByQueueId;
+    try {
+      unsubUrlByQueueId = new Map(
+        await Promise.all(
+          liveItems.map(async (item) => {
+            const token = await unsubscribeToken(env, UNSUBSCRIBE_KINDS.bandFollow, item.band_follow_id);
+            return [item.id, `${publicUrl}/api/bands/${item.band_profile_id}/unfollow?token=${token}`];
+          }),
+        ),
+      );
+    } catch (error) {
+      // Same as a failed claim batch below: nothing claimed or deleted, so the
+      // next flush retries this group from scratch.
+      logger.error("announce digest: cannot build an unsubscribe link, queue rows left for retry", {
+        event_id: items[0].event_id,
+        error,
+      });
+      failed += liveItems.length;
+      continue;
+    }
 
     // Claim each (performance_id, band_follow_id) atomically before sending,
     // batched together with this group's queue-row deletes into ONE
@@ -196,10 +219,7 @@ export async function flushAnnounceDigest(env, DB) {
 
     const bandListText = bands.map((b) => `• ${b}`).join("\n");
     const bandListHtml = bands.map((b) => `<li>${escapeHtml(b)}</li>`).join("");
-    const unsubLinks = claimed.map((item) => ({
-      item,
-      url: `${publicUrl}/api/bands/${item.band_profile_id}/unfollow?token=${item.unsubscribe_token}`,
-    }));
+    const unsubLinks = claimed.map((item) => ({ item, url: unsubUrlByQueueId.get(item.id) }));
     const unsubText = unsubLinks.map(({ item, url }) => `Unfollow ${item.band_name}: ${url}`).join("\n");
     const unsubHtml = unsubLinks
       .map(({ item, url }) => `<a href="${escapeHtml(url)}">Unfollow ${escapeHtml(item.band_name)}</a>`)

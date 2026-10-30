@@ -178,7 +178,9 @@ export async function onRequestPost(context) {
     for (const { band_profile_id } of bands.results) {
       const verificationToken = generateToken();
       const verificationTokenHash = await hashStoredToken(verificationToken);
-      const unsubscribeToken = generateToken();
+      // Unsubscribe links are derived from the row id (unsubscribeLinks.js, #1415);
+      // this hashed random value only fills the NOT NULL UNIQUE column.
+      const unsubscribePlaceholder = await hashStoredToken(generateToken());
       stmts.push(
         DB.prepare(
           `DELETE FROM band_follows
@@ -193,7 +195,7 @@ export async function onRequestPost(context) {
           email,
           band_profile_id,
           verificationTokenHash,
-          unsubscribeToken,
+          unsubscribePlaceholder,
           consentIp,
           CONSENT_VERSION,
           batchTokenHash,

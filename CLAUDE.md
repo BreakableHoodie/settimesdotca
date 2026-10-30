@@ -106,7 +106,7 @@ node scripts/delegate-verify.mjs --allow-empty -- <read-only command>   # resear
 
 Exit codes: `0` succeeded _and_ changed files · `1` the command failed · `2` **reported success but changed nothing** · `3` the delegate committed on a protected branch · `4` usage.
 
-Code `2` is the one that pays for the script. Measured 2026-08-13: an agy delegation returned exit `0` and `AGY_USAGE {"status":"SUCCESS"}` having touched **zero files** — headless agy had no `write_file` grant, so it described the work instead of doing it and still "succeeded". 96,825 tokens, nothing on disk, and nothing in its own output said so. The tool behaved exactly as its README documents ("ungranted writes leave the workspace untouched but report success"); the mistake was trusting the status field.
+Code `2` is the one that pays for the script: on 2026-08-13 an agy delegation reported `SUCCESS` with **zero files** touched (no `write_file` grant), and nothing in its output said so. Trust `git status`, not the status field. Incident: `docs/field-notes/opencode-delegation.md`.
 
 Code `3` enforces the other half of the contract below: **a delegate never moves `main`.** It may branch, commit and open a PR — that is the normal workflow now, and it routes the change through the ruleset (protected main, strict checks, threads resolved) rather than through someone remembering to look. What it must never do is commit on the default branch, which bypasses review entirely. A commit on a feature branch is reported, not failed.
 
@@ -663,7 +663,7 @@ Mail scanners fetch links with GET, so confirmation and unsubscribe GETs render 
 
 When a performance is announced (`is_announced` 0→1), verified followers are emailed once, tracked per follower in `band_follow_notifications (performance_id, band_follow_id)`; `POST /api/admin/bands/:id/resend-announcement` emails only followers with no live claim (`claimIsLiveSql`), never a delivered row (see "A claim is not a delivery record"). Shared logic: `functions/utils/bandFollowNotify.js`. **Do not reintroduce a fire-once latch without per-follower tracking.**
 
-**Confirmation tokens are stored hashed (#1415)**: `verification_token`/`batch_token` hold `hashStoredToken()` digests; readers hash before binding. A digest cannot be re-sent, so a subscription re-request rotates it (bound to the hash as read, `created_at` kept); re-requesting a live pending follow sends nothing.
+**No stored token is redeemable (#1415).** `verification_token`/`batch_token` hold `hashStoredToken()` digests; readers hash before binding, and a subscription re-request rotates the token (bound to the hash as read, `created_at` kept). Unsubscribe links are `u1.<id>.<HMAC>`, derived per email from the row id (`functions/utils/unsubscribeLinks.js`, HKDF subkey of `CSRF_SECRET`, kind in the MAC); senders never read `unsubscribe_token`, which holds a digest. Older links are looked up by hash. No key is a 500, never a false "removed" page; rotating `CSRF_SECRET` breaks sent links (#1427).
 
 Follow, subscriber and single-band digest mail carries RFC 8058 one-click unsubscribe headers (`functions/utils/email.js`); multi-band digests deliberately do not, because one click must not silently remove only one of several follows.
 

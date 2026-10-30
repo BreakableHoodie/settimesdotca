@@ -9,6 +9,7 @@ vi.mock("../email.js", async (importOriginal) => ({
 import { sendEmail } from "../email.js";
 import { notifyBandFollowers } from "../bandFollowNotify.js";
 import { toSqliteDateTime } from "../authAttempts.js";
+import { unsubscribeToken, UNSUBSCRIBE_KINDS } from "../unsubscribeLinks.js";
 import * as loggerModule from "../logger.js";
 import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../api/test-utils.js";
 
@@ -55,9 +56,18 @@ describe("notifyBandFollowers", () => {
     });
 
     expect(result).toEqual({ sent: 1, failed: 1 });
-    expect(sendEmail.mock.calls[0][1].idempotencyKey).toBe(`band-follow:${perf.id}:${f1}`);
-    const mail = sendEmail.mock.calls[0][1];
+    // Sends run concurrently, so find a@'s mail by recipient, not call order.
+    const mail = sendEmail.mock.calls.find(([, m]) => m.to === "a@example.com")[1];
+    expect(mail.idempotencyKey).toBe(`band-follow:${perf.id}:${f1}`);
     const bodyUrl = mail.text.match(/Unfollow: (\S+)/)[1];
+    expect(bodyUrl).toBe(
+      `${env.PUBLIC_URL || "https://settimes.ca"}/api/bands/${bandProfileId}/unfollow?token=${await unsubscribeToken(
+        env,
+        UNSUBSCRIBE_KINDS.bandFollow,
+        f1,
+      )}`,
+    );
+    expect(mail.text).not.toContain("tok-a");
     expect(mail.headers["List-Unsubscribe"]).toBe(`<${bodyUrl}>`);
 
     const notified = rawDb
@@ -367,5 +377,32 @@ describe("notifyBandFollowers", () => {
     expect(result.sent).toBe(1);
     expect(result.failed).toBe(0);
     expect(errorSpy).toHaveBeenCalled();
+  });
+
+  test("without the link key it sends nothing and leaves no claim behind (#1415)", async () => {
+    const { env, rawDb } = createTestEnv();
+    delete env.CSRF_SECRET;
+    const event = insertEvent(rawDb, { name: "Fest", slug: "fest-nokey" });
+    const perf = insertBand(rawDb, { name: "The Band", event_id: event.id });
+    const followId = rawDb
+      .prepare("INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)")
+      .run("a@example.com", perf.band_profile_id, "tok-nokey").lastInsertRowid;
+    const errorSpy = vi.spyOn(loggerModule.logger, "error").mockImplementation(() => {});
+
+    const result = await notifyBandFollowers(env, env.DB, {
+      performanceId: perf.id,
+      bandProfileId: perf.band_profile_id,
+      bandName: "The Band",
+      eventName: "Fest",
+      followers: [{ id: followId, email: "a@example.com" }],
+    });
+
+    expect(result.sent).toBe(0);
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM band_follow_notifications").get().n).toBe(0);
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("cannot build an unsubscribe link"),
+      expect.anything(),
+    );
   });
 });

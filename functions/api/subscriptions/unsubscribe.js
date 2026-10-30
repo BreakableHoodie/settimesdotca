@@ -3,6 +3,8 @@
 
 import { escapeHtml } from "../../utils/html.js";
 import { emailActionPage, readEmailActionToken } from "../../utils/emailActionPage.js";
+import { hashStoredToken } from "../../utils/tokens.js";
+import { isDerivedUnsubscribeToken, UNSUBSCRIBE_KINDS, verifyUnsubscribeToken } from "../../utils/unsubscribeLinks.js";
 
 export async function onRequestGet(context) {
   const { request } = context;
@@ -26,22 +28,43 @@ export async function onRequestPost(context) {
   }
 
   try {
-    // Find subscription
-    const { results } = await env.DB.prepare(
-      `
-      SELECT id, email, city, genre
-      FROM email_subscriptions
-      WHERE unsubscribe_token = ?
-    `,
-    )
-      .bind(token)
-      .all();
+    let matchingResults;
+    if (isDerivedUnsubscribeToken(token)) {
+      const id = await verifyUnsubscribeToken(env, UNSUBSCRIBE_KINDS.subscription, token);
+      matchingResults =
+        id === null
+          ? []
+          : (
+              await env.DB.prepare(
+                `
+              SELECT id, email, city, genre
+              FROM email_subscriptions
+              WHERE id = ?
+            `,
+              )
+                .bind(id)
+                .all()
+            ).results;
+    } else {
+      const tokenHash = await hashStoredToken(token);
+      matchingResults = (
+        await env.DB.prepare(
+          `
+          SELECT id, email, city, genre
+          FROM email_subscriptions
+          WHERE unsubscribe_token = ?
+        `,
+        )
+          .bind(tokenHash)
+          .all()
+      ).results;
+    }
 
-    if (results.length === 0) {
+    if (matchingResults.length === 0) {
       return new Response("Invalid unsubscribe token", { status: 404 });
     }
 
-    const subscription = results[0];
+    const subscription = matchingResults[0];
 
     // Delete subscription
     await env.DB.prepare(

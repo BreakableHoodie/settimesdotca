@@ -21,6 +21,7 @@ export function createMockContext(mockDB) {
       // unit tests.  Without an explicit ENVIRONMENT the security default is
       // now "production" (secure/closed), not localhost-sniffing. (#425)
       ENVIRONMENT: "test",
+      CSRF_SECRET: "test-csrf-secret-for-unit-tests",
     },
   };
 }

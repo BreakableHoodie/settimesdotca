@@ -16,6 +16,7 @@ import { logger } from "./logger.js";
 import { getPublicBaseUrl } from "./publicUrl.js";
 import { escapeHtml } from "./html.js";
 import { toSqliteDateTime } from "./authAttempts.js";
+import { unsubscribeToken, UNSUBSCRIBE_KINDS } from "./unsubscribeLinks.js";
 
 // Mirrors announceDigest.js, which bounds its sends for the same reason.
 //
@@ -68,7 +69,7 @@ export const CLAIM_LEASE_MINUTES = 15;
  */
 export async function pendingSubscribers(DB, { eventId, kind, limit = MAX_PER_INVOCATION }) {
   const { results } = await DB.prepare(
-    `SELECT s.id, s.email, s.unsubscribe_token
+    `SELECT s.id, s.email
      FROM email_subscriptions s
      WHERE s.verified = 1
        AND NOT EXISTS (
@@ -130,6 +131,19 @@ export async function notifySubscribers(env, DB, { eventId, kind, eventName, eve
   // budget. Same reason announceDigest.js chunks.
   const sendOne = async (sub) => {
     const claimedAt = toSqliteDateTime(new Date());
+    let unsubUrl;
+    try {
+      const token = await unsubscribeToken(env, UNSUBSCRIBE_KINDS.subscription, sub.id);
+      unsubUrl = `${publicUrl}/api/subscriptions/unsubscribe?token=${token}`;
+    } catch (error) {
+      logger.error("subscriber notify: cannot build an unsubscribe link, not sent", {
+        eventId,
+        kind,
+        subscriptionId: sub.id,
+        error,
+      });
+      return "failed";
+    }
     // Claim BEFORE delivery, so two concurrent runs cannot mail one person
     // twice. A claim is NOT a delivery record, though -- see delivered_at.
     const claim = await DB.prepare(
@@ -164,9 +178,6 @@ export async function notifySubscribers(env, DB, { eventId, kind, eventName, eve
       return "skipped";
     }
 
-    // Every send carries an unsubscribe link. The token already exists on the
-    // row; there is no excuse for a list that cannot be left.
-    const unsubUrl = `${publicUrl}/api/subscriptions/unsubscribe?token=${sub.unsubscribe_token}`;
     const result = await sendEmail(env, {
       to: sub.email,
       subject,

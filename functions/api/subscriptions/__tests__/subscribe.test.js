@@ -276,7 +276,7 @@ describe("POST /api/subscriptions/subscribe", () => {
 
     const subscription = mockDB.data.email_subscriptions[0];
     expect(subscription.verification_token).toMatch(/^sha256:[0-9a-f]{64}$/);
-    expect(subscription.unsubscribe_token).toMatch(/^[0-9a-f]{64}$/);
+    expect(subscription.unsubscribe_token).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(subscription.verification_token).not.toBe(subscription.unsubscribe_token);
   });
 

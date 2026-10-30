@@ -4,6 +4,7 @@ import * as handler from "../[id]/notify-subscribers.js";
 import { MAX_PER_INVOCATION, notifySubscribers, pendingSubscribers } from "../../../../utils/subscriberNotify.js";
 import { logger } from "../../../../utils/logger.js";
 import { toSqliteDateTime } from "../../../../utils/authAttempts.js";
+import { unsubscribeToken, UNSUBSCRIBE_KINDS } from "../../../../utils/unsubscribeLinks.js";
 
 vi.mock("../../../../utils/email.js", async (importOriginal) => ({
   // The real header builder, so these tests cannot drift from its format.
@@ -235,6 +236,17 @@ describe("POST /api/admin/events/[id]/notify-subscribers", () => {
     await post(env, headers, ev.id, { kind: "schedule_announced" });
     const mail = sendEmail.mock.calls[0][1];
     const bodyUrl = mail.text.match(/Unsubscribe: (\S+)/)[1];
+    const subscriber = rawDb
+      .prepare("SELECT id, unsubscribe_token FROM email_subscriptions WHERE email = ?")
+      .get("a@example.com");
+    expect(bodyUrl).toBe(
+      `https://settimes.ca/api/subscriptions/unsubscribe?token=${await unsubscribeToken(
+        env,
+        UNSUBSCRIBE_KINDS.subscription,
+        subscriber.id,
+      )}`,
+    );
+    expect(mail.text).not.toContain(subscriber.unsubscribe_token);
     expect(mail.html).toContain(bodyUrl);
     expect(mail.headers["List-Unsubscribe"]).toBe(`<${bodyUrl}>`);
   });

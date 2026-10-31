@@ -384,11 +384,9 @@ plaintext exists only in the confirmation link and is rotated on re-request.
 Verifying does not clear it, so a subscription confirmed before migration 0080
 holds `retired:<id>` instead: expected, and never redeemable.
 
-`unsubscribe_token` (here and in `band_follows`) holds a `sha256:` digest that
-no link carries: unsubscribe links are derived from the row id
-(`functions/utils/unsubscribeLinks.js`, #1415; keyed by
-`UNSUBSCRIBE_LINK_SECRET`, #1427), and the column is looked up
-only for links sent before that change.
+Fan email was retired on 2026-10-31: migration 0081 emptied this table and
+the other fan-email tables, no code reads them, and a later migration drops
+them.
 
 | Column               | Type    | Notes                                                                  |
 | -------------------- | ------- | ---------------------------------------------------------------------- |

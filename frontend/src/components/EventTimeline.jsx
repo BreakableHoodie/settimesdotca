@@ -8,6 +8,7 @@ import { buildDirectionsHref } from '../utils/directions'
 import { formatPerformanceDayLabel, formatTimeRange, parseLocalDate } from '../utils/timeFormat'
 import { trackTicketClick } from '../utils/metrics'
 import { safeExternalHref } from '../utils/urlSafety'
+import { calendarLinks, SITE_FEED_PATH } from '../utils/calendarLinks'
 import { sortableName } from '../utils/sortableName'
 import { Alert, Badge, Button, Card, Loading } from './ui'
 import EventsPageSkeleton from './EventsPageSkeleton'
@@ -540,6 +541,19 @@ export default function EventTimeline() {
                 {filtersHideFutureEvents && (
                   <Button variant="secondary" size="sm" onClick={clearFilters} icon={<X size={14} />}>
                     Clear filters
+                  </Button>
+                )}
+                {/* Hearing about new dates without email: the calendar feed
+                    fills in as the next edition's lineup is announced. */}
+                {!filtersHideFutureEvents && (
+                  <Button
+                    as="a"
+                    href={calendarLinks(SITE_FEED_PATH).webcal}
+                    variant="secondary"
+                    size="sm"
+                    icon={<CalendarDays size={14} aria-hidden="true" />}
+                  >
+                    Add shows to your calendar
                   </Button>
                 )}
               </div>

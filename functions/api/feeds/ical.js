@@ -1,5 +1,5 @@
 // iCal feed generation
-// GET /api/feeds/ical?city=…&genre=…
+// GET /api/feeds/ical?city=…&genre=…&band=<band_profiles.id>
 // Compatible with Google Calendar, Apple Calendar, Outlook
 
 import { getPublicDataGateResponse } from "../../utils/publicGate.js";
@@ -41,12 +41,36 @@ export async function onRequestGet(context) {
   // name the calendar keeps in a subscriber's sidebar for as long as they stay
   // subscribed, and the only branding a subscription carries.
   const activeFilters = [city, genre].filter((value) => value !== "all");
-  const calendarName = activeFilters.length > 0 ? `${activeFilters.join(" ")} Shows` : "settimes.ca";
+  let calendarName = activeFilters.length > 0 ? `${activeFilters.join(" ")} Shows` : "settimes.ca";
   // Brand rather than "Waterloo Region": the platform has hosted an event
   // outside the region, and a calendar name is a claim that stays on screen.
-  const safeFilenameStem = activeFilters.length > 0 ? activeFilters.map(sanitizeFilenamePart).join("-") : "settimes";
+  let safeFilenameStem = activeFilters.length > 0 ? activeFilters.map(sanitizeFilenamePart).join("-") : "settimes";
+
+  // `?band=` is a fan subscribing their calendar to one artist ("Add to my
+  // calendar" on the band page). It filters THIS feed rather than being a
+  // second one, so the calendar rules (no invented times, cancellations,
+  // after-midnight dating, reveal-mode gate) cannot drift between the two.
+  const bandParam = url.searchParams.get("band");
+  if (bandParam !== null && !/^[1-9]\d{0,9}$/.test(bandParam)) {
+    return new Response("Invalid band id", { status: 400, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+  }
 
   try {
+    let bandProfile = null;
+    if (bandParam !== null) {
+      bandProfile = await env.DB.prepare("SELECT id, name FROM band_profiles WHERE id = ?").bind(bandParam).first();
+      if (!bandProfile) {
+        return new Response("Band not found", {
+          status: 404,
+          headers: { "Content-Type": "text/plain; charset=utf-8" },
+        });
+      }
+      // The name a subscriber's calendar keeps for as long as they stay
+      // subscribed, like the city/genre names above.
+      calendarName = `${bandProfile.name} on settimes.ca`;
+      safeFilenameStem = sanitizeFilenamePart(bandProfile.name);
+    }
+
     // Get events
     // V2 Schema: events -> performances -> band_profiles
     let query = `
@@ -92,6 +116,13 @@ export async function onRequestGet(context) {
     if (genre !== "all") {
       query += ` AND instr(LOWER(bp.genre), LOWER(?)) > 0`;
       params.push(genre);
+    }
+
+    // An off-season band simply matches nothing: a valid, empty calendar that
+    // fills in when the next lineup is announced, which is the point.
+    if (bandProfile) {
+      query += ` AND bp.id = ?`;
+      params.push(bandProfile.id);
     }
 
     query += ` ORDER BY e.date ASC, COALESCE(p.performance_date, e.date) ASC, p.start_time ASC`;

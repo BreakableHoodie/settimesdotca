@@ -830,6 +830,15 @@ export const MUTATIONS = [
     tests: ["functions/api/feeds/__tests__/ical.test.js"],
   },
   {
+    id: "ical-band-filter-scopes-to-one-artist",
+    invariant:
+      "CLAUDE.md 'Pulling a band from a live lineup' — `?band=` filters the one shared iCal feed; dropping the predicate would hand every subscriber the whole festival under one artist's name",
+    file: "functions/api/feeds/ical.js",
+    find: "query += ` AND bp.id = ?`;",
+    replace: "query += ` AND ? IS NOT NULL`;",
+    tests: ["functions/api/feeds/__tests__/ical-band.test.js"],
+  },
+  {
     id: "no-utc-calendar-day-in-functions",
     invariant:
       "CLAUDE.md 'Server-side' (today/now is Toronto-local) — a UTC calendar day anywhere in functions/ fails the source-scanning guard",

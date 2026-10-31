@@ -622,7 +622,7 @@ The API-key routes batch their audit row with the change. **That is not a repo-w
 - **Cancelling** (the LineupTab toggle: `PATCH /api/admin/bands/:id` with `is_cancelled: true`, editor or above, #732) keeps the set visible and struck through on every fan surface, drops it from "up next" and live time math, makes it unselectable, and emits `STATUS:CANCELLED`. It applies to one performance: a band with two sets needs two cancels.
 - **Un-cancelling is the one transition that can double-book**, because a cancelled set frees its slot: the PATCH runs `checkConflicts` on `1 → 0` and 409s naming the holder, never auto-resolving.
 
-**Calendar surfaces never invent times.** Three surfaces share these rules: `functions/api/feeds/ical.js`, `prepareBands` (`DEFAULT_SET_DURATION_MS` in `frontend/src/utils/bandUtils.js`) and the My Route export (`frontend/src/utils/routeIcs.js`, #1251). Change one, change all.
+**Calendar surfaces never invent times.** Three surfaces share these rules: `functions/api/feeds/ical.js`, `prepareBands` (`DEFAULT_SET_DURATION_MS` in `frontend/src/utils/bandUtils.js`) and the My Route export (`frontend/src/utils/routeIcs.js`, #1251). Change one, change all. `?band=<band_profiles.id>` on the server feed is a filter on that same handler (the per-artist "Add to my calendar" subscription), never a second feed.
 
 - A set with no `start_time` is omitted (#1079: a `"20:00"` fallback once stacked a whole lineup at 8 PM).
 - A missing end is one hour after the start, written in `.ics` as `DURATION:PT1H`. A constant `DTEND` can precede the start, and a computed one doubles across the DST repeat hour.

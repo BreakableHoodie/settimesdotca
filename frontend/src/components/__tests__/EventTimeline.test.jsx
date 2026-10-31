@@ -1271,6 +1271,36 @@ describe('EventTimeline empty lineup and between-seasons states', () => {
     expect(screen.queryByText('Lineup TBA')).not.toBeInTheDocument()
   })
 
+  it('offers the site calendar feed in the between-seasons state, in place of the retired email signup', async () => {
+    stubTimeline({
+      now: [],
+      upcoming: [],
+      past: [
+        {
+          id: 1,
+          name: 'Long Weekend Band Crawl Vol 17',
+          slug: 'lwbc-17',
+          date: '2026-08-02',
+          status: 'archived',
+          venues: [],
+          bands: [],
+          band_count: 22,
+          venue_count: 6,
+          ticket_url: null,
+        },
+      ],
+    })
+
+    render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+
+    const link = await screen.findByRole('link', { name: 'Add shows to your calendar' })
+    expect(link).toHaveAttribute('href', `webcal://${window.location.host}/api/feeds/ical`)
+  })
+
   it('shows a between-seasons message (not the generic empty state) when only past events exist', async () => {
     stubTimeline({
       now: [],

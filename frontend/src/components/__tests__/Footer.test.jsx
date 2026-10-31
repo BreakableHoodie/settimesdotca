@@ -15,4 +15,16 @@ describe('Footer', () => {
     expect(screen.queryByRole('link', { name: /announcements|subscribe/i })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Every edition' })).toHaveAttribute('href', '/history')
   })
+
+  it('links the whole-site calendar feed over webcal', () => {
+    render(
+      <MemoryRouter>
+        <Footer />
+      </MemoryRouter>
+    )
+    expect(screen.getByRole('link', { name: 'Add all shows to your calendar' })).toHaveAttribute(
+      'href',
+      `webcal://${window.location.host}/api/feeds/ical`
+    )
+  })
 })

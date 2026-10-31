@@ -33,6 +33,7 @@ import PrivacyBanner from '../components/PrivacyBanner'
 import { Alert, Badge, Button, Card, BandProfileSkeleton } from '../components/ui'
 import { trackArtistView, trackPageView, trackSocialClick } from '../utils/metrics'
 import { fetchPublicJson } from '../utils/publicApi'
+import { bandFeedPath, calendarLinks } from '../utils/calendarLinks'
 import { getSelectedBands, saveSelectedBands, hasAnySchedule, getScheduleEventSlug } from '../utils/scheduleStorage'
 import { formatPerformanceDayLabel, formatTimeRange } from '../utils/timeFormat'
 import { safeExternalHref, safeInstagramHref } from '../utils/urlSafety'
@@ -341,6 +342,8 @@ export default function BandProfilePage() {
       </div>
     )
   }
+
+  const bandCalendar = calendarLinks(bandFeedPath(profile.id))
 
   return (
     <main id="main-content" tabIndex={-1} className="min-h-screen bg-bg-navy">
@@ -689,6 +692,44 @@ export default function BandProfilePage() {
 
           {/* Right Column - Upcoming & Past Shows */}
           <div className={profile.stats ? 'lg:col-span-2 space-y-6' : 'space-y-6'}>
+            {/* Calendar subscription. Shown for EVERY band, including one with no
+                upcoming sets: the feed is valid and empty until a lineup is
+                announced, and then fills in, which is the point. Replaces the
+                retired email follow; the fan's calendar app polls the feed, so
+                the site stores nothing about them. */}
+            <Card variant="elevated" data-testid="band-calendar">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-text-secondary">
+                  New sets show up in your calendar automatically as they&apos;re announced.
+                </p>
+                <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2">
+                  <Button
+                    as="a"
+                    href={bandCalendar.webcal}
+                    size="sm"
+                    className="min-h-[44px]"
+                    icon={<CalendarDays size={14} aria-hidden="true" />}
+                  >
+                    Add to my calendar
+                  </Button>
+                  <a
+                    href={bandCalendar.google}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex min-h-[44px] items-center text-sm text-accent-400 underline-offset-4 hover:text-accent-500 hover:underline"
+                  >
+                    Google Calendar
+                  </a>
+                  <a
+                    href={bandCalendar.download}
+                    className="inline-flex min-h-[44px] items-center text-sm text-accent-400 underline-offset-4 hover:text-accent-500 hover:underline"
+                  >
+                    Download .ics
+                  </a>
+                </div>
+              </div>
+            </Card>
+
             {/* Upcoming shows */}
             {profile.upcoming && profile.upcoming.length > 0 && (
               <Card variant="elevated" className="border-2 border-accent-500/30">

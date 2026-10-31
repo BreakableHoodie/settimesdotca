@@ -13,16 +13,7 @@ const REQUIRED_SCHEMA = {
   events: ["id", "slug", "city", "status", "reveal_mode"],
   venues: ["id", "name", "city"],
   band_profiles: ["id", "name", "name_normalized", "genre", "photo_url"],
-  performances: [
-    "id",
-    "event_id",
-    "venue_id",
-    "band_profile_id",
-    "start_time",
-    "end_time",
-    "is_announced",
-    "band_follow_notified",
-  ],
+  performances: ["id", "event_id", "venue_id", "band_profile_id", "start_time", "end_time", "is_announced"],
   users: ["id", "email", "password_hash", "role", "is_active", "totp_enabled", "totp_secret", "backup_codes"],
   lucia_sessions: ["id", "user_id", "expires_at", "ip_address", "user_agent", "created_at", "last_activity_at"],
   invite_codes: ["id", "code", "role", "is_active", "expires_at"],
@@ -44,7 +35,6 @@ const REQUIRED_SCHEMA = {
   trusted_devices: ["id", "token", "user_id", "expires_at"],
   email_otp_codes: ["id", "user_id", "code_hash", "expires_at", "verified"],
   audit_log: ["id", "user_id", "action", "resource_type", "created_at"],
-  band_follows: ["id", "email", "band_profile_id", "verified", "verification_token", "unsubscribe_token", "created_at"],
 };
 
 const wranglerBin = path.join(

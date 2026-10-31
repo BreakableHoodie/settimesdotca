@@ -28,7 +28,6 @@ const INACTIVE_BAND = {
   origin_city: 'Kitchener',
   origin_region: 'ON',
   is_active: 0,
-  follower_count: 0,
   social_links: '{}',
 }
 
@@ -40,7 +39,6 @@ const ACTIVE_BAND = {
   origin_city: 'Waterloo',
   origin_region: 'ON',
   is_active: 1,
-  follower_count: 0,
   social_links: '{}',
 }
 
@@ -96,7 +94,6 @@ const BAND_WITH_IG = {
   origin_city: 'Waterloo',
   origin_region: 'ON',
   is_active: 1,
-  follower_count: 0,
   social_links: JSON.stringify({ instagram: '@iguanas' }),
 }
 
@@ -117,7 +114,6 @@ const ZERO_LINKS_BAND = {
   origin_city: 'Waterloo',
   origin_region: 'ON',
   is_active: 1,
-  follower_count: 0,
   social_links: '{}',
 }
 
@@ -266,7 +262,6 @@ const BAND_UPCOMING = {
   origin_city: 'Waterloo',
   origin_region: 'ON',
   is_active: 1,
-  follower_count: 0,
   social_links: '{}',
   next_event_name: 'Buddies Fest 2',
   next_event_date: '2026-08-07',
@@ -282,7 +277,6 @@ const BAND_WITH_HISTORY_ONLY = {
   origin_city: 'Kitchener',
   origin_region: 'ON',
   is_active: 1,
-  follower_count: 0,
   social_links: '{}',
   next_event_name: null,
   next_event_date: null,
@@ -341,7 +335,6 @@ describe('RosterTab — Next event / Past event columns (#710)', () => {
     origin_city: 'Waterloo',
     origin_region: 'ON',
     is_active: 1,
-    follower_count: 0,
     social_links: '{}',
     next_event_name: 'Zzz Fest',
     last_event_name: null,
@@ -354,7 +347,6 @@ describe('RosterTab — Next event / Past event columns (#710)', () => {
     origin_city: 'Waterloo',
     origin_region: 'ON',
     is_active: 1,
-    follower_count: 0,
     social_links: '{}',
     next_event_name: 'Aaa Fest',
     last_event_name: null,
@@ -387,7 +379,6 @@ describe('RosterTab — Next event / Past event columns (#710)', () => {
     origin_city: 'Waterloo',
     origin_region: 'ON',
     is_active: 1,
-    follower_count: 0,
     social_links: '{}',
     next_event_name: null,
     last_event_name: 'Zzz Fest',
@@ -400,7 +391,6 @@ describe('RosterTab — Next event / Past event columns (#710)', () => {
     origin_city: 'Waterloo',
     origin_region: 'ON',
     is_active: 1,
-    follower_count: 0,
     social_links: '{}',
     next_event_name: null,
     last_event_name: 'Aaa Fest',
@@ -437,7 +427,6 @@ const ALPHA = {
   origin_city: 'Waterloo',
   origin_region: 'ON',
   is_active: 1,
-  follower_count: 0,
   social_links: '{}',
 }
 const BETA = {
@@ -448,7 +437,6 @@ const BETA = {
   origin_city: 'Waterloo',
   origin_region: 'ON',
   is_active: 1,
-  follower_count: 0,
   social_links: '{}',
 }
 const GAMMA = {
@@ -459,7 +447,6 @@ const GAMMA = {
   origin_city: 'Waterloo',
   origin_region: 'ON',
   is_active: 0,
-  follower_count: 0,
   social_links: '{}',
 }
 
@@ -541,7 +528,6 @@ describe('RosterTab — bulk actions scope to visible rows (#711)', () => {
     origin_city: 'Waterloo',
     origin_region: 'ON',
     is_active: 1,
-    follower_count: 0,
     social_links: '{}', // no links
   }
   const BAND_B = {
@@ -552,7 +538,6 @@ describe('RosterTab — bulk actions scope to visible rows (#711)', () => {
     origin_city: 'Waterloo',
     origin_region: 'ON',
     is_active: 1,
-    follower_count: 0,
     social_links: JSON.stringify({ instagram: '@bandB' }),
   }
   const BAND_C = {
@@ -563,7 +548,6 @@ describe('RosterTab — bulk actions scope to visible rows (#711)', () => {
     origin_city: 'Waterloo',
     origin_region: 'ON',
     is_active: 1,
-    follower_count: 0,
     social_links: '{}', // no links
   }
 

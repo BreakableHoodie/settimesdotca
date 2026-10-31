@@ -69,7 +69,7 @@ describe("mutation-gate entries cite CLAUDE.md sections that exist", () => {
         `CLAUDE.md '<Section>' is not being checked at all.`,
     ).toBe(entryCount);
     expect(headings.length).toBeGreaterThanOrEqual(30);
-    expect(citations).toContain("Band Announcements");
+    expect(citations).toContain("RBAC Roles");
   });
 
   it.each([...new Set(citations)])("CLAUDE.md still has a '%s' section", (cited) => {

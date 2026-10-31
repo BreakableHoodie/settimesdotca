@@ -340,7 +340,7 @@ export default function AdminPanel({ currentUser, onLogout }) {
   return (
     // Full width, deliberately: Tailwind's `container` caps at 1536px (its 2xl
     // breakpoint), which on a 1920 display left ~200px dead on each side while
-    // the 1613px roster table scrolled inside a 1502px box -- so the Followers
+    // the 1613px roster table scrolled inside a 1502px box -- so the last data
     // column sat under the sticky Actions column purely because of a cap, on a
     // display with room to spare. Admin is a data tool; the public site keeps
     // its container. All three wrappers here must stay in step or the header,

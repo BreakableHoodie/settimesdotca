@@ -62,7 +62,6 @@ dataset = "settimes_metrics"
 # - PUBLIC_URL: Base URL used in email links (for example https://settimes.ca)
 # - PUBLIC_DATA_PUBLISH_ENABLED: Set "true" to publish public event data (unset or false keeps public endpoints disabled)
 # - CSRF_SECRET: Required in production
-# - UNSUBSCRIBE_LINK_SECRET: Required to send or honour unsubscribe links; rotate via UNSUBSCRIBE_LINK_SECRET_PREVIOUS (functions/utils/unsubscribeLinks.js)
 # - MFA_TOTP_ENCRYPTION_KEY: Required before any TOTP MFA flow; set it in local .dev.vars too when testing MFA locally
 # - CSP_ENFORCE: Set "true" to enforce CSP (report-only when false/omitted)
 # - EMAIL_PROVIDER: "postmark", "mailchannels", or "resend"
@@ -128,7 +127,7 @@ database_id = "c06cc3e7-92e3-4044-a705-608330c1f4ba"
 # Plain-text vars MUST live here, not in the dashboard: a deploy with this file
 # replaces the dashboard's plain-text vars (measured 2026-10-14 -- the first
 # edge-e2e deploy wiped all three) and keeps only secrets. Secrets
-# (CSRF_SECRET, MFA_TOTP_ENCRYPTION_KEY, TURNSTILE_SECRET_KEY, UNSUBSCRIBE_LINK_SECRET) stay in the
+# (CSRF_SECRET, MFA_TOTP_ENCRYPTION_KEY, TURNSTILE_SECRET_KEY) stay in the
 # dashboard. ENVIRONMENT=preview is deliberately NOT a dev value: isDevRequest
 # fails closed on it, so previews run production code paths.
 [env.preview.vars]

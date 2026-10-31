@@ -6,7 +6,7 @@ info:
     Live API contract for the current Cloudflare Pages + D1 implementation.
 
     Highlights:
-    - Public schedule, discovery, band, feed, subscription, and telemetry endpoints
+    - Public schedule, discovery, band, feed, and telemetry endpoints
     - Invite-based admin signup with session cookies, CSRF protection, and optional TOTP MFA
     - Role-based admin routes for events, venues, bands, performers, users, invites, analytics, and maintenance
   contact:
@@ -23,8 +23,6 @@ servers:
 tags:
   - name: Public
     description: Public schedule, discovery, band, feed, and telemetry endpoints
-  - name: Public - Subscriptions
-    description: Email subscription lifecycle endpoints
   - name: Public - Auth
     description: Activation and password-reset endpoints
   - name: Admin - Auth
@@ -223,8 +221,8 @@ paths:
       description: |
         Co-performers on the same events, most-shared first, capped at 20.
 
-        The path segment is spelled `{name}` because three sibling routes
-        (`follow`, `unfollow`, `confirm-follow`) already bind that parameter and
+        The path segment is spelled `{name}` because sibling routes
+        (such as `unfollow`) already bind that parameter and
         Cloudflare Pages cannot host `[name]/` and `[id]/` at one level. The
         VALUE callers send is the canonical `band_profiles.id`; a slug is also
         accepted.
@@ -459,11 +457,10 @@ paths:
       description: |
         Aggregate-only counts, sums, and a top-N-by-popularity band list for the
         public stats page (social proof for the Vol-17 push). Never returns any
-        individual/PII/joinable-to-a-person data: `fans_following` is a
-        `COUNT(*) WHERE verified = 1` over `band_follows` (no emails, tokens, or
-        IPs are ever selected), and `routes_shared`/`route_views` are a
-        `COUNT`/`SUM(view_count)` over live `share_links` plus aggregate totals
-        folded from expired links (no slugs, band names, or performance IDs).
+        individual/PII/joinable-to-a-person data: `routes_shared`/`route_views`
+        are a `COUNT`/`SUM(view_count)` over live `share_links` plus aggregate
+        totals folded from expired links (no slugs, band names, or performance
+        IDs).
         Gated by `PUBLIC_DATA_PUBLISH_ENABLED`. Cached 5 minutes.
       responses:
         "200":
@@ -491,9 +488,6 @@ paths:
                   route_views:
                     type: integer
                     description: Sum of live and folded unique-view counts
-                  fans_following:
-                    type: integer
-                    description: Count of verified band_follows rows
                   page_views:
                     type: integer
                     description: Sum of page_views_daily.views
@@ -766,257 +760,123 @@ paths:
         "500":
           $ref: "#/components/responses/ServerError"
 
-  /api/bands/{name}/follow:
-    post:
-      tags:
-        - Public
-      summary: Follow a band (double opt-in)
-      description: |
-        Registers an email to be notified when the band joins a lineup. The
-        follow is created **unverified** and only a confirmation email is sent;
-        announcement emails reach verified followers only. Bot-protected by
-        Turnstile (`turnstileToken` in the body). `{name}` may be a numeric band
-        ID or a normalized band name. Always responds `200` for a valid request
-        regardless of whether the email already follows (no enumeration).
-        `confirmUrl` is returned only when email delivery is not configured
-        (local/dev) so the follow can still be confirmed.
-      parameters:
-        - name: name
-          in: path
-          required: true
-          description: Numeric band ID or normalized band name
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/BandFollowRequest"
-      responses:
-        "200":
-          description: Follow accepted (confirmation email sent if new)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/BandFollowResponse"
-        "400":
-          description: Invalid email or failed bot verification
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "500":
-          $ref: "#/components/responses/ServerError"
-
   /api/bands/{name}/confirm-follow:
     get:
       tags:
         - Public
-      summary: Confirm a pending band follow
+      summary: Retired email-update link (GET)
       description: |
-        Renders a confirmation form for the one-time `token`. GET never writes;
-        submit the form with POST to verify the follow. Messaging is generic so
-        the response never reveals whether a given token was valid.
+        settimes.ca no longer sends email updates. Old emailed links land here
+        and get a static page; the token is ignored and no data is read or written.
       parameters:
         - name: name
           in: path
           required: true
-          description: Numeric band ID or normalized band name
-          schema:
-            type: string
-        - name: token
-          in: query
-          required: true
-          description: One-time verification token from the confirmation email
+          description: Numeric band ID or normalized band name (ignored)
           schema:
             type: string
       responses:
-        "200":
-          description: HTML confirmation page with one button that POSTs the token back. Writes nothing and does not look the token up.
+        "410":
+          description: HTML notice that email updates have ended
           content:
             text/html:
-              schema:
-                type: string
-        "400":
-          description: Missing token, or token longer than 256 characters
-          content:
-            text/plain:
               schema:
                 type: string
     post:
       tags:
         - Public
-      summary: Confirm a pending band follow
-      description: Confirms the token submitted by the confirmation form.
-      requestBody:
-        required: true
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: "#/components/schemas/EmailActionTokenRequest"
+      summary: Retired email-update link (POST)
+      description: |
+        settimes.ca no longer sends email updates. Old emailed links land here
+        and get a static page; the token is ignored and no data is read or written.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Numeric band ID or normalized band name (ignored)
+          schema:
+            type: string
       responses:
-        "200":
-          description: HTML confirmation result
+        "410":
+          description: HTML notice that email updates have ended
           content:
             text/html:
               schema:
                 type: string
-        "400":
-          description: Missing or malformed token
-        "500":
-          $ref: "#/components/responses/ServerError"
 
   /api/bands/{name}/unfollow:
     get:
       tags:
         - Public
-      summary: Unsubscribe from a band's emails
+      summary: Retired email-update link (GET)
       description: |
-        Renders an unsubscribe form for the `token` from an email footer. GET
-        never writes; submit the form with POST to delete the follow. The POST
-        returns `200` whether or not the token existed (no enumeration).
+        settimes.ca no longer sends email updates. Old emailed links land here
+        and get a static page; the token is ignored and no data is read or written.
       parameters:
         - name: name
           in: path
           required: true
-          description: Numeric band ID or normalized band name
-          schema:
-            type: string
-        - name: token
-          in: query
-          required: true
-          description: Unsubscribe token
+          description: Numeric band ID or normalized band name (ignored)
           schema:
             type: string
       responses:
-        "200":
-          description: HTML unfollow page with one button that POSTs the token back. Writes nothing and does not look the token up.
+        "410":
+          description: HTML notice that email updates have ended
           content:
             text/html:
-              schema:
-                type: string
-        "400":
-          description: Missing token, or token longer than 256 characters
-          content:
-            text/plain:
               schema:
                 type: string
     post:
       tags:
         - Public
-      summary: Unfollow a band
-      requestBody:
-        required: true
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: "#/components/schemas/EmailActionTokenRequest"
-      responses:
-        "200":
-          description: HTML unsubscribe result
-          content:
-            text/html:
-              schema:
-                type: string
-        "400":
-          description: Missing or malformed token
-        "500":
-          $ref: "#/components/responses/ServerError"
-
-  /api/bands/follow-batch:
-    post:
-      tags:
-        - Public
-      summary: Batch follow bands (double opt-in)
+      summary: Retired email-update link (POST)
       description: |
-        Registers an email to be notified when any of the given bands joins a
-        lineup. `performance_ids` is resolved to distinct `band_profile_ids`;
-        one `band_follows` row per band is inserted (`verified=0`,
-        `INSERT OR IGNORE`). All rows share a single `batch_token` so that
-        **exactly one** combined confirmation email is sent — one Turnstile
-        solve → one email, regardless of how many bands are in the batch
-        (amplification mitigation). A confirmed address receives announcement
-        emails only after clicking the confirm link (`verify=1`). Always
-        returns `200` for valid input (no enumeration of existing follows).
-        `confirmUrl` is returned only when email delivery is unconfigured
-        (local/dev).
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/BandFollowBatchRequest"
+        settimes.ca no longer sends email updates. Old emailed links land here
+        and get a static page; the token is ignored and no data is read or written.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Numeric band ID or normalized band name (ignored)
+          schema:
+            type: string
       responses:
-        "200":
-          description: Batch accepted (one confirmation email sent if any follow was new)
+        "410":
+          description: HTML notice that email updates have ended
           content:
-            application/json:
+            text/html:
               schema:
-                $ref: "#/components/schemas/BandFollowResponse"
-        "400":
-          description: Invalid email, failed bot verification, or invalid performance_ids
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "500":
-          $ref: "#/components/responses/ServerError"
+                type: string
 
   /api/bands/confirm-follow-batch:
     get:
       tags:
         - Public
-      summary: Confirm a pending batch band follow
+      summary: Retired email-update link (GET)
       description: |
-        Renders a confirmation form for the shared `batch_token`. GET never
-        writes; POST verifies all pending (`verified=0`) rows sharing the token,
-        setting `verified=1` and clearing it in one statement. Messaging is
-        generic to avoid revealing whether the token was valid.
-      parameters:
-        - name: token
-          in: query
-          required: true
-          description: Shared batch_token from the confirmation email link
-          schema:
-            type: string
-            maxLength: 256
+        settimes.ca no longer sends email updates. Old emailed links land here
+        and get a static page; the token is ignored and no data is read or written.
       responses:
-        "200":
-          description: HTML confirmation page with one button that POSTs the token back. Writes nothing and does not look the token up.
+        "410":
+          description: HTML notice that email updates have ended
           content:
             text/html:
-              schema:
-                type: string
-        "400":
-          description: Missing token, or token longer than 256 characters
-          content:
-            text/plain:
               schema:
                 type: string
     post:
       tags:
         - Public
-      summary: Confirm a pending batch band follow
-      requestBody:
-        required: true
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: "#/components/schemas/EmailActionTokenRequest"
+      summary: Retired email-update link (POST)
+      description: |
+        settimes.ca no longer sends email updates. Old emailed links land here
+        and get a static page; the token is ignored and no data is read or written.
       responses:
-        "200":
-          description: HTML confirmation result
+        "410":
+          description: HTML notice that email updates have ended
           content:
             text/html:
               schema:
                 type: string
-        "400":
-          description: Missing or oversized token
-        "500":
-          $ref: "#/components/responses/ServerError"
 
   /api/feeds/ical:
     get:
@@ -1167,146 +1027,65 @@ paths:
         "500":
           $ref: "#/components/responses/ServerError"
 
-  /api/subscriptions/subscribe:
-    post:
-      tags:
-        - Public - Subscriptions
-      summary: Create a subscription and send verification
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/SubscriptionRequest"
-      responses:
-        "201":
-          description: Subscription created
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SubscriptionMessageResponse"
-        "200":
-          description: Existing unverified subscription reused and verification resent
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SubscriptionMessageResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "403":
-          description: Bot verification failed
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "500":
-          $ref: "#/components/responses/ServerError"
-
   /api/subscriptions/verify:
     get:
       tags:
-        - Public - Subscriptions
-      summary: Verify a subscription token
-      description: GET renders a confirmation form; POST verifies the subscription.
-      parameters:
-        - name: token
-          in: query
-          required: true
-          schema:
-            type: string
+        - Public
+      summary: Retired email-update link (GET)
+      description: |
+        settimes.ca no longer sends email updates. Old emailed links land here
+        and get a static page; the token is ignored and no data is read or written.
       responses:
-        "200":
-          description: HTML verification page with one button that POSTs the token back. Writes nothing and does not look the token up.
+        "410":
+          description: HTML notice that email updates have ended
           content:
             text/html:
               schema:
                 type: string
-        "400":
-          description: Missing token, or token longer than 256 characters
-          content:
-            text/plain:
-              schema:
-                type: string
     post:
       tags:
-        - Public - Subscriptions
-      summary: Verify a subscription token
-      requestBody:
-        required: true
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: "#/components/schemas/EmailActionTokenRequest"
+        - Public
+      summary: Retired email-update link (POST)
+      description: |
+        settimes.ca no longer sends email updates. Old emailed links land here
+        and get a static page; the token is ignored and no data is read or written.
       responses:
-        "200":
-          description: Subscription was already verified; nothing changed
-          content:
-            text/plain:
-              schema:
-                type: string
-        "303":
-          description: Verification succeeded and the client is redirected to the subscribe page
-        "400":
-          description: Missing or malformed token
         "410":
-          description: The link expired before the verification was recorded; subscribe again
+          description: HTML notice that email updates have ended
           content:
-            text/plain:
+            text/html:
               schema:
                 type: string
-        "404":
-          description: Token not found
-        "500":
-          description: Verification failed
 
   /api/subscriptions/unsubscribe:
     get:
       tags:
-        - Public - Subscriptions
-      summary: Unsubscribe from email updates
-      description: GET renders a confirmation form; POST performs the unsubscribe.
-      parameters:
-        - name: token
-          in: query
-          required: true
-          schema:
-            type: string
+        - Public
+      summary: Retired email-update link (GET)
+      description: |
+        settimes.ca no longer sends email updates. Old emailed links land here
+        and get a static page; the token is ignored and no data is read or written.
       responses:
-        "200":
-          description: HTML unsubscribe page with one button that POSTs the token back. Writes nothing and does not look the token up.
+        "410":
+          description: HTML notice that email updates have ended
           content:
             text/html:
-              schema:
-                type: string
-        "400":
-          description: Missing token, or token longer than 256 characters
-          content:
-            text/plain:
               schema:
                 type: string
     post:
       tags:
-        - Public - Subscriptions
-      summary: Unsubscribe from email updates
-      requestBody:
-        required: true
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: "#/components/schemas/EmailActionTokenRequest"
+        - Public
+      summary: Retired email-update link (POST)
+      description: |
+        settimes.ca no longer sends email updates. Old emailed links land here
+        and get a static page; the token is ignored and no data is read or written.
       responses:
-        "200":
-          description: HTML unsubscribe result
+        "410":
+          description: HTML notice that email updates have ended
           content:
             text/html:
               schema:
                 type: string
-        "400":
-          description: Missing token
-        "404":
-          description: Unknown token
-        "500":
-          description: Unsubscribe failed
 
   /api/auth/activate:
     post:
@@ -2894,93 +2673,6 @@ paths:
         "500":
           $ref: "#/components/responses/ServerError"
 
-  /api/admin/events/{id}/notify-subscribers:
-    post:
-      tags:
-        - Admin - Events
-      summary: Mail the general subscriber list about this event
-      description: >
-        Sends a one-off notice to every VERIFIED subscriber who has not already
-        received this `kind` for this event. Idempotent: a repeat call mails
-        nobody twice, and after a partial failure it retries only the addresses
-        that did not receive it. Broadcasts to all verified subscribers -- the
-        `city`, `genre` and `frequency` columns on email_subscriptions are not
-        consulted. Capped per invocation; POST again while `remaining` is above
-        zero. The event must be published.
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-          description: Event id
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [kind]
-              properties:
-                kind:
-                  type: string
-                  enum: [lineup_announced, schedule_announced]
-                  description: Which notice to send. Part of the delivery-tracking key.
-      security:
-        - AdminSessionCookie: []
-          CsrfToken: []
-      responses:
-        "200":
-          description: Send result
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SubscriberNotifyResult"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "500":
-          $ref: "#/components/responses/ServerError"
-
-  /api/admin/bands/{id}/resend-announcement:
-    post:
-      tags:
-        - Admin - Bands
-      summary: Resend a lineup announcement to un-notified followers
-      description: >
-        Re-sends the "band joined the lineup" email to verified followers who
-        were not yet notified for this performance (recovers partial send
-        failures from the initial announce). Never double-sends. `id` is a
-        performance id.
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-          description: Performance id
-      security:
-        - AdminSessionCookie: []
-          CsrfToken: []
-      responses:
-        "200":
-          description: "Resend result: { success, sent, failed }"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/GenericRecord"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "500":
-          $ref: "#/components/responses/ServerError"
-
   /api/admin/bands/bulk-preview:
     post:
       tags:
@@ -3634,53 +3326,6 @@ paths:
         "500":
           $ref: "#/components/responses/ServerError"
 
-  /api/admin/analytics/subscriptions:
-    get:
-      tags:
-        - Admin - Analytics
-      summary: Get aggregate subscription analytics
-      security:
-        - AdminSessionCookie: []
-      responses:
-        "200":
-          description: Subscription analytics response
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SubscriptionAnalyticsResponse"
-        "500":
-          $ref: "#/components/responses/ServerError"
-
-  /api/admin/flush-announce-digest:
-    post:
-      tags:
-        - Admin - Maintenance
-      summary: Flush the pending band-announcement digest queue
-      description: |
-        Groups pending `band_announce_queue` entries by `(email, event)` and
-        sends one digest email per fan per event, recording each successful send
-        in the per-follower idempotency ledger so resend never double-sends.
-        Call after a batch of announce toggles. Requires the `editor` role and a
-        configured email provider (otherwise `400`).
-      security:
-        - AdminSessionCookie: []
-          CsrfToken: []
-      responses:
-        "200":
-          description: Digest flushed
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/FlushAnnounceDigestResponse"
-        "400":
-          description: Email provider not configured
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "500":
-          $ref: "#/components/responses/ServerError"
-
   /api/admin/maintenance/cleanup-sessions:
     post:
       tags:
@@ -3809,38 +3454,6 @@ components:
     GenericRecord:
       type: object
       additionalProperties: true
-
-    SubscriberNotifyResult:
-      type: object
-      required: [success, sent, failed, skipped, remaining]
-      properties:
-        success:
-          type: boolean
-        sent:
-          type: integer
-          description: Subscribers this invocation delivered to.
-        failed:
-          type: integer
-          description: >
-            Provider delivery failures only. Their claims were released, so a
-            follow-up POST retries exactly these.
-        skipped:
-          type: integer
-          description: >
-            Subscribers whose claim was held by a concurrent invocation. NOT a
-            failure -- another run is delivering to them.
-        remaining:
-          type: integer
-          description: >
-            Verified subscribers still awaiting this notice, re-queried AFTER
-            the send. Above zero means POST again -- either the list exceeded
-            one invocation's cap, or some sends failed.
-      example:
-        success: true
-        sent: 200
-        failed: 0
-        skipped: 0
-        remaining: 5
 
     Error:
       type: object
@@ -4469,40 +4082,6 @@ components:
         user_session:
           type: string
 
-    SubscriptionRequest:
-      type: object
-      required:
-        - email
-        - city
-        - genre
-        - frequency
-      properties:
-        email:
-          type: string
-          format: email
-        city:
-          type: string
-        genre:
-          type: string
-        frequency:
-          type: string
-          enum:
-            - daily
-            - weekly
-            - monthly
-        turnstileToken:
-          type: string
-          nullable: true
-
-    SubscriptionMessageResponse:
-      type: object
-      properties:
-        message:
-          type: string
-        error:
-          type: string
-          nullable: true
-
     ActivateRequest:
       type: object
       required:
@@ -4926,19 +4505,6 @@ components:
         message:
           type: string
 
-    BandFollowRequest:
-      type: object
-      required:
-        - email
-      properties:
-        email:
-          type: string
-          format: email
-          maxLength: 320
-        turnstileToken:
-          type: string
-          description: Cloudflare Turnstile token; required in production
-
     EmailActionTokenRequest:
       type: object
       required:
@@ -4947,37 +4513,6 @@ components:
         token:
           type: string
           maxLength: 256
-
-    BandFollowResponse:
-      type: object
-      properties:
-        success:
-          type: boolean
-        confirmUrl:
-          type: string
-          description: Returned only when email delivery is unconfigured (local/dev)
-
-    BandFollowBatchRequest:
-      type: object
-      required:
-        - email
-        - performance_ids
-      properties:
-        email:
-          type: string
-          format: email
-          maxLength: 320
-        performance_ids:
-          type: array
-          description: Performance IDs to follow; resolved to distinct band_profile_ids
-          minItems: 1
-          maxItems: 30
-          items:
-            type: integer
-            minimum: 1
-        turnstileToken:
-          type: string
-          description: Cloudflare Turnstile token; required in production
 
     ScheduleShareRequest:
       type: object
@@ -5666,32 +5201,6 @@ components:
           type: integer
         hasMore:
           type: boolean
-
-    SubscriptionAnalyticsResponse:
-      type: object
-      properties:
-        total_subscribers:
-          type: integer
-        by_city:
-          type: array
-          items:
-            $ref: "#/components/schemas/GenericRecord"
-        by_genre:
-          type: array
-          items:
-            $ref: "#/components/schemas/GenericRecord"
-        by_frequency:
-          type: array
-          items:
-            $ref: "#/components/schemas/GenericRecord"
-        growth_30_days:
-          type: array
-          items:
-            $ref: "#/components/schemas/GenericRecord"
-        total_unsubscribes:
-          type: integer
-        unsubscribe_rate:
-          type: string
 
     CleanupSessionsResponse:
       type: object

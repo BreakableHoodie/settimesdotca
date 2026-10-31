@@ -1,5 +1,5 @@
 // Test helpers for admin events API tests
-import { MockD1Database } from "../../../subscriptions/__tests__/mocks/d1.js";
+import { MockD1Database } from "../../../__tests__/mocks/d1.js";
 
 export class AdminMockD1Database extends MockD1Database {
   constructor() {

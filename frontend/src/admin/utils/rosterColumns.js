@@ -39,7 +39,6 @@ export const FILTERABLE_COLUMNS = [
   { key: 'is_active', label: 'Status', type: 'values', getValues: band => [isInactive(band) ? 'Inactive' : 'Active'] },
   { key: 'link_count', label: 'Links', type: 'links' },
   { key: 'contact_email', label: 'Contact', type: 'values', getValues: band => single(band.contact_email) },
-  { key: 'follower_count', label: 'Followers', type: 'values', getValues: band => [String(band.follower_count ?? 0)] },
 ]
 
 const COLUMN_BY_KEY = new Map(FILTERABLE_COLUMNS.map(column => [column.key, column]))

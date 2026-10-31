@@ -4,16 +4,15 @@ import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import Footer from '../Footer.jsx'
 
-// The in-page subscribe prompts only show before set times are posted or
-// between seasons. Once an edition is live, the footer is the one place a fan
-// can find the announcements signup.
+// settimes.ca no longer emails fans, so the footer must not offer a signup.
 describe('Footer', () => {
-  it.each(['/', '/event/lwbc18', '/artists'])('links to the announcements signup on %s', path => {
+  it.each(['/', '/event/lwbc18', '/artists'])('offers no email signup on %s', path => {
     render(
       <MemoryRouter initialEntries={[path]}>
         <Footer />
       </MemoryRouter>
     )
-    expect(screen.getByRole('link', { name: 'Get show announcements' })).toHaveAttribute('href', '/subscribe')
+    expect(screen.queryByRole('link', { name: /announcements|subscribe/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Every edition' })).toHaveAttribute('href', '/history')
   })
 })

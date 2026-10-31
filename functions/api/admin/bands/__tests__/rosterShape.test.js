@@ -7,13 +7,12 @@ vi.mock("../../_middleware.js", () => ({
 
 import * as bandsHandler from "../../bands.js";
 import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../../test-utils.js";
-import { hashStoredToken } from "../../../../utils/tokens.js";
 
 /**
  * Pins the EXACT roster response so the query behind it can be rewritten and
  * proven behaviour-identical (#907).
  *
- * That branch runs 8 correlated subqueries per row — follower_count, event_ids,
+ * That branch runs 7 correlated subqueries per row — event_ids,
  * and three apiece for next_event_* / last_event_*, where each trio is the same
  * query differing only in the projected column. EXPLAIN QUERY PLAN shows every
  * event subquery building its own TEMP B-TREE FOR ORDER BY, per row. The
@@ -27,7 +26,7 @@ import { hashStoredToken } from "../../../../utils/tokens.js";
  *
  * The fixture deliberately covers every branch the subqueries can take:
  * a band with BOTH past and future events, one with only past, one with only
- * future, one with none at all, and one with followers (verified and not).
+ * future, one with none at all.
  */
 
 async function seedRoster(rawDb) {
@@ -52,16 +51,6 @@ async function seedRoster(rawDb) {
   rawDb
     .prepare("INSERT INTO band_profiles (name, name_normalized, is_active) VALUES (?, ?, 1)")
     .run("No Events", "noevents");
-
-  // Followers: one verified, one not. Only the verified one counts.
-  rawDb
-    .prepare("INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)")
-    .run("yes@x.co", both.band_profile_id, "tok-1");
-  rawDb
-    .prepare(
-      "INSERT INTO band_follows (email, band_profile_id, verified, verification_token, unsubscribe_token) VALUES (?, ?, 0, ?, ?)",
-    )
-    .run("no@x.co", both.band_profile_id, await hashStoredToken("pending"), "tok-2");
 
   return { both, pastOnly, futureOnly };
 }
@@ -161,7 +150,6 @@ describe("admin roster response shape (#907 rewrite guard)", () => {
       "description",
       "event_ids",
       "facebook",
-      "follower_count",
       "for_fans_of",
       "genre",
       "id",
@@ -217,7 +205,7 @@ describe("admin roster response shape (#907 rewrite guard)", () => {
     expect(futureOnly.next_event_name).toBe("Future Fest");
   });
 
-  it("gives a band with no performances nulls and a zero follower count", async () => {
+  it("gives a band with no performances nulls", async () => {
     const { env, rawDb } = createTestEnv({ role: "editor" });
     await seedRoster(rawDb);
     const body = await fetchRoster(env);
@@ -226,17 +214,6 @@ describe("admin roster response shape (#907 rewrite guard)", () => {
     expect(none.next_event_id).toBeNull();
     expect(none.last_event_id).toBeNull();
     expect(none.event_ids).toBeNull();
-    // Zero, not null — a COUNT over no rows is 0, and the UI renders it.
-    expect(none.follower_count).toBe(0);
-  });
-
-  it("counts only VERIFIED followers", async () => {
-    // The double opt-in gate. An unverified follower must not appear in a count
-    // an operator reads as "people who will be emailed".
-    const { env, rawDb } = createTestEnv({ role: "editor" });
-    await seedRoster(rawDb);
-    const body = await fetchRoster(env);
-    expect(body.bands.find((b) => b.name === "Both Sides").follower_count).toBe(1);
   });
 
   it("lists every event the band played in event_ids", async () => {

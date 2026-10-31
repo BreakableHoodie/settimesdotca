@@ -2,7 +2,7 @@
 //
 // Two strategies are used depending on endpoint sensitivity:
 //
-// 1. D1-backed (globally consistent) — used for FAIL_CLOSED_PATTERNS (auth, subscriptions,
+// 1. D1-backed (globally consistent) — used for FAIL_CLOSED_PATTERNS (auth,
 //    metrics). D1 is a globally-replicated SQLite database, so counters are shared across
 //    all Cloudflare PoPs. This prevents distributed brute-force attacks from bypassing
 //    limits by spreading requests across geographic regions. /api/metrics is included here
@@ -17,16 +17,6 @@ import { logger } from "./logger.js";
 import { routePath } from "./routePath.js";
 
 const RATE_LIMIT_PREFIX = "rate-limit:";
-
-// Band action endpoints that send email and must be fail-closed with a tight limit.
-// Scoped to the /follow|unfollow|confirm-follow suffix so that public GET reads
-// (e.g. /api/bands/<name>) are not affected.
-const BAND_ACTION_RE = /^\/api\/bands\/[^/]+\/(follow|unfollow|confirm-follow)$/;
-
-// Batch follow endpoints — flat paths under /api/bands/ (not nested under {name}).
-// Same fail-closed treatment as BAND_ACTION_RE: they send email, so D1-backed
-// globally-consistent rate limiting applies.
-const BATCH_FOLLOW_RE = /^\/api\/bands\/(follow-batch|confirm-follow-batch)$/;
 
 // Rate limit configurations by endpoint pattern.
 // Order matters: more-specific prefixes must appear before less-specific ones.
@@ -45,7 +35,6 @@ const RATE_LIMITS = {
   "/api/schedule/share": { requests: 10, window: 60 }, // POST /api/schedule/share
   "/api/schedule": { requests: 30, window: 60 },
   "/api/feeds": { requests: 20, window: 60 },
-  "/api/subscriptions": { requests: 10, window: 60 },
   "/api/metrics": { requests: 40, window: 60 },
   "/api/auth/activate": { requests: 10, window: 60 },
   "/api/auth/resend": { requests: 3, window: 300 },
@@ -63,15 +52,11 @@ const SKIP_PATTERNS = [
 // These use D1 for globally-consistent counters. /api/metrics is here for
 // write-amplification control (up to 50 D1 upserts per request), not credential
 // protection — see file header and #482.
-const FAIL_CLOSED_PATTERNS = ["/api/admin/auth/", "/api/auth/", "/api/subscriptions", "/api/metrics"];
+const FAIL_CLOSED_PATTERNS = ["/api/admin/auth/", "/api/auth/", "/api/metrics"];
 
 function shouldFailClosed(path) {
   path = routePath(new URL(path, "https://route-path.invalid"));
-  return (
-    BAND_ACTION_RE.test(path) ||
-    BATCH_FOLLOW_RE.test(path) ||
-    FAIL_CLOSED_PATTERNS.some((pattern) => path.startsWith(pattern))
-  );
+  return FAIL_CLOSED_PATTERNS.some((pattern) => path.startsWith(pattern));
 }
 
 /**
@@ -91,14 +76,6 @@ function getRateLimitConfig(path) {
     return null;
   }
 
-  // Band action endpoints (follow/unfollow/confirm-follow) — checked before the
-  // prefix loop so that the tight fail-closed limit takes precedence over 'default'.
-  if (BAND_ACTION_RE.test(path)) return { requests: 5, window: 300 };
-
-  // Batch follow endpoints — tighter than single-band follow (3/5min) because a
-  // single request can cover up to 30 bands and triggers an email send.
-  if (BATCH_FOLLOW_RE.test(path)) return { requests: 3, window: 300 };
-
   // Find matching config
   for (const [pattern, config] of Object.entries(RATE_LIMITS)) {
     if (pattern !== "default" && path.startsWith(pattern)) {
@@ -111,13 +88,12 @@ function getRateLimitConfig(path) {
 
 /**
  * Generate a stable key for rate limiting (IP + endpoint base path).
- * Auth sub-routes and band action endpoints use 5 segments so each action
- * (login, signup, follow, confirm-follow, etc.) gets a distinct D1 key.
+ * Auth sub-routes use 5 segments so each action
+ * (login, signup, etc.) gets a distinct D1 key.
  */
 function getRateLimitKey(ip, path) {
   path = routePath(new URL(path, "https://route-path.invalid"));
-  const depth =
-    path.startsWith("/api/admin/auth/") || path.startsWith("/api/auth/") || BAND_ACTION_RE.test(path) ? 5 : 4;
+  const depth = path.startsWith("/api/admin/auth/") || path.startsWith("/api/auth/") ? 5 : 4;
   const basePath = path.split("/").slice(0, depth).join("/");
   return `${ip}:${basePath}`;
 }
@@ -149,7 +125,7 @@ export async function checkRateLimitByKey(DB, key, config, logContext = {}) {
   try {
     // Single round trip: the upsert and the post-write read are combined via RETURNING,
     // instead of a separate .run() + SELECT .first(). This halves D1 cost on the hot
-    // fail-closed path (auth, subscriptions, band follows, /api/metrics — #492).
+    // fail-closed path (auth, /api/metrics — #492).
     // The CASE expression resets the window when it has expired.
     //
     // Bare `?` placeholders with each value repeated, NOT numbered `?1/?2/?3`.
@@ -222,7 +198,7 @@ function getCacheKey(ip, path) {
 
 /**
  * Check and update rate limit.
- * Uses D1 for fail-closed (auth/subscription) endpoints, Cache API for others.
+ * Uses D1 for fail-closed (fail-closed) endpoints, Cache API for others.
  *
  * @param {Request} request
  * @param {object|null} env - Cloudflare env bindings (provides env.DB for D1)

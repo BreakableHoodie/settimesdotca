@@ -1,7 +1,7 @@
 import { describe, it, test, expect, beforeEach, afterEach, vi } from "vitest";
 import { onRequestGet } from "../ical.js";
 import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../test-utils.js";
-import { MockD1Database } from "../../subscriptions/__tests__/mocks/d1.js";
+import { MockD1Database } from "../../__tests__/mocks/d1.js";
 
 // Reuse helpers from events tests
 import { createMockEvent, createMockVenue, createMockBand, seedMockData } from "../../events/__tests__/helpers.js";

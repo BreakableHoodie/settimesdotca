@@ -140,13 +140,6 @@ for (const theme of THEMES) {
       await assertNoColorContrastViolations(page, `${theme} — event schedule (/event/${slug})`);
     });
 
-    test("subscribe page (/subscribe)", async ({ page }) => {
-      await page.goto("/subscribe");
-      await expect(page.getByRole("heading", { name: "Never miss a show" })).toBeVisible();
-
-      await assertNoColorContrastViolations(page, `${theme} — subscribe (/subscribe)`);
-    });
-
     test("band profile page", async ({ page }) => {
       const href = await resolveBandProfileHref(page);
       test.skip(!href, "Seed data provides no band profile link on the homepage");

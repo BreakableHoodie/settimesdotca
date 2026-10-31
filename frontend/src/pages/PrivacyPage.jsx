@@ -77,18 +77,12 @@ export default function PrivacyPage() {
               they are deleted with their links, all of which expire by the end of November 2026.
             </p>
 
-            <h3 className="text-text-secondary font-medium mb-2 mt-4">
-              If you subscribe to email updates or follow a band
-            </h3>
+            <h3 className="text-text-secondary font-medium mb-2 mt-4">Email updates have ended</h3>
             <p>
-              We store your email address, your city/genre preferences (for subscribers), and a verification timestamp.
-              As a record of your CASL express consent, we also store the IP address from which you subscribed or
-              followed a band, the consent method (<code className="text-accent-400 text-sm">web_form</code>), and which
-              version of the consent wording you agreed to. This consent record is held for as long as your subscription
-              or follow is active and deleted when you unsubscribe. Limited request metadata may be processed
-              transiently for abuse prevention and rate limiting. Your email is only used to send the updates you
-              subscribed to, and the unsubscribe link in every email (one click in mail apps that support it) removes
-              the active subscription immediately.
+              Until October 2026 you could follow a band or subscribe to updates by email. We no longer send those
+              emails, and on 31 October 2026 we deleted every email address, consent record and IP address we stored for
+              them. Database backups that may still contain them expire within 30 days. Old unsubscribe links now just
+              say so.
             </p>
 
             <h3 className="text-text-secondary font-medium mb-2 mt-4">If you are an organiser with admin access</h3>
@@ -127,7 +121,7 @@ export default function PrivacyPage() {
                   </tr>
                   <tr>
                     <td className="py-2 pr-4">
-                      Per-address email limit (a one-way code of an address we sent a confirmation email to)
+                      Per-address email limit (a one-way code of an address we sent an account activation email to)
                     </td>
                     <td className="py-2">Up to about 2 days</td>
                   </tr>
@@ -162,16 +156,6 @@ export default function PrivacyPage() {
                   <tr>
                     <td className="py-2 pr-4">Admin action log</td>
                     <td className="py-2">1 year</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2 pr-4">Email subscribers / band followers (incl. consent IP)</td>
-                    <td className="py-2">Until unsubscribe / unfollow</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2 pr-4">
-                      Unconfirmed follow or subscription requests (email address, IP address)
-                    </td>
-                    <td className="py-2">7 days, then deleted</td>
                   </tr>
                 </tbody>
               </table>
@@ -210,9 +194,8 @@ export default function PrivacyPage() {
             <p>
               Admin accounts use a secure, HTTP-only session cookie. Public pages use a{' '}
               <code className="text-accent-400 text-sm">csrf_token</code> cookie for cross-site request forgery
-              protection when you interact with forms. Cloudflare (our hosting provider) and Turnstile (our bot
-              protection service) may also set security and anti-abuse cookies as part of their infrastructure and
-              challenge flow. The privacy banner acknowledgement is stored in{' '}
+              protection when you interact with forms. Cloudflare (our hosting provider) may also set security and
+              anti-abuse cookies as part of its infrastructure. The privacy banner acknowledgement is stored in{' '}
               <code className="text-accent-400 text-sm">localStorage</code>, not a cookie.
             </p>
           </section>
@@ -222,16 +205,16 @@ export default function PrivacyPage() {
             <p>
               SetTimes runs on <strong className="text-text-secondary">Cloudflare Pages</strong> (hosting and edge
               functions) and <strong className="text-text-secondary">Cloudflare D1</strong> (database). Data is
-              processed on Cloudflare infrastructure, which may include data centres outside Canada. Email notifications
-              (if enabled) are sent via a third-party transactional email provider.
+              processed on Cloudflare infrastructure, which may include data centres outside Canada. Account emails
+              (password resets, invitations, security notices) are sent via a third-party transactional email provider.
             </p>
           </section>
 
           <section>
-            <h2 className="text-text-primary text-lg font-semibold mb-3">CASL and commercial email</h2>
+            <h2 className="text-text-primary text-lg font-semibold mb-3">Email</h2>
             <p>
-              All email communications require your express consent (double opt-in). Every email includes an unsubscribe
-              link (one click in mail apps that support it) and identifies the sender as{' '}
+              We do not send marketing or update emails. The only emails we send are to organiser accounts (password
+              resets, invitations and security notices), and they identify the sender as{' '}
               <strong className="text-text-secondary">SetTimes</strong>. You can reach us at{' '}
               <a
                 href="mailto:hello@settimes.ca"
@@ -245,12 +228,8 @@ export default function PrivacyPage() {
 
           <section>
             <h2 className="text-text-primary text-lg font-semibold mb-3">Your rights</h2>
-            <p className="mb-3">
-              If you are an email subscriber or band follower, the unsubscribe link in every email deletes your
-              subscription immediately.
-            </p>
             <p>
-              For all other requests — access, correction, erasure, or questions — email{' '}
+              For any request — access, correction, erasure, or questions — email{' '}
               <a
                 href="mailto:hello@settimes.ca"
                 className="text-accent-400 underline underline-offset-2 hover:text-accent-500 transition-colors"

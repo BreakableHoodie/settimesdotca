@@ -1,6 +1,5 @@
 // Read or seed the D1 that the app under test uses, for flows whose token is
-// only ever emailed: password reset, follow confirmation, subscription
-// verification (#1292). Previews and local E2E have no email provider, so the
+// only ever emailed (password reset, activation) (#1292). Previews and local E2E have no email provider, so the
 // token is in the database and nowhere else.
 //
 // Two targets, never production:

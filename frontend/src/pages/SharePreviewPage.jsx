@@ -2,7 +2,6 @@ import { ArrowLeft, TriangleAlert } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import LockInLineupPanel from '../components/LockInLineupPanel'
 import { Alert, BandCardSkeleton } from '../components/ui'
 import { fetchPublicJson } from '../utils/publicApi'
 import { trackVisitOnce } from '../utils/metrics'
@@ -202,7 +201,7 @@ export default function SharePreviewPage() {
   // (every shared performance was hard-deleted -- `[]` is itself the correct
   // answer, not a signal to fall back). This single `hasLiveBands`/
   // `routeBands` pair now drives the heading, the row list, the Add button,
-  // and LockInLineupPanel -- previously each read a DIFFERENT falsy-zero
+  // -- previously each read a DIFFERENT falsy-zero
   // check (`shareData.bands?.length ?? ...` vs `shareData.bands?.length ? ...
   // : ...`) and disagreed with each other on an empty `bands: []`: the
   // heading correctly showed "0-stop route" (0 is not nullish) while the row
@@ -270,18 +269,6 @@ export default function SharePreviewPage() {
         >
           Add {stopCount} stop{stopCount !== 1 ? 's' : ''} to my route for {shareData.event_name}
         </button>
-
-        {/* routeBands is the SAME resolved list driving the heading and the
-            rows above -- shareData.performance_ids is the untouched snapshot
-            kept only for the ?import=1 apply path (App.jsx) and still
-            contains ids that no longer resolve. Deriving from routeBands
-            here keeps the follow request in sync with what stopCount and the
-            rows above actually show, including the empty-live-route case
-            (routeBands = [], not the stale snapshot). */}
-        <LockInLineupPanel
-          performanceIds={hasLiveBands ? routeBands.map(b => b.performance_id) : shareData.performance_ids}
-          bandCount={stopCount}
-        />
       </div>
     </div>
   )

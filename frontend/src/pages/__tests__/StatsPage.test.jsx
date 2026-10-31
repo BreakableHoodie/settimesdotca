@@ -35,7 +35,6 @@ describe('StatsPage', () => {
       routes_shared: 14,
       route_views: 40,
       route_views_legacy: 0,
-      fans_following: 8,
       page_views: 500,
       top_bands: [
         { name: 'The Creepshow', slug: 'the-creepshow', score: 47 },
@@ -69,7 +68,6 @@ describe('StatsPage', () => {
       routes_shared: 0,
       route_views: 0,
       route_views_legacy: 0,
-      fans_following: 0,
       page_views: 0,
       top_bands: [],
     })
@@ -77,9 +75,10 @@ describe('StatsPage', () => {
     renderPage()
 
     expect(await screen.findByText('Bands')).toBeInTheDocument()
-    const fansCard = screen.getByText('Fans following bands').previousSibling
-    expect(fansCard).toHaveTextContent('0')
-    expect(fansCard).not.toHaveClass('text-accent-400')
+    const routesCard = screen.getByText('Routes shared').previousSibling
+    expect(routesCard).toHaveTextContent('0')
+    expect(routesCard).not.toHaveClass('text-accent-400')
+    expect(screen.queryByText('Fans following bands')).not.toBeInTheDocument()
 
     // No top bands at all -> section is omitted entirely.
     expect(screen.queryByText('Top bands')).not.toBeInTheDocument()
@@ -94,7 +93,6 @@ describe('StatsPage', () => {
       routes_shared: 14,
       route_views: 2,
       route_views_legacy: 9,
-      fans_following: 8,
       page_views: 500,
       top_bands: [],
     })
@@ -115,7 +113,6 @@ describe('StatsPage', () => {
       routes_shared: 14,
       route_views: 40,
       route_views_legacy: null,
-      fans_following: 8,
       page_views: 500,
       top_bands: [],
     })

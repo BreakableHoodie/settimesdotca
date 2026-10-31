@@ -19,13 +19,12 @@ What that does for fans:
 - the set stays visible, struck through, with a "Cancelled" label — on the schedule, the artist page, the venue page and the event page
 - it stops being offered as "up next", never shows "Live Now" or "starts in N minutes", and cannot be added to a route
 - calendar subscribers get `STATUS:CANCELLED`, which Google and Apple render natively
-- **no announcement email can go out** for it, even if someone announces it afterwards
 
 Why not the alternatives:
 
 | Action | What actually happens |
 |---|---|
-| Set `is_announced = 0` | **No public change at all** on a published lineup. See "Silent no-ops" below. It can still send email if re-announced |
+| Set `is_announced = 0` | **No public change at all** on a published lineup. See "Silent no-ops" below |
 | Delete the performance row | Hides it — but a fan who already saw the lineup gets no signal, and the stop vanishes from their shared route without explanation |
 
 **A band with two sets needs each one cancelled separately.** At BF2, ALL and Kepi Ghoulie each play twice.
@@ -62,10 +61,9 @@ This drives the "Live Tonight" / "Happening Now" edge on an event's **first day 
 
 **Un-announcing a set on a published lineup.** Every public read path that returns per-performance rows guards with `AND (e.reveal_mode = 0 OR p.is_announced = 1)`. When `reveal_mode = 0` — the normal state for a published event, and BF2's state — that condition is already true, so `is_announced` is never consulted **for visibility**. The set stays fully visible. Nothing errors.
 
-Two things follow, and they are easy to conflate:
+What follows:
 
 - **Visibility:** un-announcing hides nothing on a `reveal_mode = 0` event. Only the cancel toggle does that. Hiding act-by-act is what `reveal_mode = 1` is for.
-- **Email:** `is_announced` going `0 → 1` is still what triggers the follower announcement email, on *any* reveal mode. So un-announcing and re-announcing a set here is publicly invisible **and** capable of sending mail. (A *cancelled* set cannot send — that guard is separate and holds regardless.)
 
 **Editing a shared route.** `share_links` stores a snapshot of the band names taken when the link was created. Changing the lineup afterwards does not rewrite existing share links; the page resolves live data for times and venues, and drops sets that no longer exist.
 
@@ -78,30 +76,9 @@ Two things follow, and they are easy to conflate:
 3. **Set times, cancellations and venues cache for about a minute** (`Cache-Control: public, max-age=60` on show-critical endpoints; browse-only pages cache 5 minutes). A correct-looking database and a stale page is usually this: wait a minute rather than re-editing.
 4. **Times are Toronto-local everywhere.** If something classifies as the wrong day, suspect the after-midnight rule (above) before suspecting a timezone bug.
 
-If the daily run is red and names a `flush-announce-digest` step, act on the first red run: the next day's run can be green even if nobody acts. The two labels mean different things:
-
-- `flush-announce-digest`: some fans' announcement emails were **not sent**. In the Lineup tab, use **Resend** for the affected set (`POST /api/admin/bands/:id/resend-announcement`); it mails only followers with no live claim.
-- `flush-announce-digest(unconfirmed)`: the emails **were sent**, but recording the delivery failed. Do not resend blindly. Check the logs for `announce digest delivery confirmation failed` and the provider's dashboard first. A Resend after the 15-minute claim lease would mail those fans again, and only the Resend provider deduplicates it (within 24h).
-
 ## Telling fans about a change
 
 Nothing emails anyone automatically when a set moves or is cancelled.
 
 - **Calendar subscribers** see changes late: the feed is cached for **up to an hour** (`max-age=3600`), and each calendar app then refreshes on its own schedule (often every few hours). Times move and a cancelled set shows as cancelled, but not quickly.
-- **Band followers** are emailed when a set is first *announced*. There is no email for a later change. The Lineup tab's **Resend announcement** only reaches followers the *original* announcement missed (a partial send). It does not re-mail followers whose delivery was recorded, and it never describes a change. The exception is a delivery that went out but was never recorded (see `flush-announce-digest(unconfirmed)` above): after 15 minutes Resend treats it as missed and can mail it again.
-- **Subscribers** get the admin **Notify** broadcast, and each kind of notice ("lineup is live", "set times are up") goes to a subscriber **at most once**. Pressing it again after a change sends nothing to people who already had it.
-
-So for a change on the day, **post it on Instagram** (@settimes.ca, and ask the organizers to share). The site itself shows the change within about a minute; calendars and email will not keep up.
-
-## What to avoid mid-event
-
-- **Do not run migrations or dependency upgrades during an event.** Both deploy automatically on merge.
-- **Do not delete a venue or an event** that has performances attached.
-- **Do not bulk-edit the lineup** while people are using the site; per-set edits are safe and immediate.
-
----
-
-## Related
-
-- `CLAUDE.md` → "Pulling a band from a live lineup" — the same rule with the code paths
-- `docs/ADMIN_HANDBOOK.md` — general admin usage, not show-day specific
+- **No email goes to fans.** The site no longer sends band-follow, announcement or subscriber email, so there is nothing to resend after a change.

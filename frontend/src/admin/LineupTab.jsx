@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Eye, EyeOff, Ban, RotateCcw } from 'lucide-react'
 import { bandsApi, eventsApi, venuesApi } from '../utils/adminApi'
-import AnnouncementPlanningPanel from './components/AnnouncementPlanningPanel'
 import BandForm from './components/BandForm'
 import BulkActionBar from './components/BulkActionBar'
 import BulkPreviewModal from './components/BulkPreviewModal'
@@ -58,7 +57,6 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
   const [rosterLoading, setRosterLoading] = useState(false)
   const [loadError, setLoadError] = useState(false)
   const [rosterError, setRosterError] = useState(false)
-  const [announcementPlanning, setAnnouncementPlanning] = useState([]) // #556 engagement signals
 
   // Modes: 'list', 'picker', 'form', 'import', 'schedule'
   const [viewMode, setViewMode] = useState('list')
@@ -101,7 +99,6 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
   })
   const [submitting, setSubmitting] = useState(false)
   const [togglingId, setTogglingId] = useState(null)
-  const [resendingId, setResendingId] = useState(null)
   const [cancelingId, setCancelingId] = useState(null)
   const [serverConflicts, setServerConflicts] = useState({ overlaps: [], conflicts: [] })
 
@@ -194,27 +191,9 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
     [isMultiDay, selectedEvent]
   )
 
-  // Announcement planning (#556): per-performance follower-engagement signals
-  // from the event metrics endpoint (COUNT-based aggregates only — the API
-  // never returns follower PII). Failure is quiet: the panel simply doesn't
-  // render; it must never block the lineup.
-  const loadPlanning = useCallback(async () => {
-    if (!selectedEventId) return
-    try {
-      const res = await eventsApi.getMetrics(selectedEventId)
-      setAnnouncementPlanning(res.metrics?.announcementPlanning || [])
-    } catch {
-      setAnnouncementPlanning([])
-    }
-  }, [selectedEventId])
-
   useEffect(() => {
     if (selectedEventId) loadData()
   }, [selectedEventId, loadData])
-
-  useEffect(() => {
-    loadPlanning()
-  }, [loadPlanning])
 
   // Reset form when event changes
   useEffect(() => {
@@ -375,7 +354,6 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
     try {
       await bandsApi.patch(performanceId, { is_announced: currentValue !== 1 })
       await loadData()
-      loadPlanning() // keep the announcement-planning panel in sync (#556)
     } catch (err) {
       showToast(err.message || 'Failed to update announced status', 'error')
     } finally {
@@ -395,24 +373,6 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
       showToast(err.message || 'Failed to update cancelled status', 'error')
     } finally {
       setCancelingId(null)
-    }
-  }
-
-  const handleResendAnnouncement = async (performanceId, bandName) => {
-    setResendingId(performanceId)
-    try {
-      const res = await bandsApi.resendAnnouncement(performanceId)
-      const sent = res.sent ?? 0
-      showToast(
-        sent > 0
-          ? `Resent ${bandName} announcement to ${sent} follower${sent === 1 ? '' : 's'}.`
-          : `All ${bandName} followers were already notified.`,
-        'success'
-      )
-    } catch (err) {
-      showToast(err.message || 'Failed to resend announcement', 'error')
-    } finally {
-      setResendingId(null)
     }
   }
 
@@ -779,15 +739,6 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
               onShifted={loadData}
             />
           )}
-          {/* Announcement planning (#556): engaged sets not yet announced.
-              The panel renders nothing when there's no follower signal. */}
-          <AnnouncementPlanningPanel
-            planning={announcementPlanning}
-            onAnnounce={toggleAnnounced}
-            togglingId={togglingId}
-            readOnly={readOnly}
-          />
-
           {/* Bulk Actions */}
           {!readOnly && selectedIds.size > 0 && (
             <BulkActionBar
@@ -1042,16 +993,6 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                                     aria-label={band.is_announced ? `Unannounce ${band.name}` : `Announce ${band.name}`}
                                   >
                                     {band.is_announced ? <Eye size={14} /> : <EyeOff size={14} />}
-                                  </button>
-                                )}
-                                {selectedEvent?.reveal_mode === 1 && band.is_announced === 1 && (
-                                  <button
-                                    onClick={() => handleResendAnnouncement(band.id, band.name)}
-                                    disabled={resendingId === band.id}
-                                    title="Resend the lineup announcement to followers not yet notified"
-                                    className={`px-3 py-2 min-h-[44px] bg-bg-purple hover:bg-bg-purple/80 text-white/80 rounded text-sm border border-accent-500/30 ${resendingId === band.id ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                  >
-                                    {resendingId === band.id ? 'Resending…' : 'Resend'}
                                   </button>
                                 )}
                                 <button

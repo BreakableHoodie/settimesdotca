@@ -15,7 +15,6 @@ import './index.css'
 // lazy so it stays out of the homepage's critical bundle (was ~79 KiB of
 // unused JS on `/`, delaying FCP/LCP — see #532).
 const EmbedPage = lazy(() => import('./pages/EmbedPage.jsx'))
-const SubscribePage = lazy(() => import('./pages/SubscribePage.jsx'))
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage.jsx'))
 const ActivatePage = lazy(() => import('./pages/ActivatePage.jsx'))
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage.jsx'))
@@ -94,7 +93,6 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                 <Route path="/" element={<EventsPage />} />
                 <Route path="/event/:slug" element={<App />} />
                 <Route path="/embed/:slug" element={<EmbedPage />} />
-                <Route path="/subscribe" element={<SubscribePage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/activate" element={<ActivatePage />} />
                 <Route path="/privacy" element={<PrivacyPage />} />

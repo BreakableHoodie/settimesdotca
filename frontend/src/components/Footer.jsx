@@ -15,12 +15,6 @@ function Footer() {
                 All events
               </Link>
             )}
-            {/* Always visible: the in-page subscribe prompts only show before
-                set times are posted or between seasons, so once an edition is
-                live this footer link is the one way to find /subscribe. */}
-            <Link to="/subscribe" className="text-accent-400 hover:text-accent-500 transition-colors font-medium">
-              Get show announcements
-            </Link>
             <Link to="/history" className="text-text-tertiary hover:text-accent-400 transition-colors">
               Every edition
             </Link>

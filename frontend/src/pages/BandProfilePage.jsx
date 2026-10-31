@@ -36,7 +36,6 @@ import { fetchPublicJson } from '../utils/publicApi'
 import { getSelectedBands, saveSelectedBands, hasAnySchedule, getScheduleEventSlug } from '../utils/scheduleStorage'
 import { formatPerformanceDayLabel, formatTimeRange } from '../utils/timeFormat'
 import { safeExternalHref, safeInstagramHref } from '../utils/urlSafety'
-import { TURNSTILE_ERROR_MESSAGE, TURNSTILE_VERIFYING_MESSAGE, useTurnstile } from '../hooks/useTurnstile'
 
 const ZERO_WIDTH_ENTITY_REGEX = /&shy;|&#173;|&#xad;|&ZeroWidthSpace;|&#8203;|&#x200B;/gi
 
@@ -108,36 +107,6 @@ export default function BandProfilePage() {
   const [error, setError] = useState(null)
   const [scheduleSelections, setScheduleSelections] = useState({}) // { eventSlug: Set of bandIds }
   const [stageMates, setStageMates] = useState([])
-  const [followEmail, setFollowEmail] = useState('')
-  const [followStatus, setFollowStatus] = useState('idle') // 'idle' | 'verifying' | 'loading' | 'success' | 'error'
-  const [followError, setFollowError] = useState('')
-  // Turnstile stays dormant until the visitor engages with the follow email
-  // field. Engagement requires the form to be mounted, so this also replaces
-  // the old loading/error/profile effect gating (the null-container-on-skeleton
-  // race can no longer happen).
-  const [followEngaged, setFollowEngaged] = useState(false)
-  const {
-    enabled: turnstileEnabled,
-    token: turnstileToken,
-    status: turnstileStatus,
-    containerRef: turnstileContainerRef,
-    reset: resetTurnstile,
-    submitWhenReady,
-  } = useTurnstile(followEngaged)
-
-  // A follow queued while Turnstile was still checking is dropped if the check
-  // then fails; without this the form would say "Checking…" forever (#1224).
-  useEffect(() => {
-    if (followStatus === 'verifying' && turnstileStatus === 'error') {
-      setFollowStatus('error')
-      setFollowError(TURNSTILE_ERROR_MESSAGE)
-    } else if (followStatus === 'verifying' && turnstileStatus === 'idle') {
-      // Deactivated mid-check (the lineup emptied, or the band changed): the
-      // queued follow is gone, so stop saying "Checking…".
-      setFollowStatus('idle')
-      setFollowError('')
-    }
-  }, [followStatus, turnstileStatus])
   const [userHasSchedule] = useState(() => hasAnySchedule())
   const scheduleEventSlug = useMemo(() => getScheduleEventSlug(), [])
   const sourceEventSlug = searchParams.get('fromEvent') || location.state?.fromEventSlug || null
@@ -332,52 +301,6 @@ export default function BandProfilePage() {
       document.title = pageTitle
     }
   }, [pageTitle, loading])
-
-  // Band-to-band navigation reuses this component instance: the follow form
-  // (and the Turnstile container inside it) unmounts for the loading skeleton
-  // and remounts for the new band. The widget dies with its container, so
-  // engagement must reset — the next focus re-activates a fresh widget
-  // (useTurnstile only renders on an inactive→active transition).
-  useEffect(() => {
-    setFollowEngaged(false)
-  }, [profile?.id])
-
-  const submitFollowRequest = async token => {
-    setFollowStatus('loading')
-    setFollowError('')
-    try {
-      const res = await fetch(`/api/bands/${profile.id}/follow`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: followEmail.trim(), turnstileToken: token }),
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error || 'Something went wrong')
-      }
-      setFollowStatus('success')
-      resetTurnstile()
-    } catch (err) {
-      setFollowStatus('error')
-      setFollowError(err.message)
-      resetTurnstile()
-    }
-  }
-
-  const submitFollow = e => {
-    e.preventDefault()
-    if (!followEmail.trim()) return
-    if (turnstileEnabled && !turnstileToken) {
-      const queued = submitWhenReady(submitFollowRequest)
-      if (!queued) {
-        const failed = turnstileStatus === 'error'
-        setFollowStatus(failed ? 'error' : 'verifying')
-        setFollowError(failed ? TURNSTILE_ERROR_MESSAGE : TURNSTILE_VERIFYING_MESSAGE)
-      }
-      return
-    }
-    submitWhenReady(submitFollowRequest)
-  }
 
   if (loading) {
     return <BandProfileSkeleton />
@@ -689,57 +612,6 @@ export default function BandProfilePage() {
               !profile.description && <p className="mt-5 text-sm italic text-text-tertiary">No links added yet.</p>
             )}
           </div>
-        </div>
-
-        {/* Follow band */}
-        <div className="mb-6 rounded-xl border border-text-primary/10 bg-text-primary/5 p-5">
-          <div className="mx-auto flex max-w-2xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="sm:flex-1">
-              <h2 className="mb-1 text-sm font-semibold text-text-primary">Follow {profile.name}</h2>
-              <p className="text-xs text-text-secondary">Get notified when they join a new lineup.</p>
-            </div>
-            {followStatus === 'success' ? (
-              <p className="inline-flex items-start gap-1.5 text-sm text-success-400 sm:max-w-sm">
-                <Check size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
-                Almost there — check your email to confirm your follow of {profile.name}.
-              </p>
-            ) : (
-              <form onSubmit={submitFollow} className="w-full sm:w-auto">
-                <label htmlFor="follow-email" className="sr-only">
-                  Your email address
-                </label>
-                <div className="flex gap-2 sm:w-80">
-                  <input
-                    id="follow-email"
-                    type="email"
-                    value={followEmail}
-                    onFocus={() => setFollowEngaged(true)}
-                    onChange={e => {
-                      setFollowEngaged(true)
-                      setFollowEmail(e.target.value)
-                    }}
-                    placeholder="your@email.com"
-                    required
-                    className="flex-1 min-w-0 px-3 py-2 rounded bg-bg-navy text-text-primary border border-text-primary/20 focus:border-accent-500 focus:outline-none text-sm"
-                  />
-                  <Button type="submit" disabled={followStatus === 'loading'} size="sm">
-                    {followStatus === 'loading' ? 'Saving…' : 'Follow'}
-                  </Button>
-                </div>
-                {turnstileEnabled && followEngaged && <div ref={turnstileContainerRef} className="mt-2" />}
-              </form>
-            )}
-          </div>
-          {followStatus === 'verifying' && (
-            <p className="mt-2 text-xs text-text-tertiary" role="status">
-              {followError}
-            </p>
-          )}
-          {followStatus === 'error' && (
-            <p className="mt-2 text-xs text-error-400" role="alert">
-              {followError}
-            </p>
-          )}
         </div>
 
         {/* Stage-mates — who this artist has shared a bill with, most-shared first.

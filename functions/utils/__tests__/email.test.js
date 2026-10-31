@@ -6,7 +6,7 @@
 // the config/precondition logic (not-configured, missing fields); the
 // provider dispatch and all three `fetch` calls (Postmark, MailChannels,
 // Resend) had never executed under test, because every OTHER test file that
-// touches this module (bandFollowNotify.test.js, announce-*.test.js, etc.)
+// touches this module (the auth and MFA-notice tests, etc.)
 // stubs `sendEmail` wholesale via `vi.mock("../email.js", ...)`.
 //
 // No real network calls: every test stubs `globalThis.fetch` directly and
@@ -14,7 +14,7 @@
 // closest sibling: another best-effort external HTTP call whose failure must
 // never throw to the caller).
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isEmailConfigured, listUnsubscribeHeaders, sendEmail } from "../email.js";
+import { isEmailConfigured, sendEmail } from "../email.js";
 
 const PAYLOAD = {
   to: "fan@example.com",
@@ -22,7 +22,6 @@ const PAYLOAD = {
   html: "<p>Click to confirm</p>",
   text: "Click to confirm",
 };
-const UNSUB_HEADERS = listUnsubscribeHeaders("https://settimes.ca/unsubscribe?token=abc");
 
 function jsonResponse(status, body = {}) {
   return {
@@ -83,13 +82,6 @@ describe("isEmailConfigured", () => {
 });
 
 describe("sendEmail — preconditions", () => {
-  it("builds RFC 8058 headers with an angle-bracketed URL", () => {
-    expect(UNSUB_HEADERS).toEqual({
-      "List-Unsubscribe": "<https://settimes.ca/unsubscribe?token=abc>",
-      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-    });
-  });
-
   it("returns not_configured (and never calls fetch) with no provider", async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
@@ -154,54 +146,6 @@ describe("sendEmail — preconditions", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it.each(["name\nvalue", "name\rvalue"])("rejects CR/LF in header values before any request", async (value) => {
-    const fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
-    const env = { EMAIL_PROVIDER: "mailchannels", EMAIL_FROM: "noreply@settimes.ca" };
-
-    await expect(sendEmail(env, { ...PAYLOAD, headers: { "List-Unsubscribe": value } })).rejects.toThrow(
-      "headers must contain string values without control characters",
-    );
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
-
-  it.each(["Bcc", "Reply-To", "From", "X-Anything"])(
-    "rejects a header outside the List-Unsubscribe pair (%s) before any request",
-    async (name) => {
-      const fetchSpy = vi.fn();
-      vi.stubGlobal("fetch", fetchSpy);
-      const env = { EMAIL_PROVIDER: "mailchannels", EMAIL_FROM: "noreply@settimes.ca" };
-
-      await expect(sendEmail(env, { ...PAYLOAD, headers: { [name]: "attacker@example.com" } })).rejects.toThrow(
-        "header not allowed",
-      );
-      expect(fetchSpy).not.toHaveBeenCalled();
-    },
-  );
-
-  it.each([
-    "https://settimes.ca/u?token=a>,<https://evil.example/",
-    "https://settimes.ca/u?token=a b",
-    "ftp://settimes.ca/unfollow?token=a",
-    "https://settimes.ca/u?token=a\u0000",
-    "",
-  ])("listUnsubscribeHeaders refuses a URL that could split or escape the header: %s", (url) => {
-    expect(() => listUnsubscribeHeaders(url)).toThrow("List-Unsubscribe URL");
-  });
-
-  // RFC 8058: one-click is defined for HTTPS only. Plain HTTP yields no
-  // headers (the email still sends with its body link) rather than an error.
-  it("listUnsubscribeHeaders returns no headers for a plain-HTTP URL", () => {
-    expect(listUnsubscribeHeaders("http://localhost:8788/api/bands/7/unfollow?token=abc")).toBeUndefined();
-  });
-
-  it("listUnsubscribeHeaders wraps a well-formed URL", () => {
-    expect(listUnsubscribeHeaders("https://settimes.ca/api/bands/7/unfollow?token=abc123")).toEqual({
-      "List-Unsubscribe": "<https://settimes.ca/api/bands/7/unfollow?token=abc123>",
-      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-    });
-  });
-
   it.each([
     [
       "postmark",
@@ -210,25 +154,15 @@ describe("sendEmail — preconditions", () => {
     ],
     ["mailchannels", { EMAIL_PROVIDER: "mailchannels", EMAIL_FROM: "noreply@settimes.ca" }, "headers"],
     ["resend", { EMAIL_PROVIDER: "resend", EMAIL_FROM: "noreply@settimes.ca", RESEND_API_KEY: "key" }, "headers"],
-  ])("omits provider headers when no extra headers are passed (%s)", async (_provider, env, field) => {
+  ])("never forwards caller-supplied headers to the provider (%s)", async (_provider, env, field) => {
+    // Extra headers were only for List-Unsubscribe, which left with fan email.
+    // A stray `headers` argument must not let a caller set Bcc or From.
     const fetchSpy = vi.fn(async () => jsonResponse(200));
     vi.stubGlobal("fetch", fetchSpy);
-    await sendEmail(env, PAYLOAD);
+    await sendEmail(env, { ...PAYLOAD, headers: { Bcc: "attacker@example.com" } });
     const [, options] = fetchSpy.mock.calls[0];
     expect(JSON.parse(options.body)[field]).toBeUndefined();
   });
-
-  it.each([[null], [[]], [{ "X-Test": 42 }], [{ "X-Test\nInjected": "value" }]])(
-    "rejects non-plain or non-string headers %j before any request",
-    async (headers) => {
-      const fetchSpy = vi.fn();
-      vi.stubGlobal("fetch", fetchSpy);
-      const env = { EMAIL_PROVIDER: "mailchannels", EMAIL_FROM: "noreply@settimes.ca" };
-
-      await expect(sendEmail(env, { ...PAYLOAD, headers })).rejects.toThrow();
-      expect(fetchSpy).not.toHaveBeenCalled();
-    },
-  );
 });
 
 describe("sendEmail — Postmark", () => {
@@ -245,7 +179,6 @@ describe("sendEmail — Postmark", () => {
     const result = await sendEmail(env, {
       ...PAYLOAD,
       idempotencyKey: "unsupported-postmark-key",
-      headers: UNSUB_HEADERS,
     });
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
@@ -265,10 +198,6 @@ describe("sendEmail — Postmark", () => {
       Subject: PAYLOAD.subject,
       HtmlBody: PAYLOAD.html,
       TextBody: PAYLOAD.text,
-      Headers: [
-        { Name: "List-Unsubscribe", Value: UNSUB_HEADERS["List-Unsubscribe"] },
-        { Name: "List-Unsubscribe-Post", Value: UNSUB_HEADERS["List-Unsubscribe-Post"] },
-      ],
     });
 
     expect(result).toEqual({ delivered: true });
@@ -317,7 +246,6 @@ describe("sendEmail — MailChannels", () => {
     const result = await sendEmail(env, {
       ...PAYLOAD,
       idempotencyKey: "unsupported-mailchannels-key",
-      headers: UNSUB_HEADERS,
     });
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
@@ -338,7 +266,6 @@ describe("sendEmail — MailChannels", () => {
         { type: "text/html", value: PAYLOAD.html },
         { type: "text/plain", value: PAYLOAD.text },
       ],
-      headers: UNSUB_HEADERS,
     });
 
     expect(result).toEqual({ delivered: true });
@@ -386,7 +313,7 @@ describe("sendEmail — Resend", () => {
     const fetchSpy = vi.fn(async () => jsonResponse(200));
     vi.stubGlobal("fetch", fetchSpy);
 
-    const result = await sendEmail(env, { ...PAYLOAD, idempotencyKey: "digest-key", headers: UNSUB_HEADERS });
+    const result = await sendEmail(env, { ...PAYLOAD, idempotencyKey: "digest-key" });
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     const [url, options] = fetchSpy.mock.calls[0];
@@ -405,7 +332,6 @@ describe("sendEmail — Resend", () => {
       subject: PAYLOAD.subject,
       html: PAYLOAD.html,
       text: PAYLOAD.text,
-      headers: UNSUB_HEADERS,
     });
 
     expect(result).toEqual({ delivered: true });

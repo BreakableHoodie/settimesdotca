@@ -1,8 +1,8 @@
 // Tests for the Cloudflare Turnstile bot-gate (#673). Previously zero direct
 // coverage — CLAUDE.md names verifyTurnstile()'s fail-closed-in-production
-// posture explicitly ("mirrors the CSRF_SECRET handling in utils/csrf.js"),
-// and it gates every public email-input endpoint (subscribe, follow,
-// follow-batch). This file pins the fail-closed branch itself, plus the
+// posture explicitly ("mirrors the CSRF_SECRET handling in utils/csrf.js").
+// It has no caller since fan email was retired; removal is #1431. Until then
+// this file pins the fail-closed branch itself, plus the
 // #682 early-return-on-non-2xx and network-failure paths so a future "make
 // local dev easier" change can't silently reopen the bot gate.
 import { afterEach, describe, expect, it, vi } from "vitest";

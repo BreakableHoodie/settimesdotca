@@ -6,7 +6,7 @@
  * ----------------
  * This repo has a documented, recurring "vacuous test" defect class: tests
  * that pass against BOTH the correct and the broken implementation. The
- * worst instance (see CLAUDE.md "Band Announcements"): deleting
+ * worst instance (docs/field-notes/testing-gates.md): deleting
  * `AND verified = 1` from either band-announcement recipient query left all
  * 1,169 backend tests green, because ten test files all seeded
  * `verified = 1` — no fixture could distinguish a gated query from an
@@ -238,121 +238,13 @@ export const MUTATIONS = [
     tests: ["functions/__tests__/sitemap.test.js"],
   },
   {
-    id: "band-follow-claim-lease",
-    invariant:
-      "CLAUDE.md 'A claim is not a delivery record (#1152)' — an UNDELIVERED claim past its lease is abandoned and must be retried",
-    file: "functions/utils/bandFollowNotify.js",
-    find: "AND claimed_at <= datetime('now', '-${CLAIM_LEASE_MINUTES} minutes')",
-    replace: "AND 1 = 0",
-    tests: ["functions/utils/__tests__/bandFollowNotify.test.js"],
-  },
-  {
     id: "resend-reused-key-never-counts-as-delivered",
     invariant:
-      "CLAUDE.md 'A claim is not a delivery record (#1152)' — a reused Resend idempotency key cannot prove a send, so it must never count as delivered",
+      "CLAUDE.md 'Email is account mail only' — a reused Resend idempotency key cannot prove a send, so it must never count as delivered",
     file: "functions/utils/email.js",
     find: 'return { delivered: false, reason: "idempotency_payload_mismatch" };',
     replace: "return { delivered: true };",
     tests: ["functions/utils/__tests__/email.test.js"],
-  },
-  {
-    id: "band-follow-unsubscribe-header-matches-body-link",
-    invariant:
-      "CLAUDE.md 'Band Announcements' — the RFC 8058 one-click URL is the same unsubscribe URL shown in the band-follow email body",
-    file: "functions/utils/bandFollowNotify.js",
-    find: "headers: listUnsubscribeHeaders(unsubUrl),",
-    replace: 'headers: listUnsubscribeHeaders("https://invalid.example/"),',
-    tests: ["functions/utils/__tests__/bandFollowNotify.test.js"],
-  },
-  {
-    id: "announce-digest-idempotency-key-sorts-performance-ids",
-    invariant:
-      "CLAUDE.md 'A claim is not a delivery record (#1152)' — a digest key is stable for the same task regardless of queue order",
-    file: "functions/utils/announceDigest.js",
-    find: "const sortedIds = performanceIds.map((id) => String(id)).sort();",
-    replace: "const sortedIds = performanceIds.map((id) => String(id));",
-    tests: ["functions/api/admin/bands/__tests__/announce-digest.test.js"],
-  },
-  {
-    id: "band-follow-delivered-never-retried",
-    invariant:
-      "CLAUDE.md 'A claim is not a delivery record (#1152)' — a DELIVERED row is never retried, however old the claim",
-    file: "functions/utils/bandFollowNotify.js",
-    find: "WHERE performance_id = ? AND band_follow_id = ?\n              AND delivered_at IS NULL",
-    replace: "WHERE performance_id = ? AND band_follow_id = ?",
-    tests: ["functions/utils/__tests__/bandFollowNotify.test.js"],
-  },
-  {
-    id: "band-follow-release-only-own-claim",
-    invariant:
-      "CLAUDE.md 'A claim is not a delivery record (#1152)' — a failed band-follow send releases only its own undelivered claim",
-    file: "functions/utils/bandFollowNotify.js",
-    find: ' AND claimed_at = ? AND delivered_at IS NULL",\n        )\n          .bind(performanceId, follower.id, claimedAt)',
-    replace: '"\n        )\n          .bind(performanceId, follower.id)',
-    tests: ["functions/utils/__tests__/bandFollowNotify.test.js"],
-  },
-  {
-    id: "announce-digest-release-only-own-claim",
-    invariant:
-      "CLAUDE.md 'A claim is not a delivery record (#1152)' — a failed digest send releases only its own undelivered claims",
-    file: "functions/utils/announceDigest.js",
-    find: ' AND claimed_at = ? AND delivered_at IS NULL",\n            ).bind(item.performance_id, item.band_follow_id, task.claimedAt)',
-    replace: '"\n            ).bind(item.performance_id, item.band_follow_id)',
-    tests: ["functions/api/admin/bands/__tests__/announce-digest.test.js"],
-  },
-  {
-    id: "subscriber-release-only-own-claim",
-    invariant:
-      "CLAUDE.md 'A claim is not a delivery record (#1152)' — a failed subscriber send releases only its own undelivered claim",
-    file: "functions/utils/subscriberNotify.js",
-    find: ' AND claimed_at = ? AND delivered_at IS NULL",\n      )\n        .bind(sub.id, eventId, kind, claimedAt)',
-    replace: '"\n      )\n        .bind(sub.id, eventId, kind)',
-    tests: ["functions/api/admin/events/__tests__/notify-subscribers.test.js"],
-  },
-  {
-    id: "announce-double-opt-in-primary",
-    invariant:
-      "CLAUDE.md 'Band Announcements' — announcement emails target verified = 1 followers only (primary announce query)",
-    file: "functions/api/admin/bands/[id].js",
-    find: "AND verified = 1",
-    replace: "",
-    tests: ["functions/api/admin/bands/__tests__/announce-double-opt-in.test.js"],
-  },
-  {
-    id: "announce-double-opt-in-resend",
-    invariant:
-      "CLAUDE.md 'Band Announcements' — resend-announcement recovers only followers without a notification row, and still only verified ones",
-    file: "functions/api/admin/bands/[id]/resend-announcement.js",
-    find: "AND bf.verified = 1",
-    replace: "",
-    tests: ["functions/api/admin/bands/__tests__/announce-double-opt-in.test.js"],
-  },
-  {
-    id: "recipient-cap-follow",
-    invariant:
-      "CLAUDE.md 'Public senders cap emails per recipient' — POST /api/bands/:name/follow checks the per-address allowance before it writes",
-    file: "functions/api/bands/[name]/follow.js",
-    find: "const cap = await allowEmailToRecipient(DB, email);",
-    replace: "const cap = { allowed: true };",
-    tests: ["functions/utils/__tests__/recipientEmailCap.test.js"],
-  },
-  {
-    id: "recipient-cap-follow-batch",
-    invariant:
-      "CLAUDE.md 'Public senders cap emails per recipient' — POST /api/bands/follow-batch checks the per-address allowance before it writes",
-    file: "functions/api/bands/follow-batch.js",
-    find: "const cap = await allowEmailToRecipient(DB, email);",
-    replace: "const cap = { allowed: true };",
-    tests: ["functions/utils/__tests__/recipientEmailCap.test.js"],
-  },
-  {
-    id: "recipient-cap-subscribe",
-    invariant:
-      "CLAUDE.md 'Public senders cap emails per recipient' — POST /api/subscriptions/subscribe checks the per-address allowance before it emails",
-    file: "functions/api/subscriptions/subscribe.js",
-    find: "const cap = await allowEmailToRecipient(env.DB, email);",
-    replace: "const cap = { allowed: true };",
-    tests: ["functions/utils/__tests__/recipientEmailCap.test.js"],
   },
   {
     id: "recipient-cap-resend-activation",
@@ -389,80 +281,6 @@ export const MUTATIONS = [
     find: "RECIPIENT_EMAIL_WINDOW_SECONDS + 60 * 60;",
     replace: "1800;",
     tests: ["functions/utils/__tests__/recipientEmailCap.test.js"],
-  },
-  {
-    id: "consent-confirmation-single-follow-timestamp",
-    invariant:
-      "CLAUDE.md 'Proof of consent is recorded at confirmation' — a single band follow confirmation records its SQLite timestamp",
-    file: "functions/api/bands/[name]/confirm-follow.js",
-    find: "confirmed_at = datetime('now'), ",
-    replace: "",
-    tests: ["functions/api/bands/__tests__/confirm-follow.test.js"],
-  },
-  {
-    id: "confirmation-link-expires-follow",
-    invariant:
-      "CLAUDE.md 'Emailed links never act on a GET (#1291)' — pending band follow confirmation links expire after 7 days",
-    file: "functions/api/bands/[name]/confirm-follow.js",
-    find: "WHERE id = ? AND verified = 0 AND ${pendingConfirmationLiveSql()}`",
-    replace: "WHERE id = ? AND verified = 0`",
-    tests: ["functions/api/bands/__tests__/confirm-follow.test.js"],
-  },
-  {
-    id: "consent-confirmation-subscription-timestamp",
-    invariant:
-      "CLAUDE.md 'Proof of consent is recorded at confirmation' — a subscription confirmation records its SQLite timestamp",
-    file: "functions/api/subscriptions/verify.js",
-    find: "SET verified = 1, confirmed_at = datetime('now')",
-    replace: "SET verified = 1",
-    tests: ["functions/api/subscriptions/__tests__/verify.test.js"],
-  },
-  {
-    id: "confirmation-link-expires-subscription",
-    invariant:
-      "CLAUDE.md 'Emailed links never act on a GET (#1291)' — pending subscription confirmation links expire after 7 days",
-    file: "functions/api/subscriptions/verify.js",
-    find: "AND verified = 0\n        AND ${pendingConfirmationLiveSql()}",
-    replace: "AND verified = 0\n        AND 1 = 0",
-    tests: ["functions/api/subscriptions/__tests__/verify.test.js"],
-  },
-  {
-    id: "email-link-get-does-not-confirm-follow",
-    invariant:
-      "CLAUDE.md 'Emailed links never act on a GET (#1291)' — GET renders a confirmation page and does not confirm a band follow",
-    file: "functions/api/bands/[name]/confirm-follow.js",
-    find: "  const { request } = context;\n  const token = await readEmailActionToken(request);",
-    replace:
-      "  const { request } = context;\n  const token = await readEmailActionToken(request);\n  return onRequestPost(context);",
-    tests: ["functions/api/bands/__tests__/confirm-follow.test.js"],
-  },
-  {
-    id: "email-link-get-does-not-verify-subscription",
-    invariant:
-      "CLAUDE.md 'Emailed links never act on a GET (#1291)' — GET renders a verification page and does not verify a subscription",
-    file: "functions/api/subscriptions/verify.js",
-    find: "  const { request } = context;\n  const token = await readEmailActionToken(request);",
-    replace:
-      "  const { request } = context;\n  const token = await readEmailActionToken(request);\n  return onRequestPost(context);",
-    tests: ["functions/api/subscriptions/__tests__/verify.test.js"],
-  },
-  {
-    id: "email-action-page-real-origin",
-    invariant:
-      "CLAUDE.md 'Emailed links never act on a GET (#1291)' — the action page overrides no-referrer so browsers send a real Origin, not null (403)",
-    file: "functions/utils/emailActionPage.js",
-    find: '<meta name="referrer" content="same-origin">',
-    replace: "",
-    tests: ["functions/utils/__tests__/emailActionPage.test.js"],
-  },
-  {
-    id: "confirm-url-echo-dev-only",
-    invariant:
-      "CLAUDE.md 'Emailed links never act on a GET (#1291)' — confirmation URLs are echoed only for explicitly allowed development requests",
-    file: "functions/api/bands/[name]/follow.js",
-    find: "if (isNewFollow && !isEmailConfigured(env) && isDevRequest(request, env))",
-    replace: "if (isNewFollow && !isEmailConfigured(env))",
-    tests: ["functions/api/bands/__tests__/follow.test.js"],
   },
   {
     id: "after-midnight-threshold-server",
@@ -787,15 +605,6 @@ export const MUTATIONS = [
     tests: ["functions/api/internal/__tests__/run-scheduled.test.js"],
   },
   {
-    id: "announce-digest-unconfirmed-is-visible",
-    invariant:
-      "CLAUDE.md 'A claim is not a delivery record (#1152)' — a delivered email whose confirmation write fails remains sent but makes the scheduled run red",
-    file: "functions/utils/announceDigest.js",
-    find: "unconfirmed++;",
-    replace: "void 0;",
-    tests: ["functions/api/admin/bands/__tests__/announce-digest.test.js"],
-  },
-  {
     id: "time-validation-range-not-just-shape",
     invariant:
       "CLAUDE.md 'Time validation is shape AND range' — admin write paths bound hours/minutes via isValidTime, never an inline shape regex (#1089)",
@@ -1116,122 +925,6 @@ export const MUTATIONS = [
     find: "  if (!stillEnrolled) {",
     replace: "  if (false) {",
     tests: ["functions/api/admin/mfa/__tests__/mfa-settings.test.js"],
-  },
-  {
-    id: "confirmation-reader-hashes-token",
-    invariant:
-      "CLAUDE.md 'Band Announcements' — confirmation readers hash submitted bearer tokens before lookup, so stored digests and retired values cannot be replayed",
-    file: "functions/api/bands/[name]/confirm-follow.js",
-    find: ".bind(tokenHash)",
-    replace: ".bind(token)",
-    tests: ["functions/api/bands/__tests__/confirm-follow.test.js"],
-  },
-  {
-    id: "confirmation-writer-stores-token-hash",
-    invariant:
-      "CLAUDE.md 'Band Announcements' — new confirmation links store only the SHA-256 token digest, never the emailed plaintext",
-    file: "functions/api/bands/[name]/follow.js",
-    find: ".bind(email, band.id, verificationTokenHash, unsubscribePlaceholder, consentIp, CONSENT_VERSION)",
-    replace: ".bind(email, band.id, verificationToken, unsubscribePlaceholder, consentIp, CONSENT_VERSION)",
-    tests: ["functions/api/bands/__tests__/follow.test.js"],
-  },
-  {
-    id: "unfollow-legacy-reader-hashes-token",
-    invariant: "CLAUDE.md 'Band Announcements' — legacy unsubscribe readers hash submitted bearer tokens before lookup",
-    file: "functions/api/bands/[name]/unfollow.js",
-    find: ".bind(tokenHash)",
-    replace: ".bind(token)",
-    tests: ["functions/api/bands/__tests__/unfollow.test.js"],
-  },
-  {
-    id: "subscription-unsubscribe-legacy-reader-hashes-token",
-    invariant:
-      "CLAUDE.md 'Band Announcements' — legacy subscription unsubscribe readers hash submitted bearer tokens before lookup",
-    file: "functions/api/subscriptions/unsubscribe.js",
-    find: ".bind(tokenHash)",
-    replace: ".bind(token)",
-    tests: ["functions/api/subscriptions/__tests__/unsubscribe.test.js"],
-  },
-  {
-    id: "unsubscribe-verify-throws-without-key",
-    invariant:
-      "CLAUDE.md 'Band Announcements' — an unsubscribe link that cannot be checked (no key) is a 500, never a false 'removed' page",
-    file: "functions/utils/unsubscribeLinks.js",
-    find: 'const secrets = [currentSecret(env, "verify")];',
-    replace:
-      "const secrets = [env?.UNSUBSCRIBE_LINK_SECRET].filter(isSecret);\n  if (secrets.length === 0) return null;",
-    tests: ["functions/api/bands/__tests__/unfollow.test.js"],
-  },
-  {
-    id: "unsubscribe-verify-accepts-previous-key",
-    invariant:
-      "CLAUDE.md 'Band Announcements' — a rotated unsubscribe key keeps verifying as the previous key, so sent links survive a rotation",
-    file: "functions/utils/unsubscribeLinks.js",
-    find: "if (isSecret(previous)) secrets.push(previous);",
-    replace: "if (false) secrets.push(previous);",
-    tests: ["functions/utils/__tests__/unsubscribeLinks.test.js"],
-  },
-  {
-    id: "unsubscribe-token-binds-kind-to-mac",
-    invariant:
-      "CLAUDE.md 'Band Announcements' — unsubscribe MACs bind the token kind so links cannot cross resource types",
-    file: "functions/utils/unsubscribeLinks.js",
-    find: "`unsubscribe|${kind}|${id}`",
-    replace: "`unsubscribe|${id}`",
-    tests: ["functions/utils/__tests__/unsubscribeLinks.test.js"],
-  },
-  {
-    id: "batch-confirmation-reader-hashes-token",
-    invariant: "CLAUDE.md 'Band Announcements' — the multi-band confirm hashes the submitted batch token before lookup",
-    file: "functions/api/bands/confirm-follow-batch.js",
-    find: "const tokenHash = await hashStoredToken(token);",
-    replace: "const tokenHash = token;",
-    tests: ["functions/api/bands/__tests__/follow-batch.test.js"],
-  },
-  {
-    id: "batch-confirmation-writer-stores-token-hash",
-    invariant: "CLAUDE.md 'Band Announcements' — a multi-band follow stores only the digest of its shared batch token",
-    file: "functions/api/bands/follow-batch.js",
-    find: "          batchTokenHash,\n",
-    replace: "          batchToken,\n",
-    tests: ["functions/api/bands/__tests__/follow-batch.test.js"],
-  },
-  {
-    id: "subscription-verify-hashes-token",
-    invariant:
-      "CLAUDE.md 'Band Announcements' — subscription verification hashes the submitted token before every lookup",
-    file: "functions/api/subscriptions/verify.js",
-    find: "const tokenHash = await hashStoredToken(token);",
-    replace: "const tokenHash = token;",
-    tests: ["functions/api/subscriptions/__tests__/verify.test.js"],
-  },
-  {
-    id: "subscription-rerequest-rotates-token",
-    invariant:
-      "CLAUDE.md 'Band Announcements' — a re-request emails a fresh token, because the stored value is a digest that can never confirm",
-    file: "functions/api/subscriptions/subscribe.js",
-    find: "emailResult = await sendVerificationEmail(env, email, newVerificationToken);",
-    replace: "emailResult = await sendVerificationEmail(env, email, current.verification_token);",
-    tests: ["functions/api/subscriptions/__tests__/subscribe.test.js"],
-  },
-  {
-    id: "subscription-rotation-matches-null-token",
-    invariant:
-      "CLAUDE.md 'Band Announcements' — a re-request rotates a pending row even when its token is NULL, so it can never match nothing forever",
-    file: "functions/api/subscriptions/subscribe.js",
-    find: "verification_token IS ? AND",
-    replace: "verification_token = ? AND",
-    tests: ["functions/api/subscriptions/__tests__/confirmationExpiryRealDb.test.js"],
-  },
-  {
-    id: "subscription-failed-resend-restores-link",
-    invariant:
-      "CLAUDE.md 'Band Announcements' — a failed re-send puts the previous token back, so the link in the earlier email keeps working",
-    file: "functions/api/subscriptions/subscribe.js",
-    find: '            console.warn("[Subscribe] Verification email not delivered:", emailResult.reason);\n            await restorePreviousToken(env, current.id, current.verification_token, newVerificationTokenHash);',
-    replace:
-      '            console.warn("[Subscribe] Verification email not delivered:", emailResult.reason);\n            await dropUnmailedSubscription(env, newVerificationTokenHash);',
-    tests: ["functions/api/subscriptions/__tests__/confirmationExpiryRealDb.test.js"],
   },
   {
     id: "mfa-login-backup-code-spend-not-restored",

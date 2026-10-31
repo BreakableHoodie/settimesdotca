@@ -1540,7 +1540,7 @@ describe('EventTimeline between-seasons filter copy accuracy', () => {
     expect(within(alertBox).getByText(/no upcoming events right now/i)).toBeInTheDocument()
     expect(within(alertBox).queryByText(/no upcoming events match your filters/i)).not.toBeInTheDocument()
     expect(within(alertBox).queryByText(/your filters are hiding every upcoming event/i)).not.toBeInTheDocument()
-    expect(within(alertBox).getByRole('link', { name: /subscribe for updates/i })).toBeInTheDocument()
+    expect(within(alertBox).queryByRole('link', { name: /subscribe for updates/i })).not.toBeInTheDocument()
     expect(within(alertBox).queryByRole('button', { name: /clear filters/i })).not.toBeInTheDocument()
   })
 

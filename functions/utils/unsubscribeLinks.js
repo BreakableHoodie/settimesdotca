@@ -1,7 +1,7 @@
 // Unsubscribe links are derived from the row id, which is an AUTOINCREMENT
-// primary key and is never reused. They therefore need no expiry: a link must
-// keep working for the life of its follow. (A D1 Time Travel restore rolls the
-// id counter back, so ids can be reissued after one.)
+// primary key and is never reused. Tokens carry no expiry; a link verifies
+// while the key that signed it is the current or the previous one. (A D1 Time
+// Travel restore rolls the id counter back, so ids can be reissued after one.)
 //
 // Keyed by UNSUBSCRIBE_LINK_SECRET, never CSRF_SECRET, so a CSRF rotation
 // leaves sent links working (#1427). To rotate this key, move the current value

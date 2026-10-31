@@ -26,7 +26,6 @@
 //                    and the cap would reset itself. The predicates are disjoint
 //                    (LIKE vs NOT LIKE), in one statement.
 
-import { pendingConfirmationLiveSql } from "../../../utils/consent.js";
 import { RECIPIENT_KEY_PREFIX, RECIPIENT_KEY_RETENTION_SECONDS } from "../../../utils/recipientEmailCap.js";
 
 export async function runRetentionCleanup(env) {
@@ -77,17 +76,6 @@ export async function runRetentionCleanup(env) {
               OR (key LIKE '${RECIPIENT_KEY_PREFIX}%' AND updated_at < unixepoch() - ${RECIPIENT_KEY_RETENTION_SECONDS})`,
         ).run(),
     ],
-    [
-      "band_follows",
-      () => DB.prepare(`DELETE FROM band_follows WHERE verified = 0 AND NOT (${pendingConfirmationLiveSql()})`).run(),
-    ],
-    [
-      "email_subscriptions",
-      () =>
-        DB.prepare(
-          `DELETE FROM email_subscriptions WHERE verified = 0 AND NOT (${pendingConfirmationLiveSql()})`,
-        ).run(),
-    ],
   ];
   const results = await Promise.allSettled(deletes.map(([, run]) => Promise.resolve().then(run)));
   const failedTables = [
@@ -115,8 +103,6 @@ export async function runRetentionCleanup(env) {
     adminAudit,
     apiKeyRequests,
     rateLimits,
-    bandFollows,
-    emailSubscriptions,
   ] = results.map((result) => result.value);
 
   return {
@@ -130,7 +116,5 @@ export async function runRetentionCleanup(env) {
     audit_log_deleted: adminAudit.meta.changes,
     api_key_requests_deleted: apiKeyRequests.meta.changes,
     rate_limits_deleted: rateLimits.meta.changes,
-    band_follows_deleted: bandFollows.meta.changes,
-    email_subscriptions_deleted: emailSubscriptions.meta.changes,
   };
 }

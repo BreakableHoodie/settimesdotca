@@ -1,6 +1,6 @@
 // Tests for functions/utils/email.js — the fire-and-forget transactional
-// email sender behind (among other things) the band-follow double opt-in
-// confirmation email, the ONLY path to `band_follows.verified = 1`.
+// email sender behind every account email (password reset, invites,
+// activation, MFA notices).
 //
 // #1015: this module sat at 35.7% statement coverage. What was covered was
 // the config/precondition logic (not-configured, missing fields); the

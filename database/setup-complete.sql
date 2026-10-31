@@ -178,48 +178,6 @@ CREATE INDEX IF NOT EXISTS idx_events_status ON events(status);
 
 CREATE INDEX IF NOT EXISTS idx_events_archived ON events(archived_at);
 
-CREATE TABLE IF NOT EXISTS email_subscriptions (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  email TEXT NOT NULL,
-  city TEXT NOT NULL,                    -- "portland", "seattle", "all"
-  genre TEXT NOT NULL,                   -- "punk", "indie", "all"
-  frequency TEXT NOT NULL DEFAULT 'weekly', -- "daily", "weekly", "monthly"
-  verified BOOLEAN NOT NULL DEFAULT 0,   -- Email verified via confirmation link
-  verification_token TEXT UNIQUE,        -- Token for email verification
-  unsubscribe_token TEXT UNIQUE NOT NULL, -- Token for unsubscribe link
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  last_email_sent TEXT, consent_ip TEXT, consent_method TEXT NOT NULL DEFAULT 'web_form', confirmed_at TEXT, consent_version TEXT,                  -- When was last email sent
-
-  UNIQUE(email, city, genre)             -- Prevent duplicate subscriptions
-);
-
-CREATE TABLE IF NOT EXISTS subscription_verifications (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  subscription_id INTEGER NOT NULL,
-  verified_at TEXT NOT NULL DEFAULT (datetime('now')),                       -- For spam prevention
-
-  FOREIGN KEY (subscription_id) REFERENCES email_subscriptions(id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS subscription_unsubscribes (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  subscription_id INTEGER NOT NULL,
-  unsubscribed_at TEXT NOT NULL DEFAULT (datetime('now')),
-  reason TEXT,                           -- Optional feedback
-
-  FOREIGN KEY (subscription_id) REFERENCES email_subscriptions(id) ON DELETE CASCADE
-);
-
-CREATE INDEX IF NOT EXISTS idx_subscriptions_email ON email_subscriptions(email);
-
-CREATE INDEX IF NOT EXISTS idx_subscriptions_city_genre ON email_subscriptions(city, genre);
-
-CREATE INDEX IF NOT EXISTS idx_subscriptions_verified ON email_subscriptions(verified);
-
-CREATE INDEX IF NOT EXISTS idx_subscriptions_verification_token ON email_subscriptions(verification_token);
-
-CREATE INDEX IF NOT EXISTS idx_subscriptions_unsubscribe_token ON email_subscriptions(unsubscribe_token);
-
 CREATE TABLE IF NOT EXISTS schedule_builds (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   event_id INTEGER NOT NULL,
@@ -351,7 +309,7 @@ CREATE TABLE IF NOT EXISTS "performances" (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   created_by_user_id INTEGER,
   updated_by_user_id INTEGER,
-  updated_at TEXT DEFAULT (datetime('now')), is_announced INTEGER NOT NULL DEFAULT 1, band_follow_notified INTEGER NOT NULL DEFAULT 0, performance_date TEXT, is_cancelled INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT DEFAULT (datetime('now')), is_announced INTEGER NOT NULL DEFAULT 1, performance_date TEXT, is_cancelled INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
   FOREIGN KEY (band_profile_id) REFERENCES band_profiles(id) ON DELETE RESTRICT,
   FOREIGN KEY (venue_id) REFERENCES venues(id) ON DELETE SET NULL,
@@ -375,21 +333,6 @@ END;
 
 CREATE INDEX IF NOT EXISTS idx_performances_announced
   ON performances(event_id, is_announced);
-
-CREATE TABLE IF NOT EXISTS band_follows (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  email TEXT NOT NULL,
-  band_profile_id INTEGER NOT NULL REFERENCES band_profiles(id) ON DELETE CASCADE,
-  verified INTEGER NOT NULL DEFAULT 0,
-  verification_token TEXT UNIQUE,
-  unsubscribe_token TEXT UNIQUE NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (datetime('now')), consent_ip TEXT, consent_method TEXT NOT NULL DEFAULT 'web_form', batch_token TEXT, confirmed_at TEXT, consent_version TEXT,
-  UNIQUE(email, band_profile_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_band_follows_band ON band_follows(band_profile_id);
-
-CREATE INDEX IF NOT EXISTS idx_band_follows_email ON band_follows(email);
 
 CREATE TABLE IF NOT EXISTS share_links (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -415,25 +358,6 @@ CREATE TABLE IF NOT EXISTS page_views_daily (
 );
 
 CREATE INDEX IF NOT EXISTS idx_page_views_date ON page_views_daily(date);
-
-CREATE TABLE IF NOT EXISTS band_announce_queue (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  band_follow_id INTEGER NOT NULL REFERENCES band_follows(id) ON DELETE CASCADE,
-  performance_id INTEGER NOT NULL REFERENCES performances(id) ON DELETE CASCADE,
-  event_id INTEGER NOT NULL,
-  band_name TEXT NOT NULL,
-  event_name TEXT NOT NULL,
-  event_slug TEXT NOT NULL,
-  band_profile_id INTEGER NOT NULL,
-  queued_at TEXT NOT NULL DEFAULT (datetime('now')),
-  UNIQUE(band_follow_id, performance_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_band_announce_queue_event ON band_announce_queue(event_id);
-
-CREATE INDEX IF NOT EXISTS idx_band_announce_queue_follow ON band_announce_queue(band_follow_id);
-
-CREATE INDEX IF NOT EXISTS idx_band_follows_batch_token ON band_follows(batch_token);
 
 CREATE TABLE IF NOT EXISTS auth_audit (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -502,46 +426,6 @@ CREATE TABLE IF NOT EXISTS api_keys (
 CREATE INDEX IF NOT EXISTS idx_api_keys_created_by ON api_keys (created_by);
 
 CREATE INDEX IF NOT EXISTS idx_audit_log_api_key ON audit_log (api_key_id);
-
-CREATE TABLE IF NOT EXISTS subscription_notifications (
-  id              INTEGER PRIMARY KEY,
-  subscription_id INTEGER NOT NULL REFERENCES email_subscriptions(id) ON DELETE CASCADE,
-  event_id        INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-  kind            TEXT    NOT NULL,
-  -- When the row was CLAIMED, not when mail was delivered. The two are
-  -- deliberately separate columns.
-  claimed_at      TEXT    NOT NULL DEFAULT (datetime('now')),
-  -- NULL until the provider confirms. A claim is NOT a delivery record: if the
-  -- Worker dies between claiming and sending -- CPU limit, eviction, an
-  -- unhandled throw -- the row survives with delivered_at still NULL, and a
-  -- claim-only design would exclude that subscriber from every later run
-  -- FOREVER, having mailed them nothing.
-  --
-  -- So `pendingSubscribers` treats a claim older than the lease window with no
-  -- delivery as abandoned and retryable. Delivered rows are permanent.
-  delivered_at    TEXT,
-  -- The claim. INSERT OR IGNORE against this returns changes=0 when another
-  -- request already claimed this recipient, which is what stops two concurrent
-  -- sends mailing the same person twice.
-  UNIQUE (subscription_id, event_id, kind)
-);
-
-CREATE INDEX IF NOT EXISTS idx_subscription_notifications_lookup
-  ON subscription_notifications(event_id, kind, subscription_id);
-
-CREATE TABLE IF NOT EXISTS "band_follow_notifications" (
-  id             INTEGER PRIMARY KEY AUTOINCREMENT,
-  performance_id INTEGER NOT NULL REFERENCES performances(id) ON DELETE CASCADE,
-  band_follow_id INTEGER NOT NULL REFERENCES band_follows(id) ON DELETE CASCADE,
-  -- A run took ownership. Not proof of anything having been sent.
-  claimed_at     TEXT    NOT NULL DEFAULT (datetime('now')),
-  -- NULL until the provider confirms. Only this makes the row permanent.
-  delivered_at   TEXT,
-  UNIQUE (performance_id, band_follow_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_band_follow_notifications_lookup
-  ON band_follow_notifications(performance_id, band_follow_id, delivered_at, claimed_at);
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_schedule_builds_unique
   ON schedule_builds(event_id, performance_id, visitor_hash);

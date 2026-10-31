@@ -587,15 +587,6 @@ export const MUTATIONS = [
     tests: ["functions/api/admin/maintenance/__tests__/retentionWindows.test.js"],
   },
   {
-    id: "retention-unconfirmed-signups",
-    invariant:
-      "CLAUDE.md 'Retention windows are a published promise' — never-confirmed follow and subscription requests are deleted after 7 days",
-    file: "functions/api/admin/maintenance/retention.js",
-    find: "() => DB.prepare(`DELETE FROM band_follows WHERE verified = 0 AND NOT (${pendingConfirmationLiveSql()})`).run(),",
-    replace: "() => DB.prepare(`DELETE FROM band_follows WHERE verified = 0 AND 1 = 0`).run(),",
-    tests: ["functions/api/admin/maintenance/__tests__/retentionWindows.test.js"],
-  },
-  {
     id: "scheduled-retention-failure-is-visible",
     invariant:
       "CLAUDE.md 'Retention windows are a published promise' — a failed retention step turns the daily scheduled run red",

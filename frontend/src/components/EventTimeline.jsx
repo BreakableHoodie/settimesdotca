@@ -551,6 +551,7 @@ export default function EventTimeline() {
                     href={calendarLinks(SITE_FEED_PATH).webcal}
                     variant="secondary"
                     size="sm"
+                    className="min-h-[44px]"
                     icon={<CalendarDays size={14} aria-hidden="true" />}
                   >
                     Add shows to your calendar

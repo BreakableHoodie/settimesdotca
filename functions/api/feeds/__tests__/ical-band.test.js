@@ -59,12 +59,20 @@ describe("GET /api/feeds/ical?band= — one artist's calendar", () => {
   });
 
   test("a band with no upcoming sets is a valid, named, empty calendar", async () => {
-    const { env, rawDb } = seed();
-    const idle = rawDb
-      .prepare("INSERT INTO band_profiles (name, name_normalized) VALUES (?, ?)")
-      .run("Off Season", "off season");
+    const { env, rawDb, venue } = seed();
+    // Public (it played a past, archived edition) but nothing upcoming: the
+    // off-season state every band is in between editions.
+    const past = insertEvent(rawDb, { name: "Last Year", slug: "last-year", date: "2020-07-04" });
+    rawDb.prepare("UPDATE events SET status = 'archived' WHERE id=?").run(past.id);
+    const idle = insertBand(rawDb, {
+      name: "Off Season",
+      event_id: past.id,
+      venue_id: venue.id,
+      start_time: "20:00",
+      end_time: "21:00",
+    });
 
-    const res = await get(env, `?band=${idle.lastInsertRowid}`);
+    const res = await get(env, `?band=${idle.band_profile_id}`);
     const text = await res.text();
 
     expect(res.status).toBe(200);
@@ -90,6 +98,33 @@ describe("GET /api/feeds/ical?band= — one artist's calendar", () => {
     rawDb.prepare("UPDATE band_profiles SET genre = 'Punk' WHERE id = ?").run(a);
     expect(await (await get(env, `?band=${a}&genre=punk`)).text()).toContain("BEGIN:VEVENT");
     expect(await (await get(env, `?band=${a}&genre=jazz`)).text()).not.toContain("BEGIN:VEVENT");
+  });
+
+  // The band page's rule: an artist booked only on a draft event is not public
+  // yet, so the feed must not name them in X-WR-CALNAME either.
+  test("a band booked only on a draft event is a 404, not a named calendar", async () => {
+    const { env, rawDb, venue } = seed();
+    const draft = insertEvent(rawDb, { name: "Unannounced", slug: "unannounced", date: "2099-08-01" });
+    rawDb.prepare("UPDATE events SET status = 'draft' WHERE id=?").run(draft.id);
+    const secret = insertBand(rawDb, {
+      name: "Secret Headliner",
+      event_id: draft.id,
+      venue_id: venue.id,
+      start_time: "22:00",
+      end_time: "23:00",
+    });
+
+    const res = await get(env, `?band=${secret.band_profile_id}`);
+    expect(res.status).toBe(404);
+    expect(await res.text()).not.toContain("Secret Headliner");
+  });
+
+  test("a band with no sets at all is a 404", async () => {
+    const { env, rawDb } = seed();
+    const bare = rawDb
+      .prepare("INSERT INTO band_profiles (name, name_normalized) VALUES (?, ?)")
+      .run("Never Booked", "never booked");
+    expect((await get(env, `?band=${bare.lastInsertRowid}`)).status).toBe(404);
   });
 
   test("an unknown band id is a 404 and writes no calendar", async () => {

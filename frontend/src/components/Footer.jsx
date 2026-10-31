@@ -1,9 +1,11 @@
 import { Link, useLocation } from 'react-router-dom'
 import { InstagramIcon } from './ui/SocialIcons'
+import { calendarLinks, SITE_FEED_PATH } from '../utils/calendarLinks'
 
 function Footer() {
   const { pathname } = useLocation()
   const isHome = pathname === '/'
+  const siteCalendar = calendarLinks(SITE_FEED_PATH)
 
   return (
     <footer className="py-8 sm:py-10 mt-12 border-t border-accent-500/20 bg-bg-navy/50 min-h-[120px] sm:min-h-[140px]">
@@ -27,6 +29,9 @@ function Footer() {
             <Link to="/stats" className="text-text-tertiary hover:text-accent-400 transition-colors">
               Stats
             </Link>
+            <a href={siteCalendar.webcal} className="text-text-tertiary hover:text-accent-400 transition-colors">
+              Add all shows to your calendar
+            </a>
             <Link to="/privacy" className="text-text-tertiary hover:text-accent-400 transition-colors">
               Privacy Policy
             </Link>

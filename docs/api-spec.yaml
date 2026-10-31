@@ -883,7 +883,10 @@ paths:
       tags:
         - Public
       summary: Download the iCal feed
-      description: Returns a public calendar feed filtered by city and genre.
+      description: >-
+        Returns a public calendar feed filtered by city, genre and/or artist.
+        `band` is how a fan subscribes a calendar app to one artist; a band
+        with no upcoming sets gets a valid, empty, named calendar.
       parameters:
         - name: city
           in: query
@@ -897,11 +900,30 @@ paths:
           schema:
             type: string
             default: all
+        - name: band
+          in: query
+          required: false
+          description: A `band_profiles.id` (positive integer, at most 10 digits).
+          schema:
+            type: string
+            pattern: "^[1-9][0-9]{0,9}$"
       responses:
         "200":
           description: iCal response
           content:
             text/calendar:
+              schema:
+                type: string
+        "400":
+          description: Malformed `band` id (plain text)
+          content:
+            text/plain:
+              schema:
+                type: string
+        "404":
+          description: No such band (plain text)
+          content:
+            text/plain:
               schema:
                 type: string
         "503":

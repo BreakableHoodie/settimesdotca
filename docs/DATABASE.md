@@ -194,8 +194,7 @@ event-specific "who's playing when/where."
 | `start_time`           | TEXT    | Nullable (made optional in migration 0032)                                                                                                                                                                     |
 | `end_time`             | TEXT    | Nullable (made optional in migration 0032)                                                                                                                                                                     |
 | `notes`                | TEXT    | Nullable                                                                                                                                                                                                       |
-| `is_announced`         | INTEGER | NOT NULL, DEFAULT 1 — gates the public schedule and triggers follower emails on 0→1                                                                                                                            |
-| `band_follow_notified` | INTEGER | NOT NULL, DEFAULT 0                                                                                                                                                                                            |
+| `is_announced`         | INTEGER | NOT NULL, DEFAULT 1 — gates the public schedule while `events.reveal_mode = 1`                                                                                                                                 |
 | `created_at`           | TEXT    | NOT NULL, DEFAULT `datetime('now')`                                                                                                                                                                            |
 | `created_by_user_id`   | INTEGER | Nullable, FK → `users(id)`                                                                                                                                                                                     |
 | `updated_by_user_id`   | INTEGER | Nullable, FK → `users(id)`                                                                                                                                                                                     |
@@ -247,71 +246,8 @@ replay (#506).
 
 ### Fan engagement
 
-#### `band_follows`
-
-A fan's follow of a band (double opt-in — see `CLAUDE.md` "Band Announcements").
-Added in migration 0035.
-
-`verification_token` and `batch_token` are stored as `sha256:` plus lowercase
-SHA-256 hex; plaintext values exist only in confirmation links.
-
-| Column               | Type    | Notes                                                                                                                                                                    |
-| -------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `id`                 | INTEGER | PK, autoincrement                                                                                                                                                        |
-| `email`              | TEXT    | NOT NULL                                                                                                                                                                 |
-| `band_profile_id`    | INTEGER | NOT NULL, FK → `band_profiles(id)` ON DELETE CASCADE                                                                                                                     |
-| `verified`           | INTEGER | NOT NULL, DEFAULT 0 — set to 1 only via `confirm-follow`                                                                                                                 |
-| `verification_token` | TEXT    | UNIQUE, nullable — cleared once confirmed                                                                                                                                |
-| `unsubscribe_token`  | TEXT    | UNIQUE, NOT NULL                                                                                                                                                         |
-| `created_at`         | TEXT    | NOT NULL, DEFAULT `datetime('now')`                                                                                                                                      |
-| `consent_ip`         | TEXT    | Nullable — added in migration 0045                                                                                                                                       |
-| `consent_method`     | TEXT    | NOT NULL, DEFAULT `'web_form'` — added in migration 0045                                                                                                                 |
-| `batch_token`        | TEXT    | Nullable — added in migration 0047; ties together rows from one batch-follow submission so a multi-band follow sends a single confirmation email instead of one per band |
-| `confirmed_at`       | TEXT    | Nullable — set when the double opt-in is confirmed                                                                                                                       |
-| `consent_version`    | TEXT    | Nullable — wording/version shown when consent was given                                                                                                                  |
-
-Constraint: `UNIQUE(email, band_profile_id)`. Indexes:
-`idx_band_follows_band(band_profile_id)`, `idx_band_follows_email(email)`,
-`idx_band_follows_batch_token(batch_token)`.
-
-#### `band_follow_notifications`
-
-Per-follower delivery tracking for "this band just got announced" emails.
-Added in migration 0041 to replace a fire-once latch that silently dropped
-fans whose first send failed.
-
-| Column           | Type    | Notes                                                                |
-| ---------------- | ------- | -------------------------------------------------------------------- |
-| `id`             | INTEGER | PK, autoincrement                                                    |
-| `performance_id` | INTEGER | NOT NULL, FK → `performances(id)` ON DELETE CASCADE                  |
-| `band_follow_id` | INTEGER | NOT NULL, FK → `band_follows(id)` ON DELETE CASCADE                  |
-| `claimed_at`     | TEXT    | NOT NULL, DEFAULT `datetime('now')` — claim time, not delivery proof |
-| `delivered_at`   | TEXT    | Nullable — set only after the provider confirms delivery             |
-
-Constraint: `UNIQUE(performance_id, band_follow_id)`. An undelivered claim past
-the lease is retryable; a delivered row is permanent. Index:
-`idx_band_follow_notifications_lookup(performance_id, band_follow_id, delivered_at, claimed_at)`.
-
-#### `band_announce_queue`
-
-Queue of per-follower "band announced" events awaiting a digest send. Added in
-migration 0046.
-
-| Column            | Type    | Notes                                                           |
-| ----------------- | ------- | --------------------------------------------------------------- |
-| `id`              | INTEGER | PK, autoincrement                                               |
-| `band_follow_id`  | INTEGER | NOT NULL, FK → `band_follows(id)` ON DELETE CASCADE             |
-| `performance_id`  | INTEGER | NOT NULL, FK → `performances(id)` ON DELETE CASCADE             |
-| `event_id`        | INTEGER | NOT NULL — **no FK constraint** (denormalized snapshot)         |
-| `band_name`       | TEXT    | NOT NULL — denormalized snapshot of the band name at queue time |
-| `event_name`      | TEXT    | NOT NULL — denormalized snapshot                                |
-| `event_slug`      | TEXT    | NOT NULL — denormalized snapshot                                |
-| `band_profile_id` | INTEGER | NOT NULL — **no FK constraint** (denormalized snapshot)         |
-| `queued_at`       | TEXT    | NOT NULL, DEFAULT `datetime('now')`                             |
-
-Constraint: `UNIQUE(band_follow_id, performance_id)`. Indexes:
-`idx_band_announce_queue_event(event_id)`,
-`idx_band_announce_queue_follow(band_follow_id)`.
+Band follows and their announcement tables were dropped by migration 0082
+(fan email retired 2026-10-31; migration 0081 deleted the rows first).
 
 #### `share_links`
 
@@ -364,97 +300,11 @@ identifier is retained; readers add these totals to live-link metrics.
 | `views_legacy`  | INTEGER | NOT NULL, DEFAULT 0, CHECK >= 0            |
 | `imports`       | INTEGER | NOT NULL, DEFAULT 0, CHECK >= 0            |
 
-### Subscriptions & schedule builds
+### Schedule builds
 
-These four tables are live and queried (`functions/api/subscriptions/*`,
-`functions/api/schedule/build.js`, `functions/api/admin/events/[id]/metrics.js`,
-`functions/api/admin/analytics/subscriptions.js`). They originate in
-`migrations/0006_migration-subscriptions.sql` and
-`migrations/0007_migration-metrics.sql`, and — since the `database/setup-complete.sql`
-regeneration in #506 — are created by the bootstrap too. Columns below reflect
-their final form after later ALTERs (migrations 0027 and 0045).
-
-#### `email_subscriptions`
-
-City/genre email digest subscriptions, double opt-in via a verification link.
-Created by `POST /api/subscriptions/subscribe`.
-
-`verification_token` is stored as `sha256:` plus lowercase SHA-256 hex; the
-plaintext exists only in the confirmation link and is rotated on re-request.
-Verifying does not clear it, so a subscription confirmed before migration 0080
-holds `retired:<id>` instead: expected, and never redeemable.
-
-Fan email was retired on 2026-10-31: migration 0081 emptied this table and
-the other fan-email tables, no code reads them, and a later migration drops
-them.
-
-| Column               | Type    | Notes                                                                  |
-| -------------------- | ------- | ---------------------------------------------------------------------- |
-| `id`                 | INTEGER | PK, autoincrement                                                      |
-| `email`              | TEXT    | NOT NULL                                                               |
-| `city`               | TEXT    | NOT NULL — city name or `'all'`                                        |
-| `genre`              | TEXT    | NOT NULL — genre or `'all'`                                            |
-| `frequency`          | TEXT    | NOT NULL, DEFAULT `'weekly'` — `daily` \| `weekly` \| `monthly`        |
-| `verified`           | BOOLEAN | NOT NULL, DEFAULT 0 — declared BOOLEAN in the migration; stored as 0/1 |
-| `verification_token` | TEXT    | UNIQUE, nullable                                                       |
-| `unsubscribe_token`  | TEXT    | UNIQUE, NOT NULL                                                       |
-| `created_at`         | TEXT    | NOT NULL, DEFAULT `datetime('now')`                                    |
-| `last_email_sent`    | TEXT    | Nullable                                                               |
-| `consent_ip`         | TEXT    | Nullable — added in migration 0045                                     |
-| `consent_method`     | TEXT    | NOT NULL, DEFAULT `'web_form'` — added in migration 0045               |
-| `confirmed_at`       | TEXT    | Nullable — set when the subscription is confirmed                      |
-| `consent_version`    | TEXT    | Nullable — wording/version shown when consent was given                |
-
-Constraint: `UNIQUE(email, city, genre)`. Indexes:
-`idx_subscriptions_email(email)`, `idx_subscriptions_city_genre(city, genre)`,
-`idx_subscriptions_verified(verified)`,
-`idx_subscriptions_verification_token(verification_token)`,
-`idx_subscriptions_unsubscribe_token(unsubscribe_token)`.
-
-#### `subscription_verifications`
-
-Log row written when a subscription is confirmed
-(`functions/api/subscriptions/verify.js`).
-
-| Column            | Type    | Notes                                                      |
-| ----------------- | ------- | ---------------------------------------------------------- |
-| `id`              | INTEGER | PK, autoincrement                                          |
-| `subscription_id` | INTEGER | NOT NULL, FK → `email_subscriptions(id)` ON DELETE CASCADE |
-| `verified_at`     | TEXT    | NOT NULL, DEFAULT `datetime('now')`                        |
-
-The original `ip_address` column was dropped in migration 0027 (never
-populated by any code path; PII storage minimisation). No indexes.
-
-#### `subscription_unsubscribes`
-
-Unsubscribe log for metrics (`functions/api/subscriptions/unsubscribe.js`).
-
-| Column            | Type    | Notes                                                      |
-| ----------------- | ------- | ---------------------------------------------------------- |
-| `id`              | INTEGER | PK, autoincrement                                          |
-| `subscription_id` | INTEGER | NOT NULL, FK → `email_subscriptions(id)` ON DELETE CASCADE |
-| `unsubscribed_at` | TEXT    | NOT NULL, DEFAULT `datetime('now')`                        |
-| `reason`          | TEXT    | Nullable — optional feedback                               |
-
-No indexes.
-
-#### `subscription_notifications`
-
-Per-subscription, per-event delivery claims. `claimed_at` is not proof of
-delivery; undelivered claims past the lease are retryable, while
-`delivered_at` makes a successful delivery permanent.
-
-| Column            | Type    | Notes                                                      |
-| ----------------- | ------- | ---------------------------------------------------------- |
-| `id`              | INTEGER | PK                                                         |
-| `subscription_id` | INTEGER | NOT NULL, FK → `email_subscriptions(id)` ON DELETE CASCADE |
-| `event_id`        | INTEGER | NOT NULL, FK → `events(id)` ON DELETE CASCADE              |
-| `kind`            | TEXT    | NOT NULL                                                   |
-| `claimed_at`      | TEXT    | NOT NULL, default `datetime('now')`                        |
-| `delivered_at`    | TEXT    | Nullable                                                   |
-
-Constraint: `UNIQUE(subscription_id, event_id, kind)`. Index:
-`idx_subscription_notifications_lookup(event_id, kind, subscription_id)`.
+The email subscription tables (`email_subscriptions`, `subscription_verifications`,
+`subscription_unsubscribes`, `subscription_notifications`) were dropped by
+migration 0082 when fan email was retired (2026-10-31).
 
 #### `schedule_builds`
 
@@ -852,22 +702,13 @@ plain denormalized integers with no constraint, called out individually):
 | `trusted_devices`            | `user_id`            | `users(id)`               | CASCADE   |
 | `audit_log`                  | `user_id`            | `users(id)`               | SET NULL  |
 | `auth_attempts`              | `user_id`            | `users(id)`               | SET NULL  |
-| `band_follows`               | `band_profile_id`    | `band_profiles(id)`       | CASCADE   |
-| `band_follow_notifications`  | `performance_id`     | `performances(id)`        | CASCADE   |
-| `band_follow_notifications`  | `band_follow_id`     | `band_follows(id)`        | CASCADE   |
-| `band_announce_queue`        | `band_follow_id`     | `band_follows(id)`        | CASCADE   |
-| `band_announce_queue`        | `performance_id`     | `performances(id)`        | CASCADE   |
 | `share_links`                | `event_id`           | `events(id)`              | CASCADE   |
-| `subscription_verifications` | `subscription_id`    | `email_subscriptions(id)` | CASCADE   |
-| `subscription_unsubscribes`  | `subscription_id`    | `email_subscriptions(id)` | CASCADE   |
 | `schedule_builds`            | `event_id`           | `events(id)`              | CASCADE   |
 | `schedule_builds`            | `performance_id`     | `performances(id)`        | CASCADE   |
 | `audit_log` | `api_key_id` | `api_keys(id)` | (none) |
 | `api_keys` | `created_by` | `users(id)` | RESTRICT |
 | `event_daily_stats` | `event_id` | `events(id)` | CASCADE |
 | `share_link_views` | `slug` | `share_links(slug)` | CASCADE |
-| `subscription_notifications` | `event_id` | `events(id)` | CASCADE |
-| `subscription_notifications` | `subscription_id` | `email_subscriptions(id)` | CASCADE |
 | `event_venue_delays` | `event_id` | `events(id)` | CASCADE |
 | `event_venue_delays` | `venue_id` | `venues(id)` | CASCADE |
 | `event_venue_delays` | `updated_by` | `users(id)` | SET NULL |
@@ -921,41 +762,6 @@ FROM share_links sl
 JOIN events e ON e.id = sl.event_id AND e.status IN ('published', 'archived')
 WHERE sl.slug = ? AND sl.expires_at > datetime('now');
 ```
-
-**Atomic claim-before-send** (`functions/utils/bandFollowNotify.js`) — how
-`band_follow_notifications` prevents double-sending announcement emails under
-concurrent resend requests:
-
-```sql
--- `?claimed` below is ONE toSqliteDateTime() value per send attempt.
-
--- 1. Claim. changes === 0 means a row already exists for this follower.
-INSERT OR IGNORE INTO band_follow_notifications (performance_id, band_follow_id, claimed_at)
-VALUES (?, ?, ?claimed);
-
--- 2. Only when step 1 claimed nothing: take over an ABANDONED claim
---    (undelivered and older than the 15-minute lease). A delivered row or a
---    live claim matches nothing, so at most one request wins.
-UPDATE band_follow_notifications
-   SET claimed_at = ?claimed
- WHERE performance_id = ? AND band_follow_id = ?
-   AND delivered_at IS NULL
-   AND claimed_at <= datetime('now', '-15 minutes');
-
--- 3a. Send succeeded: record the delivery. Mandatory, because an unmarked
---     claim becomes retryable once its lease expires.
-UPDATE band_follow_notifications SET delivered_at = datetime('now')
- WHERE performance_id = ? AND band_follow_id = ?;
-
--- 3b. Send failed: release ONLY this attempt's undelivered claim, so a
---     later takeover or a delivery made meanwhile is never removed (#1311).
-DELETE FROM band_follow_notifications
- WHERE performance_id = ? AND band_follow_id = ?
-   AND claimed_at = ?claimed AND delivered_at IS NULL;
-```
-
-The lease is `CLAIM_LEASE_MINUTES`. Every reader that asks "has this follower
-been handled?" uses `claimIsLiveSql()` from the same file.
 
 **Compensating delete on a non-batchable mutation**
 (`functions/api/admin/events/[id]/duplicate.js`) — D1 has no transactions, so

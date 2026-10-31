@@ -130,7 +130,7 @@ describe("/api/bands/:name/unfollow", () => {
       .prepare("INSERT INTO band_follows (email, band_profile_id, unsubscribe_token) VALUES (?, ?, ?)")
       .run("fan@example.com", band.band_profile_id, "sha256:keyless").lastInsertRowid;
     const token = await unsubscribeToken(env, UNSUBSCRIBE_KINDS.bandFollow, id);
-    delete env.CSRF_SECRET;
+    delete env.UNSUBSCRIBE_LINK_SECRET;
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const res = await onRequestPost({

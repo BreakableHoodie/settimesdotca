@@ -381,7 +381,7 @@ describe("notifyBandFollowers", () => {
 
   test("without the link key it sends nothing and leaves no claim behind (#1415)", async () => {
     const { env, rawDb } = createTestEnv();
-    delete env.CSRF_SECRET;
+    delete env.UNSUBSCRIBE_LINK_SECRET;
     const event = insertEvent(rawDb, { name: "Fest", slug: "fest-nokey" });
     const perf = insertBand(rawDb, { name: "The Band", event_id: event.id });
     const followId = rawDb

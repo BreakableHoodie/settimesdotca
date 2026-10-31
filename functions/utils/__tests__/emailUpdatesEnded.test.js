@@ -5,8 +5,9 @@ import * as confirmFollow from "../../api/bands/[name]/confirm-follow.js";
 import * as confirmBatch from "../../api/bands/confirm-follow-batch.js";
 import * as unsubscribe from "../../api/subscriptions/unsubscribe.js";
 import * as verify from "../../api/subscriptions/verify.js";
+import * as subscribePage from "../../subscribe.js";
 
-const ROUTES = { unfollow, confirmFollow, confirmBatch, unsubscribe, verify };
+const ROUTES = { unfollow, confirmFollow, confirmBatch, unsubscribe, verify, subscribePage };
 
 // No DB binding at all: any read or write would throw.
 const ctx = (method) => ({

@@ -638,7 +638,7 @@ Incident detail: `docs/field-notes/lineup-cancellation.md`.
 
 settimes.ca no longer emails fans. Band follows, event subscriptions and announcement email were removed (10 follows from 2 people, 0 announcements ever delivered), which made CASL's sender-footer question moot. What remains is account mail: password reset, invites and signup activation, `resend-activation`, MFA notices.
 
-- **The old emailed URLs stay alive** (`bands/[name]/unfollow`, `confirm-follow`, `confirm-follow-batch`, `subscriptions/unsubscribe`, `subscriptions/verify`): each answers 410 with one static page (`functions/utils/emailUpdatesEnded.js`) that ignores the token and never touches D1. Do not delete them; they are in inboxes.
+- **The old emailed URLs stay alive** (`bands/[name]/unfollow`, `confirm-follow`, `confirm-follow-batch`, `subscriptions/unsubscribe`, `subscriptions/verify`): each answers 410 with one static page (`functions/utils/emailUpdatesEnded.js`) that ignores the token and reads no table. `/subscribe` (`functions/subscribe.js`) answers the same. Do not delete them; they are in inboxes and search indexes.
 - **`sendEmail` sends no caller-supplied headers.** The List-Unsubscribe path left with fan email, so a stray `headers` argument can never set Bcc or From.
 - **A Resend 409 is never "delivered".** `concurrent_idempotent_requests` is a send in flight; `invalid_idempotent_request` (a reused `Idempotency-Key`) cannot prove a send and is logged at `error`. Kept for any future claim-then-send mail.
 - **Do not bring fan email back without** double opt-in, per-recipient caps, signed rotatable unsubscribe links, a CASL sender footer with a mailing address, and claim/delivery tracking. The retired design and its incidents: `docs/field-notes/email-delivery.md`.
@@ -900,7 +900,7 @@ addresses, never by loosening the scan. In the mutation gate.
 ### Retention windows are a published promise
 
 The privacy policy's retention table (`frontend/src/pages/PrivacyPage.jsx`) states
-how long each kind of personal data is kept. Two handlers make the other published windows true:
+how long each kind of personal data is kept. Two handlers make the published windows true:
 `functions/api/admin/maintenance/retention.js` deletes expired rows, and
 `functions/scheduled/anonymize-schedule-builds.js` anonymises schedule-build
 visitor codes 30 days after an event. Both run daily

@@ -1,7 +1,7 @@
 // Cloudflare Turnstile server-side verification.
 //
-// Used by the public POST endpoints that need a bot gate (api/metrics.js), so the
-// bot-gate logic — and especially its fail-closed posture — lives in exactly one place.
+// Unused since fan email was retired (follow and subscribe were its only
+// callers); removal is tracked in #1431.
 //
 // SECURITY: when TURNSTILE_SECRET_KEY is unset we fail OPEN only in local dev
 // and fail CLOSED in production. A missing or misconfigured secret must never

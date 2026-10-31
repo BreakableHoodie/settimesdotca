@@ -144,6 +144,8 @@ describe("staticPageMeta — durable guard: every static _routes.json include ac
     /^\/events\//,
     /^\/band\//,
     /^\/venue\//,
+    // Retired page: a 410 (emailUpdatesEnded.js), not a page with meta.
+    /^\/subscribe$/,
   ];
 
   function isExempt(routePattern) {

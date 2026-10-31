@@ -194,9 +194,8 @@ export default function PrivacyPage() {
             <p>
               Admin accounts use a secure, HTTP-only session cookie. Public pages use a{' '}
               <code className="text-accent-400 text-sm">csrf_token</code> cookie for cross-site request forgery
-              protection when you interact with forms. Cloudflare (our hosting provider) and Turnstile (our bot
-              protection service) may also set security and anti-abuse cookies as part of their infrastructure and
-              challenge flow. The privacy banner acknowledgement is stored in{' '}
+              protection when you interact with forms. Cloudflare (our hosting provider) may also set security and
+              anti-abuse cookies as part of its infrastructure. The privacy banner acknowledgement is stored in{' '}
               <code className="text-accent-400 text-sm">localStorage</code>, not a cookie.
             </p>
           </section>

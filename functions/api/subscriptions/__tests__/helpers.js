@@ -22,6 +22,7 @@ export function createMockContext(mockDB) {
       // now "production" (secure/closed), not localhost-sniffing. (#425)
       ENVIRONMENT: "test",
       CSRF_SECRET: "test-csrf-secret-for-unit-tests",
+      UNSUBSCRIBE_LINK_SECRET: "test-unsubscribe-link-secret-for-unit-tests",
     },
   };
 }

@@ -1157,9 +1157,19 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'Band Announcements' — an unsubscribe link that cannot be checked (no key) is a 500, never a false 'removed' page",
     file: "functions/utils/unsubscribeLinks.js",
-    find: 'throw new Error("CSRF_SECRET is required to verify unsubscribe links");',
-    replace: "return null;",
+    find: 'const secrets = [currentSecret(env, "verify")];',
+    replace:
+      "const secrets = [env?.UNSUBSCRIBE_LINK_SECRET].filter(isSecret);\n  if (secrets.length === 0) return null;",
     tests: ["functions/api/bands/__tests__/unfollow.test.js"],
+  },
+  {
+    id: "unsubscribe-verify-accepts-previous-key",
+    invariant:
+      "CLAUDE.md 'Band Announcements' — a rotated unsubscribe key keeps verifying as the previous key, so sent links survive a rotation",
+    file: "functions/utils/unsubscribeLinks.js",
+    find: "if (isSecret(previous)) secrets.push(previous);",
+    replace: "if (false) secrets.push(previous);",
+    tests: ["functions/utils/__tests__/unsubscribeLinks.test.js"],
   },
   {
     id: "unsubscribe-token-binds-kind-to-mac",

@@ -325,6 +325,7 @@ CORS requests with credentials (`credentials: 'include'`) only allowed from appr
 
 ```bash
 CSRF_SECRET=<secret>                       # Required; CSRF HMAC key
+UNSUBSCRIBE_LINK_SECRET=<secret>           # Required; signs unsubscribe links (old key -> UNSUBSCRIBE_LINK_SECRET_PREVIOUS)
 MFA_TOTP_ENCRYPTION_KEY=<secret>            # Required for encrypted TOTP secrets; never rotate after use
 TURNSTILE_SECRET_KEY=<secret>              # Required; production bot protection fails closed when absent
 CRON_SECRET=<secret>                       # Required by the scheduled-job endpoint

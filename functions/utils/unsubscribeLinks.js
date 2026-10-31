@@ -3,7 +3,13 @@
 // keep working for the life of its follow. (A D1 Time Travel restore rolls the
 // id counter back, so ids can be reissued after one.)
 //
-// Rotating CSRF_SECRET invalidates every link already sent (#1427).
+// Keyed by UNSUBSCRIBE_LINK_SECRET, never CSRF_SECRET, so a CSRF rotation
+// leaves sent links working (#1427). To rotate this key, move the current value
+// to UNSUBSCRIBE_LINK_SECRET_PREVIOUS and set a new one: links signed with the
+// previous key still verify. Keep the previous key at least 60 days (CASL), so
+// never rotate twice inside that window. If the key LEAKED, set a new one and
+// leave _PREVIOUS unset: sent links stop working, but the leaked key can no
+// longer unsubscribe everyone.
 
 import { logger } from "./logger.js";
 
@@ -40,11 +46,20 @@ function requireId(id) {
   return value;
 }
 
-function secretForBuild(env) {
-  const secret = env?.CSRF_SECRET;
-  if (typeof secret !== "string" || secret.length === 0) {
-    throw new Error("CSRF_SECRET is required to build unsubscribe links");
-  }
+// The salt is empty, so the key is only as strong as the secret: anyone holding
+// one real link can test guesses offline. Generate with `openssl rand -hex 32`.
+const MIN_SECRET_LENGTH = 32;
+
+function isSecret(value) {
+  return typeof value === "string" && value.length >= MIN_SECRET_LENGTH;
+}
+
+function currentSecret(env, purpose) {
+  const secret = env?.UNSUBSCRIBE_LINK_SECRET;
+  if (!isSecret(secret))
+    throw new Error(
+      `UNSUBSCRIBE_LINK_SECRET (${MIN_SECRET_LENGTH}+ characters) is required to ${purpose} unsubscribe links`,
+    );
   return secret;
 }
 
@@ -74,7 +89,7 @@ function decodeBase64Url(value) {
 
 export async function unsubscribeToken(env, kind, id) {
   const value = requireId(id);
-  const secret = secretForBuild(env);
+  const secret = currentSecret(env, "build");
   const key = await getDerivedKey(secret);
   const signature = await crypto.subtle.sign("HMAC", key, macInput(kind, value));
   return `u1.${value}.${base64Url(new Uint8Array(signature))}`;
@@ -91,20 +106,19 @@ export async function verifyUnsubscribeToken(env, kind, token) {
   const signature = decodeBase64Url(match[2]);
   if (!Number.isSafeInteger(id) || signature === null) return null;
 
-  const secret = env?.CSRF_SECRET;
-  if (typeof secret !== "string" || secret.length === 0) {
-    throw new Error("CSRF_SECRET is required to verify unsubscribe links");
-  }
+  const secrets = [currentSecret(env, "verify")];
+  const previous = env.UNSUBSCRIBE_LINK_SECRET_PREVIOUS;
+  if (isSecret(previous)) secrets.push(previous);
+  else if (previous) logger.error("UNSUBSCRIBE_LINK_SECRET_PREVIOUS is too short and is ignored");
 
-  const key = await getDerivedKey(secret);
-  const valid = await crypto.subtle.verify("HMAC", key, signature, macInput(kind, id));
-  if (!valid) {
-    // Well-formed but wrong: a forgery, or a link signed before a key rotation.
-    // The id alone, never the token.
-    logger.warn("unsubscribe MAC mismatch", { kind, id });
-    return null;
+  for (const secret of secrets) {
+    const key = await getDerivedKey(secret);
+    if (await crypto.subtle.verify("HMAC", key, signature, macInput(kind, id))) return id;
   }
-  return id;
+  // Well-formed but wrong: a forgery, or a link signed before the previous key.
+  // The id alone, never the token.
+  logger.warn("unsubscribe MAC mismatch", { kind, id });
+  return null;
 }
 
 export function isDerivedUnsubscribeToken(token) {

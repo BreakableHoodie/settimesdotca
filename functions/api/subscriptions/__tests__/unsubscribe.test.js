@@ -196,7 +196,7 @@ describe("/api/subscriptions/unsubscribe", () => {
       unsubscribe_token: "sha256:stored",
     });
     const token = await unsubscribeToken(mockContext.env, UNSUBSCRIBE_KINDS.subscription, 1);
-    delete mockContext.env.CSRF_SECRET;
+    delete mockContext.env.UNSUBSCRIBE_LINK_SECRET;
     mockContext.request = new Request(`http://localhost/api/subscriptions/unsubscribe?token=${token}`, {
       method: "POST",
     });

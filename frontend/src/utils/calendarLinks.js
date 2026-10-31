@@ -15,12 +15,17 @@ function currentHost() {
   return typeof window !== 'undefined' ? window.location.host : ''
 }
 
+// The download keeps the page's own scheme, so local http dev still works.
+function currentProtocol() {
+  return typeof window !== 'undefined' ? window.location.protocol : 'https:'
+}
+
 /**
  * @param {string} path - feed path starting with "/"
  * @returns {{ webcal: string, google: string, download: string }}
  *   `webcal`: Apple Calendar, Outlook and most phones subscribe on tap.
  *   `google`: Google Calendar's "add by URL" deep link, which wants the webcal URL.
- *   `download`: the plain https URL, for "Download .ics".
+ *   `download`: the plain http(s) URL, for "Download .ics".
  */
 export function calendarLinks(path) {
   const host = currentHost()
@@ -28,6 +33,6 @@ export function calendarLinks(path) {
   return {
     webcal,
     google: `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcal)}`,
-    download: `https://${host}${path}`,
+    download: `${currentProtocol()}//${host}${path}`,
   }
 }

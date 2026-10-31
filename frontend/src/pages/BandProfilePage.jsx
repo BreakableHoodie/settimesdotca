@@ -707,6 +707,7 @@ export default function BandProfilePage() {
                     as="a"
                     href={bandCalendar.webcal}
                     size="sm"
+                    className="min-h-[44px]"
                     icon={<CalendarDays size={14} aria-hidden="true" />}
                   >
                     Add to my calendar
@@ -715,13 +716,13 @@ export default function BandProfilePage() {
                     href={bandCalendar.google}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm text-accent-400 underline-offset-4 hover:text-accent-500 hover:underline"
+                    className="inline-flex min-h-[44px] items-center text-sm text-accent-400 underline-offset-4 hover:text-accent-500 hover:underline"
                   >
                     Google Calendar
                   </a>
                   <a
                     href={bandCalendar.download}
-                    className="text-sm text-accent-400 underline-offset-4 hover:text-accent-500 hover:underline"
+                    className="inline-flex min-h-[44px] items-center text-sm text-accent-400 underline-offset-4 hover:text-accent-500 hover:underline"
                   >
                     Download .ics
                   </a>

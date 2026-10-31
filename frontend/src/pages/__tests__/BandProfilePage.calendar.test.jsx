@@ -69,7 +69,7 @@ describe('BandProfilePage — "Add to my calendar" replaces the email follow', (
     )
     expect(screen.getByRole('link', { name: 'Download .ics' })).toHaveAttribute(
       'href',
-      `https://${host}/api/feeds/ical?band=312`
+      `${window.location.protocol}//${host}/api/feeds/ical?band=312`
     )
     expect(
       screen.getByText(/New sets show up in your calendar automatically as they're announced\./)

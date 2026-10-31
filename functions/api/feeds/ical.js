@@ -58,7 +58,22 @@ export async function onRequestGet(context) {
   try {
     let bandProfile = null;
     if (bandParam !== null) {
-      bandProfile = await env.DB.prepare("SELECT id, name FROM band_profiles WHERE id = ?").bind(bandParam).first();
+      // The band page's existence rule (api/bands/[name].js): an artist is
+      // public only once they have a set in a public event past the reveal
+      // gate. Without it, any id would name a draft-only booking in
+      // X-WR-CALNAME before its lineup was announced.
+      bandProfile = await env.DB.prepare(
+        `SELECT bp.id, bp.name FROM band_profiles bp
+         WHERE bp.id = ?
+           AND EXISTS (
+             SELECT 1 FROM performances p JOIN events e ON e.id = p.event_id
+             WHERE p.band_profile_id = bp.id
+               AND ${publicEventStatusSql("e")}
+               AND (e.reveal_mode = 0 OR p.is_announced = 1)
+           )`,
+      )
+        .bind(bandParam)
+        .first();
       if (!bandProfile) {
         return new Response("Band not found", {
           status: 404,

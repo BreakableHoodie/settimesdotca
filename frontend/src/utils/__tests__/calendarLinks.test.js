@@ -6,7 +6,7 @@ describe('calendarLinks', () => {
     const { webcal, google, download } = calendarLinks(SITE_FEED_PATH)
     const host = window.location.host
     expect(webcal).toBe(`webcal://${host}/api/feeds/ical`)
-    expect(download).toBe(`https://${host}/api/feeds/ical`)
+    expect(download).toBe(`${window.location.protocol}//${host}/api/feeds/ical`)
     expect(google).toBe(`https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcal)}`)
   })
 

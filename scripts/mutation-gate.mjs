@@ -830,6 +830,15 @@ export const MUTATIONS = [
     tests: ["functions/api/feeds/__tests__/ical.test.js"],
   },
   {
+    id: "ical-band-feed-names-only-public-artists",
+    invariant:
+      "CLAUDE.md 'Pulling a band from a live lineup' — the band calendar names an artist only once they have a set in a public event past the reveal gate",
+    file: "functions/api/feeds/ical.js",
+    find: "WHERE p.band_profile_id = bp.id",
+    replace: "WHERE p.band_profile_id = bp.id OR 1 = 1",
+    tests: ["functions/api/feeds/__tests__/ical-band.test.js"],
+  },
+  {
     id: "ical-band-filter-scopes-to-one-artist",
     invariant:
       "CLAUDE.md 'Pulling a band from a live lineup' — `?band=` filters the one shared iCal feed; dropping the predicate would hand every subscriber the whole festival under one artist's name",

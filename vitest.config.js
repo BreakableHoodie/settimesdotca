@@ -7,8 +7,8 @@ export default defineConfig({
     testTimeout: 10000,
     server: {
       deps: {
-        inline: ["better-sqlite3"]
-      }
+        inline: ["better-sqlite3"],
+      },
     },
     coverage: {
       provider: "v8",
@@ -38,21 +38,18 @@ export default defineConfig({
       //
       // Headroom is kept at the previous ~1.3-1.8 points, so the ratchet is as
       // strict as before. A lower number here is NOT a coverage regression.
+      //
+      // 2026-10-31, fan email retired: ~12k lines of well-tested code left, so
+      // the average fell (statements 86.84, branches 79.90, functions 91.26,
+      // lines 87.45) with no remaining file losing a test. Floors follow the
+      // measured values down by one point each, no further.
       thresholds: {
-        statements: 87,
-        branches: 80,
-        functions: 92,
-        lines: 88,
+        statements: 86,
+        branches: 79,
+        functions: 91,
+        lines: 87,
       },
-      exclude: [
-        "node_modules/",
-        "__tests__/",
-        "mocks/",
-        "*.config.js",
-        "dist/",
-        "frontend/",
-        "backend/",
-      ],
+      exclude: ["node_modules/", "__tests__/", "mocks/", "*.config.js", "dist/", "frontend/", "backend/"],
       include: ["functions/**/*.js"],
       reportsDirectory: "./coverage",
     },

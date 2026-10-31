@@ -839,6 +839,15 @@ export const MUTATIONS = [
     tests: ["functions/api/feeds/__tests__/ical-band.test.js"],
   },
   {
+    id: "ical-band-feed-respects-reveal-gate",
+    invariant:
+      "CLAUDE.md 'Pulling a band from a live lineup' — an artist whose only set is unannounced on a reveal-mode event gets no named calendar",
+    file: "functions/api/feeds/ical.js",
+    find: "               AND (e.reveal_mode = 0 OR p.is_announced = 1)",
+    replace: "               AND (e.reveal_mode = 0 OR p.is_announced = 1 OR 1 = 1)",
+    tests: ["functions/api/feeds/__tests__/ical-band.test.js"],
+  },
+  {
     id: "ical-band-filter-scopes-to-one-artist",
     invariant:
       "CLAUDE.md 'Pulling a band from a live lineup' — `?band=` filters the one shared iCal feed; dropping the predicate would hand every subscriber the whole festival under one artist's name",

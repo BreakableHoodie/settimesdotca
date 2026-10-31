@@ -63,7 +63,7 @@ describe('BandProfilePage — "Add to my calendar" replaces the email follow', (
   async function expectLinks() {
     expect(await screen.findByRole('heading', { level: 1, name: 'Calendar Band' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Add to my calendar' })).toHaveAttribute('href', webcal)
-    expect(screen.getByRole('link', { name: 'Google Calendar' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Google Calendar (on a computer)' })).toHaveAttribute(
       'href',
       `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcal)}`
     )

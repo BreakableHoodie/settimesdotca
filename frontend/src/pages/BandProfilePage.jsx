@@ -718,7 +718,7 @@ export default function BandProfilePage() {
                     rel="noopener noreferrer"
                     className="inline-flex min-h-[44px] items-center text-sm text-accent-400 underline-offset-4 hover:text-accent-500 hover:underline"
                   >
-                    Google Calendar
+                    Google Calendar (on a computer)
                   </a>
                   <a
                     href={bandCalendar.download}

@@ -119,6 +119,24 @@ describe("GET /api/feeds/ical?band= — one artist's calendar", () => {
     expect(await res.text()).not.toContain("Secret Headliner");
   });
 
+  test("a band whose only set is unannounced on a reveal-mode event is a 404", async () => {
+    const { env, rawDb, venue } = seed();
+    const reveal = insertEvent(rawDb, { name: "Reveal Fest", slug: "reveal-fest", date: "2099-09-01" });
+    rawDb.prepare("UPDATE events SET status = 'published', reveal_mode = 1 WHERE id=?").run(reveal.id);
+    const hidden = insertBand(rawDb, {
+      name: "Not Yet Revealed",
+      event_id: reveal.id,
+      venue_id: venue.id,
+      start_time: "22:00",
+      end_time: "23:00",
+    });
+    rawDb.prepare("UPDATE performances SET is_announced = 0 WHERE id=?").run(hidden.id);
+
+    const res = await get(env, `?band=${hidden.band_profile_id}`);
+    expect(res.status).toBe(404);
+    expect(await res.text()).not.toContain("Not Yet Revealed");
+  });
+
   test("a band with no sets at all is a 404", async () => {
     const { env, rawDb } = seed();
     const bare = rawDb

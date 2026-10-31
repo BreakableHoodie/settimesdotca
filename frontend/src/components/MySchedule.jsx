@@ -30,7 +30,6 @@ import { torontoClock } from '../utils/festivalDays'
 import { buildRouteIcs } from '../utils/routeIcs'
 import { useFestivalDayFilter } from '../hooks/useFestivalDayFilter'
 import BandCard from './BandCard'
-import LockInLineupPanel from './LockInLineupPanel'
 import { DayDivider, DayTabs } from './ui'
 import { walkMinutesBetween } from '../utils/walkTime'
 
@@ -192,9 +191,9 @@ function MySchedule({
   // Filter (not scroll-anchor, locked product decision): once a day tab is
   // active, everything below — conflict/overlap detection, the countdown
   // list, the "longest break" reminder — operates on just that day's
-  // selections. Share schedule / Lock-In deliberately read the RAW `bands`
-  // prop instead (see handleShareSchedule/performanceIds below), not this
-  // filtered set, so sharing/locking in always covers the fan's whole
+  // selections. Share schedule deliberately reads the RAW `bands`
+  // prop instead (see handleShareSchedule below), not this
+  // filtered set, so sharing always covers the fan's whole
   // multi-day route regardless of which day tab they're looking at.
   const dayFilteredBands = useMemo(
     () => (hasDayTabs && activeDate ? bands.filter(band => band.date === activeDate) : bands),
@@ -303,17 +302,6 @@ function MySchedule({
 
   const bandById = useMemo(() => new Map(visibleBands.map(b => [b.id, b])), [visibleBands])
   const bandNameById = useMemo(() => new Map(visibleBands.map(b => [b.id, b.name])), [visibleBands])
-
-  // Extract numeric performance IDs from band composite IDs (e.g. "event-slug-perf-42" → 42).
-  // Mirrors the same split used in handleShareSchedule so the two stay in sync.
-  const performanceIds = useMemo(() => {
-    return bands.reduce((acc, band) => {
-      const parts = band.id.split('-')
-      const id = parseInt(parts[parts.length - 1], 10)
-      if (Number.isFinite(id) && id > 0) acc.push(id)
-      return acc
-    }, [])
-  }, [bands])
 
   const timedBands = bands.filter(band => band.startTime)
   const canAddRouteToCalendar = timedBands.length > 0
@@ -834,10 +822,6 @@ function MySchedule({
             </Fragment>
           )
         })}
-      </div>
-
-      <div className="max-w-5xl mx-auto">
-        <LockInLineupPanel performanceIds={performanceIds} bandCount={performanceIds.length} />
       </div>
 
       {routeCalendarControl}

@@ -6,8 +6,8 @@
 // against our sender reputation. This caps the address instead, whatever IPs the
 // requests come from.
 //
-// Shared by follow, follow-batch, subscribe and resend-activation: one window, one
-// counter per address, so 3 follows + 2 subscribes exhaust the same allowance.
+// Used by resend-activation (the fan-facing follow and subscribe senders were
+// removed): one window, one counter per address.
 //
 // The key is a SHA-256 digest of the normalised address, never the address itself:
 // `rate_limits` is pruned on a timer and must not become a second place that

@@ -9,16 +9,12 @@ vi.mock("../../../scheduled/expire-share-links.js", () => ({
 vi.mock("../../../scheduled/anonymize-schedule-builds.js", () => ({
   anonymizeScheduleBuilds: vi.fn(() => Promise.resolve({ failures: [] })),
 }));
-vi.mock("../../../utils/announceDigest.js", () => ({
-  flushAnnounceDigest: vi.fn(() => Promise.resolve()),
-}));
 
 import { createTestEnv } from "../../test-utils.js";
 import { onRequestPost } from "../run-scheduled.js";
 import { runRetentionCleanup } from "../../../api/admin/maintenance/retention.js";
 import { expireShareLinks } from "../../../scheduled/expire-share-links.js";
 import { anonymizeScheduleBuilds } from "../../../scheduled/anonymize-schedule-builds.js";
-import { flushAnnounceDigest } from "../../../utils/announceDigest.js";
 
 const SECRET = "test-cron-secret-for-unit-tests";
 
@@ -112,6 +108,5 @@ describe("POST /api/internal/run-scheduled", () => {
     expect(typeof body.durationMs).toBe("number");
     expect(expireShareLinks).toHaveBeenCalledOnce();
     expect(anonymizeScheduleBuilds).toHaveBeenCalledOnce();
-    expect(flushAnnounceDigest).toHaveBeenCalledOnce();
   });
 });

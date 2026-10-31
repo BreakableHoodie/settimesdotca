@@ -1,4 +1,4 @@
-import { Archive, ArrowLeft, Bell, CircleAlert, WifiOff, X } from 'lucide-react'
+import { Archive, ArrowLeft, CircleAlert, Info, WifiOff, X } from 'lucide-react'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
@@ -951,13 +951,9 @@ function App() {
         {/* Teaser for either "more bands" or "no set times yet" — see stillToCome */}
         {stillToCome && (
           <div className="flex items-start gap-2 rounded-lg border border-accent-500/20 bg-accent-500/10 px-3 py-2.5 text-xs sm:items-center sm:gap-3 sm:px-4 sm:py-3 sm:text-sm">
-            <Bell size={16} className="shrink-0 text-accent-400" aria-hidden="true" />
+            <Info size={16} className="shrink-0 text-accent-400" aria-hidden="true" />
             <p className="text-text-secondary">
-              <span className="font-semibold">{stillToCome}</span>{' '}
-              <a href="/subscribe" className="underline hover:text-accent-200 transition-colors">
-                Subscribe for updates
-              </a>{' '}
-              or follow individual bands on their profile pages.
+              <span className="font-semibold">{stillToCome}</span>
             </p>
           </div>
         )}

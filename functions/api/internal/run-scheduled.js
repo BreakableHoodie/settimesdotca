@@ -23,7 +23,7 @@ function secretsMatch(a, b) {
  *
  * Secret-protected endpoint that invokes the scheduled handler (popularity
  * aggregation + PII retention cleanup + share-link expiry + schedule-build
- * anonymisation + announcement digest delivery). Called by the
+ * anonymisation). Called by the
  * .github/workflows/scheduled-jobs.yml GitHub Actions cron workflow because
  * Cloudflare Pages does not support native cron triggers.
  *

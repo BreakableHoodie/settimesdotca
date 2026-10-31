@@ -233,11 +233,6 @@ export default function RosterTab({ showToast, readOnly = false }) {
         const bVal = (b.last_event_name || '').toLowerCase()
         return sortConfig.direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
       }
-      if (sortConfig.key === 'follower_count') {
-        const aVal = a.follower_count ?? 0
-        const bVal = b.follower_count ?? 0
-        return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal
-      }
       if (sortConfig.key === 'link_count') {
         const aVal = countLinks(a)
         const bVal = countLinks(b)
@@ -818,18 +813,6 @@ export default function RosterTab({ showToast, readOnly = false }) {
                       triggerRef={filterRefs.contact_email}
                       renderColumnFilterPanel={renderColumnFilterPanel}
                     />
-                    <FilterableHeader
-                      sortKey="follower_count"
-                      label="Followers"
-                      align="right"
-                      sortConfig={sortConfig}
-                      columnFilters={columnFilters}
-                      openFilterKey={openFilterKey}
-                      onSort={handleSort}
-                      onToggleFilter={toggleFilterPanel}
-                      triggerRef={filterRefs.follower_count}
-                      renderColumnFilterPanel={renderColumnFilterPanel}
-                    />
                     {!readOnly && (
                       <th className="sticky right-0 z-10 after:absolute after:inset-y-0 after:left-0 after:w-px after:bg-white/40 after:content-[''] bg-bg-navy px-3 py-3 text-right text-white font-semibold whitespace-nowrap align-middle">
                         Actions
@@ -914,15 +897,6 @@ export default function RosterTab({ showToast, readOnly = false }) {
                           <SocialLinksIcons band={band} />
                         </td>
                         <td className="px-3 py-3 text-white/70">{band.contact_email || '-'}</td>
-                        <td className="px-3 py-3 text-right text-white/70">
-                          {band.follower_count > 0 ? (
-                            <span className="inline-flex items-center rounded-full bg-accent-500/15 px-2 py-1 text-xs font-semibold text-accent-300">
-                              {band.follower_count}
-                            </span>
-                          ) : (
-                            <span className="text-white/30">0</span>
-                          )}
-                        </td>
                         {!readOnly && (
                           <td
                             className={`sticky right-0 z-10 after:absolute after:inset-y-0 after:left-0 after:w-px after:bg-white/40 after:content-[''] px-3 py-3 ${stickyCellClassName}`}
@@ -1001,7 +975,6 @@ export default function RosterTab({ showToast, readOnly = false }) {
                       <SocialLinksIcons band={band} />
                     </div>
                     <div>Contact: {band.contact_email || '-'}</div>
-                    <div>Followers: {band.follower_count ?? 0}</div>
                   </div>
                   {!readOnly && (
                     <div className="flex flex-wrap gap-2">

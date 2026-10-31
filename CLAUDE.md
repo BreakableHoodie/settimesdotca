@@ -10,19 +10,19 @@ AI assistant context for this codebase. Captures non-obvious invariants, known g
 
 Invoke these without being asked — don't wait for the user to request them:
 
-| Trigger                                                                                                           | Action                                                                                                                                                                                             |
-| ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Before opening any PR**                                                                                         | `make review` (CodeRabbit) — the standing review gate                                                                                                                                              |
-| Multi-file feature touching a documented invariant, a migration, or an architectural decision                     | Invoke `pr-review-toolkit:code-reviewer` agent **in addition** to CodeRabbit                                                                                                                       |
-| **Any bug you diagnose**                                                                                          | Sweep for other instances of the same class before calling it fixed — see "Sweep for siblings" below                                                                                               |
-| **Adding/changing a test for a documented invariant in `functions/` or `frontend/`**                              | Add/refresh its entry in `scripts/mutation-gate.mjs` (frontend entries: `stack: "frontend"`) — see "The mutation gate" below. A test only ever seen passing proves nothing                         |
-| **Adding a new handler under `functions/api/`**                                                                   | It must be executed by at least one test. `make coverage-floor` fails on any file at 0% — the global coverage average cannot see a file-shaped hole                                                |
-| After editing `functions/utils/auth.js`, session endpoints (`sessions/`), or follow/unfollow/confirm-follow flows | Invoke `cloudflare-security-reviewer` agent                                                                                                                                                        |
-| After writing or modifying error handling (`catch` blocks, `.catch()`, `try/finally`) in `functions/`             | Invoke `pr-review-toolkit:silent-failure-hunter` agent                                                                                                                                             |
-| After editing `frontend/src/` public pages (outside `admin/`)                                                     | Scan for `text-white`/`bg-white` theme violations before finishing                                                                                                                                 |
-| After adding/editing anything in `migrations/`                                                                    | Run `node scripts/regenerate-setup-complete.mjs` then `node scripts/check-schema-drift.mjs` — `setup-complete.sql`'s schema section is generated, never hand-edit it (CI enforces via quality.yml) |
-| When SEO-relevant pages change (band pages, event pages, venue pages)                                             | Check structured data and `document.title` assignments                                                                                                                                             |
-| **Start of a release cycle, or ~quarterly**                                                                       | Run the codebase report card — `docs/REPORT_CARD_REVIEW.md` (see below)                                                                                                                            |
+| Trigger                                                                                                 | Action                                                                                                                                                                                             |
+| ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Before opening any PR**                                                                               | `make review` (CodeRabbit) — the standing review gate                                                                                                                                              |
+| Multi-file feature touching a documented invariant, a migration, or an architectural decision           | Invoke `pr-review-toolkit:code-reviewer` agent **in addition** to CodeRabbit                                                                                                                       |
+| **Any bug you diagnose**                                                                                | Sweep for other instances of the same class before calling it fixed — see "Sweep for siblings" below                                                                                               |
+| **Adding/changing a test for a documented invariant in `functions/` or `frontend/`**                    | Add/refresh its entry in `scripts/mutation-gate.mjs` (frontend entries: `stack: "frontend"`) — see "The mutation gate" below. A test only ever seen passing proves nothing                         |
+| **Adding a new handler under `functions/api/`**                                                         | It must be executed by at least one test. `make coverage-floor` fails on any file at 0% — the global coverage average cannot see a file-shaped hole                                                |
+| After editing `functions/utils/auth.js`, session endpoints (`sessions/`), or any route that sends email | Invoke `cloudflare-security-reviewer` agent                                                                                                                                                        |
+| After writing or modifying error handling (`catch` blocks, `.catch()`, `try/finally`) in `functions/`   | Invoke `pr-review-toolkit:silent-failure-hunter` agent                                                                                                                                             |
+| After editing `frontend/src/` public pages (outside `admin/`)                                           | Scan for `text-white`/`bg-white` theme violations before finishing                                                                                                                                 |
+| After adding/editing anything in `migrations/`                                                          | Run `node scripts/regenerate-setup-complete.mjs` then `node scripts/check-schema-drift.mjs` — `setup-complete.sql`'s schema section is generated, never hand-edit it (CI enforces via quality.yml) |
+| When SEO-relevant pages change (band pages, event pages, venue pages)                                   | Check structured data and `document.title` assignments                                                                                                                                             |
+| **Start of a release cycle, or ~quarterly**                                                             | Run the codebase report card — `docs/REPORT_CARD_REVIEW.md` (see below)                                                                                                                            |
 
 The `hooks` in `.claude/settings.local.json` automate the mechanical parts (prettier, ESLint, pre-PR gate). The triggers above require judgment — apply them proactively.
 
@@ -617,10 +617,10 @@ The API-key routes batch their audit row with the change. **That is not a repo-w
 
 **Use the cancel toggle (`is_cancelled = 1`). Do not un-announce, and do not delete the row.**
 
-- **`is_announced = 0` hides nothing on a `reveal_mode = 0` event**, which is the normal published state. Per-performance public read paths gate with `(e.reveal_mode = 0 OR p.is_announced = 1)` (some bind it as `? = 0`), which short-circuits true. There are ten: `api/bands/[name].js`, `api/bands/[name]/stage-mates.js`, `api/bands/stats/[name].js`, `api/events/[id]/details.js`, `api/events/timeline.js`, `api/feeds/ical.js`, `api/schedule.js`, `api/schedule/share/[slug].js`, `api/venues/[id].js`, `event/[slug].js`. To sweep, grep `is_announced = 1` and then check the projection, because `follow-batch.js`, `schedule/build.js`, `s/[slug].js` and `api/history.js` (counts and distinct band/venue lists) match but return no per-performance rows. The `0 → 1` transition still sends follower email, so un- and re-announcing can mail people while changing nothing publicly.
+- **`is_announced = 0` hides nothing on a `reveal_mode = 0` event**, which is the normal published state. Per-performance public read paths gate with `(e.reveal_mode = 0 OR p.is_announced = 1)` (some bind it as `? = 0`), which short-circuits true. There are ten: `api/bands/[name].js`, `api/bands/[name]/stage-mates.js`, `api/bands/stats/[name].js`, `api/events/[id]/details.js`, `api/events/timeline.js`, `api/feeds/ical.js`, `api/schedule.js`, `api/schedule/share/[slug].js`, `api/venues/[id].js`, `event/[slug].js`. To sweep, grep `is_announced = 1` and then check the projection, because `schedule/build.js`, `s/[slug].js` and `api/history.js` (counts and distinct band/venue lists) match but return no per-performance rows.
 - **Deleting the row** hides the set, but fans get no cancellation signal, and it vanishes silently from shared routes (#733).
-- **Cancelling** (the LineupTab toggle: `PATCH /api/admin/bands/:id` with `is_cancelled: true`, editor or above, #732) keeps the set visible and struck through on every fan surface, drops it from "up next" and live time math, makes it unselectable, emits `STATUS:CANCELLED`, and blocks the announcement email. It applies to one performance: a band with two sets needs two cancels.
-- **Un-cancelling resends nothing**, since the announce path needs an `is_announced` `0 → 1` transition. **It is also the one transition that can double-book**, because a cancelled set frees its slot: the PATCH runs `checkConflicts` on `1 → 0` and 409s naming the holder, never auto-resolving.
+- **Cancelling** (the LineupTab toggle: `PATCH /api/admin/bands/:id` with `is_cancelled: true`, editor or above, #732) keeps the set visible and struck through on every fan surface, drops it from "up next" and live time math, makes it unselectable, and emits `STATUS:CANCELLED`. It applies to one performance: a band with two sets needs two cancels.
+- **Un-cancelling is the one transition that can double-book**, because a cancelled set frees its slot: the PATCH runs `checkConflicts` on `1 → 0` and 409s naming the holder, never auto-resolving.
 
 **Calendar surfaces never invent times.** Three surfaces share these rules: `functions/api/feeds/ical.js`, `prepareBands` (`DEFAULT_SET_DURATION_MS` in `frontend/src/utils/bandUtils.js`) and the My Route export (`frontend/src/utils/routeIcs.js`, #1251). Change one, change all.
 
@@ -634,51 +634,19 @@ The server feed's two fallbacks are in the mutation gate (`ical-no-fabricated-st
 
 Incident detail: `docs/field-notes/lineup-cancellation.md`.
 
-### A claim is not a delivery record (#1152)
+## Email is account mail only — fan email retired 2026-10-31
 
-`band_follow_notifications` once used one row for both "sending to this person" and "sent". A Worker that died between the two left a row that every reader, resends included, read as delivered, and the follower was dropped silently. Migration 0065 split it into `claimed_at` (NOT NULL, defaults to now) and `delivered_at` (set **only** on provider confirmation), and dropped `notified_at`.
+settimes.ca no longer emails fans. Band follows, event subscriptions and announcement email were removed (10 follows from 2 people, 0 announcements ever delivered), which made CASL's sender-footer question moot. What remains is account mail: password reset, invites and signup activation, `resend-activation`, MFA notices.
 
-**Two rules, always tested as a pair:** an undelivered claim past its lease is retried; a delivered row is never retried, however old. Rule 1 alone is satisfied by retrying everything, which re-mails the whole history.
-
-- Failed-send release matches that attempt's `claimed_at` and `delivered_at IS NULL`, so it cannot remove a later takeover or delivery.
-- `CLAIM_LEASE_MINUTES` (15) and `claimIsLiveSql(alias)` in `functions/utils/bandFollowNotify.js` are the single home for "does this row still speak for the follower?". Readers import it: `resend-announcement.js` and `events/[id]/metrics.js` (`would_notify_count`).
-- **Marking `delivered_at` on success is mandatory.** Left unmarked, a success looks like a crash and is re-mailed 15 minutes later. `announceDigest.js` is the easy one to miss.
-- **Guard tests live at the sender** (`notifyBandFollowers` called directly). The read filter and the takeover's `delivered_at IS NULL` are each independently sufficient, so handler-level tests survive breaking either one. Both sender tests are in the mutation gate.
-- **A confirmation write must never fail a delivered send.** Every `SET delivered_at` write is caught locally, logged, and still counted as sent: `bandFollowNotify.js`, `announceDigest.js`, `subscriberNotify.js`. `deliveryConfirmationGuard.test.js` finds each write, asserts by brace depth that it sits inside a `try`, asserts it finds at least three, and asserts its own detector can return false.
-- **Resend requests carry an `Idempotency-Key`:** `band-follow:<performanceId>:<followerId>`, `subscriber:<eventId>:<kind>:<subscriptionId>`, and `announce-digest:<sha256>` over the recipient and sorted performance ids. **Both 409s mean undelivered.** `concurrent_idempotent_requests` is still in flight; `invalid_idempotent_request` cannot prove a send, so it is logged at `error`. A retry may run at once, but it cannot succeed until the 24h key expires: a possible late duplicate, never a silent drop. Postmark and MailChannels get no key; they have no equivalent.
-
-The incident and the mutation evidence: `docs/field-notes/email-delivery.md`.
-
-## Band Announcements
-
-Band follows are **double opt-in**: `POST /api/bands/:name/follow` creates the row `verified = 0` with a `verification_token` and sends only a confirmation email. Clicking the link first loads `GET /api/bands/:name/confirm-follow?token=…`, which renders a confirmation page; its form POST sets `verified = 1` and clears the token (idempotent). Announcement emails target `verified = 1` followers **only** (the `WHERE … verified = 1` filter in `admin/bands/[id].js` and `resend-announcement.js`), so an address the submitter doesn't control can never be enrolled in the announcement stream — it receives at most one confirmation email. **Do not revert follow to auto-verify (`verified = 1` on insert)** — it reopens the email-bombing vector.
-
-### Emailed links never act on a GET (#1291)
-
-Mail scanners fetch links with GET, so confirmation and unsubscribe GETs render a no-store, noindex page with a button and write nothing; the POST acts. Those POSTs accept the token from the form or the query string (RFC 8058 one-click). Confirmation URLs are echoed in API responses only for allowed development requests with email unconfigured. Links expire after 7 days; an expired pending request is deleted on re-request and gets a fresh token and consent timestamp.
-
-**The page's `<meta name="referrer" content="same-origin">` is load-bearing.** Under the global `Referrer-Policy: no-referrer` a browser posts the form with `Origin: null`, which the origin allowlist rejects. `curl` and every unit test passed while every Chromium button failed, so verify a change by clicking in a real browser against `wrangler pages dev`. Never allowlist `"null"` (sandboxed iframes send it).
-
-**The double opt-in gate is guarded by `functions/api/admin/bands/__tests__/announce-double-opt-in.test.js`**, which seeds an **unverified** follower and asserts it is never queued or emailed, one case per sender. **A third sender means a third case.** Before it, every fixture seeded `verified = 1`, and deleting the gate left all tests green.
-
-When a performance is announced (`is_announced` 0→1), verified followers are emailed once, tracked per follower in `band_follow_notifications (performance_id, band_follow_id)`; `POST /api/admin/bands/:id/resend-announcement` emails only followers with no live claim (`claimIsLiveSql`), never a delivered row (see "A claim is not a delivery record"). Shared logic: `functions/utils/bandFollowNotify.js`. **Do not reintroduce a fire-once latch without per-follower tracking.**
-
-**No stored token is redeemable (#1415).** `verification_token`/`batch_token` hold `hashStoredToken()` digests; readers hash before binding, and a subscription re-request rotates the token (bound to the hash as read, `created_at` kept). Unsubscribe links are `u1.<id>.<HMAC>`, derived per email from the row id (`functions/utils/unsubscribeLinks.js`, kind in the MAC); senders never read `unsubscribe_token`, which holds a digest. Older links are looked up by hash. Keyed by `UNSUBSCRIBE_LINK_SECRET` (rotate via `_PREVIOUS`, #1427); no key is a 500, never a false "removed" page.
-
-Follow, subscriber and single-band digest mail carries RFC 8058 one-click unsubscribe headers (`functions/utils/email.js`); multi-band digests deliberately do not, because one click must not silently remove only one of several follows.
-
-Bot protection on follow and subscribe goes through `verifyTurnstile()` (`functions/utils/turnstile.js`), which **fails closed in production**: `TURNSTILE_SECRET_KEY` must be set in the production Pages project.
+- **The old emailed URLs stay alive** (`bands/[name]/unfollow`, `confirm-follow`, `confirm-follow-batch`, `subscriptions/unsubscribe`, `subscriptions/verify`): each answers 410 with one static page (`functions/utils/emailUpdatesEnded.js`) that ignores the token and never touches D1. Do not delete them; they are in inboxes.
+- **`sendEmail` sends no caller-supplied headers.** The List-Unsubscribe path left with fan email, so a stray `headers` argument can never set Bcc or From.
+- **A Resend 409 is never "delivered".** `concurrent_idempotent_requests` is a send in flight; `invalid_idempotent_request` (a reused `Idempotency-Key`) cannot prove a send and is logged at `error`. Kept for any future claim-then-send mail.
+- **Do not bring fan email back without** double opt-in, per-recipient caps, signed rotatable unsubscribe links, a CASL sender footer with a mailing address, and claim/delivery tracking. The retired design and its incidents: `docs/field-notes/email-delivery.md`.
 
 ### Public senders cap emails per recipient (#1337)
 
-Follow, follow-batch, subscribe and resend-activation share ONE allowance per address: 5 emails per 24 h (`functions/utils/recipientEmailCap.js`), whatever IPs the requests come from. A batch is one email. The `rate_limits` key is `email-recipient:` plus a SHA-256 of the trimmed, lowercased address; the raw address is never stored or logged (logs carry 8 hex chars). The cap is checked **before the write** (follow, batch, subscribe) or before the token rotates (resend-activation), so a capped request inserts nothing. A pre-read keeps a no-op request from spending the allowance. Over the cap the response is identical to success. It fails closed, and `allowEmailToRecipient` returns `reason: "capped"` (warn) or `"counter_unavailable"` (error), because a D1 outage must not be logged as abuse protection working.
-**A failed provider send drops that request's own pending row** (by its token or batch token), or re-requests no-op for 7 days.
-**Retention:** `retention.js` prunes `rate_limits` at 30 min but keeps `email-recipient:` keys 25 h; otherwise the cap resets itself. The prune runs daily, so the published bounds are worst cases: about 25 h for per-IP counters and about 2 days (25 h + one daily interval) for recipient keys. Change the cadence or the window, and update `PrivacyPage.jsx` in the same PR. A new public sender that emails a caller-supplied address must call `allowEmailToRecipient`.
-**Exempt, deliberately:** invite signup (`admin/auth/signup.js`) sends an activation email uncapped. It needs a valid single-use invite code, so it is not an open door like the four above.
-
-### Proof of consent is recorded at confirmation (#1289)
-
-Band follows and email subscriptions store `confirmed_at` and the `consent_version` that identifies the wording shown when the request was made; legacy rows remain NULL because their wording and confirmation time were not recorded. Bump `CONSENT_VERSION` whenever the follow/subscribe form wording or confirmation email wording changes. Confirmation writes use SQLite's `datetime('now')` and must never overwrite an existing confirmed timestamp.
+`POST /api/auth/resend-activation`, the one public route that emails a caller-supplied address, is capped at 5 emails per 24 h per address (`functions/utils/recipientEmailCap.js`), whatever IPs the requests come from. The `rate_limits` key is `email-recipient:` plus a SHA-256 of the trimmed, lowercased address; the raw address is never stored or logged (logs carry 8 hex chars). The cap is checked before the token rotates. Over the cap the response is identical to success. It fails closed, and `allowEmailToRecipient` returns `reason: "capped"` (warn) or `"counter_unavailable"` (error), because a D1 outage must not be logged as abuse protection working.
+**Retention:** `retention.js` prunes `rate_limits` at 30 min but keeps `email-recipient:` keys 25 h; otherwise the cap resets itself. The prune runs daily, so the published bounds are worst cases: about 25 h for per-IP counters and about 2 days for recipient keys. Change the cadence or the window, and update `PrivacyPage.jsx` in the same PR. A new public sender that emails a caller-supplied address must call `allowEmailToRecipient`. Invite signup (`admin/auth/signup.js`) is exempt: it needs a valid single-use invite code.
 
 ---
 
@@ -724,7 +692,7 @@ Node and local `wrangler` do not enforce the Workers runtime's limits (the PBKDF
 - **Plain-text vars live in `wrangler.toml` (`[env.preview.vars]`), never the dashboard**: a deploy replaces dashboard plain-text vars and keeps only secrets.
 - Previews set `ENVIRONMENT=preview` (production code paths under `isDevRequest`), use Turnstile's always-pass test keys and no email provider. Tests hit the stable alias `edge-e2e.longweekend-bandcrawl.pages.dev`, which the preview's `CORS_ALLOWED_ORIGINS` names.
 - **Production rate limits apply**, so the run is two phases with no retries.
-- Emailed tokens are read from D1 (`e2e/utils/d1.js`); remote mode (`E2E_D1_REMOTE=1`) can name only the scratch D1. Every confirmation is clicked in a real browser. **`invite-signup.spec` is the PBKDF2 canary**; its invitee context passes an empty `storageState` explicitly, or it inherits the signed-in admin.
+- Tokens a preview cannot email are seeded or read through D1 (`e2e/utils/d1.js`); remote mode (`E2E_D1_REMOTE=1`) can name only the scratch D1. **`invite-signup.spec` and `password-reset-link.spec` are the PBKDF2 canaries**; its invitee context passes an empty `storageState` explicitly, or it inherits the signed-in admin.
 - **Ready means the alias serves THIS RUN'S deployment** (`scripts/wait-for-preview.mjs`, #1340). Only the `edge-e2e-deployment.txt` marker proves it (Vite hashes repeat across runs). A missing chunk is `200 text/html` on Pages, so check content-type.
 - Runs queue (`cancel-in-progress: false`); every run deletes its deployment and a failed delete fails the job. Fork and Dependabot PRs get no secrets and are skipped loudly. The request-only `ical-feed.spec.js` also exercises the feed on the edge.
 
@@ -932,11 +900,7 @@ addresses, never by loosening the scan. In the mutation gate.
 ### Retention windows are a published promise
 
 The privacy policy's retention table (`frontend/src/pages/PrivacyPage.jsx`) states
-how long each kind of personal data is kept. Unconfirmed follow and subscription
-requests, including their email and consent IP, expire after 7 days; confirmation
-and re-request paths use the same window, while
-`functions/api/admin/maintenance/retention.js` deletes any remaining pending rows.
-Two handlers make the other published windows true:
+how long each kind of personal data is kept. Two handlers make the other published windows true:
 `functions/api/admin/maintenance/retention.js` deletes expired rows, and
 `functions/scheduled/anonymize-schedule-builds.js` anonymises schedule-build
 visitor codes 30 days after an event. Both run daily

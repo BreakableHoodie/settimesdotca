@@ -27,9 +27,8 @@ function renderPage(slug = 'abc123') {
 // fix has the endpoint drop hard-deleted rows from `bands` while leaving the
 // stale `performance_ids`/`band_names` snapshot untouched (for the ?import=1
 // apply path). That means this page's route count MUST derive from
-// `bands.length`, never `band_names.length` — otherwise the heading, the Add
-// button, and LockInLineupPanel's count all disagree with the actual number
-// of rows rendered.
+// `bands.length`, never `band_names.length` — otherwise the heading and the
+// Add button disagree with the actual number of rows rendered.
 describe('SharePreviewPage — orphaned/cancelled performances (#733)', () => {
   beforeEach(() => {
     vi.stubEnv('VITE_TURNSTILE_SITE_KEY', '')

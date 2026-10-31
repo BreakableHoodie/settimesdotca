@@ -30,7 +30,6 @@ import { describe, expect, it } from "vitest";
 import { createTestEnv, grantStepUp, insertBand, insertEvent, insertVenue } from "../../test-utils.js";
 
 const POLICY = {
-  "GET /api/admin/analytics/subscriptions": "admin",
   "GET /api/admin/api-keys": "admin",
   "POST /api/admin/api-keys": "admin",
   "DELETE /api/admin/api-keys/[id]": "admin",
@@ -40,7 +39,6 @@ const POLICY = {
   "PUT /api/admin/bands/[id]": "editor",
   "PATCH /api/admin/bands/[id]": "editor",
   "DELETE /api/admin/bands/[id]": "editor",
-  "POST /api/admin/bands/[id]/resend-announcement": "editor",
   "POST /api/admin/bands/bulk-preview": "editor",
   "DELETE /api/admin/bands/bulk": "editor",
   "POST /api/admin/bands/bulk": "editor",
@@ -57,7 +55,6 @@ const POLICY = {
   "POST /api/admin/events/[id]/duplicate": "editor",
   "PUT /api/admin/events/[id]/edit": "editor",
   "GET /api/admin/events/[id]/metrics": "viewer",
-  "POST /api/admin/events/[id]/notify-subscribers": "editor",
   "POST /api/admin/events/[id]/publish": "editor",
   "POST /api/admin/events/[id]/reveal-mode": "editor",
   "PUT /api/admin/events/[id]/schedule": "editor",
@@ -67,7 +64,6 @@ const POLICY = {
   "POST /api/admin/events/posters": "editor",
   "GET /api/admin/events/posters": "editor",
   "POST /api/admin/events/wizard": "editor",
-  "POST /api/admin/flush-announce-digest": "editor",
   "GET /api/admin/invite-codes": "admin",
   "POST /api/admin/invite-codes": "admin",
   "DELETE /api/admin/invite-codes/[id]": "admin",

@@ -1,5 +1,7 @@
 # Email delivery
 
+> **Retired 2026-10-31.** Fan email (band follows, subscriptions, announcements) was removed; see CLAUDE.md "Email is account mail only". Everything below describes the retired design and is kept as the checklist for any revival.
+
 Moved verbatim from `CLAUDE.md` on 2026-10-16, when it passed the 150k-character
 limit. `CLAUDE.md` keeps the rules; this file keeps the incidents, measurements
 and reasoning behind them. Read it before changing the code a section guards.

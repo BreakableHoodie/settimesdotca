@@ -8,23 +8,16 @@ const ROW_CLASS =
 const SEARCH_CLASS =
   'min-h-[44px] w-full px-3 py-2 rounded bg-bg-navy text-white border border-white/10 focus:border-accent-500 focus:outline-hidden text-sm placeholder:text-white/40'
 
-// `(Blanks)` always sorts last; everything else is localeCompare, except
-// follower_count, which needs a numeric comparator (lexicographic would put
-// "10" before "2"). Picked by column key rather than by inspecting the
-// values, since a column's sort kind is a property of the column, not the
-// data it happens to contain this render.
-function sortValues(column, values) {
+// `(Blanks)` always sorts last; everything else is localeCompare.
+function sortValues(values) {
   const withoutBlank = values.filter(v => v !== BLANK)
   const hasBlank = values.length !== withoutBlank.length
-  const sorted =
-    column.key === 'follower_count'
-      ? withoutBlank.sort((a, b) => Number(a) - Number(b))
-      : withoutBlank.sort((a, b) => a.localeCompare(b))
+  const sorted = withoutBlank.sort((a, b) => a.localeCompare(b))
   return hasBlank ? [...sorted, BLANK] : sorted
 }
 
 // Generic value-checklist dropdown, shared by every `type: 'values'` column
-// in FILTERABLE_COLUMNS (Name, Origin, Genre, Status, Contact, Followers).
+// in FILTERABLE_COLUMNS (Name, Origin, Genre, Status, Contact).
 // The Links column uses LinksColumnFilter instead -- its value shape
 // (`{ mode, keys, noLinks }`) doesn't fit a flat checked-values list.
 //
@@ -78,7 +71,7 @@ export default function ColumnFilter({
     }
   }, [onClose, triggerRef, closeOnEscape])
 
-  const allValues = useMemo(() => sortValues(column, Array.from(counts.keys())), [column, counts])
+  const allValues = useMemo(() => sortValues(Array.from(counts.keys())), [counts])
 
   const visibleValues = useMemo(() => {
     const query = search.trim().toLowerCase()

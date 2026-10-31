@@ -598,7 +598,7 @@ export async function onRequestPatch(context) {
     }
 
     const performance = await DB.prepare(
-      "SELECT id, event_id, venue_id, start_time, end_time, performance_date, is_announced, is_cancelled, band_follow_notified FROM performances WHERE id = ?",
+      "SELECT id, event_id, venue_id, start_time, end_time, performance_date, is_announced, is_cancelled FROM performances WHERE id = ?",
     )
       .bind(performanceId)
       .first();
@@ -675,86 +675,6 @@ export async function onRequestPatch(context) {
       .bind(...params)
       .run();
 
-    // Sweep this performance's own pending band_announce_queue rows the
-    // moment it's cancelled (#732 MAJOR 1 hygiene) -- a set that will never
-    // be sent shouldn't sit in the queue as a dead row. The digest itself
-    // also re-checks is_cancelled at send time (functions/utils/announceDigest.js)
-    // as a second layer of defense for the race where cancellation lands
-    // between the queue insert and the flush's read.
-    if (hasCancelled && isCancelled === 1) {
-      await DB.prepare("DELETE FROM band_announce_queue WHERE performance_id = ?").bind(performanceId).run();
-    }
-
-    // Queue band-follower notifications on first 0 → 1 transition.
-    // Followers are batched into band_announce_queue; POST /api/admin/flush-announce-digest
-    // groups them by (email, event) and sends one digest per fan per event.
-    //
-    // `isCancelled` above already holds the EFFECTIVE post-request value (the
-    // new body value if this request touched is_cancelled, otherwise the
-    // stored one) -- gating on it here, not performance.is_cancelled, is what
-    // catches BOTH a same-request cancel+announce (body sets is_cancelled
-    // true) AND an announce-only request against a row that was already
-    // cancelled (body never sets is_cancelled, so the stored value carries
-    // through unchanged). Without this a cancelled set could still email
-    // every verified follower (#732 MAJOR 1).
-    if (
-      hasAnnounced &&
-      newValue === 1 &&
-      isCancelled === 0 &&
-      performance.is_announced === 0 &&
-      !performance.band_follow_notified
-    ) {
-      const perf = await DB.prepare(
-        `SELECT p.band_profile_id, bp.name as band_name,
-                e.id as event_id, e.name as event_name, e.slug as event_slug
-         FROM performances p
-         JOIN band_profiles bp ON p.band_profile_id = bp.id
-         JOIN events e ON p.event_id = e.id
-         WHERE p.id = ?`,
-      )
-        .bind(performanceId)
-        .first();
-
-      if (perf) {
-        const { results: followers = [] } = await DB.prepare(
-          "SELECT id FROM band_follows WHERE band_profile_id = ? AND verified = 1",
-        )
-          .bind(perf.band_profile_id)
-          .all();
-
-        if (followers.length > 0) {
-          // Atomic latch: only the first concurrent announce-toggle queues followers.
-          const claimed = await DB.prepare(
-            "UPDATE performances SET band_follow_notified = 1 WHERE id = ? AND band_follow_notified = 0",
-          )
-            .bind(performanceId)
-            .run();
-
-          if (claimed.meta.changes > 0) {
-            // Queue one row per follower. INSERT OR IGNORE on UNIQUE(band_follow_id,
-            // performance_id) prevents double-queuing from a retry.
-            await DB.batch(
-              followers.map((f) =>
-                DB.prepare(
-                  `INSERT OR IGNORE INTO band_announce_queue
-                   (band_follow_id, performance_id, event_id, band_name, event_name, event_slug, band_profile_id)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                ).bind(
-                  f.id,
-                  Number(performanceId),
-                  perf.event_id,
-                  perf.band_name,
-                  perf.event_name,
-                  perf.event_slug,
-                  perf.band_profile_id,
-                ),
-              ),
-            );
-          }
-        }
-      }
-    }
-
     // Pick the most specific audit action name: a request only ever flips one
     // of these two flags in practice (the LineupTab announce toggle and the
     // cancel toggle are separate buttons), but a combined request still logs
@@ -780,9 +700,7 @@ export async function onRequestPatch(context) {
       ipAddress,
     );
 
-    const updated = await DB.prepare(
-      "SELECT is_announced, is_cancelled, band_follow_notified FROM performances WHERE id = ?",
-    )
+    const updated = await DB.prepare("SELECT is_announced, is_cancelled FROM performances WHERE id = ?")
       .bind(performanceId)
       .first();
 
@@ -793,7 +711,6 @@ export async function onRequestPatch(context) {
           id: Number(performanceId),
           is_announced: updated?.is_announced ?? newValue,
           is_cancelled: updated?.is_cancelled ?? isCancelled,
-          band_follow_notified: updated?.band_follow_notified ?? 0,
         },
       }),
       { status: 200, headers: { "Content-Type": "application/json" } },

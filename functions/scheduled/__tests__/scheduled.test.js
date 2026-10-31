@@ -1,10 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createTestEnv } from "../../api/test-utils.js";
 
-// Mock announce digest so we can assert it was called without real email I/O.
-vi.mock("../../utils/announceDigest.js", () => ({
-  flushAnnounceDigest: vi.fn(() => Promise.resolve({ sent: 0, failed: 0, skipped: 0, unconfirmed: 0 })),
-}));
 vi.mock("../aggregate-stats.js", () => ({
   scheduled: vi.fn(() => Promise.resolve({ failures: [] })),
 }));
@@ -15,7 +11,6 @@ vi.mock("../anonymize-schedule-builds.js", () => ({
   anonymizeScheduleBuilds: vi.fn(() => Promise.resolve({ failures: [] })),
 }));
 
-import { flushAnnounceDigest } from "../../utils/announceDigest.js";
 import { scheduled as aggregateStats } from "../aggregate-stats.js";
 import { expireShareLinks } from "../expire-share-links.js";
 import { anonymizeScheduleBuilds } from "../anonymize-schedule-builds.js";
@@ -26,46 +21,29 @@ describe("scheduled()", () => {
     vi.clearAllMocks();
   });
 
-  it("invokes flushAnnounceDigest on every scheduled run", async () => {
+  it("runs every step on every scheduled run", async () => {
     const { env } = createTestEnv();
     await scheduled({}, env, {});
-    expect(flushAnnounceDigest).toHaveBeenCalledOnce();
-    expect(flushAnnounceDigest).toHaveBeenCalledWith(env, env.DB);
-  });
-
-  it("throws the failed digest step after attempting every step", async () => {
-    flushAnnounceDigest.mockRejectedValueOnce(new Error("email provider down"));
-    const { env } = createTestEnv();
-    const error = await scheduled({}, env, {}).catch((err) => err);
-    expect(error).toMatchObject({ failedSteps: ["flush-announce-digest"] });
     expect(aggregateStats).toHaveBeenCalledOnce();
     expect(expireShareLinks).toHaveBeenCalledOnce();
+    expect(anonymizeScheduleBuilds).toHaveBeenCalledOnce();
+  });
+
+  it("throws the failed step after attempting every step", async () => {
+    expireShareLinks.mockRejectedValueOnce(new Error("d1 down"));
+    const { env } = createTestEnv();
+    const error = await scheduled({}, env, {}).catch((err) => err);
+    expect(error).toMatchObject({ failedSteps: ["expire-share-links"] });
+    expect(aggregateStats).toHaveBeenCalledOnce();
     expect(anonymizeScheduleBuilds).toHaveBeenCalledOnce();
     expect(error.errors).toHaveLength(error.failedSteps.length);
   });
 
-  it("throws when the digest reports undelivered messages", async () => {
-    flushAnnounceDigest.mockResolvedValueOnce({ sent: 0, failed: 1, skipped: 0 });
+  it("surfaces labelled failures a step reports without throwing", async () => {
+    anonymizeScheduleBuilds.mockResolvedValueOnce({ failures: ["anonymize-event-7"] });
     const { env } = createTestEnv();
-
-    await expect(scheduled({}, env, {})).rejects.toMatchObject({
-      failedSteps: ["flush-announce-digest"],
-    });
-  });
-
-  it("throws when the digest reports an unconfirmed delivery", async () => {
-    flushAnnounceDigest.mockResolvedValueOnce({ sent: 1, failed: 0, skipped: 0, unconfirmed: 1 });
-    const { env } = createTestEnv();
-
     const error = await scheduled({}, env, {}).catch((err) => err);
-    expect(error.failedSteps).toEqual(["flush-announce-digest(unconfirmed)"]);
+    expect(error.failedSteps).toEqual(["anonymize-event-7"]);
     expect(error.errors).toHaveLength(1);
-  });
-
-  it("still runs on an empty queue without error", async () => {
-    const { env } = createTestEnv();
-    // Default mock returns zero counts — simulate an empty queue.
-    await expect(scheduled({}, env, {})).resolves.not.toThrow();
-    expect(flushAnnounceDigest).toHaveBeenCalledOnce();
   });
 });

@@ -207,15 +207,15 @@ jobs:
       - name: "E2E on the edge, phase 1: user management, invite signup, share, publish"
         env:
           CI: "true"
-          # emailed-token-flows.spec reads the tokens a preview cannot email
-          # from the scratch D1 (e2e/utils/d1.js, which can name no other).
+          # e2e/utils/d1.js reads tokens a preview cannot email from the scratch
+          # D1 (it can name no other).
           E2E_D1_REMOTE: "1"
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_PAGES_API_TOKEN }}
           PLAYWRIGHT_BASE_URL: ${{ env.PREVIEW_URL }}
           E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
           E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
-        run: npx playwright test --retries=0 --project=setup --project=chromium e2e/auth.setup.js e2e/user-management.spec.js e2e/invite-signup.spec.js e2e/share-schedule.spec.js e2e/event-creation.spec.js e2e/emailed-token-flows.spec.js e2e/ical-feed.spec.js
+        run: npx playwright test --retries=0 --project=setup --project=chromium e2e/auth.setup.js e2e/user-management.spec.js e2e/invite-signup.spec.js e2e/share-schedule.spec.js e2e/event-creation.spec.js e2e/password-reset-link.spec.js e2e/ical-feed.spec.js
 
       # Runs after a phase-1 TEST failure (success() || failure()), but never
       # when the reset, deploy or readiness failed: then there is no fresh

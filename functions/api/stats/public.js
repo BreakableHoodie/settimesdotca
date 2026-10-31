@@ -7,8 +7,6 @@
 //
 // PRIVACY CONTRACT (see #462) — this endpoint must NEVER select or return any
 // individual/PII/joinable-to-a-person field:
-//   - band_follows has email, verification_token, unsubscribe_token, consent_ip.
-//     Only ever `COUNT(*) WHERE verified = 1` against it — never SELECT those columns.
 //   - share_links/event_share_totals: aggregate counts and separate SUMs of
 //     views — never slug/band_names/performance_ids or visitor keys.
 //   - No IPs, emails, session IDs, tokens, or raw rows anywhere in the response.
@@ -45,54 +43,43 @@ export async function onRequestGet(context) {
   const { DB } = env;
 
   try {
-    const [
-      bandsRes,
-      venuesRes,
-      eventsRes,
-      performancesRes,
-      shareRes,
-      shareTotalsRes,
-      followsRes,
-      pageViewsRes,
-      topBandsRes,
-    ] = await DB.batch([
-      DB.prepare(`SELECT COUNT(*) AS count FROM band_profiles WHERE is_active = 1`),
-      DB.prepare(`SELECT COUNT(*) AS count FROM venues`),
-      DB.prepare(`SELECT COUNT(*) AS count FROM events WHERE ${publicEventStatusSql()}`),
-      DB.prepare(
-        `SELECT COUNT(*) AS count
+    const [bandsRes, venuesRes, eventsRes, performancesRes, shareRes, shareTotalsRes, pageViewsRes, topBandsRes] =
+      await DB.batch([
+        DB.prepare(`SELECT COUNT(*) AS count FROM band_profiles WHERE is_active = 1`),
+        DB.prepare(`SELECT COUNT(*) AS count FROM venues`),
+        DB.prepare(`SELECT COUNT(*) AS count FROM events WHERE ${publicEventStatusSql()}`),
+        DB.prepare(
+          `SELECT COUNT(*) AS count
            FROM performances p
            JOIN events e ON e.id = p.event_id
            WHERE ${publicEventStatusSql("e")}`,
-      ),
-      // Keep the two share-view units separate: unique visitors versus
-      // pre-cutover, undeduplicated raw fetches.
-      DB.prepare(
-        `SELECT COUNT(*) AS count,
+        ),
+        // Keep the two share-view units separate: unique visitors versus
+        // pre-cutover, undeduplicated raw fetches.
+        DB.prepare(
+          `SELECT COUNT(*) AS count,
                   COALESCE(SUM(view_count), 0) AS total_views,
                   COALESCE(SUM(view_count_legacy), 0) AS total_views_legacy
            FROM share_links`,
-      ),
-      DB.prepare(
-        `SELECT COALESCE(SUM(shares), 0) AS shares,
+        ),
+        DB.prepare(
+          `SELECT COALESCE(SUM(shares), 0) AS shares,
                   COALESCE(SUM(views), 0) AS views,
                   COALESCE(SUM(views_legacy), 0) AS views_legacy
            FROM event_share_totals`,
-      ),
-      // band_follows: verified-only count. Never select email/tokens/consent_ip.
-      DB.prepare(`SELECT COUNT(*) AS count FROM band_follows WHERE verified = 1`),
-      DB.prepare(`SELECT COALESCE(SUM(views), 0) AS total_views FROM page_views_daily`),
-      // Top bands by popularity. The secondary ORDER BY key (name) makes this
-      // degrade gracefully to alphabetical order pre-event, when
-      // popularity_score is all zero.
-      DB.prepare(
-        `SELECT name, popularity_score
+        ),
+        DB.prepare(`SELECT COALESCE(SUM(views), 0) AS total_views FROM page_views_daily`),
+        // Top bands by popularity. The secondary ORDER BY key (name) makes this
+        // degrade gracefully to alphabetical order pre-event, when
+        // popularity_score is all zero.
+        DB.prepare(
+          `SELECT name, popularity_score
            FROM band_profiles
            WHERE is_active = 1
            ORDER BY popularity_score DESC, name COLLATE NOCASE ASC
            LIMIT ?`,
-      ).bind(TOP_BANDS_LIMIT),
-    ]);
+        ).bind(TOP_BANDS_LIMIT),
+      ]);
 
     const topBands = (topBandsRes.results || []).map((row) => ({
       name: row.name,
@@ -109,7 +96,6 @@ export async function onRequestGet(context) {
       route_views: (shareRes.results?.[0]?.total_views || 0) + (shareTotalsRes.results?.[0]?.views || 0),
       route_views_legacy:
         (shareRes.results?.[0]?.total_views_legacy || 0) + (shareTotalsRes.results?.[0]?.views_legacy || 0),
-      fans_following: followsRes.results?.[0]?.count || 0,
       page_views: pageViewsRes.results?.[0]?.total_views || 0,
       top_bands: topBands,
     };

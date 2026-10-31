@@ -33,7 +33,7 @@ export default function TermsPage() {
         </div>
 
         <h1 className="text-text-primary text-3xl font-bold mb-2">Terms of Service</h1>
-        <p className="text-text-tertiary text-sm mb-4">Last updated: June 2026</p>
+        <p className="text-text-tertiary text-sm mb-4">Last updated: October 2026</p>
 
         {/* Good-faith notice for a free community project (not legal advice). */}
         <div className="border border-border bg-surface rounded-lg px-4 py-3 mb-10 text-sm text-text-secondary">
@@ -73,8 +73,8 @@ export default function TermsPage() {
             <h2 className="text-text-primary text-lg font-semibold mb-3">2. The Service</h2>
             <p>
               SetTimes lets visitors browse event lineups, set times, venues, and artist information, build a personal
-              schedule (stored on your own device), share schedules, and optionally subscribe by email to event or
-              artist updates. The Service is provided free of charge.
+              schedule (stored on your own device), share schedules, and add sets to your calendar. The Service is
+              provided free of charge.
             </p>
             <p className="mt-3">
               We do not sell tickets, admit attendees, run venues, or organize the events listed. Ticketing, entry, age
@@ -88,7 +88,6 @@ export default function TermsPage() {
             <p className="mb-3">You agree not to:</p>
             <ul className="list-disc list-outside pl-5 space-y-2">
               <li>use the Service for any unlawful purpose or in violation of these Terms;</li>
-              <li>submit email addresses you do not own or control, or sign others up without their consent;</li>
               <li>
                 scrape, harvest, or bulk-extract data, or use bots, except as permitted by our{' '}
                 <code className="text-accent-400 text-sm">robots.txt</code>;
@@ -116,7 +115,7 @@ export default function TermsPage() {
             <h2 className="text-text-primary text-lg font-semibold mb-3">4. User-submitted content</h2>
             <p className="mb-3">
               Some features let you or event organizers submit content — for example, band/artist information, photos,
-              links, and email addresses for follows and subscriptions (&ldquo;Submissions&rdquo;).
+              and links (&ldquo;Submissions&rdquo;).
             </p>
             <ul className="list-disc list-outside pl-5 space-y-2">
               <li>
@@ -133,11 +132,6 @@ export default function TermsPage() {
                 <strong className="text-text-primary">Licence to us.</strong> You grant SetTimes a non-exclusive,
                 royalty-free, worldwide licence to host, store, reproduce, and display your Submissions for the purpose
                 of operating and promoting the Service. You retain ownership of your content.
-              </li>
-              <li>
-                <strong className="text-text-primary">Email addresses.</strong> When you submit an email to follow a
-                band or subscribe to updates, you confirm it is your own address. We use a double opt-in confirmation
-                step, and you can unsubscribe at any time (see the Privacy Policy).
               </li>
               <li>
                 <strong className="text-text-primary">Takedown.</strong> If you believe content on the Service infringes

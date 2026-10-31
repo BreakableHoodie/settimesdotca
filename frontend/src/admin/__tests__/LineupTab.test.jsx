@@ -25,11 +25,9 @@ vi.mock('../../utils/adminApi', () => ({
     bulkUpdate: vi.fn(),
     bulkAddToLineup: vi.fn(),
     patch: vi.fn(),
-    resendAnnouncement: vi.fn(),
     getStats: vi.fn(),
   },
   eventsApi: {
-    getMetrics: vi.fn(),
     getVenueDelays: vi.fn(),
     updateSchedule: vi.fn(),
   },
@@ -241,7 +239,6 @@ beforeEach(() => {
   venuesApi.getAll.mockResolvedValue({ venues: VENUES })
   bandsApi.getByEvent.mockResolvedValue({ bands: [] })
   bandsApi.getAll.mockResolvedValue({ bands: [] })
-  eventsApi.getMetrics.mockResolvedValue({ metrics: { announcementPlanning: [] } })
   eventsApi.getVenueDelays.mockResolvedValue({ delays: [] })
 })
 
@@ -424,7 +421,7 @@ describe('LineupTab — cancel / restore toggle', () => {
 })
 
 describe('LineupTab — announce toggle', () => {
-  // reveal_mode: 1 is what makes the announce/resend controls appear at all —
+  // reveal_mode: 1 is what makes the announce control appears at all —
   // on reveal_mode: 0 (the normal published-lineup state) they must not
   // render, since is_announced has no visibility effect there (CLAUDE.md).
   it('announces a hidden set (is_announced: true) and un-announces an announced one', async () => {
@@ -441,15 +438,13 @@ describe('LineupTab — announce toggle', () => {
     fireEvent.click(within(rowFor(table, 'Headliner')).getByRole('button', { name: 'Announce Headliner' }))
 
     await waitFor(() => expect(bandsApi.patch).toHaveBeenCalledWith(1, { is_announced: true }))
-    // Announcing flips the row into the "is_announced === 1" branch, which is
-    // also the branch that unlocks the Resend button — proving both toggle
-    // AND its downstream effect in one assertion.
+    // Announcing flips the row into the "is_announced === 1" branch.
     await waitFor(() =>
       expect(
         within(rowFor(table, 'Headliner')).getByRole('button', { name: 'Unannounce Headliner' })
       ).toBeInTheDocument()
     )
-    expect(within(rowFor(table, 'Headliner')).getByRole('button', { name: 'Resend' })).toBeInTheDocument()
+    expect(within(rowFor(table, 'Headliner')).queryByRole('button', { name: 'Resend' })).not.toBeInTheDocument()
 
     bandsApi.patch.mockResolvedValueOnce({ success: true })
     bandsApi.getByEvent.mockResolvedValueOnce({ bands: [{ ...band, is_announced: 0 }] })
@@ -484,59 +479,6 @@ describe('LineupTab — announce toggle', () => {
 
     expect(within(row).queryByRole('button', { name: 'Resend' })).not.toBeInTheDocument()
     expect(within(row).getByRole('button', { name: /Cancel/i })).toBeInTheDocument()
-  })
-})
-
-describe('LineupTab — resend announcement', () => {
-  it('resends to remaining followers and reports the count', async () => {
-    const band = makeBand({ is_announced: 1 })
-    await renderLineup({ bands: [band], event: makeEvent({ reveal_mode: 1 }) })
-    const table = screen.getByRole('table')
-
-    bandsApi.resendAnnouncement.mockResolvedValueOnce({ sent: 3 })
-    fireEvent.click(within(rowFor(table, 'Headliner')).getByRole('button', { name: 'Resend' }))
-
-    await waitFor(() => expect(bandsApi.resendAnnouncement).toHaveBeenCalledWith(1))
-    await waitFor(() =>
-      expect(showToast).toHaveBeenCalledWith('Resent Headliner announcement to 3 followers.', 'success')
-    )
-  })
-
-  it('singularizes "follower" for a count of exactly one', async () => {
-    const band = makeBand({ is_announced: 1 })
-    await renderLineup({ bands: [band], event: makeEvent({ reveal_mode: 1 }) })
-    const table = screen.getByRole('table')
-
-    bandsApi.resendAnnouncement.mockResolvedValueOnce({ sent: 1 })
-    fireEvent.click(within(rowFor(table, 'Headliner')).getByRole('button', { name: 'Resend' }))
-
-    await waitFor(() =>
-      expect(showToast).toHaveBeenCalledWith('Resent Headliner announcement to 1 follower.', 'success')
-    )
-  })
-
-  it('reports "already notified" when there is nobody left to resend to', async () => {
-    const band = makeBand({ is_announced: 1 })
-    await renderLineup({ bands: [band], event: makeEvent({ reveal_mode: 1 }) })
-    const table = screen.getByRole('table')
-
-    bandsApi.resendAnnouncement.mockResolvedValueOnce({ sent: 0 })
-    fireEvent.click(within(rowFor(table, 'Headliner')).getByRole('button', { name: 'Resend' }))
-
-    await waitFor(() =>
-      expect(showToast).toHaveBeenCalledWith('All Headliner followers were already notified.', 'success')
-    )
-  })
-
-  it('reports a resend failure via showToast', async () => {
-    const band = makeBand({ is_announced: 1 })
-    await renderLineup({ bands: [band], event: makeEvent({ reveal_mode: 1 }) })
-    const table = screen.getByRole('table')
-
-    bandsApi.resendAnnouncement.mockRejectedValueOnce(new Error('Provider outage'))
-    fireEvent.click(within(rowFor(table, 'Headliner')).getByRole('button', { name: 'Resend' }))
-
-    await waitFor(() => expect(showToast).toHaveBeenCalledWith('Provider outage', 'error'))
   })
 })
 

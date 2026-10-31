@@ -2,7 +2,7 @@
 //
 // e2e/accessibility/public-routes.spec.js runs the broad WCAG ruleset against
 // the fan-facing surface (#1072). Before it, most public routes had no axe
-// coverage at all — only `/`, `/subscribe`, `/event/:slug` and `/admin/login`
+// coverage at all — only `/`, `/event/:slug` and `/admin/login`
 // were scanned — so a new page could (and did) ship with unreadable controls
 // or focus-order bugs that only a crawler would ever hit.
 //
@@ -44,7 +44,6 @@ const COVERED_PATHS = new Set([
   '/event/:slug', // Event schedule — App/ScheduleView, ready: "Full lineup"
   '/events/:slug/recap', // Event recap — EventRecapPage, ready: "Archived lineup"
   '/embed/:slug', // Embed — EmbedPage/ScheduleView, ready: "Full lineup"
-  '/subscribe', // SubscribePage, ready: "Never miss a show"
   '/reset-password', // no-token error/form state, ready: "Reset password"
   '/activate', // no-token error state, ready: "Activation failed"
   '/privacy', // PrivacyPage, ready: "Privacy Policy"

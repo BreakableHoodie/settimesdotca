@@ -1,4 +1,4 @@
-// Mock D1 database for subscription system tests
+// Mock D1 database used by the public events and iCal feed tests
 export class MockD1Database {
   constructor() {
     this.data = {

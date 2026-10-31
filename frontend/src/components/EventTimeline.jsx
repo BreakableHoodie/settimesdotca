@@ -535,15 +535,11 @@ export default function EventTimeline() {
                 <p className="text-text-secondary mb-4">
                   {filtersHideFutureEvents
                     ? "Your filters are hiding every upcoming event. Clear them to see what's next."
-                    : "We're between seasons — browse past events below, or subscribe to hear about new dates first."}
+                    : "We're between seasons — browse past events below."}
                 </p>
-                {filtersHideFutureEvents ? (
+                {filtersHideFutureEvents && (
                   <Button variant="secondary" size="sm" onClick={clearFilters} icon={<X size={14} />}>
                     Clear filters
-                  </Button>
-                ) : (
-                  <Button as={Link} to="/subscribe" variant="secondary" size="sm">
-                    Subscribe for updates
                   </Button>
                 )}
               </div>

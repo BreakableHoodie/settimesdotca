@@ -29,7 +29,6 @@ const BAND = {
   name: 'Active Aardvarks',
   genre: 'rock',
   is_active: 1,
-  follower_count: 0,
   social_links: '{}',
   photo_url: 'https://old.example/a.jpg',
 }

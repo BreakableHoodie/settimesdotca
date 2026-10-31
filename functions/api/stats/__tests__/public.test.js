@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createTestEnv, insertEvent, insertBand, insertVenue, insertShareLink } from "../../test-utils";
 import * as stats from "../public.js";
-import { hashStoredToken } from "../../../utils/tokens.js";
 
 function seedEnv() {
   const { env, rawDb } = createTestEnv({ role: "editor" });
@@ -49,17 +48,6 @@ describe("Public aggregate stats - GET /api/stats/public", () => {
     insertShareLink(rawDb, { slug: "share2", event_id: published.id, event_slug: "vol-17" });
     rawDb.prepare("UPDATE share_links SET view_count = 5 WHERE slug = 'share2'").run();
 
-    // Verified follow: counted. Unverified follow: must NOT be counted.
-    const bandARow = rawDb.prepare("SELECT id FROM band_profiles WHERE name = ?").get("Band A");
-    rawDb
-      .prepare("INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token) VALUES (?, ?, 1, ?)")
-      .run("verified@example.test", bandARow.id, "unsub-token-1");
-    rawDb
-      .prepare(
-        "INSERT INTO band_follows (email, band_profile_id, verified, verification_token, unsubscribe_token) VALUES (?, ?, 0, ?, ?)",
-      )
-      .run("unverified@example.test", bandARow.id, await hashStoredToken("verify-token-1"), "unsub-token-2");
-
     rawDb.prepare("INSERT INTO page_views_daily (page, date, views) VALUES (?, ?, ?)").run("/", "2026-07-01", 100);
     rawDb.prepare("INSERT INTO page_views_daily (page, date, views) VALUES (?, ?, ?)").run("/about", "2026-07-01", 25);
 
@@ -76,7 +64,7 @@ describe("Public aggregate stats - GET /api/stats/public", () => {
     expect(body.routes_shared).toBe(2);
     expect(body.route_views).toBe(15);
     expect(body.route_views_legacy).toBe(0);
-    expect(body.fans_following).toBe(1); // only the verified follow
+    expect(body).not.toHaveProperty("fans_following"); // email follows were retired
     expect(body.page_views).toBe(125);
 
     expect(body.top_bands.length).toBeGreaterThan(0);
@@ -130,26 +118,9 @@ describe("Public aggregate stats - GET /api/stats/public", () => {
     const venue = insertVenue(rawDb, { name: "Roost", city: "Waterloo" });
     const ev = insertEvent(rawDb, { name: "Vol 17", slug: "vol-17" });
     publish(rawDb, ev.id);
-    const perf = insertBand(rawDb, { name: "Band A", event_id: ev.id, venue_id: venue.id });
+    insertBand(rawDb, { name: "Band A", event_id: ev.id, venue_id: venue.id });
 
     insertShareLink(rawDb, { slug: "share1", event_id: ev.id, event_slug: "vol-17" });
-
-    rawDb
-      .prepare(
-        "INSERT INTO band_follows (email, band_profile_id, verified, unsubscribe_token, consent_ip) VALUES (?, ?, 1, ?, ?)",
-      )
-      .run("real.fan@example.test", perf.band_profile_id, "unsub-abc", "203.0.113.7");
-    rawDb
-      .prepare(
-        "INSERT INTO band_follows (email, band_profile_id, verified, verification_token, unsubscribe_token, consent_ip) VALUES (?, ?, 0, ?, ?, ?)",
-      )
-      .run(
-        "pending.fan@example.test",
-        perf.band_profile_id,
-        await hashStoredToken("verify-xyz"),
-        "unsub-def",
-        "203.0.113.8",
-      );
 
     const res = await getStats(env);
     expect(res.status).toBe(200);
@@ -162,21 +133,6 @@ describe("Public aggregate stats - GET /api/stats/public", () => {
     // happens to contain "ip" — e.g. "Skip", "Flip" — can't false-fail this.
     for (const forbidden of ["@", "token", "verification", "unsubscribe", "consent", "consent_ip", "email"]) {
       expect(lower).not.toContain(forbidden);
-    }
-
-    // Privacy guard (values): the concrete PII values we seeded above must never
-    // appear verbatim either — this catches a value-only leak (e.g. selecting
-    // consent_ip and echoing the address) that a field-name scan would miss.
-    for (const secret of [
-      "real.fan@example.test",
-      "pending.fan@example.test",
-      "203.0.113.7",
-      "203.0.113.8",
-      "unsub-abc",
-      "unsub-def",
-      "verify-xyz",
-    ]) {
-      expect(raw).not.toContain(secret);
     }
   });
 
@@ -199,7 +155,6 @@ describe("Public aggregate stats - GET /api/stats/public", () => {
     expect(body.routes_shared).toBe(0);
     expect(body.route_views).toBe(0);
     expect(body.route_views_legacy).toBe(0);
-    expect(body.fans_following).toBe(0);
     expect(body.page_views).toBe(0);
     expect(body.top_bands).toEqual([]);
   });

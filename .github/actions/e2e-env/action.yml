@@ -288,7 +288,7 @@ runs:
         - name: Initialize D1 database with schema
           shell: bash
           run: |
-              printf 'CSRF_SECRET="e2e-test-csrf-secret-for-ci"\nUNSUBSCRIBE_LINK_SECRET="e2e-test-unsubscribe-link-secret"\nPUBLIC_DATA_PUBLISH_ENABLED="true"\nENVIRONMENT="development"\n' > .dev.vars
+              printf 'CSRF_SECRET="e2e-test-csrf-secret-for-ci"\nPUBLIC_DATA_PUBLISH_ENABLED="true"\nENVIRONMENT="development"\n' > .dev.vars
 
               echo "Initializing D1 database with schema..."
               ./frontend/node_modules/.bin/wrangler d1 execute settimes-production-db --local --persist-to .wrangler/state --file=database/setup-complete.sql

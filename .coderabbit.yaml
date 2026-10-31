@@ -79,15 +79,11 @@ reviews:
         - Roles ascend strictly `viewer` -> `editor` -> `admin`. Flag a permission check using the wrong tier for the operation's sensitivity (e.g. user management gated at `editor`).
         - Session validation and CSRF are enforced CENTRALLY in functions/api/admin/_middleware.js for all /api/admin/* routes. Do NOT flag an individual endpoint for lacking its own session or CSRF check — that is the intended architecture. Flag only if the middleware itself stops validating, or if a mutating admin route is added outside its reach.
 
-    # Invariant: double opt-in band follows, verified-only announcements,
-    # per-follower delivery tracking, Turnstile on public email input
-    # (CLAUDE.md "Band Announcements").
-    - path: "functions/api/bands/**"
+    # Invariant: fan email is retired (CLAUDE.md "Email is account mail only").
+    - path: "functions/**"
       instructions: |
-        - Band follows are double opt-in: inserts must be created with `verified = 0` plus a `verification_token`. Flag any insert that sets `verified = 1` directly — it reopens the email-bombing vector this design closed.
-        - Announcement emails must filter `WHERE verified = 1`. Flag any announcement/resend query that omits this filter.
-        - Per-follower delivery tracking lives in `band_follow_notifications` (performance_id, band_follow_id). Flag any fire-once latch (e.g. a single `is_announced`-style flag) that gates sending without a per-follower row — it silently drops fans whose first send failed.
-        - Public email-input endpoints (follow, subscribe) must go through `verifyTurnstile()` (functions/utils/turnstile.js). Flag a new public email-input endpoint that skips it.
+        - settimes.ca no longer emails fans. Flag any new route that stores a fan's email address or sends email to a caller-supplied address other than `auth/resend-activation.js`; such a feature needs double opt-in, a per-recipient cap (`allowEmailToRecipient`), signed unsubscribe links and a CASL sender footer first.
+        - The retired emailed URLs (`api/bands/[name]/unfollow.js`, `confirm-follow.js`, `confirm-follow-batch.js`, `api/subscriptions/unsubscribe.js`, `verify.js`) must keep answering 410 via `functions/utils/emailUpdatesEnded.js` without touching D1. Flag a change that deletes them or makes them read the token.
 
     # Invariant: semantic theme tokens only on public surfaces, no hardcoded
     # white, React 19 document.title workaround (CLAUDE.md "Theming" +

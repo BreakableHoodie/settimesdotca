@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, useCallback, memo } from 'react'
-import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { eventsApi, bandsApi } from '../utils/adminApi'
 import { useEventContext } from '../contexts/EventContext'
 import EventFormModal from './components/EventFormModal'
@@ -178,23 +177,6 @@ const formatEventDate = dateString =>
     day: 'numeric',
   })
 
-// Which notice this event's subscribers are owed, derived from its own state
-// rather than asked for (#1150). The two are mutually exclusive in time:
-//
-//   lineup announced, nothing placed   -> "the lineup is live"
-//   any set has a start_time           -> "set times are up"
-//
-// Deriving it keeps one button in a row that already has four, and it cannot
-// be got wrong by accident. The cost is that the earlier notice cannot be sent
-// once the schedule lands -- correct here, since by then the lineup is old news.
-// If that ever needs overriding, this is where a picker would go.
-const notifyKindFor = event => (Number(event?.scheduled_count) > 0 ? 'schedule_announced' : 'lineup_announced')
-
-// Published only, because the endpoint refuses anything else (mailing a list
-// about a draft announces something nobody can open), and non-empty, because
-// an event with no lineup has no news yet.
-const canNotifySubscribers = event => event?.status === 'published' && Number(event?.band_count) > 0
-
 // A row re-renders when its event OBJECT changes, never on a list of fields.
 // The row's Edit button closes over `event`, so a row that skips a render
 // hands the form a stale copy, and saving that form writes the stale values
@@ -217,7 +199,6 @@ const EventRow = memo(function EventRow({
   onTogglePublish,
   onArchive,
   onDelete,
-  onNotifySubscribers,
   showToast,
   readOnly,
   canArchiveEvents,
@@ -309,15 +290,6 @@ const EventRow = memo(function EventRow({
                 Archive
               </button>
             )}
-            {canNotifySubscribers(event) && (
-              <button
-                onClick={() => onNotifySubscribers(event)}
-                className={`px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors ${buttonFocusClass}`}
-                title="Email the subscriber list about this event"
-              >
-                Notify
-              </button>
-            )}
             {canDeleteEvents && (
               <button
                 onClick={() => onDelete(event)}
@@ -340,7 +312,6 @@ const EventCard = memo(function EventCard({
   onTogglePublish,
   onArchive,
   onDelete,
-  onNotifySubscribers,
   readOnly,
   canArchiveEvents,
   canDeleteEvents,
@@ -396,14 +367,6 @@ const EventCard = memo(function EventCard({
                 className={`px-4 py-2 min-h-[44px] bg-gray-600 hover:bg-gray-700 text-white rounded text-sm font-medium transition-colors ${buttonFocusClass}`}
               >
                 Archive
-              </button>
-            )}
-            {canNotifySubscribers(event) && (
-              <button
-                onClick={() => onNotifySubscribers(event)}
-                className={`px-4 py-2 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors ${buttonFocusClass}`}
-              >
-                Notify
               </button>
             )}
             {canDeleteEvents && (
@@ -663,71 +626,6 @@ export default function EventsTab({
       onEventsChange()
     } catch (err) {
       showToast('Failed to archive event: ' + err.message, 'error')
-    }
-  }
-
-  const [notifyConfirm, setNotifyConfirm] = useState({ open: false, message: '', onConfirm: () => {} })
-
-  // Mail the general subscriber list about this event (#1150).
-  //
-  // ConfirmDialog, not window.confirm. The rest of this file still uses
-  // window.confirm, but the shared component is the repo's real one (App.jsx,
-  // AdminPanel, AdminApp, LineupTab) and it is the accessible one -- focus
-  // trap, ESC, a real dialog role, theme-aware danger styling. Adding the
-  // better pattern here rather than propagating the older one; migrating this
-  // file's other three confirms is its own change.
-  //
-  // The confirm NAMES the notice, because the kind is derived rather than
-  // chosen and an operator should see which one is going out before it does.
-  //
-  // Email is the one side effect with no undo, which is why this is manual and
-  // why the wording is blunt. It is safe to repeat, though: the server tracks
-  // delivery per (subscriber, event, kind), so a second press mails nobody
-  // twice -- and a non-zero `remaining` means the send was capped, not failed,
-  // so pressing again is exactly right.
-  const handleNotifySubscribers = async event => {
-    if (readOnly) {
-      showToast('Read-only access: notifying subscribers is disabled for your role.', 'error')
-      return
-    }
-    const kind = notifyKindFor(event)
-    const notice = kind === 'schedule_announced' ? 'Set times are up' : 'The lineup is live'
-    setNotifyConfirm({
-      open: true,
-      message: `Email every verified subscriber about "${event.name}"?\n\nNotice: ${notice}\n\nThis cannot be undone.`,
-      onConfirm: () => sendSubscriberNotice(event, kind),
-    })
-  }
-
-  // Split from the confirm so the dialog owns the decision and this owns the
-  // send -- the same shape LineupTab uses.
-  const sendSubscriberNotice = async (event, kind) => {
-    try {
-      const res = await eventsApi.notifySubscribers(event.id, kind)
-      const sent = res.sent ?? 0
-      const remaining = res.remaining ?? 0
-      const failed = res.failed ?? 0
-      // `failed === 0` is load-bearing, not defensive. A send where EVERY
-      // delivery failed returns sent 0 / remaining 0 / failed > 0, which
-      // matches the first two conditions exactly -- so without it a total
-      // failure renders as "already notified", in green, and the operator
-      // never learns nobody was mailed.
-      if (sent === 0 && remaining === 0 && failed === 0) {
-        showToast('Every subscriber had already been notified.', 'success')
-      } else {
-        showToast(
-          `Notified ${sent} subscriber${sent === 1 ? '' : 's'}.` +
-            (failed > 0 ? ` ${failed} failed.` : '') +
-            // Surfaced rather than hidden: the send is capped per invocation,
-            // and a fan left in `remaining` hears nothing until someone presses
-            // again. Saying so is what makes that recoverable.
-            (remaining > 0 ? ` ${remaining} still to go — press Notify again.` : ''),
-          failed > 0 ? 'error' : 'success'
-        )
-      }
-      refreshEvents()
-    } catch (err) {
-      showToast('Failed to notify subscribers: ' + err.message, 'error')
     }
   }
 
@@ -1306,7 +1204,6 @@ export default function EventsTab({
                       onEdit={startEdit}
                       onTogglePublish={handleTogglePublish}
                       onArchive={handleArchive}
-                      onNotifySubscribers={handleNotifySubscribers}
                       onDelete={handleDelete}
                       showToast={showToast}
                       readOnly={readOnly}
@@ -1328,7 +1225,6 @@ export default function EventsTab({
                   onEdit={startEdit}
                   onTogglePublish={handleTogglePublish}
                   onArchive={handleArchive}
-                  onNotifySubscribers={handleNotifySubscribers}
                   onDelete={handleDelete}
                   readOnly={readOnly}
                   canArchiveEvents={canArchiveEvents}
@@ -1379,18 +1275,6 @@ export default function EventsTab({
           </div>
         </div>
       )}
-      <ConfirmDialog
-        isOpen={notifyConfirm.open}
-        title="Notify subscribers"
-        message={notifyConfirm.message}
-        confirmText="Send"
-        variant="danger"
-        onConfirm={async () => {
-          setNotifyConfirm(d => ({ ...d, open: false }))
-          await notifyConfirm.onConfirm()
-        }}
-        onCancel={() => setNotifyConfirm(d => ({ ...d, open: false }))}
-      />
     </div>
   )
 }

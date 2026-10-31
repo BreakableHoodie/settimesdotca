@@ -84,7 +84,7 @@ self.addEventListener('fetch', event => {
 
   // Public API requests: network-first with a bounded cache fallback.
   // Must come before the navigate check so that navigations to /api/ URLs
-  // (e.g. /api/bands/:name/confirm-follow, /api/feeds/ical) are handled here
+  // (e.g. /api/feeds/ical) are handled here
   // instead of navigationStrategy — preventing non-shell content from being
   // written to the /index.html cache slot.
   if (url.pathname.startsWith('/api/')) {

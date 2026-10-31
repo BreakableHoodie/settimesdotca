@@ -12,7 +12,6 @@ const STAT_DEFS = [
   { key: 'performances', label: 'Sets played' },
   { key: 'routes_shared', label: 'Routes shared' },
   { key: 'route_views', label: 'Route views (unique visitors per link, all-time)', legacyKey: 'route_views_legacy' },
-  { key: 'fans_following', label: 'Fans following bands' },
   { key: 'page_views', label: 'Page views' },
 ]
 
@@ -20,8 +19,8 @@ function formatNumber(value) {
   return (value || 0).toLocaleString()
 }
 
-// Zero-value metrics (expected pre-launch for engagement counters like fans
-// following or routes shared) render in a muted tone instead of the bold
+// Zero-value metrics (expected pre-launch for engagement counters like
+// routes shared) render in a muted tone instead of the bold
 // accent color, so an early low count never reads as a broken/prominent "0".
 function StatCard({ label, value, legacyValue }) {
   const isZero = !value

@@ -12,7 +12,7 @@ global.caches = {
   default: mockCache,
 };
 
-// Mock D1 database (used for fail-closed endpoints: /api/auth/*, /api/subscriptions).
+// Mock D1 database (used for fail-closed endpoints: /api/auth/*).
 // checkRateLimitD1 issues a single INSERT ... ON CONFLICT ... RETURNING statement
 // (#492), so the mock only needs to satisfy .bind(...).first().
 function makeMockDB({ count = 1, window_start = null } = {}) {
@@ -103,16 +103,16 @@ describe("Rate Limiting", () => {
       expect(result.remaining).toBe(59); // Window reset, so 60 - 1
     });
 
-    it("should fall back to Cache API for subscriptions when DB is unavailable", async () => {
+    it("should fall back to Cache API for fail-closed paths when DB is unavailable", async () => {
       // No env.DB provided — falls back to Cache API (local dev)
-      const request = new Request("https://example.com/api/subscriptions", {
+      const request = new Request("https://example.com/api/auth/activate", {
         headers: { "CF-Connecting-IP": "1.2.3.4" },
       });
 
       const result = await checkRateLimit(request);
 
       expect(result.allowed).toBe(true);
-      expect(result.remaining).toBe(9); // 10 - 1 for subscriptions
+      expect(result.remaining).toBe(9); // 10 - 1 for /api/auth/activate
     });
 
     it("should fail open if Cache API errors (non-sensitive endpoint)", async () => {
@@ -156,10 +156,10 @@ describe("Rate Limiting", () => {
       expect(result.remaining).toBe(0);
     });
 
-    it("should allow subscription requests under the limit using D1", async () => {
+    it("should allow /api/auth/activate requests under the limit using D1", async () => {
       const db = makeMockDB({ count: 1 });
       const env = { DB: db };
-      const request = new Request("https://example.com/api/subscriptions", {
+      const request = new Request("https://example.com/api/auth/activate", {
         headers: { "CF-Connecting-IP": "1.2.3.4" },
       });
 
@@ -366,38 +366,9 @@ describe("Rate Limiting", () => {
     });
   });
 
-  // ── Band action endpoints (Item 4) ─────────────────────────────────────────
+  // ── Band endpoints (the follow routes were retired; reads stay on the Cache API) ──
 
-  describe("band action endpoints — fail-closed with tight limit", () => {
-    it("/api/bands/<name>/follow is fail-closed (uses D1) with limit 5/300s", async () => {
-      const db = makeMockDB({ count: 3 }); // under the 5-req/300s limit
-      const env = { DB: db };
-      const request = new Request("https://example.com/api/bands/my-band/follow", {
-        headers: { "CF-Connecting-IP": "1.2.3.4" },
-      });
-
-      const result = await checkRateLimit(request, env);
-
-      expect(result.allowed).toBe(true);
-      expect(result.remaining).toBe(2); // 5 - 3
-      // D1 must be used (fail-closed path), not Cache API
-      expect(db.prepare).toHaveBeenCalled();
-      expect(mockCache.match).not.toHaveBeenCalled();
-    });
-
-    it("mixed-case band follow gets the same fail-closed config", async () => {
-      const db = makeMockDB({ count: 3 });
-      const result = await checkRateLimit(
-        new Request("https://example.com/api/bands/x/Follow", {
-          headers: { "CF-Connecting-IP": "1.2.3.4" },
-        }),
-        { DB: db },
-      );
-
-      expect(result).toMatchObject({ allowed: true, remaining: 2, limit: 5 });
-      expect(db.prepare).toHaveBeenCalled();
-    });
-
+  describe("band endpoints", () => {
     it("mixed-case auth requests share the existing counter", async () => {
       const { env, rawDb } = createTestEnv({ role: "admin" });
       const headers = { "CF-Connecting-IP": "1.2.3.4" };
@@ -413,113 +384,21 @@ describe("Rate Limiting", () => {
       expect(apiKeyRateLimitKey(42, "/api/admin/API-KEYS")).toBe(apiKeyRateLimitKey(42, "/api/admin/api-keys"));
     });
 
-    it("/api/bands/<name>/follow fails closed when limit is exceeded", async () => {
-      const db = makeMockDB({ count: 6 }); // over the 5-req/300s limit
-      const env = { DB: db };
-      const request = new Request("https://example.com/api/bands/my-band/follow", {
-        headers: { "CF-Connecting-IP": "1.2.3.4" },
-      });
-
-      const result = await checkRateLimit(request, env);
-
-      expect(result.allowed).toBe(false);
-      expect(result.remaining).toBe(0);
-    });
-
-    it("/api/bands/<name>/unfollow is fail-closed with the same tight limit", async () => {
+    it("normalizes trailing slashes for fail-closed paths and their counter keys", async () => {
       const db = makeMockDB({ count: 1 });
-      const env = { DB: db };
-      const request = new Request("https://example.com/api/bands/my-band/unfollow", {
-        headers: { "CF-Connecting-IP": "1.2.3.4" },
-      });
-
-      const result = await checkRateLimit(request, env);
-
-      expect(result.allowed).toBe(true);
-      expect(result.remaining).toBe(4); // 5 - 1
-      expect(db.prepare).toHaveBeenCalled();
-    });
-
-    it("/api/bands/<name>/confirm-follow is fail-closed with the tight limit", async () => {
-      const db = makeMockDB({ count: 1 });
-      const env = { DB: db };
-      const request = new Request("https://example.com/api/bands/my-band/confirm-follow", {
-        headers: { "CF-Connecting-IP": "1.2.3.4" },
-      });
-
-      const result = await checkRateLimit(request, env);
-
-      expect(result.allowed).toBe(true);
-      expect(result.remaining).toBe(4);
-      expect(db.prepare).toHaveBeenCalled();
-    });
-
-    it("normalizes trailing slashes for band actions and their counter keys", async () => {
-      const preparedCalls = [];
-      const db = {
-        prepare: vi.fn().mockImplementation(() => {
-          preparedCalls.push(true);
-          return {
-            bind: vi.fn().mockReturnValue({
-              first: vi.fn().mockResolvedValue({
-                count: 1,
-                window_start: Math.floor(Date.now() / 1000),
-              }),
-            }),
-          };
-        }),
-      };
       const env = { DB: db };
       const headers = { "CF-Connecting-IP": "1.2.3.4" };
 
-      const follow = await checkRateLimit(
-        new Request("https://example.com/api/bands/my-band/follow", { headers }),
-        env,
-      );
-      const followSlash = await checkRateLimit(
-        new Request("https://example.com/api/bands/my-band/follow/", { headers }),
-        env,
-      );
+      const plain = await checkRateLimit(new Request("https://example.com/api/auth/activate", { headers }), env);
+      const slash = await checkRateLimit(new Request("https://example.com/api/auth/activate/", { headers }), env);
 
-      expect(follow.limit).toBe(5);
-      expect(followSlash.limit).toBe(5);
+      expect(plain.limit).toBe(10);
+      expect(slash.limit).toBe(10);
       const keys = db.prepare.mock.results.map((result) => result.value.bind.mock.calls[0][0]);
       expect(keys[0]).toBe(keys[1]);
-      expect(preparedCalls).toHaveLength(2);
     });
 
-    it("normalizes trailing slashes for batch follow", async () => {
-      const db = makeMockDB({ count: 1 });
-      const result = await checkRateLimit(
-        new Request("https://example.com/api/bands/follow-batch/", {
-          headers: { "CF-Connecting-IP": "1.2.3.4" },
-        }),
-        { DB: db },
-      );
-
-      expect(result.limit).toBe(3);
-      expect(result.remaining).toBe(2);
-    });
-
-    it("/api/bands/<name>/follow fails closed when D1 throws", async () => {
-      const db = {
-        prepare: vi.fn().mockReturnValue({
-          bind: vi.fn().mockReturnValue({
-            first: vi.fn().mockRejectedValue(new Error("D1 error")),
-          }),
-        }),
-      };
-      const env = { DB: db };
-      const request = new Request("https://example.com/api/bands/my-band/follow", {
-        headers: { "CF-Connecting-IP": "1.2.3.4" },
-      });
-
-      const result = await checkRateLimit(request, env);
-
-      expect(result.allowed).toBe(false); // fail closed
-    });
-
-    it("public GET /api/bands/<name> (no action suffix) is NOT fail-closed and uses Cache API", async () => {
+    it("public GET /api/bands/<name> is NOT fail-closed and uses Cache API", async () => {
       const db = makeMockDB({ count: 1 });
       const env = { DB: db };
       const request = new Request("https://example.com/api/bands/my-band", {
@@ -534,8 +413,8 @@ describe("Rate Limiting", () => {
       expect(mockCache.match).toHaveBeenCalled();
     });
 
-    it("band action endpoints use depth-5 keys so each action is rate-limited independently", async () => {
-      // Two calls: one to /follow, one to /unfollow — D1 keys must differ
+    it("auth endpoints use depth-5 keys so each action is rate-limited independently", async () => {
+      // Two calls: one to /activate, one to /resend — D1 keys must differ
       const preparedCalls = [];
       const db = {
         prepare: vi.fn().mockImplementation((sql) => {
@@ -553,13 +432,13 @@ describe("Rate Limiting", () => {
       const env = { DB: db };
 
       await checkRateLimit(
-        new Request("https://example.com/api/bands/my-band/follow", {
+        new Request("https://example.com/api/auth/activate", {
           headers: { "CF-Connecting-IP": "1.2.3.4" },
         }),
         env,
       );
       await checkRateLimit(
-        new Request("https://example.com/api/bands/my-band/unfollow", {
+        new Request("https://example.com/api/auth/resend", {
           headers: { "CF-Connecting-IP": "1.2.3.4" },
         }),
         env,
@@ -571,7 +450,7 @@ describe("Rate Limiting", () => {
       // Extract the bind arguments from the upsert calls to confirm distinct keys
       const bindCalls = db.prepare.mock.results.map((r) => r.value.bind.mock.calls[0]).filter(Boolean);
 
-      // The first positional arg to bind is the key — should differ for /follow vs /unfollow
+      // The first positional arg to bind is the key — should differ for /activate vs /resend
       const keys = bindCalls.map((args) => args[0]);
       // Both calls must use distinct keys
       const uniqueKeys = [...new Set(keys)];

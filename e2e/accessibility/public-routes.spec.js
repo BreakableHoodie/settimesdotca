@@ -2,7 +2,7 @@
  * Public Routes — Table-Driven Full-Page Axe Coverage (#1072)
  *
  * The fan-facing surface is what crawlers and real users hit first, but most
- * of its routes had no axe coverage: only `/`, `/subscribe`, `/event/:slug`
+ * of its routes had no axe coverage: only `/`, `/event/:slug`
  * and `/admin/login` were scanned. This spec runs the broad WCAG ruleset (the
  * same `.withTags(...)` standard theme-contrast.spec.js uses, NOT admin's
  * narrow `cat.forms`/`cat.name-role-value`) against every public route, each
@@ -45,7 +45,6 @@ const surfaces = [
     ready: (page) => page.getByRole("heading", { name: "Archived lineup" }),
   },
   { path: "/embed/:future", label: "Embed", ready: (page) => page.getByRole("heading", { name: "Full lineup" }) },
-  { path: "/subscribe", label: "Subscribe", ready: (page) => page.getByRole("heading", { name: "Never miss a show" }) },
   {
     path: "/reset-password",
     label: "Reset password (no token)",

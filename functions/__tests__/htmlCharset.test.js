@@ -33,7 +33,7 @@ describe("HTML pages served by Pages Functions declare UTF-8", () => {
 
   it("every HTML document carries <meta charset>", () => {
     const docs = FILES.filter(({ source }) => /<html[\s>]/i.test(source));
-    expect(docs.length).toBeGreaterThanOrEqual(4);
+    expect(docs.length).toBeGreaterThanOrEqual(2);
     const offenders = docs.filter(({ source }) => !/<meta charset=/i.test(source)).map(({ file }) => file);
     expect(offenders).toEqual([]);
   });

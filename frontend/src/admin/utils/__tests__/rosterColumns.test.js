@@ -23,7 +23,6 @@ const band = (overrides = {}) => ({
   origin_region: '',
   origin: '',
   contact_email: '',
-  follower_count: 0,
   social_links: '{}',
   ...overrides,
 })
@@ -127,27 +126,6 @@ describe('getValues — contact_email column', () => {
     expect(getValuesFor('contact_email', band({ contact_email: 'a@example.com' }))).toEqual(['a@example.com'])
   })
 })
-
-describe('getValues — follower_count column', () => {
-  it('stringifies 0', () => {
-    expect(getValuesFor('follower_count', band({ follower_count: 0 }))).toEqual(['0'])
-  })
-
-  it('stringifies 1', () => {
-    expect(getValuesFor('follower_count', band({ follower_count: 1 }))).toEqual(['1'])
-  })
-
-  it('defaults undefined to "0"', () => {
-    expect(getValuesFor('follower_count', band({ follower_count: undefined }))).toEqual(['0'])
-  })
-
-  // D1 returns NULL, not undefined, for an unset INTEGER column -- the `??`
-  // in getValues handles both, but only `undefined` had coverage above.
-  it('defaults null (as D1 returns for an unset column) to "0"', () => {
-    expect(getValuesFor('follower_count', band({ follower_count: null }))).toEqual(['0'])
-  })
-})
-
 describe('matchesColumnFilters', () => {
   it('matches everything when there are no filters', () => {
     expect(matchesColumnFilters(band(), undefined)).toBe(true)

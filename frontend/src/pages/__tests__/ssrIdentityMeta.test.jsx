@@ -47,7 +47,6 @@ import ContactPage from '../ContactPage.jsx'
 import StatsPage from '../StatsPage.jsx'
 import PrivacyPage from '../PrivacyPage.jsx'
 import TermsPage from '../TermsPage.jsx'
-import SubscribePage from '../SubscribePage.jsx'
 import EventRecapPage from '../EventRecapPage.jsx'
 import VenuePage from '../VenuePage.jsx'
 import BandProfilePage from '../BandProfilePage.jsx'
@@ -244,7 +243,6 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
       performances: 23,
       routes_shared: 14,
       route_views: 40,
-      fans_following: 8,
       page_views: 500,
       top_bands: [],
     })
@@ -294,22 +292,6 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
 
     expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
     await waitFor(() => expect(document.title).toBe('Terms of Service | SetTimes'))
-  })
-
-  it('SubscribePage (/subscribe)', async () => {
-    seedSsrHead('/subscribe', 'Subscribe — Never Miss a Show | SetTimes')
-
-    render(
-      withProviders(
-        <MemoryRouter>
-          <SubscribePage />
-        </MemoryRouter>
-      )
-    )
-    await screen.findByRole('heading', { level: 1, name: 'Never miss a show' })
-
-    expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
-    await waitFor(() => expect(document.title).toBe('Subscribe — Never Miss a Show | SetTimes'))
   })
 
   it('EventRecapPage (/events/:slug/recap)', async () => {

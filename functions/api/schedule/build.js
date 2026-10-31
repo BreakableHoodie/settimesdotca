@@ -80,7 +80,7 @@ export async function onRequestPost(context) {
     //    indistinguishable from each other and from a valid one, so they are
     //    dropped rather than reported. A refusal that fires only for real rows
     //    is itself the disclosure -- the reasoning behind #983's /band/<slug>
-    //    gate, and behind follow-batch.js dropping unknown ids silently.
+    //    gate.
     //
     //    Reporting is the easy mistake here: the catch below tests an error
     //    message for "performance_id", which a raw `FOREIGN KEY constraint

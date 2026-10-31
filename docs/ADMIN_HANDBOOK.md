@@ -202,7 +202,6 @@ There is no password-based direct creation flow. The admin creates an invite; th
 - `performances` - Links a band profile to an event, venue, and set time
 - `audit_log` - Security audit trail
 - `api_keys` - Machine credentials and revocation state
-- `subscription_notifications` - Subscription delivery claims
 - `event_daily_stats` - Daily event aggregates
 - `invite_codes` - User invite system
 

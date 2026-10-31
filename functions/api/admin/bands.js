@@ -129,7 +129,6 @@ export async function onRequestGet(context) {
           bp.social_links,
           bp.members,
           bp.for_fans_of,
-          (SELECT COUNT(*) FROM band_follows bf WHERE bf.band_profile_id = bp.id AND bf.verified = 1) AS follower_count,
           v.name as venue_name,
           e.name as event_name
         FROM performances p
@@ -263,7 +262,6 @@ export async function onRequestGet(context) {
           bp.social_links,
           bp.members,
           bp.for_fans_of,
-          (SELECT COUNT(*) FROM band_follows bf WHERE bf.band_profile_id = bp.id AND bf.verified = 1) AS follower_count,
           (SELECT GROUP_CONCAT(DISTINCT perf.event_id) FROM performances perf WHERE perf.band_profile_id = bp.id) AS event_ids,
           next_ev.event_id AS next_event_id,
           next_ev.event_name AS next_event_name,

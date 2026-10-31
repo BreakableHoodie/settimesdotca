@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { onRequestGet } from "../public.js";
-import { MockD1Database } from "../../subscriptions/__tests__/mocks/d1.js";
+import { MockD1Database } from "../../__tests__/mocks/d1.js";
 import { createMockEvent, createMockVenue, createMockBand, seedMockData } from "./helpers.js";
 import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../test-utils.js";
 

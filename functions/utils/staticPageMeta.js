@@ -85,14 +85,6 @@ export const STATIC_PAGES = {
     ogTitle: "Terms of Service | SetTimes",
     ogDescription: "Terms of Service for SetTimes — Waterloo region live music event scheduling tool.",
   },
-  "/subscribe": {
-    title: "Subscribe — Never Miss a Show | SetTimes",
-    description:
-      "Get notified about new live music events and lineup announcements in Waterloo Region. Subscribe for show alerts from SetTimes.",
-    ogTitle: "Subscribe — Never Miss a Show | SetTimes",
-    ogDescription:
-      "Get notified about new live music events and lineup announcements in Waterloo Region. Subscribe for show alerts from SetTimes.",
-  },
 };
 
 // Builds the CF Pages Function handler for one registered static page. All
@@ -116,10 +108,9 @@ export function staticPageHandler(path) {
       `<meta property="og:title" content="${escapeAttr(ogTitle)}" />`,
       `<meta property="og:description" content="${escapeAttr(ogDescription)}" />`,
       `<meta property="og:type" content="website" />`,
-      // SubscribePage.jsx's old client Helmet was the only STATIC_PAGES entry
-      // that declared og:site_name — carried forward here so the ownership
-      // sweep (#784 CodeRabbit) doesn't silently drop it, and applied to all
-      // registered pages for consistency (og:site_name never varies by page).
+      // A client Helmet once declared og:site_name for one static page; it is
+      // emitted here for every registered page (#784 CodeRabbit), since
+      // og:site_name never varies by page.
       `<meta property="og:site_name" content="SetTimes" />`,
       `<meta property="og:image" content="${escapeAttr(DEFAULT_OG_IMAGE)}" />`,
       `<meta name="twitter:card" content="summary_large_image" />`,

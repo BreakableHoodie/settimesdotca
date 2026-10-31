@@ -413,7 +413,7 @@ export default function EventRecapPage() {
           <section aria-label="Archive next steps" className="mt-12 rounded-2xl bg-surface p-6 text-center">
             <h2 className="mb-2 text-xl font-semibold text-text-primary">Keep exploring the archive</h2>
             <p className="mb-4 text-text-tertiary">
-              Revisit the archived schedule, jump into band histories, or get notified when the next lineup drops.
+              Revisit the archived schedule, jump into band histories, or browse the other editions.
             </p>
             <div className="flex flex-wrap justify-center gap-3">
               <Link
@@ -422,12 +422,6 @@ export default function EventRecapPage() {
               >
                 <CalendarDays size={16} aria-hidden="true" />
                 Archived schedule
-              </Link>
-              <Link
-                to="/subscribe"
-                className="inline-flex min-h-[44px] items-center rounded-lg bg-accent-400 px-5 py-3 font-semibold text-bg-navy transition-colors hover:bg-accent-400/90"
-              >
-                Get notified
               </Link>
             </div>
           </section>

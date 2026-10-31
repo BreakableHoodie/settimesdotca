@@ -116,7 +116,7 @@ describe("staticPageMeta — every registered static page", () => {
       });
 
       // #784 CodeRabbit follow-up: og:site_name was declared by
-      // SubscribePage.jsx's old client Helmet but never emitted by this
+      // a client Helmet but never emitted by this
       // handler -- silently dropped, not merely duplicated, once the client
       // Helmet ownership sweep removed it. Every registered page emits it now
       // for consistency (og:site_name never varies by page).

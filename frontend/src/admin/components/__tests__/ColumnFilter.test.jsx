@@ -5,7 +5,6 @@ import ColumnFilter from '../ColumnFilter'
 import { BLANK } from '../../utils/rosterColumns'
 
 const GENRE_COLUMN = { key: 'genre', label: 'Genre' }
-const FOLLOWER_COLUMN = { key: 'follower_count', label: 'Followers' }
 
 // The panel is normally rendered as a sibling of its trigger button (owned by
 // a separate FilterFunnel instance), not nested inside it -- so the outside
@@ -149,19 +148,6 @@ describe('ColumnFilter', () => {
     const { onClear } = setup({ value: ['punk'] })
     fireEvent.click(screen.getByRole('button', { name: 'Clear filter' }))
     expect(onClear).toHaveBeenCalledTimes(1)
-  })
-
-  it('sorts follower_count numerically, not lexicographically', () => {
-    setup({
-      column: FOLLOWER_COLUMN,
-      counts: new Map([
-        ['10', 2],
-        ['2', 5],
-        ['1', 1],
-      ]),
-    })
-    const rows = screen.getAllByRole('checkbox').map(c => c.getAttribute('aria-label'))
-    expect(rows.slice(1)).toEqual(['1 — 1', '2 — 5', '10 — 2'])
   })
 
   it('closes on Escape and returns focus to the trigger', () => {

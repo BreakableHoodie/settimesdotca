@@ -73,9 +73,9 @@ describe("every link in an outgoing email reaches a real handler", () => {
   );
 
   it("finds the email senders and their links (the scan is not vacuous)", () => {
-    expect(EMAIL_SENDERS.length).toBeGreaterThanOrEqual(8);
-    expect(links.length).toBeGreaterThanOrEqual(10);
-    expect(links.map((l) => l.path)).toContain("/api/subscriptions/verify");
+    expect(EMAIL_SENDERS.length).toBeGreaterThanOrEqual(5);
+    expect(links.length).toBeGreaterThanOrEqual(4);
+    expect(links.map((l) => l.path)).toContain("/reset-password");
   });
 
   it.each(links.map((l) => [l.path, l.file]))("%s (from %s) is served", (path) => {

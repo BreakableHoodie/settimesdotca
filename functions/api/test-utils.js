@@ -309,7 +309,6 @@ export function createTestEnv({ role = "editor", mfaEnrolled = role === "admin" 
       ALLOW_HEADER_AUTH: "true",
       ENVIRONMENT: "test",
       CSRF_SECRET: "test-csrf-secret-for-unit-tests",
-      UNSUBSCRIBE_LINK_SECRET: "test-unsubscribe-link-secret-for-unit-tests",
       MFA_TOTP_ENCRYPTION_KEY: "test-mfa-totp-encryption-key",
     },
     rawDb,

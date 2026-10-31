@@ -653,7 +653,7 @@ describe('still-to-come teaser', () => {
     renderApp()
 
     expect(await screen.findByText(/Set times coming soon\./)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Subscribe for updates/ })).toHaveAttribute('href', '/subscribe')
+    expect(screen.queryByRole('link', { name: /Subscribe for updates/ })).not.toBeInTheDocument()
   })
 
   it('still says "more bands dropping soon" on a staged reveal', async () => {

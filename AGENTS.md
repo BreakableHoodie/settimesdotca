@@ -78,8 +78,8 @@ masks failures (this shipped a red lint to CI once). `make` propagates failures 
   text only. Structured facts (genre, origin, links) may be researched, but only to the
   highest confidence — the source must unambiguously identify the specific band; a missing
   field beats a wrong attribution.
-- **Band follows are double opt-in** (`verified = 1` gates announcement email). Never revert
-  to auto-verify — it reopens an email-bombing vector.
+- **The site sends no fan email** (retired 2026-10-31: no band follows, subscriptions or
+  announcements). Do not add any without the checklist in CLAUDE.md "Email is account mail only".
 
 ## PR rules
 

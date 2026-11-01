@@ -36,6 +36,7 @@ function extractPaths(source) {
 }
 
 // Does functions/ serve this path? `${…}` segments match any `[param]` dir/file.
+// The `[[path]]` catch-all (404s unknown paths, #1446) is not a handler for a link.
 function servedByFunction(path) {
   const segments = path.split("/").filter(Boolean);
   const match = (dir, i) => {
@@ -46,7 +47,7 @@ function servedByFunction(path) {
     const dynamic = seg.includes("${");
     const candidates = entries.filter((e) => {
       const base = e.replace(/\.js$/, "");
-      return dynamic ? /^\[.+\]$/.test(base) : base === seg || /^\[.+\]$/.test(base);
+      return dynamic ? /^\[[^[\]]+\]$/.test(base) : base === seg || /^\[[^[\]]+\]$/.test(base);
     });
     return candidates.some((e) => {
       const p = join(dir, e);

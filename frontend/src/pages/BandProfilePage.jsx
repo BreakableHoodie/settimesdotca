@@ -23,6 +23,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { renderMarkdownToSafeHtml } from '../utils/markdown'
 import { BAND_PHOTO_CROP } from '../utils/bandPhoto'
+import { useNoindex } from '../utils/useNoindex'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import BandFacts from '../components/BandFacts'
 import BandStats from '../components/BandStats'
@@ -294,6 +295,8 @@ export default function BandProfilePage() {
     },
     [scheduleSelections, profile?.name]
   )
+
+  useNoindex(!loading && isNotFoundError)
 
   useEffect(() => {
     // While the fetch is in flight, the SSR-injected <title> (already in the

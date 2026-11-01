@@ -156,18 +156,18 @@ describe("SSR /events/[slug]/recap", () => {
     );
   });
 
-  test("falls back to the plain shell for an unknown slug", async () => {
+  test("answers a noindex 404 (#1446) for an unknown slug", async () => {
     const { env } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
 
     const response = await onRequestGet(makeContext({ env, slug: "does-not-exist" }));
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(404);
     const html = await response.text();
     // The raw shell, untouched — none of the recap-specific injection ran.
-    expect(html).toBe(STUB_HTML);
+    expect(html).toContain('<meta name="robots" content="noindex">');
   });
 
-  test("falls back to the plain shell for an unpublished, non-archived event", async () => {
+  test("answers a noindex 404 (#1446) for an unpublished, non-archived event", async () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
     insertEvent(rawDb, {
@@ -180,9 +180,9 @@ describe("SSR /events/[slug]/recap", () => {
     // publicEventStatusSql()'s status IN ('published', 'archived') gate.
 
     const response = await onRequestGet(makeContext({ env, slug: "draft-event-recap" }));
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(404);
     const html = await response.text();
-    expect(html).toBe(STUB_HTML);
+    expect(html).toContain('<meta name="robots" content="noindex">');
   });
 
   // CodeRabbit Major (#784 follow-up): this route claims to be the ARCHIVE
@@ -190,7 +190,7 @@ describe("SSR /events/[slug]/recap", () => {
   // archived gate alone says nothing about timing. A published event dated
   // in the future must still fall back to the plain shell, not get
   // recap-specific meta for a show that hasn't happened.
-  test("falls back to the plain shell for a published event whose date is in the future", async () => {
+  test("answers a noindex 404 (#1446) for a published event whose date is in the future", async () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
     insertEvent(rawDb, {
@@ -201,9 +201,9 @@ describe("SSR /events/[slug]/recap", () => {
     });
 
     const response = await onRequestGet(makeContext({ env, slug: "future-event-recap" }));
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(404);
     const html = await response.text();
-    expect(html).toBe(STUB_HTML);
+    expect(html).toContain('<meta name="robots" content="noindex">');
   });
 
   // Multi-day events: the last day (end_date), not the first (date), is what
@@ -211,7 +211,7 @@ describe("SSR /events/[slug]/recap", () => {
   // convention documented in CLAUDE.md (scheduleStorage stale-detection).
   // A multi-day event whose START date has passed but END date hasn't must
   // still fall back to the plain shell.
-  test("falls back to the plain shell for a multi-day event still in progress (end_date in the future)", async () => {
+  test("answers a noindex 404 (#1446) for a multi-day event still in progress (end_date in the future)", async () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
     const event = insertEvent(rawDb, {
@@ -223,9 +223,9 @@ describe("SSR /events/[slug]/recap", () => {
     rawDb.prepare("UPDATE events SET end_date='2999-01-01' WHERE id=?").run(event.id);
 
     const response = await onRequestGet(makeContext({ env, slug: "in-progress-multiday-recap" }));
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(404);
     const html = await response.text();
-    expect(html).toBe(STUB_HTML);
+    expect(html).toContain('<meta name="robots" content="noindex">');
   });
 
   // CodeRabbit Minor (#784 follow-up): `date`/`end_date` are TEXT columns
@@ -264,14 +264,14 @@ describe("SSR /events/[slug]/recap", () => {
     expect(html).toBe(STUB_HTML);
   });
 
-  test("falls back to the plain shell on a malformed slug", async () => {
+  test("answers a noindex 404 (#1446) on a malformed slug", async () => {
     const { env } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
 
     const response = await onRequestGet(makeContext({ env, slug: "not valid!" }));
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(404);
     const html = await response.text();
-    expect(html).toBe(STUB_HTML);
+    expect(html).toContain('<meta name="robots" content="noindex">');
   });
 
   test("falls back to the plain shell on a DB error", async () => {

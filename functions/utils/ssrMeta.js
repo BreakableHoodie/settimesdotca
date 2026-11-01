@@ -195,3 +195,40 @@ export async function serveWithInjectedMeta(context, { title = null, metaTags = 
     return env.ASSETS.fetch(request);
   }
 }
+
+export const NOT_FOUND_TITLE = "Page not found | SetTimes";
+
+/**
+ * Answer a real 404 for a URL whose entity (or path) definitely does not exist.
+ *
+ * The SPA shell is the body, so a person still gets the app and its NotFound
+ * page; the status and `noindex` are what tell a crawler the URL is not a page
+ * (a 200 with the home page's title is a soft 404, #1446).
+ *
+ * Call it ONLY when a lookup succeeded and found nothing. A D1 error or a
+ * closed public-data gate must keep serving the shell: a transient failure
+ * must never 404 a real page. If the shell itself cannot be fetched this
+ * still answers 404, as plain text, never a 200.
+ */
+export async function serveNotFound(context) {
+  const { request, env } = context;
+  try {
+    const origin = new URL(request.url).origin;
+    const indexResponse = await env.ASSETS.fetch(new Request(`${origin}/`));
+    if (indexResponse.ok) {
+      let html = await indexResponse.text();
+      html = html.replace(DEFAULT_META_RE, "");
+      html = html.replace(/<title>[\s\S]*?<\/title>/i, () => `<title>${escapeAttr(NOT_FOUND_TITLE)}</title>`);
+      html = html.replace("</head>", () => `    <meta name="robots" content="noindex">\n  </head>`);
+      const headers = headersForRewrittenShell(indexResponse.headers);
+      headers.set("Cache-Control", "public, max-age=60");
+      return new Response(html, { status: 404, headers });
+    }
+  } catch (err) {
+    console.error("SSR not-found shell failed:", err);
+  }
+  return new Response("Not found", {
+    status: 404,
+    headers: { "Content-Type": "text/plain;charset=UTF-8", "Cache-Control": "public, max-age=60" },
+  });
+}

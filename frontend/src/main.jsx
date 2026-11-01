@@ -38,7 +38,11 @@ const hostname = typeof window !== 'undefined' ? window.location.hostname || '' 
 const isPreviewBuild = hostname.startsWith('dev.') || hostname.endsWith('.pages.dev')
 const robotsMeta = typeof document !== 'undefined' ? document.querySelector("meta[name='robots']") : null
 if (robotsMeta) {
-  robotsMeta.setAttribute('content', isPreviewBuild ? 'noindex, nofollow' : 'index,follow')
+  // A server-sent noindex (functions/utils/ssrMeta.js serveNotFound, #1446) is
+  // never upgraded to index,follow: crawlers read the rendered DOM too.
+  if (!/noindex/i.test(robotsMeta.getAttribute('content') || '')) {
+    robotsMeta.setAttribute('content', isPreviewBuild ? 'noindex, nofollow' : 'index,follow')
+  }
 } else if (typeof document !== 'undefined') {
   const meta = document.createElement('meta')
   meta.name = 'robots'

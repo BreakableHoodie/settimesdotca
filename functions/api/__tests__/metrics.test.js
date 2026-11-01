@@ -642,6 +642,16 @@ describe("POST /api/metrics — show-night curve (event_hourly_views, #1246 Q1)"
 
   test("answers before the writes and hands them to waitUntil (#1411)", async () => {
     const { env, rawDb } = createTestEnv();
+    // Hold the D1 batch open: the response must come back while it is pending.
+    const realBatch = env.DB.batch.bind(env.DB);
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    env.DB.batch = async (stmts) => {
+      await gate;
+      return realBatch(stmts);
+    };
     const pending = [];
     const res = await onRequestPost({
       request: makeRequest([{ event: "page_view", props: { page: "/" } }]),
@@ -650,7 +660,9 @@ describe("POST /api/metrics — show-night curve (event_hourly_views, #1246 Q1)"
     });
     expect(res.status).toBe(200);
     expect(pending).toHaveLength(1);
+    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM page_views_daily").get().n).toBe(0);
 
+    release();
     await Promise.all(pending);
     expect(rawDb.prepare("SELECT page, views FROM page_views_daily").all()).toEqual([{ page: "/", views: 1 }]);
   });

@@ -1524,8 +1524,8 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'Metrics & Analytics' — event_hourly_views counts event_view only while the festival date is inside the event's [date, end_date], so a view after the last show day writes no hourly row (#1246 Q1)",
     file: "functions/api/metrics.js",
-    find: "          festivalDate <= (row.end_date || row.date),",
-    replace: "          true,",
+    find: "festivalDate <= (row.end_date || row.date),",
+    replace: "true,",
     tests: ["functions/api/__tests__/metrics.test.js"],
   },
   {
@@ -1533,8 +1533,8 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'Metrics & Analytics' — event_hourly_views keys a view by FESTIVAL date, so a 01:30 view after the show counts on the previous evening at hour 1, never on the next calendar day (#1246 Q1)",
     file: "functions/api/metrics.js",
-    find: "      const festivalDate = eventLocalFestivalToday(now);",
-    replace: "      const festivalDate = eventLocalToday(now);",
+    find: "  const festivalDate = eventLocalFestivalToday(now);",
+    replace: "  const festivalDate = eventLocalToday(now);",
     tests: ["functions/api/__tests__/metrics.test.js"],
   },
   {

@@ -1525,6 +1525,54 @@ describe('EventTimeline empty lineup and between-seasons states', () => {
     await waitFor(() => expect(fetchCount).toBe(3))
   })
 
+  it('ignores a slower, older timeline response that lands after a newer one (#1412)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const edition = {
+      id: 9,
+      name: 'Live Fest',
+      slug: 'live-fest',
+      date: '2026-10-31',
+      status: 'published',
+      venues: [],
+      bands: [],
+      band_count: 0,
+      venue_count: 0,
+      ticket_url: null,
+    }
+    let fetchCount = 0
+    let releaseFirst
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(url => {
+        if (!url.startsWith('/api/events/timeline')) return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+        fetchCount += 1
+        if (fetchCount === 1) {
+          // The first load is slow and says "between seasons".
+          return new Promise(resolve => {
+            releaseFirst = () =>
+              resolve(jsonResponse({ now: [], upcoming: [], past: [{ ...edition, status: 'archived' }] }))
+          })
+        }
+        return Promise.resolve(jsonResponse({ now: [edition], upcoming: [], past: [] }))
+      })
+    )
+    render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+    await waitFor(() => expect(fetchCount).toBe(1))
+    document.dispatchEvent(new Event('visibilitychange'))
+    await waitFor(() => expect(fetchCount).toBe(2))
+
+    // The stale "between seasons" answer lands last and must not win.
+    releaseFirst()
+    expect(await screen.findByText('Live Fest')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /show history|hide history/i })).not.toBeInTheDocument()
+    await vi.advanceTimersByTimeAsync(60000)
+    await waitFor(() => expect(fetchCount).toBe(3))
+  })
+
   it('does not reopen a manually collapsed Past section on a later past-only poll', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
 

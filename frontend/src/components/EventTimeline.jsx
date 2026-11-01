@@ -74,6 +74,7 @@ export default function EventTimeline() {
   const detailControllersRef = useRef(new Map())
 
   useEffect(() => {
+    let fetchSeq = 0
     const fetchTimeline = async (isSilent = false) => {
       try {
         if (!isSilent) {
@@ -81,7 +82,11 @@ export default function EventTimeline() {
         }
         setError(null)
 
+        // Fetches can overlap (first load, tab shown again, a poll) and finish
+        // out of order; only the newest one may update the timeline and pace.
+        const seq = ++fetchSeq
         const data = await fetchPublicJson('/api/events/timeline?pastLimit=50', {}, 'Failed to fetch events timeline')
+        if (seq !== fetchSeq) return
         latestRef.current = data
         setTimeline(data)
       } catch (err) {
@@ -101,7 +106,8 @@ export default function EventTimeline() {
     let disposed = false
     let resumeCount = 0
     fetchTimeline().finally(() => {
-      if (!disposed) startPolling()
+      // A resume that started meanwhile owns the schedule.
+      if (!disposed && resumeCount === 0) startPolling()
     })
 
     // The poll exists for "Now Playing", so its pace follows what is on (#1412):

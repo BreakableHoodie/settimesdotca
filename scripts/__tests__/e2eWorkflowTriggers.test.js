@@ -9,8 +9,15 @@ import { load as loadYaml } from "js-yaml";
 // e2e-a11y-visual did not run on it, and the new rule failed the next
 // frontend PR instead.
 const REPO_ROOT = fileURLToPath(new URL("../..", import.meta.url));
-const prPaths = (workflow) =>
-  loadYaml(readFileSync(join(REPO_ROOT, ".github/workflows", workflow), "utf8")).on.pull_request.paths;
+const workflowDoc = (workflow) => loadYaml(readFileSync(join(REPO_ROOT, ".github/workflows", workflow), "utf8"));
+// edge-e2e.yml filters in a `changes` job rather than on the trigger (#1410).
+const prPaths = (workflow) => {
+  const doc = workflowDoc(workflow);
+  const filterStep = doc.jobs?.changes?.steps?.find((step) =>
+    String(step.uses ?? "").startsWith("dorny/paths-filter@"),
+  );
+  return filterStep ? loadYaml(filterStep.with.filters).edge : doc.on.pull_request.paths;
+};
 
 describe("path-filtered E2E jobs run on dependency changes", () => {
   it.each([
@@ -39,6 +46,34 @@ describe("path-filtered E2E jobs run on dependency changes", () => {
   ])("%s triggers on its dependencies", (workflow, required) => {
     const paths = prPaths(workflow);
     for (const path of required) expect(paths, `${workflow} is missing ${path}`).toContain(path);
+  });
+});
+
+// "Preview edge E2E" is a required check (#1410). A required check must report
+// on every PR, so the workflow cannot be path-filtered on its trigger, and a
+// failed `changes` job must run the suite: a skip would pass the check.
+describe("edge-e2e.yml can be a required check", () => {
+  const doc = () => workflowDoc("edge-e2e.yml");
+
+  it("triggers on every pull request, with no path filter", () => {
+    const trigger = doc().on.pull_request;
+    expect(trigger?.paths).toBeUndefined();
+    expect(trigger?.["paths-ignore"]).toBeUndefined();
+  });
+
+  it("runs the suite when it cannot tell what changed", () => {
+    const job = doc().jobs["edge-e2e"];
+    expect(job.needs).toContain("changes");
+    expect(job.if).toContain("needs.changes.result != 'success'");
+    expect(job.if).toContain("needs.changes.outputs.edge == 'true'");
+    // A failed image job must not skip the suite either (a skip passes the check).
+    expect(job.if).not.toContain("needs.playwright-image.result");
+  });
+
+  it("queues only the deploying job on the shared scratch D1", () => {
+    const d = doc();
+    expect(d.concurrency).toBeUndefined();
+    expect(d.jobs["edge-e2e"].concurrency).toEqual({ group: "edge-e2e", "cancel-in-progress": false, queue: "max" });
   });
 });
 

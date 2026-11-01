@@ -8,29 +8,11 @@ name: Edge E2E
 
 on:
   workflow_dispatch:
+  # Every PR, so "Preview edge E2E" can be a required check (#1410): a
+  # path-filtered workflow never reports on a PR outside its paths, which would
+  # block that PR forever. The `changes` job decides instead, and a skipped job
+  # counts as passing a required check.
   pull_request:
-    paths:
-      - "functions/**"
-      - "frontend/src/**"
-      - "migrations/**"
-      - "database/**"
-      - "e2e/**"
-      - "wrangler.toml"
-      - "playwright.config.js"
-      # Dependencies change what is built and deployed, and the Playwright
-      # that tests it (root lockfile), so a dependency-only PR runs this too.
-      - "package.json"
-      - "package-lock.json"
-      - "frontend/package.json"
-      - "frontend/package-lock.json"
-      - "scripts/reset-e2e-db.mjs"
-      - ".github/actions/playwright-image/**"
-      - ".github/workflows/edge-e2e.yml"
-
-# One shared scratch D1: runs must queue, never overlap or cancel mid-reset.
-concurrency:
-  group: edge-e2e
-  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -65,6 +47,42 @@ jobs:
       - id: image
         uses: ./.github/actions/playwright-image
 
+  # Does this PR touch anything the edge run depends on? Dependencies count:
+  # they change what is built and deployed, and the Playwright that tests it.
+  changes:
+    name: Edge-relevant changes
+    if: github.event_name == 'pull_request'
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      # dorny/paths-filter reads the PR's file list from the API.
+      pull-requests: read
+    outputs:
+      edge: ${{ steps.filter.outputs.edge }}
+    steps:
+      - id: filter
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
+        with:
+          # A YAML list, never a `|` block: a block is one pattern that matches
+          # nothing (scripts/__tests__/e2eWorkflowTriggers.test.js).
+          filters: |
+            edge:
+              - "functions/**"
+              - "frontend/src/**"
+              - "migrations/**"
+              - "database/**"
+              - "e2e/**"
+              - "wrangler.toml"
+              - "playwright.config.js"
+              - "package.json"
+              - "package-lock.json"
+              - "frontend/package.json"
+              - "frontend/package-lock.json"
+              - "scripts/reset-e2e-db.mjs"
+              - ".github/actions/playwright-image/**"
+              - ".github/workflows/edge-e2e.yml"
+
   not-run:
     name: Preview edge E2E (not run)
     # Keyed on the PR's AUTHOR, not github.actor: a human re-running a
@@ -79,9 +97,24 @@ jobs:
 
   edge-e2e:
     name: Preview edge E2E
-    if: github.event_name != 'pull_request' || (github.event.pull_request.user.login != 'dependabot[bot]' && !github.event.pull_request.head.repo.fork)
+    # always(): `changes` is skipped outside pull requests. A failed `changes`
+    # or `playwright-image` runs this job rather than skipping it (with no
+    # image it then fails): a skip passes the required check.
+    if: >-
+      always() &&
+      (github.event_name != 'pull_request' ||
+       ((needs.changes.outputs.edge == 'true' || needs.changes.result != 'success') &&
+        github.event.pull_request.user.login != 'dependabot[bot]' && !github.event.pull_request.head.repo.fork))
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
-    needs: playwright-image
+    needs: [playwright-image, changes]
+    # One shared scratch D1: runs must queue, never overlap or cancel mid-reset.
+    # Job-level, so a PR that skips the suite does not wait in this queue.
+    # queue: max keeps every waiting run: the default cancels the pending one
+    # when another joins, which would fail that PR's required check.
+    concurrency:
+      group: edge-e2e
+      cancel-in-progress: false
+      queue: max
     # Browsers and their system packages come preinstalled: no apt (#1391).
     # --ipc=host: Chromium runs out of shared memory in Docker's default 64 MB.
     container:

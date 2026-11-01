@@ -694,7 +694,8 @@ Node and local `wrangler` do not enforce the Workers runtime's limits (the PBKDF
 - **Production rate limits apply**, so the run is two phases with no retries.
 - Tokens a preview cannot email are seeded or read through D1 (`e2e/utils/d1.js`); remote mode (`E2E_D1_REMOTE=1`) can name only the scratch D1. **`invite-signup.spec` and `password-reset-link.spec` are the PBKDF2 canaries**; its invitee context passes an empty `storageState` explicitly, or it inherits the signed-in admin.
 - **Ready means the alias serves THIS RUN'S deployment** (`scripts/wait-for-preview.mjs`, #1340). Only the `edge-e2e-deployment.txt` marker proves it (Vite hashes repeat across runs). A missing chunk is `200 text/html` on Pages, so check content-type.
-- Runs queue (`cancel-in-progress: false`); every run deletes its deployment and a failed delete fails the job. Fork and Dependabot PRs get no secrets and are skipped loudly. The request-only `ical-feed.spec.js` also exercises the feed on the edge.
+- **"Preview edge E2E" is a required check (#1410).** The workflow runs on every PR and a `changes` job (`dorny/paths-filter`) decides whether the suite runs; a skipped job passes the check, and a failed `changes` runs the suite rather than skipping it. Never move the path filter back onto the trigger: a required check that never reports blocks the PR forever.
+- Runs queue on the scratch D1 (job-level `concurrency`, `cancel-in-progress: false`); every run deletes its deployment and a failed delete fails the job. Fork and Dependabot PRs get no secrets and are skipped loudly. The request-only `ical-feed.spec.js` also exercises the feed on the edge.
 
 Full text: `docs/field-notes/testing-gates.md`.
 

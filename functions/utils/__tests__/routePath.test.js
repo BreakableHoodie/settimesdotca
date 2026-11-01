@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { routePath, trimTrailingSlashes } from "../routePath.js";
+import { isApiRoute, routePath, trimTrailingSlashes } from "../routePath.js";
 
 describe("routePath", () => {
   it.each([
@@ -32,5 +32,19 @@ describe("trimTrailingSlashes", () => {
     const started = performance.now();
     for (let i = 0; i < 20; i++) trimTrailingSlashes(hostile);
     expect(performance.now() - started).toBeLessThan(200);
+  });
+  describe("isApiRoute fails closed on alternate spellings (#1446)", () => {
+    const api = (p) => isApiRoute(`https://settimes.ca${p}`);
+    it.each([
+      "/api/metrics",
+      "/API/metrics",
+      "//api/metrics",
+      "/api//metrics",
+      "/%61pi/metrics",
+      "/%41PI/x",
+      "/%2Fapi/metrics",
+    ])("%s is the API", (p) => expect(api(p)).toBe(true));
+    it("treats an undecodable path as the API", () => expect(api("/%E0%A4%A/x")).toBe(true));
+    it.each(["/", "/band/1", "/apiary", "/about/api"])("%s is not the API", (p) => expect(api(p)).toBe(false));
   });
 });

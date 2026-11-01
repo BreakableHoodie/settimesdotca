@@ -3,16 +3,78 @@
 
 import { checkRateLimit, rateLimitHeaders, rateLimitResponse } from "./utils/rateLimit.js";
 import { createRequestLogger } from "./utils/logger.js";
-import { routePath } from "./utils/routePath.js";
+import { routePath, isApiRoute } from "./utils/routePath.js";
 import { isDevRequest } from "./utils/auth.js";
+
+const ERROR_SECURITY_HEADERS = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "no-referrer",
+  "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
+};
+
+// A static string on purpose: the error page must not depend on anything (the
+// shell fetch, D1) that may be what just failed. The page has no script and no
+// style, so this CSP can forbid both and everything else.
+const ERROR_PAGE_HTML = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Something went wrong | SetTimes</title>
+</head>
+<body>
+<main>
+<h1>Something went wrong</h1>
+<p>Something went wrong on our side. Please try again in a moment.</p>
+<p><a href="/">Back to SetTimes</a></p>
+</main>
+</body>
+</html>
+`;
+
+const ERROR_PAGE_CSP = "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+
+// (the HTML branch also sets HSTS on https, like every other response)
+// A thrown error on a page route: HTML for a browser, JSON for everything else
+// (/api/*, fetch(), curl). Path decisions go through routePath() because Pages
+// matches routes case-insensitively, so /API/x is still the API.
+export function errorResponseFor(request) {
+  const isPage = !isApiRoute(request);
+  const wantsHtml = (request.headers.get("Accept") || "").toLowerCase().includes("text/html");
+  if (isPage && wantsHtml) {
+    return new Response(ERROR_PAGE_HTML, {
+      status: 500,
+      headers: {
+        "Content-Type": "text/html;charset=UTF-8",
+        "Cache-Control": "no-store",
+        "Content-Security-Policy": ERROR_PAGE_CSP,
+        ...(request.url.startsWith("https://")
+          ? { "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload" }
+          : {}),
+        ...ERROR_SECURITY_HEADERS,
+      },
+    });
+  }
+  return new Response(JSON.stringify({ error: "Internal server error" }), {
+    status: 500,
+    headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...ERROR_SECURITY_HEADERS },
+  });
+}
 
 export async function onRequest(context) {
   const { request, env } = context;
 
   // Only process API routes - let static files pass through without middleware
   const url = new URL(request.url);
-  if (!url.pathname.startsWith("/api/")) {
-    return context.next();
+  if (!isApiRoute(request)) {
+    try {
+      return await context.next();
+    } catch (error) {
+      console.error("Page route error:", request.method, url.pathname, error);
+      return errorResponseFor(request);
+    }
   }
 
   const log = createRequestLogger(context);

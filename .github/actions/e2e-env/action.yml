@@ -48,7 +48,7 @@ runs:
               esac
 
         # Browsers come only from the official Playwright image (#1391); the
-        # apt install path was removed in #1395. A job that installs browsers
+        # apt install path was removed in #1450 (#1395). A job that installs browsers
         # outside the image fails here rather than reaching for apt.
         - name: Require the Playwright image
           if: inputs.install-playwright == 'true'

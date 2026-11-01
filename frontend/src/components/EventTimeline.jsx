@@ -10,6 +10,7 @@ import { trackTicketClick } from '../utils/metrics'
 import { safeExternalHref } from '../utils/urlSafety'
 import { calendarLinks, SITE_FEED_PATH } from '../utils/calendarLinks'
 import { sortableName } from '../utils/sortableName'
+import { timelinePollDelayMs } from '../utils/timelinePoll'
 import { Alert, Badge, Button, Card, Loading } from './ui'
 import EventsPageSkeleton from './EventsPageSkeleton'
 
@@ -61,6 +62,8 @@ export default function EventTimeline() {
 
   // Fetch timeline data
   const pollRef = useRef(null)
+  // The last timeline fetched, read when scheduling the next poll.
+  const latestRef = useRef(null)
   // Track loading/loaded state to prevent duplicate fetches
   const detailsStateRef = useRef({})
   // In-flight detail requests, so unmount can cancel them. Needed because
@@ -71,6 +74,7 @@ export default function EventTimeline() {
   const detailControllersRef = useRef(new Map())
 
   useEffect(() => {
+    let fetchSeq = 0
     const fetchTimeline = async (isSilent = false) => {
       try {
         if (!isSilent) {
@@ -78,7 +82,12 @@ export default function EventTimeline() {
         }
         setError(null)
 
+        // Fetches can overlap (first load, tab shown again, a poll) and finish
+        // out of order; only the newest one may update the timeline and pace.
+        const seq = ++fetchSeq
         const data = await fetchPublicJson('/api/events/timeline?pastLimit=50', {}, 'Failed to fetch events timeline')
+        if (seq !== fetchSeq) return
+        latestRef.current = data
         setTimeline(data)
       } catch (err) {
         console.error('Error fetching timeline:', err)
@@ -92,38 +101,62 @@ export default function EventTimeline() {
       }
     }
 
-    fetchTimeline()
+    // Polling starts once the first response is in, so its first delay is paced
+    // by what is actually on, not by the "nothing known yet" default.
+    let disposed = false
+    let resumeCount = 0
+    fetchTimeline().finally(() => {
+      // A resume that started meanwhile owns the schedule.
+      if (!disposed && resumeCount === 0) startPolling()
+    })
 
-    // Real-time updates: refresh every 60 seconds for "Now Playing"
+    // The poll exists for "Now Playing", so its pace follows what is on (#1412):
+    // every minute while something is happening, every 5 while an edition is
+    // upcoming (catching the day it goes live), every 15 between seasons, when
+    // the payload is only past editions and nothing on it changes by the minute.
+    const scheduleNext = () => {
+      const id = setTimeout(async () => {
+        if (document.visibilityState === 'visible') {
+          await fetchTimeline(true)
+        }
+        // Only the current chain continues: a hide-then-show during the fetch
+        // has already started a new one, and two chains would double the rate.
+        if (pollRef.current === id) scheduleNext()
+      }, timelinePollDelayMs(latestRef.current))
+      pollRef.current = id
+    }
     const startPolling = () => {
       if (pollRef.current) return
-      pollRef.current = setInterval(() => {
-        if (document.visibilityState === 'visible') {
-          fetchTimeline(true)
-        }
-      }, 60000)
+      scheduleNext()
     }
     const stopPolling = () => {
       if (pollRef.current) {
-        clearInterval(pollRef.current)
+        clearTimeout(pollRef.current)
         pollRef.current = null
       }
     }
 
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
-        fetchTimeline(true)
-        startPolling()
+        // Pace from what this fetch returns, not from the timeline last seen
+        // before the tab was hidden (a show may have started since).
+        // Only the latest resume may start the poll: an older fetch finishing
+        // late must not schedule from a stale timeline.
+        stopPolling()
+        const resume = ++resumeCount
+        fetchTimeline(true).finally(() => {
+          if (!disposed && resume === resumeCount && document.visibilityState === 'visible') startPolling()
+        })
       } else {
         stopPolling()
       }
     }
 
-    startPolling()
     document.addEventListener('visibilitychange', handleVisibility)
 
     const detailControllers = detailControllersRef.current
     return () => {
+      disposed = true
       stopPolling()
       document.removeEventListener('visibilitychange', handleVisibility)
       for (const controller of detailControllers.values()) {

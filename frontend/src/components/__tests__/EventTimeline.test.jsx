@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom'
 import EventTimeline from '../EventTimeline'
 import { POSTER_IMAGE_HOST } from '../../utils/posterImage'
 import { formatPerformanceDayLabel } from '../../utils/timeFormat'
+import { POLL_OFF_SEASON_MS } from '../../utils/timelinePoll'
 
 // EventTimeline expands details inside a React transition
 // (`useTransition` in EventTimeline.jsx, ~line 48). React deliberately
@@ -1422,7 +1423,7 @@ describe('EventTimeline empty lineup and between-seasons states', () => {
   })
 
   // Regression: the auto-expand effect above is keyed on `[timeline]`, and
-  // the 60s poll (fetchTimeline(true) in the main data-fetch effect) calls
+  // the timeline poll (fetchTimeline(true) in the main data-fetch effect) calls
   // setTimeline(data) with a fresh object identity every tick -- even when
   // the shape is unchanged. Without the wasPastOnlyRef transition guard,
   // that re-runs the auto-expand effect on every poll and calls
@@ -1431,6 +1432,147 @@ describe('EventTimeline empty lineup and between-seasons states', () => {
   // true })` + `vi.advanceTimersByTimeAsync` pattern as
   // BandProfilePage.test.jsx (#739) -- shouldAdvanceTime keeps
   // findBy/waitFor's own polling working under fake timers.
+  it('keeps the one-minute poll while an edition is happening now (#1412)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const live = {
+      now: [
+        {
+          id: 9,
+          name: 'Live Fest',
+          slug: 'live-fest',
+          date: '2026-10-31',
+          status: 'published',
+          venues: [],
+          bands: [],
+          band_count: 0,
+          venue_count: 0,
+          ticket_url: null,
+        },
+      ],
+      upcoming: [],
+      past: [],
+    }
+    let fetchCount = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(url => {
+        if (url.startsWith('/api/events/timeline')) {
+          fetchCount += 1
+          return Promise.resolve(jsonResponse(live))
+        }
+        return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+      })
+    )
+    render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+    await waitFor(() => expect(fetchCount).toBe(1))
+    await vi.advanceTimersByTimeAsync(60000)
+    await waitFor(() => expect(fetchCount).toBe(2))
+  })
+
+  it('re-paces the poll from the fetch made when the tab is shown again (#1412)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const edition = {
+      id: 9,
+      name: 'Live Fest',
+      slug: 'live-fest',
+      date: '2026-10-31',
+      status: 'published',
+      venues: [],
+      bands: [],
+      band_count: 0,
+      venue_count: 0,
+      ticket_url: null,
+    }
+    let fetchCount = 0
+    let live = false
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(url => {
+        if (url.startsWith('/api/events/timeline')) {
+          fetchCount += 1
+          return Promise.resolve(
+            jsonResponse(
+              live
+                ? { now: [edition], upcoming: [], past: [] }
+                : { now: [], upcoming: [], past: [{ ...edition, status: 'archived' }] }
+            )
+          )
+        }
+        return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+      })
+    )
+    let visibility = 'visible'
+    vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility)
+    render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+    await waitFor(() => expect(fetchCount).toBe(1))
+
+    visibility = 'hidden'
+    document.dispatchEvent(new Event('visibilitychange'))
+    live = true
+    visibility = 'visible'
+    document.dispatchEvent(new Event('visibilitychange'))
+    await waitFor(() => expect(fetchCount).toBe(2))
+
+    await vi.advanceTimersByTimeAsync(60000)
+    await waitFor(() => expect(fetchCount).toBe(3))
+  })
+
+  it('ignores a slower, older timeline response that lands after a newer one (#1412)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const edition = {
+      id: 9,
+      name: 'Live Fest',
+      slug: 'live-fest',
+      date: '2026-10-31',
+      status: 'published',
+      venues: [],
+      bands: [],
+      band_count: 0,
+      venue_count: 0,
+      ticket_url: null,
+    }
+    let fetchCount = 0
+    let releaseFirst
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(url => {
+        if (!url.startsWith('/api/events/timeline')) return Promise.reject(new Error(`Unexpected fetch URL: ${url}`))
+        fetchCount += 1
+        if (fetchCount === 1) {
+          // The first load is slow and says "between seasons".
+          return new Promise(resolve => {
+            releaseFirst = () =>
+              resolve(jsonResponse({ now: [], upcoming: [], past: [{ ...edition, status: 'archived' }] }))
+          })
+        }
+        return Promise.resolve(jsonResponse({ now: [edition], upcoming: [], past: [] }))
+      })
+    )
+    render(
+      <MemoryRouter>
+        <EventTimeline />
+      </MemoryRouter>
+    )
+    await waitFor(() => expect(fetchCount).toBe(1))
+    document.dispatchEvent(new Event('visibilitychange'))
+    await waitFor(() => expect(fetchCount).toBe(2))
+
+    // The stale "between seasons" answer lands last and must not win.
+    releaseFirst()
+    expect(await screen.findByText('Live Fest')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /show history|hide history/i })).not.toBeInTheDocument()
+    await vi.advanceTimersByTimeAsync(60000)
+    await waitFor(() => expect(fetchCount).toBe(3))
+  })
+
   it('does not reopen a manually collapsed Past section on a later past-only poll', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
 
@@ -1484,8 +1626,11 @@ describe('EventTimeline empty lineup and between-seasons states', () => {
     expect(screen.getByRole('button', { name: /show history/i })).toBeInTheDocument()
     expect(screen.queryByText('Long Weekend Band Crawl Vol 17')).not.toBeInTheDocument()
 
-    // Drive the 60s poll. It must fetch a genuinely new payload.
+    // Between seasons the poll is slow (#1412): nothing at the live minute...
     await vi.advanceTimersByTimeAsync(60000)
+    expect(fetchCount).toBe(1)
+    // ...then the off-season poll. It must fetch a genuinely new payload.
+    await vi.advanceTimersByTimeAsync(POLL_OFF_SEASON_MS - 60000)
     await waitFor(() => expect(fetchCount).toBeGreaterThan(1))
 
     // ...but the collapse must survive it: still "Show history", and no past

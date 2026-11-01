@@ -25,6 +25,7 @@
 // ARE the homepage's correct meta, and EventsPage's own Helmet canonical is
 // already CANONICAL_HOST + "/". EventsPage keeps full client-side ownership
 // of its identity meta — the only route in the app that does.
+import { loadHubLinks } from "./crawlableLinks.js";
 import { serveWithInjectedMeta, escapeAttr, CANONICAL_HOST, DEFAULT_OG_IMAGE } from "./ssrMeta.js";
 
 export const STATIC_PAGES = {
@@ -119,6 +120,8 @@ export function staticPageHandler(path) {
       `<meta name="twitter:image" content="${escapeAttr(DEFAULT_OG_IMAGE)}" />`,
     ];
 
-    return serveWithInjectedMeta(context, { title, metaTags });
+    // Hub pages server-render their entity links (#1447); "" for every other page.
+    const pageLinks = await loadHubLinks(context.env, path);
+    return serveWithInjectedMeta(context, { title, metaTags, pageLinks });
   };
 }

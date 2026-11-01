@@ -24,6 +24,7 @@ import {
 import { normalizeHttpUrl, validateDate } from "../../utils/validation.js";
 import { eventLocalFestivalToday } from "../../utils/eventDay.js";
 import { concludedEventSql } from "../../utils/eventVisibility.js";
+import { loadEventLinks } from "../../utils/crawlableLinks.js";
 
 const DATE_LABEL_FORMAT = { year: "numeric", month: "long", day: "numeric" };
 
@@ -61,7 +62,7 @@ export async function onRequestGet(context) {
     // nothing. Identical predicate and identical bind value as that API and as
     // the sitemap: the drift between the three IS the bug.
     event = await env.DB.prepare(
-      `SELECT id, name, slug, date, end_date, poster_url
+      `SELECT id, name, slug, date, end_date, poster_url, reveal_mode
        FROM events
        WHERE slug = ? AND ${concludedEventSql()}`,
     )
@@ -181,7 +182,15 @@ export async function onRequestGet(context) {
     `<meta name="twitter:image" content="${escapeAttr(ogImageUrl)}" />`,
   ];
 
-  return serveWithInjectedMeta(context, { title, metaTags, jsonLd: [breadcrumb] });
+  // Lineup and venue links, reveal-gated; a failed read means no links (#1447).
+  let pageLinks = "";
+  try {
+    pageLinks = await loadEventLinks(env, event);
+  } catch (err) {
+    console.error("SSR event recap link lookup failed:", slug, err);
+  }
+
+  return serveWithInjectedMeta(context, { title, metaTags, jsonLd: [breadcrumb], pageLinks });
 }
 
 // HEAD answers like GET: the catch-all is the only all-method route, so without this a HEAD would 404 (#1446).

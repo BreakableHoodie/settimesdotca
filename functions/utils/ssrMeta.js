@@ -157,7 +157,17 @@ export function headersForRewrittenShell(sourceHeaders) {
   return headers;
 }
 
-export async function serveWithInjectedMeta(context, { title = null, metaTags = [], jsonLd = null } = {}) {
+// `pageLinks` is already-escaped markup from functions/utils/crawlableLinks.js,
+// spliced into the shell's <noscript> at its marker (#1447). The marker is
+// always removed so an empty list leaves no stray comment.
+// Where crawlableLinks.js injects its <noscript> link lists (#1447); the one home
+// for the string, which frontend/index.html carries.
+export const PAGE_LINKS_MARKER = "<!-- page-links -->";
+
+export async function serveWithInjectedMeta(
+  context,
+  { title = null, metaTags = [], jsonLd = null, pageLinks = "" } = {},
+) {
   const { request, env } = context;
   try {
     const origin = new URL(request.url).origin;
@@ -168,6 +178,7 @@ export async function serveWithInjectedMeta(context, { title = null, metaTags = 
     let html = await indexResponse.text();
 
     html = html.replace(DEFAULT_META_RE, "");
+    html = html.replace(PAGE_LINKS_MARKER, () => pageLinks);
     // Function replacers throughout: a string replacement interprets $', $` and
     // $& in the injected (data-bearing) text and splices the page into itself.
     if (title) {

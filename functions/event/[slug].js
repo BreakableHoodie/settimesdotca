@@ -19,6 +19,7 @@ import {
   nextCalendarDay,
 } from "../utils/eventDay.js";
 import { concludedEventSql, publicEventStatusSql } from "../utils/eventVisibility.js";
+import { renderEventLinks } from "../utils/crawlableLinks.js";
 
 // Sets starting before 06:00 are after-midnight sets that belong to the
 // PREVIOUS festival day (AFTER_MIDNIGHT_THRESHOLD_HOUR = 6 convention; the
@@ -610,5 +611,10 @@ export async function onRequest(context) {
 
   const title = `${event.name} — Set Times & Lineup${event.city ? ` in ${event.city}` : ""} | SetTimes`;
 
-  return serveWithInjectedMeta(context, { title, metaTags, jsonLd: [musicEvent, breadcrumb] });
+  return serveWithInjectedMeta(context, {
+    title,
+    metaTags,
+    jsonLd: [musicEvent, breadcrumb],
+    pageLinks: renderEventLinks(bands, venues),
+  });
 }

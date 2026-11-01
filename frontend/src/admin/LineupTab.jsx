@@ -7,6 +7,8 @@ import BulkPreviewModal from './components/BulkPreviewModal'
 import BulkBandImport from './components/BulkBandImport'
 import ArtistPicker from './components/ArtistPicker'
 import LoadError from './components/LoadError'
+import RetryRegion from '../components/RetryRegion'
+import useRetryFocus from '../hooks/useRetryFocus'
 import ScheduleGrid from './components/ScheduleGrid'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { parseOrigin } from '../utils/parseOrigin'
@@ -56,6 +58,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
   const [loading, setLoading] = useState(true)
   const [rosterLoading, setRosterLoading] = useState(false)
   const [loadError, setLoadError] = useState(false)
+  const retry = useRetryFocus({ what: 'the lineup', error: loadError })
   const [rosterError, setRosterError] = useState(false)
 
   // Modes: 'list', 'picker', 'form', 'import', 'schedule'
@@ -124,50 +127,58 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
     currentEventRef.current = selectedEventId
   }, [selectedEventId])
 
-  const loadData = useCallback(async () => {
-    // A stale call must not take a request id: that would orphan the current
-    // event's in-flight load and leave it loading forever.
-    if (selectedEventId !== currentEventRef.current) return true
-    const reqId = ++loadReqRef.current
-    const isStale = () => reqId !== loadReqRef.current || selectedEventId !== currentEventRef.current
-    try {
-      setLoading(true)
-      const [venuesRes, bandsRes] = await Promise.all([venuesApi.getAll(), bandsApi.getByEvent(selectedEventId)])
+  // A Retry passes quiet: its status region already announces the failure,
+  // and an error toast too would announce it twice (#1420).
+  const loadData = useCallback(
+    async ({ quiet = false } = {}) => {
+      // A stale call must not take a request id: that would orphan the current
+      // event's in-flight load and leave it loading forever.
+      if (selectedEventId !== currentEventRef.current) return true
+      const reqId = ++loadReqRef.current
+      const isStale = () => reqId !== loadReqRef.current || selectedEventId !== currentEventRef.current
+      try {
+        setLoading(true)
+        const [venuesRes, bandsRes] = await Promise.all([venuesApi.getAll(), bandsApi.getByEvent(selectedEventId)])
 
-      if (isStale()) return true
-      setVenues(venuesRes.venues || [])
-      setBands(bandsRes.bands || [])
-      setLoadError(false)
-      return true
-    } catch (err) {
-      if (isStale()) return false
-      setLoadError(true)
-      showToast('Failed to load schedule: ' + err.message, 'error')
-      // Returns a boolean rather than rethrowing: every existing caller
-      // ignores the result and must keep working unchanged. Only the schedule
-      // save needs to know, because a save that succeeds against a reload that
-      // fails leaves the grid showing STALE values -- which reads as "my edit
-      // did not take" when in fact it did.
-      return false
-    } finally {
-      if (reqId === loadReqRef.current) setLoading(false)
-    }
-  }, [selectedEventId, showToast])
+        if (isStale()) return true
+        setVenues(venuesRes.venues || [])
+        setBands(bandsRes.bands || [])
+        setLoadError(false)
+        return true
+      } catch (err) {
+        if (isStale()) return false
+        setLoadError(true)
+        if (!quiet) showToast('Failed to load schedule: ' + err.message, 'error')
+        // Returns a boolean rather than rethrowing: every existing caller
+        // ignores the result and must keep working unchanged. Only the schedule
+        // save needs to know, because a save that succeeds against a reload that
+        // fails leaves the grid showing STALE values -- which reads as "my edit
+        // did not take" when in fact it did.
+        return false
+      } finally {
+        if (reqId === loadReqRef.current) setLoading(false)
+      }
+    },
+    [selectedEventId, showToast]
+  )
 
-  const loadRoster = useCallback(async () => {
-    if (!selectedEventId) return
-    try {
-      setRosterLoading(true)
-      const allBandsRes = await bandsApi.getAll()
-      setAllBands(allBandsRes.bands || [])
-      setRosterError(false)
-    } catch (err) {
-      setRosterError(true)
-      showToast('Failed to load roster: ' + err.message, 'error')
-    } finally {
-      setRosterLoading(false)
-    }
-  }, [selectedEventId, showToast])
+  const loadRoster = useCallback(
+    async ({ quiet = false } = {}) => {
+      if (!selectedEventId) return
+      try {
+        setRosterLoading(true)
+        const allBandsRes = await bandsApi.getAll()
+        setAllBands(allBandsRes.bands || [])
+        setRosterError(false)
+      } catch (err) {
+        setRosterError(true)
+        if (!quiet) showToast('Failed to load roster: ' + err.message, 'error')
+      } finally {
+        setRosterLoading(false)
+      }
+    },
+    [selectedEventId, showToast]
+  )
 
   // The roster API now returns inactive/retired profiles too (#619, so
   // RosterTab can manage them) — filter them back out here so the lineup
@@ -812,11 +823,15 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
           </div>
 
           {/* List */}
-          <div className="bg-bg-purple rounded-lg border border-accent-500/20 overflow-hidden">
+          <RetryRegion
+            retry={retry}
+            label="Lineup"
+            className="bg-bg-purple rounded-lg border border-accent-500/20 overflow-hidden"
+          >
             {loading ? (
               <div className="p-8 text-center text-accent-400">Loading lineup...</div>
             ) : loadError && bands.length === 0 ? (
-              <LoadError what="the lineup" onRetry={loadData} />
+              <LoadError what="the lineup" onRetry={() => retry.startRetry(() => loadData({ quiet: true }))} />
             ) : filteredBands.length === 0 ? (
               <div className="p-8 text-center text-white/50">
                 {bands.length === 0 ? 'No performances scheduled yet.' : 'No performances match your filters.'}
@@ -1159,7 +1174,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                 </div>
               </>
             )}
-          </div>
+          </RetryRegion>
         </>
       )}
       <ConfirmDialog

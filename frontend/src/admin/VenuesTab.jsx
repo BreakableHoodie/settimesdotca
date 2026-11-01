@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { venuesApi } from '../utils/adminApi'
 import LoadError from './components/LoadError'
+import RetryRegion from '../components/RetryRegion'
+import useRetryFocus from '../hooks/useRetryFocus'
 import { FIELD_LIMITS } from '../utils/validation'
 import { filterVenues, formatVenueAddress, sortVenues } from './utils/venueRoster'
 
@@ -47,20 +49,26 @@ export default function VenuesTab({ showToast, readOnly = false, canManage = fal
     contact_email: '',
   })
   const [submitting, setSubmitting] = useState(false)
+  const retry = useRetryFocus({ what: 'venues', error: loadError })
 
-  const loadVenues = useCallback(async () => {
-    try {
-      setLoading(true)
-      const result = await venuesApi.getAll()
-      setVenues(result.venues || [])
-      setLoadError(false)
-    } catch (err) {
-      setLoadError(true)
-      showToast('Failed to load venues: ' + err.message, 'error')
-    } finally {
-      setLoading(false)
-    }
-  }, [showToast])
+  // A Retry passes quiet: its status region already announces the failure,
+  // and an error toast too would announce it twice (#1420).
+  const loadVenues = useCallback(
+    async ({ quiet = false } = {}) => {
+      try {
+        setLoading(true)
+        const result = await venuesApi.getAll()
+        setVenues(result.venues || [])
+        setLoadError(false)
+      } catch (err) {
+        setLoadError(true)
+        if (!quiet) showToast('Failed to load venues: ' + err.message, 'error')
+      } finally {
+        setLoading(false)
+      }
+    },
+    [showToast]
+  )
 
   useEffect(() => {
     loadVenues()
@@ -235,7 +243,9 @@ export default function VenuesTab({ showToast, readOnly = false, canManage = fal
     }))
   }
 
-  if (loading) {
+  // First load only: a retry (load error still set) keeps the tab, and the
+  // region holding focus, on screen (#1420).
+  if (loading && !loadError) {
     return (
       <div className="text-center py-12">
         <div className="text-accent-400 text-lg">Loading venues...</div>
@@ -477,9 +487,13 @@ export default function VenuesTab({ showToast, readOnly = false, canManage = fal
       )}
 
       {/* Venues List */}
-      <div className="bg-bg-purple rounded-lg border border-accent-500/20 overflow-hidden">
+      <RetryRegion
+        retry={retry}
+        label="Venues"
+        className="bg-bg-purple rounded-lg border border-accent-500/20 overflow-hidden"
+      >
         {loadError && venues.length === 0 ? (
-          <LoadError what="venues" onRetry={loadVenues} />
+          <LoadError what="venues" onRetry={() => retry.startRetry(() => loadVenues({ quiet: true }))} />
         ) : filteredVenues.length === 0 ? (
           <div className="p-8 text-center text-white/50">
             {venues.length === 0
@@ -620,7 +634,7 @@ export default function VenuesTab({ showToast, readOnly = false, canManage = fal
             </div>
           </>
         )}
-      </div>
+      </RetryRegion>
     </div>
   )
 }

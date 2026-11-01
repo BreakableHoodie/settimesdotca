@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import LoadError from './LoadError'
+import RetryRegion from '../../components/RetryRegion'
+import useRetryFocus from '../../hooks/useRetryFocus'
 import PropTypes from 'prop-types'
 import { BAND_PHOTO_CROP } from '../../utils/bandPhoto'
 
@@ -19,6 +21,7 @@ export default function ArtistPicker({
   const [bulkStartTime, setBulkStartTime] = useState('')
   const [bulkEndTime, setBulkEndTime] = useState('')
   const inputRef = useRef(null)
+  const retry = useRetryFocus({ what: 'the roster', error: loadError && artists.length === 0 })
 
   const formatOrigin = artist =>
     [artist.origin_city, artist.origin_region].filter(Boolean).join(', ') || artist.origin || ''
@@ -83,7 +86,11 @@ export default function ArtistPicker({
         onChange={e => setQuery(e.target.value)}
       />
 
-      <div className="max-h-64 overflow-y-auto border border-white/10 rounded bg-black/20">
+      <RetryRegion
+        retry={retry}
+        label="Artist roster"
+        className="max-h-64 overflow-y-auto border border-white/10 rounded bg-black/20"
+      >
         {loading && artists.length === 0 && <div className="p-8 text-center text-white/50">Loading roster...</div>}
         {filtered.map(artist => {
           const id = artist.band_profile_id || artist.id
@@ -130,7 +137,9 @@ export default function ArtistPicker({
             </div>
           )
         })}
-        {loadError && artists.length === 0 && !loading && <LoadError what="the roster" onRetry={onRetry} />}
+        {loadError && artists.length === 0 && !loading && (
+          <LoadError what="the roster" onRetry={() => retry.startRetry(() => onRetry({ quiet: true }))} />
+        )}
         {filtered.length === 0 && query && !loading && !(loadError && artists.length === 0) && (
           <div className="p-8 text-center">
             <p className="text-white/50 mb-4">No artist found named &quot;{query}&quot;</p>
@@ -142,7 +151,7 @@ export default function ArtistPicker({
             </button>
           </div>
         )}
-      </div>
+      </RetryRegion>
 
       {/* Bulk add bar — shown when 1+ artists are checked */}
       {checkedIds.size > 0 && (

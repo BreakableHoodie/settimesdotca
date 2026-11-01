@@ -8,6 +8,8 @@ import PosterImage from '../components/PosterImage'
 import { fetchPublicJson } from '../utils/publicApi'
 import { trackPageView } from '../utils/metrics'
 import { parseLocalDate } from '../utils/timeFormat'
+import RetryRegion from '../components/RetryRegion'
+import useRetryFocus from '../hooks/useRetryFocus'
 
 const PAGE_TITLE = 'Every edition | SetTimes'
 
@@ -73,6 +75,7 @@ function EditionTile({ edition }) {
 export default function HistoryPage() {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
+  const retry = useRetryFocus({ what: 'the editions', error })
 
   useEffect(() => {
     document.title = PAGE_TITLE
@@ -89,7 +92,8 @@ export default function HistoryPage() {
     controllerRef.current = controller
     setError(null)
     setData(null)
-    fetchPublicJson('/api/history', { signal: controller.signal }, 'Failed to load the editions')
+    // Returned so a Retry can wait for the outcome (useRetryFocus).
+    return fetchPublicJson('/api/history', { signal: controller.signal }, 'Failed to load the editions')
       .then(setData)
       .catch(err => {
         if (err?.name !== 'AbortError') setError(err)
@@ -136,117 +140,119 @@ export default function HistoryPage() {
       </header>
 
       <main id="main-content" className="container mx-auto max-w-7xl space-y-12 px-4 py-8">
-        {error ? (
-          <div role="alert" className="py-16 text-center text-text-secondary">
-            <p>Couldn&apos;t load the editions right now.</p>
-            <button
-              type="button"
-              onClick={load}
-              className="mt-4 min-h-[44px] rounded-lg bg-accent-500 px-4 py-2 font-semibold text-bg-navy hover:bg-accent-600 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500"
-            >
-              Retry
-            </button>
-          </div>
-        ) : !data ? (
-          <p className="py-16 text-center text-text-tertiary">Loading editions…</p>
-        ) : (
-          <>
-            <section aria-labelledby="wall-heading">
-              <h2 id="wall-heading" className="sr-only">
-                Posters
-              </h2>
-              <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                {editions.map(edition => (
-                  <EditionTile key={edition.slug} edition={edition} />
-                ))}
-              </ul>
-            </section>
-
-            {data.regulars.length > 0 && (
-              <section aria-labelledby="regulars-heading">
-                <h2 id="regulars-heading" className="font-display text-2xl font-bold text-text-primary">
-                  Regulars
+        <RetryRegion retry={retry} label="Editions" className="space-y-12">
+          {error ? (
+            <div role={retry.retried ? undefined : 'alert'} className="py-16 text-center text-text-secondary">
+              <p>Couldn&apos;t load the editions right now.</p>
+              <button
+                type="button"
+                onClick={() => retry.startRetry(load)}
+                className="mt-4 min-h-[44px] rounded-lg bg-accent-500 px-4 py-2 font-semibold text-bg-navy hover:bg-accent-600 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500"
+              >
+                Retry
+              </button>
+            </div>
+          ) : !data ? (
+            <p className="py-16 text-center text-text-tertiary">Loading editions…</p>
+          ) : (
+            <>
+              <section aria-labelledby="wall-heading">
+                <h2 id="wall-heading" className="sr-only">
+                  Posters
                 </h2>
-                <p className="mt-1 text-sm text-text-tertiary">Artists who have played the most editions.</p>
-                <table className="mt-4 w-full text-left text-sm">
-                  <thead className="text-text-tertiary">
-                    <tr className="border-b border-border">
-                      <th scope="col" className="py-2 pr-4 font-medium">
-                        Artist
-                      </th>
-                      <th scope="col" className="py-2 pr-4 font-medium">
-                        Editions
-                      </th>
-                      <th scope="col" className="py-2 font-medium">
-                        First played
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.regulars.map(r => (
-                      <tr key={r.band_profile_id} className="border-b border-border">
-                        <td className="py-2 pr-4">
-                          <Link to={`/band/${r.band_profile_id}`} className="text-accent-400 hover:text-accent-300">
-                            {r.name}
-                          </Link>
-                        </td>
-                        <td className="py-2 pr-4 tabular-nums text-text-primary">{r.editions}</td>
-                        <td className="py-2 text-text-secondary">{r.first.name}</td>
+                <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                  {editions.map(edition => (
+                    <EditionTile key={edition.slug} edition={edition} />
+                  ))}
+                </ul>
+              </section>
+
+              {data.regulars.length > 0 && (
+                <section aria-labelledby="regulars-heading">
+                  <h2 id="regulars-heading" className="font-display text-2xl font-bold text-text-primary">
+                    Regulars
+                  </h2>
+                  <p className="mt-1 text-sm text-text-tertiary">Artists who have played the most editions.</p>
+                  <table className="mt-4 w-full text-left text-sm">
+                    <thead className="text-text-tertiary">
+                      <tr className="border-b border-border">
+                        <th scope="col" className="py-2 pr-4 font-medium">
+                          Artist
+                        </th>
+                        <th scope="col" className="py-2 pr-4 font-medium">
+                          Editions
+                        </th>
+                        <th scope="col" className="py-2 font-medium">
+                          First played
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </section>
-            )}
-
-            {data.venues.length > 0 && (
-              <section aria-labelledby="venues-heading">
-                <h2 id="venues-heading" className="font-display text-2xl font-bold text-text-primary">
-                  Venues
-                </h2>
-                {/* Older editions were entered without venues, so say where the
-                    record starts rather than imply every venue began then. */}
-                <p className="mt-1 text-sm text-text-tertiary">
-                  Venues are on record from{' '}
-                  {parseLocalDate(
-                    data.venues.reduce((min, v) => (v.first_date < min ? v.first_date : min), '9999')
-                  )?.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}{' '}
-                  on.
-                </p>
-                <table className="mt-4 w-full text-left text-sm">
-                  <thead className="text-text-tertiary">
-                    <tr className="border-b border-border">
-                      <th scope="col" className="py-2 pr-4 font-medium">
-                        Venue
-                      </th>
-                      <th scope="col" className="py-2 pr-4 font-medium">
-                        Editions
-                      </th>
-                      <th scope="col" className="py-2 font-medium">
-                        Years
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.venues.map(v => {
-                      const first = yearOf(v.first_date)
-                      const last = yearOf(v.last_date)
-                      return (
-                        <tr key={v.venue_id} className="border-b border-border">
-                          <td className="py-2 pr-4 text-text-primary">{v.name}</td>
-                          <td className="py-2 pr-4 tabular-nums text-text-primary">{v.editions}</td>
-                          <td className="py-2 tabular-nums text-text-secondary">
-                            {first === last ? first : `${first}–${last}`}
+                    </thead>
+                    <tbody>
+                      {data.regulars.map(r => (
+                        <tr key={r.band_profile_id} className="border-b border-border">
+                          <td className="py-2 pr-4">
+                            <Link to={`/band/${r.band_profile_id}`} className="text-accent-400 hover:text-accent-300">
+                              {r.name}
+                            </Link>
                           </td>
+                          <td className="py-2 pr-4 tabular-nums text-text-primary">{r.editions}</td>
+                          <td className="py-2 text-text-secondary">{r.first.name}</td>
                         </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </section>
-            )}
-          </>
-        )}
+                      ))}
+                    </tbody>
+                  </table>
+                </section>
+              )}
+
+              {data.venues.length > 0 && (
+                <section aria-labelledby="venues-heading">
+                  <h2 id="venues-heading" className="font-display text-2xl font-bold text-text-primary">
+                    Venues
+                  </h2>
+                  {/* Older editions were entered without venues, so say where the
+                    record starts rather than imply every venue began then. */}
+                  <p className="mt-1 text-sm text-text-tertiary">
+                    Venues are on record from{' '}
+                    {parseLocalDate(
+                      data.venues.reduce((min, v) => (v.first_date < min ? v.first_date : min), '9999')
+                    )?.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}{' '}
+                    on.
+                  </p>
+                  <table className="mt-4 w-full text-left text-sm">
+                    <thead className="text-text-tertiary">
+                      <tr className="border-b border-border">
+                        <th scope="col" className="py-2 pr-4 font-medium">
+                          Venue
+                        </th>
+                        <th scope="col" className="py-2 pr-4 font-medium">
+                          Editions
+                        </th>
+                        <th scope="col" className="py-2 font-medium">
+                          Years
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.venues.map(v => {
+                        const first = yearOf(v.first_date)
+                        const last = yearOf(v.last_date)
+                        return (
+                          <tr key={v.venue_id} className="border-b border-border">
+                            <td className="py-2 pr-4 text-text-primary">{v.name}</td>
+                            <td className="py-2 pr-4 tabular-nums text-text-primary">{v.editions}</td>
+                            <td className="py-2 tabular-nums text-text-secondary">
+                              {first === last ? first : `${first}–${last}`}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </section>
+              )}
+            </>
+          )}
+        </RetryRegion>
       </main>
 
       <Footer />

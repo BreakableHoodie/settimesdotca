@@ -149,6 +149,36 @@ describe('HistoryPage (#1250)', () => {
     await waitFor(() => expect(fetchPublicJson).toHaveBeenCalledTimes(2))
   })
 
+  it('Retry keeps keyboard focus off <body> and announces the result (#1420)', async () => {
+    fetchPublicJson.mockRejectedValueOnce(new Error('down')).mockResolvedValueOnce(DATA)
+    renderPage()
+    const alert = await screen.findByRole('alert')
+    const retryButton = within(alert).getByRole('button', { name: 'Retry' })
+    retryButton.focus()
+    expect(document.activeElement).toBe(retryButton)
+    fireEvent.click(retryButton)
+
+    const region = screen.getByRole('group', { name: 'Editions' })
+    await waitFor(() => expect(within(region).getByRole('status')).toHaveTextContent('The editions loaded.'))
+    expect(document.activeElement).not.toBe(document.body)
+    expect(document.activeElement).toBe(region)
+  })
+
+  it('a second failure says so once, keeps focus in the region, and is not announced twice (#1420)', async () => {
+    fetchPublicJson.mockRejectedValue(new Error('down'))
+    renderPage()
+    const alert = await screen.findByRole('alert')
+    const retryButton = within(alert).getByRole('button', { name: 'Retry' })
+    retryButton.focus()
+    fireEvent.click(retryButton)
+
+    const region = screen.getByRole('group', { name: 'Editions' })
+    await waitFor(() => expect(within(region).getByRole('status')).toHaveTextContent("Couldn't load the editions."))
+    expect(document.activeElement).toBe(region)
+    expect(within(region).queryByRole('alert')).toBeNull()
+    expect(within(region).getByRole('button', { name: 'Retry' })).toBeInTheDocument()
+  })
+
   it('aborts the Retry request, not just the first one, when the page is left', async () => {
     fetchPublicJson.mockRejectedValueOnce(new Error('down')).mockImplementationOnce(() => new Promise(() => {}))
     const { unmount } = renderPage()

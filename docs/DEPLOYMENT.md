@@ -46,7 +46,6 @@ PUBLIC_URL=https://settimes.ca
 PUBLIC_DATA_PUBLISH_ENABLED=true
 CSRF_SECRET=<secret>
 MFA_TOTP_ENCRYPTION_KEY=<secret; never rotate after encrypted TOTP data exists>
-TURNSTILE_SECRET_KEY=<secret; production fails closed when absent>
 CRON_SECRET=<secret>
 EMAIL_PROVIDER=postmark|mailchannels|resend
 EMAIL_FROM=<sender address>
@@ -166,7 +165,7 @@ Confirm that CI applied the numbered migrations and that the live database is `s
 
 ### Function errors
 
-Inspect the Pages deployment logs and confirm the production secrets above are present. `CSRF_SECRET`, `MFA_TOTP_ENCRYPTION_KEY`, `TURNSTILE_SECRET_KEY`, and `CRON_SECRET` fail closed when required values are missing.
+Inspect the Pages deployment logs and confirm the production secrets above are present. `CSRF_SECRET`, `MFA_TOTP_ENCRYPTION_KEY`, and `CRON_SECRET` fail closed when required values are missing.
 
 ## Related Docs
 

@@ -61,7 +61,7 @@ masks failures (this shipped a red lint to CI once). `make` propagates failures 
 - **Theme tokens on public pages** — `text-text-*`, `bg-surface*`, `border-border`; never
   hardcoded `text-white`/`bg-white` (invisible on light themes). Admin (`frontend/src/admin/`)
   is dark-pinned; hardcoded white there is intentional.
-- **Two CSPs**: `frontend/public/_headers` governs the document (Turnstile, inline scripts —
+- **Two CSPs**: `frontend/public/_headers` governs the document (inline scripts —
   the theme-flash script is hash-allowlisted; editing it requires regenerating the hash);
   `functions/_middleware.js` governs API responses only.
 - **Any list query with a LIMIT must bound the entity it lists** — GROUP BY the entity id or

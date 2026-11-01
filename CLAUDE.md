@@ -690,7 +690,7 @@ Node and local `wrangler` do not enforce the Workers runtime's limits (the PBKDF
 
 - **Data:** previews bind only the scratch D1 `settimes-e2e-db`. `scripts/reset-e2e-db.mjs` rebuilds it each run from `database/setup-complete.sql` plus `database/seed-test-data.sql`, refuses any other name or id, and drops children before parents (D1 ignores `foreign_keys = OFF`).
 - **Plain-text vars live in `wrangler.toml` (`[env.preview.vars]`), never the dashboard**: a deploy replaces dashboard plain-text vars and keeps only secrets.
-- Previews set `ENVIRONMENT=preview` (production code paths under `isDevRequest`), use Turnstile's always-pass test keys and no email provider. Tests hit the stable alias `edge-e2e.longweekend-bandcrawl.pages.dev`, which the preview's `CORS_ALLOWED_ORIGINS` names.
+- Previews set `ENVIRONMENT=preview` (production code paths under `isDevRequest`) and no email provider. Tests hit the stable alias `edge-e2e.longweekend-bandcrawl.pages.dev`, which the preview's `CORS_ALLOWED_ORIGINS` names.
 - **Production rate limits apply**, so the run is two phases with no retries.
 - Tokens a preview cannot email are seeded or read through D1 (`e2e/utils/d1.js`); remote mode (`E2E_D1_REMOTE=1`) can name only the scratch D1. **`invite-signup.spec` and `password-reset-link.spec` are the PBKDF2 canaries**; its invitee context passes an empty `storageState` explicitly, or it inherits the signed-in admin.
 - **Ready means the alias serves THIS RUN'S deployment** (`scripts/wait-for-preview.mjs`, #1340). Only the `edge-e2e-deployment.txt` marker proves it (Vite hashes repeat across runs). A missing chunk is `200 text/html` on Pages, so check content-type.
@@ -882,7 +882,7 @@ Plan-tier history, job logs and the Semgrep investigation: `docs/field-notes/sec
 ### Outbound requests go only to fixed addresses (SSRF)
 
 The server never opens an address a caller can influence. Every `fetch` in
-`functions/` targets a hard-coded `https://` URL (Turnstile, Postmark,
+`functions/` targets a hard-coded `https://` URL (Postmark,
 MailChannels, Resend) or `env.ASSETS`, which serves this site's own files and
 cannot reach the network. Band photos and posters arrive as file uploads, never
 as "import from URL", and stored artist links are rendered, never visited.
@@ -921,14 +921,14 @@ reporting a successful run.
 
 There are **two** CSPs, and the one the browser enforces on a page is **not** the middleware:
 
-- **`frontend/public/_headers`** sets the CSP (and COOP/COEP/CORP) on **static/document responses** — i.e. the HTML the browser loads. **This is the browser-enforced CSP for pages and the one that governs Turnstile, the service worker, and inline scripts.** Edit this for anything affecting what the page can load.
+- **`frontend/public/_headers`** sets the CSP (and COOP/COEP/CORP) on **static/document responses** — i.e. the HTML the browser loads. **This is the browser-enforced CSP for pages and the one that governs the service worker and inline scripts.** Edit this for anything affecting what the page can load.
 - **`functions/_middleware.js`** sets a CSP on **Pages Functions / API responses** (JSON), enforced unless `isDevRequest` says this is a known dev environment, and `CSP_ENFORCE` overrides either way. It does not govern the document.
 - **Never compare `env.ENVIRONMENT` directly; call `isDevRequest`.** Production runs with `ENVIRONMENT` unset (a deploy with `wrangler.toml` wiped the plain-text var), and three `=== "production"` checks read that as non-production: the API CSP was report-only and password-reset completion echoed a `debugId` (#1273). `functions/__tests__/environmentFailsClosed.test.js` fails the build if any other file reads `ENVIRONMENT`.
 
 For the `_headers` document CSP:
 
-- **Turnstile** needs `https://challenges.cloudflare.com` in `script-src`/`frame-src` ([CSP docs](https://developers.cloudflare.com/turnstile/reference/content-security-policy/)); no `'unsafe-inline'`.
-- **`Cross-Origin-Embedder-Policy: require-corp` must NOT be set** — it blocks the Turnstile iframe (which doesn't send COEP; `credentialless` isn't supported in Safari). The app needs no cross-origin isolation.
+- **No `'unsafe-inline'`** in `script-src`; the one inline script is allowed by hash (next bullet). The only third-party script origin is Cloudflare Web Analytics, and no third-party frame origin is allowed (#1431).
+- **`Cross-Origin-Embedder-Policy: require-corp` must NOT be set** — it blocks cross-origin subresources that send no `Cross-Origin-Resource-Policy`, and band photos are served from another origin (`BAND_PHOTOS_PUBLIC_URL`, `band-photos.settimes.ca`). The app also needs no cross-origin isolation.
 - **The inline theme-flash `<script>` in `frontend/index.html`** is allowed by a `'sha256-…'` hash in `script-src`. **If you edit that script, regenerate the hash** (sha256 of the exact built script body, base64) or it silently stops running and a theme flash returns. No test covers this — verify by building and hashing `dist/index.html`.
 - **Cloudflare Rocket Loader must stay DISABLED** for the zone. It rewrites/inline-executes `<script>` tags, which strict CSP blocks ("Refused to execute inline script"). A modern code-split Vite SPA gains nothing from it.
 

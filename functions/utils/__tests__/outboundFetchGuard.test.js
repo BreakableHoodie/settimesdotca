@@ -9,8 +9,8 @@ import { describe, expect, it } from "vitest";
 // CLAUDE.md "Outbound requests go only to fixed addresses (SSRF)". Server-side
 // request forgery needs one thing: a server request whose address a caller can
 // influence. Today every request in functions/ goes to a hard-coded https URL
-// (Turnstile, the three email providers) or to the site's own static assets
-// through env.ASSETS. This scan keeps it that way: a new `fetch(userUrl)`, a
+// (the three email providers: Postmark, MailChannels, Resend) or to the site's
+// own static assets through env.ASSETS. This scan keeps it that way: a new `fetch(userUrl)`, a
 // template-literal URL, or another binding's .fetch fails the build until a
 // human has decided it is safe and widened the rule here on purpose.
 //
@@ -244,11 +244,11 @@ describe("server requests go only to addresses fixed in code (SSRF guard)", () =
   });
 
   it("still finds the requests it is meant to police", () => {
-    // Turnstile + Postmark + MailChannels + Resend. If this drops, the scan
+    // Postmark + MailChannels + Resend. If this drops, the scan
     // has stopped seeing fetch calls and the test above is passing vacuously.
     const totalGlobal = results.reduce((n, r) => n + r.globalCount, 0);
     const totalAssets = results.reduce((n, r) => n + r.assetsCount, 0);
-    expect(totalGlobal).toBeGreaterThanOrEqual(4);
+    expect(totalGlobal).toBeGreaterThanOrEqual(3);
     expect(totalAssets).toBeGreaterThanOrEqual(1);
   });
 

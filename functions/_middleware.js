@@ -204,8 +204,7 @@ export async function onRequest(context) {
 
   // Single source of truth for the Content-Security-Policy (reused on both the
   // success and error responses below).
-  //   - script-src/frame-src/connect-src allow https://challenges.cloudflare.com
-  //     for Cloudflare Turnstile (per its CSP docs); no 'unsafe-inline' needed.
+  //   - no 'unsafe-inline'; script-src is 'self' plus the theme-flash hash below.
   //   - the inline theme-flash bootstrap in frontend/index.html is permitted by
   //     its sha256 hash — REGENERATE this hash if that <script> ever changes
   //     (openssl/Node sha256 over the exact script body, base64).
@@ -215,14 +214,14 @@ export async function onRequest(context) {
   // DISABLED for this zone or it will trip "Refused to execute inline script".
   const csp = [
     "default-src 'self'",
-    "script-src 'self' https://challenges.cloudflare.com 'sha256-AthfpLUxHMTHKKJhjnay6WvKZb8lWKmb3ca+GM+ZrkI='",
+    "script-src 'self' 'sha256-AthfpLUxHMTHKKJhjnay6WvKZb8lWKmb3ca+GM+ZrkI='",
     "style-src 'self'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
-    "connect-src 'self' https://challenges.cloudflare.com",
+    "connect-src 'self'",
     "object-src 'none'",
-    "frame-src 'self' https://challenges.cloudflare.com",
-    "child-src 'self' https://challenges.cloudflare.com",
+    "frame-src 'self'",
+    "child-src 'self'",
     "worker-src 'self'",
     "base-uri 'self'",
     "frame-ancestors 'none'",

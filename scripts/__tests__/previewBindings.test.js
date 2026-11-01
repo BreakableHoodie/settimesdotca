@@ -67,7 +67,7 @@ describe("preview deployments never bind production data", () => {
   });
 
   // isDevRequest allowlists development/dev/test; any of those on a public
-  // preview would switch off secure cookies, CSRF and Turnstile there.
+  // preview would switch off secure cookies and CSRF there.
   it("previews declare a non-dev ENVIRONMENT and allow only the edge-e2e origin", () => {
     const vars = lines.filter(({ table, line }) => table === "env.preview.vars" && line !== "[env.preview.vars]");
     expect(vars.map(({ line }) => line)).toEqual([

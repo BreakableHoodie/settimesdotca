@@ -1,7 +1,7 @@
 // Per-RECIPIENT cap on the emails the public, unauthenticated senders may send (#1337).
 //
 // The per-IP limits in rateLimit.js say nothing about how many emails ONE inbox
-// receives: a bot that rotates IPs and solves Turnstile could send a single address
+// receives: a bot that rotates IPs could send a single address
 // one confirmation per band in the catalogue, all billed to us and all counting
 // against our sender reputation. This caps the address instead, whatever IPs the
 // requests come from.

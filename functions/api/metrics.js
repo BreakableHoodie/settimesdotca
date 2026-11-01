@@ -15,16 +15,15 @@ const ALLOWED_EVENTS = new Set([
   "social_link_click",
   "ticket_click",
   "visit",
-  "turnstile_error",
 ]);
 
-const SAFE_KEYS = new Set(["band_profile_id", "event_id", "link_type", "page", "error_code", "referrer_bucket"]);
+const SAFE_KEYS = new Set(["band_profile_id", "event_id", "link_type", "page", "referrer_bucket"]);
 
 const REFERRER_BUCKETS = new Set(["instagram", "facebook", "google", "other_search", "direct", "other"]);
 
 // Props come from the browser and flow into Analytics Engine blobs, which cap
 // a datapoint at 16 KB. Every real value is a short path, link type, id or
-// Turnstile code, so a string is truncated here and anything that is not a
+// referrer bucket, so a string is truncated here and anything that is not a
 // finite number or a string is dropped.
 const MAX_PROP_LENGTH = 200;
 
@@ -114,7 +113,6 @@ export async function onRequestPost(context) {
             String(event.props?.event_id ?? ""),
             String(event.props?.link_type ?? ""),
             String(event.props?.page ?? ""),
-            String(event.props?.error_code ?? ""),
           ],
           doubles: [Date.now()],
           indexes: [event.event],

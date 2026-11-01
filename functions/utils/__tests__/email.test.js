@@ -10,9 +10,7 @@
 // stubs `sendEmail` wholesale via `vi.mock("../email.js", ...)`.
 //
 // No real network calls: every test stubs `globalThis.fetch` directly and
-// restores it in afterEach, matching the idiom in turnstile.test.js (the
-// closest sibling: another best-effort external HTTP call whose failure must
-// never throw to the caller).
+// restores it in afterEach.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { isEmailConfigured, sendEmail } from "../email.js";
 

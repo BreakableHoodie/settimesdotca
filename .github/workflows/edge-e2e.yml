@@ -122,9 +122,6 @@ jobs:
 
       - name: Build frontend
         working-directory: frontend
-        env:
-          # Cloudflare's always-pass TEST site key; pairs with the preview's test secret.
-          VITE_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
         # The marker identifies THIS run's deployment to wait-for-preview.mjs:
         # Vite hashes alone repeat across deployments of the same frontend
         # source (a functions-only PR, a re-run). Only this workflow writes it;

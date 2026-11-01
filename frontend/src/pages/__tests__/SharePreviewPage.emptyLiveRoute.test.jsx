@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { HelmetProvider } from 'react-helmet-async'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import SharePreviewPage from '../SharePreviewPage.jsx'
 import { ThemeProvider } from '../../components/ThemeProvider.jsx'
 import { fetchPublicJson } from '../../utils/publicApi'
@@ -35,14 +35,6 @@ function renderPage(slug = 'abc123') {
 // exactly that shape (bands: [], band_names: 2 stale entries) and pins BOTH
 // the heading and the row count to the SAME resolved list.
 describe('SharePreviewPage — an empty live bands list must not fall back to the stale snapshot (#733)', () => {
-  beforeEach(() => {
-    vi.stubEnv('VITE_TURNSTILE_SITE_KEY', '')
-  })
-
-  afterEach(() => {
-    vi.unstubAllEnvs()
-  })
-
   it('renders a 0-stop route with zero rows when every shared performance was hard-deleted', async () => {
     fetchPublicJson.mockResolvedValue({
       slug: 'abc123',

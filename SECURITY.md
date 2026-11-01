@@ -113,7 +113,7 @@ POST /api/admin/auth/signup
 - `functions/_middleware.js` - API response CSP
 
 The exact directives are maintained in those two files. The document policy
-includes Turnstile support and a hash allowlist for the theme-flash script;
+includes a hash allowlist for the theme-flash script;
 keep it strict and do not add `unsafe-inline` to script execution.
 
 ### P1-8: Fixed CORS Validation
@@ -284,7 +284,7 @@ The document policy is maintained in `_headers`; do not describe it as a Helmet 
 
 ### Notes
 
-- The document policy includes the Turnstile origins and a hash allowlist for the theme-flash script.
+- The document policy includes a hash allowlist for the theme-flash script.
 - API responses use the policy assembled by `functions/_middleware.js`.
 
 ---
@@ -326,7 +326,6 @@ CORS requests with credentials (`credentials: 'include'`) only allowed from appr
 ```bash
 CSRF_SECRET=<secret>                       # Required; CSRF HMAC key
 MFA_TOTP_ENCRYPTION_KEY=<secret>            # Required for encrypted TOTP secrets; never rotate after use
-TURNSTILE_SECRET_KEY=<secret>              # Required; production bot protection fails closed when absent
 CRON_SECRET=<secret>                       # Required by the scheduled-job endpoint
 PUBLIC_URL=https://settimes.ca
 EMAIL_PROVIDER=postmark|mailchannels|resend

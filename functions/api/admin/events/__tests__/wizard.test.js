@@ -102,6 +102,28 @@ describe("POST /api/admin/events/wizard - event validation", () => {
     expect(res.status).toBe(201);
   });
 
+  // The cutoff is the Toronto festival day (#1417). 01:00 UTC on 1 Nov is
+  // 21:00 on 31 Oct in Toronto, so a UTC calendar day would refuse tonight's show;
+  // 05:00 UTC on 1 Nov is 01:00 in Toronto, still the 31 Oct festival day.
+  it.each([
+    ["8 PM Toronto, UTC already tomorrow", "2026-11-01T01:00:00Z", "2026-10-31", 201],
+    ["1 AM Toronto, still last night's festival day", "2026-11-01T05:00:00Z", "2026-10-31", 201],
+    ["the day before the Toronto festival day", "2026-11-01T05:00:00Z", "2026-10-30", 400],
+    ["noon Toronto, yesterday's date", "2026-11-01T16:00:00Z", "2026-10-31", 400],
+  ])("past-date cutoff: %s", async (_label, nowIso, date, status) => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(nowIso));
+    try {
+      const payload = basePayload();
+      payload.event.slug = `cutoff-${status}-${date}`;
+      payload.event.date = date;
+      const res = await wizardHandler.onRequestPost({ request: makeRequest(payload), env });
+      expect(res.status).toBe(status);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("rejects duplicate slug with 409", async () => {
     insertEvent(rawDb, { slug: "test-fest" });
     const res = await wizardHandler.onRequestPost({
@@ -223,6 +245,22 @@ describe("POST /api/admin/events/wizard - band validation", () => {
       env,
     });
     expect(res.status).toBe(201);
+  });
+
+  it("names both sets in the conflict, and allows the same slot at another venue", async () => {
+    const clash = basePayload();
+    clash.bands.push({ name: "Band Two", venueIndex: 0, startTime: "20:30", endTime: "21:30" });
+    const res = await wizardHandler.onRequestPost({ request: makeRequest(clash), env });
+    expect(res.status).toBe(409);
+    const { error } = await res.json();
+    expect(error).toContain('"Band Two"');
+
+    const elsewhere = basePayload();
+    elsewhere.event.slug = "elsewhere-fest";
+    elsewhere.venues.push({ name: "Second Room" });
+    elsewhere.bands.push({ name: "Band Two", venueIndex: 1, startTime: "20:30", endTime: "21:30" });
+    const ok = await wizardHandler.onRequestPost({ request: makeRequest(elsewhere), env });
+    expect(ok.status).toBe(201);
   });
 
   it("rejects schedule conflicts between bands at the same venue with 409", async () => {

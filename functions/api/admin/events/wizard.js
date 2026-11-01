@@ -19,30 +19,24 @@ import {
   validateSetTimes,
 } from "../../../utils/validation.js";
 import { getClientIP, parseJsonObjectBody } from "../../../utils/request.js";
-import { buildIntervals, intervalsOverlap } from "../../../utils/timeConflicts.js";
+import { detectDraftConflicts } from "../../../utils/timeConflicts.js";
+import { eventLocalFestivalToday } from "../../../utils/eventDay.js";
 import { normalizeBandName } from "../../../utils/bandName.js";
 import { inkForNewVenueOrNull } from "../../../utils/venueInk.js";
 
-// Detect scheduling conflicts within the submitted band list (all for a new event).
-function findConflict(bands) {
-  const byVenue = {};
-  for (const b of bands) {
-    if (!b.startTime || !b.endTime) continue;
-    (byVenue[b.venueIndex] ??= []).push(b);
-  }
-  for (const group of Object.values(byVenue)) {
-    for (let i = 0; i < group.length; i++) {
-      for (let j = i + 1; j < group.length; j++) {
-        const aIntervals = buildIntervals(group[i].startTime, group[i].endTime);
-        const bIntervals = buildIntervals(group[j].startTime, group[j].endTime);
-        const hasOverlap = aIntervals.some((a) => bIntervals.some((b) => intervalsOverlap(a, b)));
-        if (hasOverlap) {
-          return `"${group[i].name}" and "${group[j].name}" have overlapping times at the same venue`;
-        }
-      }
-    }
-  }
-  return null;
+// The wizard's whole lineup is new, so every row counts as changed. It goes
+// through detectDraftConflicts, the one home for "conflicts on the final
+// arrangement" (CLAUDE.md #1161), so a rule change there reaches the wizard too.
+function findConflict(bands, eventDate) {
+  const rows = bands.map((b, i) => ({
+    id: i,
+    name: b.name,
+    venue_id: b.venueIndex,
+    start_time: b.startTime,
+    end_time: b.endTime,
+  }));
+  const [first] = detectDraftConflicts(rows, { eventDate, changedIds: new Set(rows.map((r) => r.id)) });
+  return first ? `"${first.a.name}" and "${first.b.name}" have overlapping times at the same venue` : null;
 }
 
 export async function onRequestPost(context) {
@@ -75,12 +69,10 @@ export async function onRequestPost(context) {
   const { name, date, slug, description } = eventValidation.sanitized;
 
   // Wizard always creates drafts — archived/backdated events are out of scope here.
-  // Workers run in UTC; users submit their local date. A user in UTC-12 submitting
-  // "today" could be one day behind UTC, so we allow dates >= yesterday (UTC) as a
-  // grace window that covers all time zones.
-  const yesterday = new Date();
-  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-  const cutoffStr = yesterday.toISOString().slice(0, 10);
+  // "Past" is judged on the Toronto festival day (CLAUDE.md "Server-side today/now
+  // is Toronto-local"): organisers are in Toronto, and at 1 AM tonight's show is
+  // still today, so the festival day, not the calendar day, is the cutoff.
+  const cutoffStr = eventLocalFestivalToday();
   if (date < cutoffStr) {
     return validationErrorResponse("Draft events created via the wizard cannot have a past date");
   }
@@ -169,7 +161,7 @@ export async function onRequestPost(context) {
   }
 
   // Detect time conflicts before touching the DB (new event = no pre-existing performances).
-  const conflict = findConflict(sanitizedBands);
+  const conflict = findConflict(sanitizedBands, date);
   if (conflict) {
     return new Response(JSON.stringify({ error: `Schedule conflict: ${conflict}` }), {
       status: 409,

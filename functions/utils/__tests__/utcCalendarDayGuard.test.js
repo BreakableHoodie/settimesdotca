@@ -63,10 +63,8 @@ const ALLOWED = {
   // Round-trips a noon-UTC probe to reject impossible dates (Feb 30). Never
   // asks what day it is.
   "event/[slug].js": { reason: "noon-UTC validity probe, not a 'today'", hits: [SLICE] },
-  // Admin-only past-date check made deliberately LENIENT: "yesterday in UTC"
-  // admits today in every timezone. It can refuse nothing a Toronto admin
-  // should be allowed and hides nothing from fans.
-  "api/admin/events/wizard.js": { reason: "deliberately lenient admin cutoff", hits: [SLICE] },
+  // The event wizard's cutoff was here until #1417 moved it to the Toronto
+  // festival day.
 };
 
 // Comment lines are dropped before scanning: several files explain this very

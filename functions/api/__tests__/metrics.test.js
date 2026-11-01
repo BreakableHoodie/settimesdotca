@@ -620,4 +620,68 @@ describe("POST /api/metrics — show-night curve (event_hourly_views, #1246 Q1)"
     const daily = rawDb.prepare("SELECT event_views FROM event_daily_stats WHERE event_id = ?").get(event.id);
     expect(daily.event_views).toBe(1);
   });
+  test("a failing artist_daily_stats write does not skip the page-view write after it (#1411)", async () => {
+    const { env, rawDb } = createTestEnv();
+    const errorSpy = vi.spyOn(loggerModule.logger, "error").mockImplementation(() => {});
+    rawDb.exec("ALTER TABLE artist_daily_stats RENAME TO artist_daily_stats_gone");
+
+    const res = await onRequestPost({
+      request: makeRequest([
+        { event: "artist_profile_view", props: { band_profile_id: 1 } },
+        { event: "page_view", props: { page: "/band/1" } },
+      ]),
+      env,
+    });
+    expect(res.status).toBe(200);
+    expect(rawDb.prepare("SELECT page, views FROM page_views_daily").all()).toEqual([{ page: "/band/1", views: 1 }]);
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("artist_daily_stats upsert failed"),
+      expect.any(Object),
+    );
+  });
+
+  test("answers before the writes and hands them to waitUntil (#1411)", async () => {
+    const { env, rawDb } = createTestEnv();
+    // Hold the D1 batch open: the response must come back while it is pending.
+    const realBatch = env.DB.batch.bind(env.DB);
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    env.DB.batch = async (stmts) => {
+      await gate;
+      return realBatch(stmts);
+    };
+    const pending = [];
+    const res = await onRequestPost({
+      request: makeRequest([{ event: "page_view", props: { page: "/" } }]),
+      env,
+      waitUntil: (promise) => pending.push(promise),
+    });
+    expect(res.status).toBe(200);
+    expect(pending).toHaveLength(1);
+    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM page_views_daily").get().n).toBe(0);
+
+    release();
+    await Promise.all(pending);
+    expect(rawDb.prepare("SELECT page, views FROM page_views_daily").all()).toEqual([{ page: "/", views: 1 }]);
+  });
+  test("a missing page_views_daily table does not skip the event-day write after it (#1411)", async () => {
+    const { env, rawDb } = createTestEnv();
+    vi.spyOn(loggerModule.logger, "error").mockImplementation(() => {});
+    const event = insertEvent(rawDb, { slug: "pv-gone-fest" });
+    rawDb.exec("ALTER TABLE page_views_daily RENAME TO page_views_daily_gone");
+
+    const res = await onRequestPost({
+      request: makeRequest([
+        { event: "page_view", props: { page: "/" } },
+        { event: "ticket_click", props: { event_id: event.id } },
+      ]),
+      env,
+    });
+    expect(res.status).toBe(200);
+    expect(rawDb.prepare("SELECT event_id, ticket_clicks FROM event_daily_stats").all()).toEqual([
+      { event_id: event.id, ticket_clicks: 1 },
+    ]);
+  });
 });

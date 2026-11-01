@@ -874,6 +874,16 @@ export const MUTATIONS = [
     tests: ["functions/api/admin/events/__tests__/wizard.test.js"],
   },
   {
+    id: "metrics-artist-write-isolated",
+    invariant:
+      "CLAUDE.md 'Metrics & Analytics' — each D1 write in the beacon is isolated; a failing artist_daily_stats batch must not skip the writes after it (#1411)",
+    file: "functions/api/metrics.js",
+    find: 'logger.error("artist_daily_stats upsert failed; this batch\'s artist views and social clicks are lost", {',
+    replace:
+      'throw err; logger.error("artist_daily_stats upsert failed; this batch\'s artist views and social clicks are lost", {',
+    tests: ["functions/api/__tests__/metrics.test.js"],
+  },
+  {
     id: "no-utc-calendar-day-in-functions",
     invariant:
       "CLAUDE.md 'Server-side' (today/now is Toronto-local) — a UTC calendar day anywhere in functions/ fails the source-scanning guard",
@@ -1514,8 +1524,8 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'Metrics & Analytics' — event_hourly_views counts event_view only while the festival date is inside the event's [date, end_date], so a view after the last show day writes no hourly row (#1246 Q1)",
     file: "functions/api/metrics.js",
-    find: "          festivalDate <= (row.end_date || row.date),",
-    replace: "          true,",
+    find: "festivalDate <= (row.end_date || row.date),",
+    replace: "true,",
     tests: ["functions/api/__tests__/metrics.test.js"],
   },
   {
@@ -1523,8 +1533,8 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'Metrics & Analytics' — event_hourly_views keys a view by FESTIVAL date, so a 01:30 view after the show counts on the previous evening at hour 1, never on the next calendar day (#1246 Q1)",
     file: "functions/api/metrics.js",
-    find: "      const festivalDate = eventLocalFestivalToday(now);",
-    replace: "      const festivalDate = eventLocalToday(now);",
+    find: "  const festivalDate = eventLocalFestivalToday(now);",
+    replace: "  const festivalDate = eventLocalToday(now);",
     tests: ["functions/api/__tests__/metrics.test.js"],
   },
   {

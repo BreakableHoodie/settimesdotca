@@ -14,7 +14,13 @@
 // functions/utils/ssrMeta.js for the full SSR-injection rationale.
 
 import { isPublicDataEnabled } from "../../utils/publicGate.js";
-import { escapeAttr, serveWithInjectedMeta, CANONICAL_HOST, DEFAULT_OG_IMAGE } from "../../utils/ssrMeta.js";
+import {
+  escapeAttr,
+  serveWithInjectedMeta,
+  serveNotFound,
+  CANONICAL_HOST,
+  DEFAULT_OG_IMAGE,
+} from "../../utils/ssrMeta.js";
 import { normalizeHttpUrl, validateDate } from "../../utils/validation.js";
 import { eventLocalFestivalToday } from "../../utils/eventDay.js";
 import { concludedEventSql } from "../../utils/eventVisibility.js";
@@ -39,8 +45,11 @@ export async function onRequestGet(context) {
   const { params, env, request } = context;
   const slug = params.slug;
 
-  if (!/^[a-z0-9-]{1,64}$/i.test(slug || "") || !isPublicDataEnabled(env)) {
+  if (!isPublicDataEnabled(env)) {
     return env.ASSETS.fetch(request);
+  }
+  if (!/^[a-z0-9-]{1,64}$/i.test(slug || "")) {
+    return serveNotFound(context);
   }
 
   let event;
@@ -62,7 +71,7 @@ export async function onRequestGet(context) {
     console.error("SSR event recap lookup failed:", slug, err);
     return env.ASSETS.fetch(request);
   }
-  if (!event) return env.ASSETS.fetch(request);
+  if (!event) return serveNotFound(context);
 
   // NOT a second conclusion gate (#787). "Has this edition ended?" is answered
   // once, by concludedEventSql() in the query above -- the same predicate, with
@@ -150,3 +159,6 @@ export async function onRequestGet(context) {
 
   return serveWithInjectedMeta(context, { title, metaTags });
 }
+
+// HEAD answers like GET: the catch-all is the only all-method route, so without this a HEAD would 404 (#1446).
+export const onRequestHead = onRequestGet;

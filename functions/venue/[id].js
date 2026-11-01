@@ -2,7 +2,13 @@
 // JSON-LD for crawlers. See functions/utils/ssrMeta.js for rationale + fallback.
 
 import { isPublicDataEnabled } from "../utils/publicGate.js";
-import { escapeAttr, serveWithInjectedMeta, CANONICAL_HOST, DEFAULT_OG_IMAGE } from "../utils/ssrMeta.js";
+import {
+  escapeAttr,
+  serveWithInjectedMeta,
+  serveNotFound,
+  CANONICAL_HOST,
+  DEFAULT_OG_IMAGE,
+} from "../utils/ssrMeta.js";
 
 export async function onRequest(context) {
   const { params, env, request } = context;
@@ -15,8 +21,14 @@ export async function onRequest(context) {
   // with the homepage title and no canonical, and 14 duplicates entered the index
   // (#983). If a /venue/<slug> link builder is ever added, this branch must resolve
   // and 301 the way redirectSlugToId does there -- do not just add the links.
-  if (!/^\d+$/.test(id || "") || !isPublicDataEnabled(env)) {
+  // The gate comes first: while public data is off, whether a venue exists must
+  // not be observable, so a closed gate serves the plain shell (never a 404).
+  if (!isPublicDataEnabled(env)) {
     return env.ASSETS.fetch(request);
+  }
+  // No venue has a non-numeric id, so this is a definite miss (#1446).
+  if (!/^\d+$/.test(id || "")) {
+    return serveNotFound(context);
   }
 
   let venue;
@@ -32,7 +44,7 @@ export async function onRequest(context) {
     console.error("SSR venue lookup failed:", id, err);
     return env.ASSETS.fetch(request);
   }
-  if (!venue) return env.ASSETS.fetch(request);
+  if (!venue) return serveNotFound(context);
 
   // Pin to the production host — preview deploys must not self-canonicalise.
   const url = `${CANONICAL_HOST}/venue/${id}`;

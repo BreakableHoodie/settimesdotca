@@ -443,7 +443,7 @@ as RFC 5545 `STATUS:CANCELLED`), and `events/[id]/recap.js` (gated by
 
 ## Metrics & Analytics
 
-Metrics write to D1 daily-aggregate tables (`page_views_daily`, `artist_daily_stats`) via `POST /api/metrics`, plus an optional Cloudflare Analytics Engine sink (`env.ANALYTICS`, configured in `wrangler.toml`). Ingestion is best-effort and fire-and-forget; failures must not surface to users.
+Metrics write to D1 daily-aggregate tables (`page_views_daily`, `artist_daily_stats`) via `POST /api/metrics`, plus an optional Cloudflare Analytics Engine sink (`env.ANALYTICS`, configured in `wrangler.toml`). Ingestion is best-effort and fire-and-forget; failures must not surface to users. The 200 goes out first and the D1 writes finish in `waitUntil`, each table in its own try/catch so one failing write never skips the rest (#1411).
 
 **Show-night curve (#1246 Q1).** `event_hourly_views` (festival date + Toronto hour -> count) answers "when do fans use the site on show night?". `POST /api/metrics` writes it from `event_view` only while the festival date (`eventLocalFestivalToday`) is inside `[date, end_date]`; no visitor key, in its own try/catch. First-party: the zone keeps hourly data ~3 days, and Functions invocation counts are crawler-dominated. In the mutation gate.
 

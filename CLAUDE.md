@@ -48,7 +48,7 @@ Prefer a durable guard over a repeat audit: a source-scanning test (as `bandFiel
 
 ### Verify guards against the failure they guard, not the success
 
-**Code whose only job runs when something breaks must be tested broken.** A guard, diagnostic, timeout, retry or error handler is never exercised by the happy path. Five shipped in one day (2026-08-19, #879–#883) after the code was read, and each was caught only by running the failure. Substitute the failing thing and run it:
+**Code whose only job runs when something breaks must be tested broken.** A guard, diagnostic, timeout, retry or error handler is never exercised by the happy path. Five shipped in one day (2026-08-19, #879–#883) after the code was read, and each was caught only by running the failure. Substitute the failing thing and run it (`run_bounded` and `run_listener_check` were the E2E apt-install helpers; that path was removed in #1395, and the lessons stand):
 
 ```bash
 ss() { return 0; }; run_listener_check                     # -> "  none", not silence

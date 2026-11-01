@@ -47,20 +47,18 @@ runs:
                   *) echo "✗ seed-admin must be 'true' or 'false' (got '$SEED_ADMIN')." >&2; exit 1 ;;
               esac
 
-        # In the Playwright image (#1391) the browsers and every system package
-        # they need are already installed, so the apt cache and the bounded
-        # `--with-deps` install below are skipped: the image has no sudo, and
-        # skipping apt is the point of using it.
-        - name: Detect a preinstalled Playwright image
-          id: pw-image
+        # Browsers come only from the official Playwright image (#1391); the
+        # apt install path was removed in #1395. A job that installs browsers
+        # outside the image fails here rather than reaching for apt.
+        - name: Require the Playwright image
           if: inputs.install-playwright == 'true'
           shell: bash
           run: |
               if [ -n "${PLAYWRIGHT_BROWSERS_PATH:-}" ] && compgen -G "$PLAYWRIGHT_BROWSERS_PATH/chromium-*" >/dev/null; then
-                  echo "preinstalled=true" >> "$GITHUB_OUTPUT"
-                  echo "Playwright image: browsers in $PLAYWRIGHT_BROWSERS_PATH, skipping apt."
+                  echo "Playwright image: browsers in $PLAYWRIGHT_BROWSERS_PATH."
               else
-                  echo "preinstalled=false" >> "$GITHUB_OUTPUT"
+                  echo "✗ No preinstalled browsers. Run this job in the Playwright image: a container: set from the playwright-image job output (.github/actions/playwright-image, #1391)." >&2
+                  exit 1
               fi
 
         - name: Setup Node
@@ -86,193 +84,8 @@ runs:
           working-directory: frontend
           run: npm ci --ignore-scripts
 
-        - name: Cache Playwright browsers
-          if: inputs.install-playwright == 'true' && steps.pw-image.outputs.preinstalled != 'true'
-          id: playwright-cache
-          uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-          with:
-              path: ~/.cache/ms-playwright
-              key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-              restore-keys: |
-                  playwright-${{ runner.os }}-
-
-        - name: Restore cached apt packages for Playwright
-          if: inputs.install-playwright == 'true' && steps.pw-image.outputs.preinstalled != 'true'
-          id: apt-debs
-          uses: ./.github/actions/apt-deb-cache
-          with:
-              mode: restore
-
-        - name: Install Playwright browsers
-          if: inputs.install-playwright == 'true' && steps.pw-image.outputs.preinstalled != 'true'
-          shell: bash
-          env:
-              CACHE_HIT: ${{ steps.playwright-cache.outputs.cache-hit }}
-          run: |
-              # Bounded because `install-deps` shells out to apt-get, which can
-              # block indefinitely on a dpkg lock or an unreachable mirror. On
-              # 2026-08-19 it hung 34m47s and consumed the job's entire 35-minute
-              # budget, leaving a step boundary as the only clue (#881). The boot
-              # loop below already learned this lesson in #625; this step had not.
-              #
-              # A timeout turns a 35-minute silent stall into a fast, obviously
-              # retryable failure. Exit 124 is timeout(1)'s signal, called out so
-              # the next reader does not have to look it up.
-              # Retry is gated on apt recovery (#883). `timeout` kills only the
-              # process it launched -- the `npx playwright install-deps` wrapper --
-              # while the apt-get it re-exec'd as root survives, holding
-              # /var/lib/apt/lists/lock. A naive retry therefore died in ~2s with
-              # "Could not get lock ... held by process N", turning a clear 124 into
-              # a confusing exit 1. The orphan must be killed and the locks cleared
-              # before re-attempting.
-              #
-              # Safe because hosted runners are single-use VMs: this only runs after
-              # the bound has already fired, and the state it touches is discarded
-              # with the job. Do NOT copy this anywhere long-lived.
-              # Returns 0 only if apt is genuinely usable again. The caller must
-              # NOT retry on a non-zero return: a retry into a still-locked apt
-              # burns another 300s and reports a confusing exit 1 instead of the
-              # clear timeout -- which is why the first attempt at this was reverted.
-              # Returns 0 only if apt is genuinely usable again. The caller must
-              # NOT retry on a non-zero return: a retry into a still-locked apt
-              # burns another 300s and reports a confusing exit 1 instead of the
-              # clear timeout -- which is why the first attempt at this was reverted.
-              # The archive lock lives where apt-deb-cache points Dir::Cache::Archives
-              # (#1391); the default path stays listed in case that step is skipped.
-              APT_LOCKS="/var/lib/apt/lists/lock /var/cache/apt/archives/lock $HOME/.cache/apt-debs/lock /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend"
-
-              apt_recover() {
-                  echo "  recovering apt state (killing orphaned apt/dpkg)" >&2
-                  local SUDO=""
-                  [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1 && SUDO="sudo -n"
-
-                  # Kill the holders. Deliberately NOT `rm` the lock files: unlinking
-                  # a lock does not release it, and a retry would then create a FRESH
-                  # lock and run apt concurrently with the surviving holder, which is
-                  # how dpkg state actually gets corrupted. Killing the holder
-                  # releases its fcntl lock; that is the whole job.
-                  $SUDO pkill -9 -x apt-get 2>/dev/null || true
-                  $SUDO pkill -9 -x dpkg 2>/dev/null || true
-                  # fuser catches holders pgrep's exact-name match misses (apt,
-                  # unattended-upgrades, dpkg-deb ...). Absent on some images, so it
-                  # is best-effort here and only authoritative in the check below.
-                  if command -v fuser >/dev/null 2>&1; then
-                      # shellcheck disable=SC2086
-                      $SUDO fuser -k -9 $APT_LOCKS >/dev/null 2>&1 || true
-                  fi
-                  sleep 2
-
-                  # Repair a transaction interrupted by the kill. Unlike the kills,
-                  # this must SUCCEED -- a half-configured dpkg fails every later
-                  # install, so retrying on top of it is worse than not retrying.
-                  if ! $SUDO dpkg --configure -a >/dev/null 2>&1; then
-                      echo "  recovery FAILED: dpkg --configure -a could not repair state" >&2
-                      return 1
-                  fi
-
-                  # VERIFY, rather than assume. Every kill above is `|| true`, so a
-                  # missing sudo grant or an unmatched holder would otherwise pass
-                  # silently and doom the retry before it started.
-                  if command -v fuser >/dev/null 2>&1; then
-                      # shellcheck disable=SC2086
-                      if $SUDO fuser -s $APT_LOCKS 2>/dev/null; then
-                          echo "  recovery FAILED: an apt lock still has a holder — not retrying" >&2
-                          return 1
-                      fi
-                  else
-                      # Fail closed. pgrep is NOT a substitute for a lock-aware
-                      # check: a container test held a real fcntl lock on
-                      # /var/lib/apt/lists/lock from a process named `python3`,
-                      # which `pgrep -x apt-get` cannot match by construction.
-                      # Claiming recovery on that basis would send the retry into
-                      # a still-locked apt -- the exact confusion that got the
-                      # first retry reverted in #882. Nor can we install psmisc
-                      # here: apt is the thing that is locked.
-                      echo "  cannot verify lock holders without fuser — not retrying" >&2
-                      return 1
-                  fi
-                  echo "  recovery ok: no holder on the apt locks" >&2
-                  return 0
-              }
-
-              # Returns 0, or the command's exit code. Prints why. Sets
-              # BOUNDED_TIMED_OUT=1 when the bound fired, so the caller can retry a
-              # timeout without re-deriving that from the exit code.
-              run_bounded_once() {
-                  local label="$1"
-                  shift
-                  # Assign from the failing command directly. The original bug here
-                  # was `if timeout ...; then return 0; fi` followed by `code=$?`:
-                  # an `if` whose condition FAILS and has no else returns 0, so $?
-                  # was the if-statement's status, not the command's -- every failure
-                  # captured as 0 and silently treated as success.
-                  #
-                  # NOTE: `local` is not the culprit, contrary to what this comment
-                  # previously said. `false; local code=$?` correctly yields 1; the
-                  # form that does mask is `local code=$(cmd)`. Verified 2026-08-19.
-                  local code=0
-                  # -k: `timeout` sends SIGTERM, which apt-get mid-dpkg can ignore
-                  # or block on -- leaving the process alive and the step still
-                  # hung, i.e. failing in exactly the case this bound exists for.
-                  # SIGKILL follows 30s later and cannot be ignored.
-                  local started=$SECONDS
-                  timeout -k 30s 300s "$@" || code=$?
-                  local elapsed=$(( SECONDS - started ))
-                  [ "$code" -eq 0 ] && return 0
-                  # `timeout -k 30s 300s` has exactly two kill points: SIGTERM at
-                  # 300s (exit 124) and, if that was ignored, SIGKILL at 330s (exit
-                  # 137). But `timeout` passes THROUGH a wrapped command that exits
-                  # 124 or 137 on its own, so the code alone cannot tell a bound from
-                  # an ordinary failure. Require the elapsed time to match the kill
-                  # point the code implies -- 137 at 305s is not our SIGKILL, which
-                  # cannot fire before 330s, so it is the command's own status.
-                  BOUNDED_TIMED_OUT=0
-                  if { [ "$code" -eq 124 ] && [ "$elapsed" -ge 300 ]; } \
-                     || { [ "$code" -eq 137 ] && [ "$elapsed" -ge 330 ]; }; then
-                      BOUNDED_TIMED_OUT=1
-                      echo "✗ $label exceeded 300s and was killed — usually apt-get" >&2
-                      echo "  blocked on a lock or a slow mirror." >&2
-                  else
-                      echo "✗ $label failed with exit $code" >&2
-                  fi
-                  return "$code"
-              }
-
-              # One retry, and ONLY for a timeout. An ordinary failure (bad package,
-              # no network) reproduces identically and would burn another 300s for
-              # nothing.
-              run_bounded() {
-                  local label="$1"
-                  shift
-                  local code=0
-                  run_bounded_once "$label" "$@" || code=$?
-                  [ "$code" -eq 0 ] && return 0
-                  # Retry ONLY when the bound fired AND recovery verified itself.
-                  if [ "${BOUNDED_TIMED_OUT:-0}" -eq 1 ] && apt_recover; then
-                      echo "  retrying once after recovery…" >&2
-                      code=0
-                      run_bounded_once "$label (retry)" "$@" || code=$?
-                  fi
-                  return "$code"
-              }
-
-              if [ "$CACHE_HIT" = "true" ]; then
-                  run_bounded "playwright install-deps chromium" npx playwright install-deps chromium
-                  run_bounded "playwright install chromium" npx playwright install chromium
-              else
-                  run_bounded "playwright install chromium --with-deps" npx playwright install chromium --with-deps
-              fi
-
-        - name: Save apt packages for Playwright
-          if: inputs.install-playwright == 'true' && steps.pw-image.outputs.preinstalled != 'true'
-          uses: ./.github/actions/apt-deb-cache
-          with:
-              mode: save
-              key: ${{ steps.apt-debs.outputs.key }}
-              cache-hit: ${{ steps.apt-debs.outputs.cache-hit }}
-
         - name: Check the image's browsers match the lockfile
-          if: inputs.install-playwright == 'true' && steps.pw-image.outputs.preinstalled == 'true'
+          if: inputs.install-playwright == 'true'
           shell: bash
           # A no-op when the image matches the lockfile, which the
           # playwright-image action guarantees. If they ever differ, this

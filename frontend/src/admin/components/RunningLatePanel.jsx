@@ -60,21 +60,26 @@ export default function RunningLatePanel({ eventId, readOnly = false, showToast,
   // isStale and leave the error up over the newer request's result.
   const loadSeqRef = useRef(0)
 
-  const load = useCallback(async () => {
-    if (!eventId) return
-    const seq = ++loadSeqRef.current
-    const superseded = () => seq !== loadSeqRef.current || isStale(eventId)
-    setLoadError(false)
-    try {
-      const res = await eventsApi.getVenueDelays(eventId)
-      if (superseded()) return
-      setDelays(res.delays || [])
-    } catch (err) {
-      if (superseded()) return
-      setLoadError(true)
-      showToast?.(`Could not load running-late status: ${err.message}`, 'error')
-    }
-  }, [eventId, showToast])
+  // A Retry passes quiet: its status region already announces the failure,
+  // and an error toast too would announce it twice (#1420).
+  const load = useCallback(
+    async ({ quiet = false } = {}) => {
+      if (!eventId) return
+      const seq = ++loadSeqRef.current
+      const superseded = () => seq !== loadSeqRef.current || isStale(eventId)
+      setLoadError(false)
+      try {
+        const res = await eventsApi.getVenueDelays(eventId)
+        if (superseded()) return
+        setDelays(res.delays || [])
+      } catch (err) {
+        if (superseded()) return
+        setLoadError(true)
+        if (!quiet) showToast?.(`Could not load running-late status: ${err.message}`, 'error')
+      }
+    },
+    [eventId, showToast]
+  )
 
   useEffect(() => {
     setDelays([])
@@ -126,7 +131,8 @@ export default function RunningLatePanel({ eventId, readOnly = false, showToast,
   }
 
   let content = null
-  if (loadError) content = <LoadError what="running-late status" onRetry={() => retry.startRetry(load)} />
+  if (loadError)
+    content = <LoadError what="running-late status" onRetry={() => retry.startRetry(() => load({ quiet: true }))} />
   else if (delays.length > 0)
     content = (
       <section aria-labelledby="running-late-heading" className="mb-6 rounded-lg border border-white/10 bg-white/5 p-4">

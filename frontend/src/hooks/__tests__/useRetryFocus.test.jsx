@@ -66,6 +66,9 @@ describe('useRetryFocus', () => {
 
     fireEvent.click(retryButton)
     expect(status()).toHaveTextContent('Loading venues…')
+    // Focus is in the region while the load is still pending, not on <body>.
+    expect(screen.getByText('Spinner')).toBeInTheDocument()
+    expect(document.activeElement).toBe(region())
 
     await screen.findByText('List')
     await waitFor(() => expect(status()).toHaveTextContent('Venues loaded.'))

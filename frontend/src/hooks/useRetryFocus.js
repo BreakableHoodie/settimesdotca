@@ -47,6 +47,9 @@ export default function useRetryFocus({ what, error }) {
       inFlight.current = true
       setRetried(true)
       setStatusText(`Loading ${what}…`)
+      // Focus moves now, not when the load settles: the loader may remove the
+      // focused Retry button at once, leaving focus on <body> while it runs.
+      regionRef.current?.focus()
       let threw = false
       try {
         await fn()

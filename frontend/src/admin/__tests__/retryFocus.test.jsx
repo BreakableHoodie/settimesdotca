@@ -65,11 +65,15 @@ describe('Retry keeps focus and announces — UserManagement', () => {
 
   it('says "Couldn\'t load users." once, keeps focus in the region, when the retry fails again', async () => {
     usersApi.getAll.mockRejectedValue(new Error('boom'))
-    render(<UserManagement showToast={vi.fn()} />)
+    const showToast = vi.fn()
+    render(<UserManagement showToast={showToast} />)
     await screen.findByRole('alert')
+    expect(showToast).toHaveBeenCalledTimes(1) // the first failure still toasts
 
     await focusAndRetry(regionNamed('Users'))
     await expectFocusedRegion('Users', "Couldn't load users.")
+    // ...but a failed retry does not: the status line already said it.
+    expect(showToast).toHaveBeenCalledTimes(1)
     const region = regionNamed('Users')
     // The status line speaks for the failure after a retry; the alert must not
     // announce it a second time.

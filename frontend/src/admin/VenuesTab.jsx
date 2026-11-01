@@ -51,19 +51,24 @@ export default function VenuesTab({ showToast, readOnly = false, canManage = fal
   const [submitting, setSubmitting] = useState(false)
   const retry = useRetryFocus({ what: 'venues', error: loadError })
 
-  const loadVenues = useCallback(async () => {
-    try {
-      setLoading(true)
-      const result = await venuesApi.getAll()
-      setVenues(result.venues || [])
-      setLoadError(false)
-    } catch (err) {
-      setLoadError(true)
-      showToast('Failed to load venues: ' + err.message, 'error')
-    } finally {
-      setLoading(false)
-    }
-  }, [showToast])
+  // A Retry passes quiet: its status region already announces the failure,
+  // and an error toast too would announce it twice (#1420).
+  const loadVenues = useCallback(
+    async ({ quiet = false } = {}) => {
+      try {
+        setLoading(true)
+        const result = await venuesApi.getAll()
+        setVenues(result.venues || [])
+        setLoadError(false)
+      } catch (err) {
+        setLoadError(true)
+        if (!quiet) showToast('Failed to load venues: ' + err.message, 'error')
+      } finally {
+        setLoading(false)
+      }
+    },
+    [showToast]
+  )
 
   useEffect(() => {
     loadVenues()
@@ -488,7 +493,7 @@ export default function VenuesTab({ showToast, readOnly = false, canManage = fal
         className="bg-bg-purple rounded-lg border border-accent-500/20 overflow-hidden"
       >
         {loadError && venues.length === 0 ? (
-          <LoadError what="venues" onRetry={() => retry.startRetry(loadVenues)} />
+          <LoadError what="venues" onRetry={() => retry.startRetry(() => loadVenues({ quiet: true }))} />
         ) : filteredVenues.length === 0 ? (
           <div className="p-8 text-center text-white/50">
             {venues.length === 0

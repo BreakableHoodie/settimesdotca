@@ -57,19 +57,24 @@ export default function UserManagement({ showToast }) {
   // useCallback so the mount effect can declare it as a dependency without
   // re-running every render. `showToast` is itself useCallback-wrapped by
   // AdminPanel, so this identity is stable.
-  const fetchUsers = useCallback(async () => {
-    try {
-      const data = await usersApi.getAll()
-      setUsers(data.users)
-      setLoadError(false)
-    } catch (error) {
-      console.error('Failed to fetch users:', error)
-      setLoadError(true)
-      showToast('Failed to fetch users', 'error')
-    } finally {
-      setLoading(false)
-    }
-  }, [showToast])
+  // A Retry passes quiet: its status region already announces the failure,
+  // and an error toast too would announce it twice (#1420).
+  const fetchUsers = useCallback(
+    async ({ quiet = false } = {}) => {
+      try {
+        const data = await usersApi.getAll()
+        setUsers(data.users)
+        setLoadError(false)
+      } catch (error) {
+        console.error('Failed to fetch users:', error)
+        setLoadError(true)
+        if (!quiet) showToast('Failed to fetch users', 'error')
+      } finally {
+        setLoading(false)
+      }
+    },
+    [showToast]
+  )
 
   useEffect(() => {
     fetchUsers()
@@ -273,7 +278,7 @@ export default function UserManagement({ showToast }) {
         className="bg-white/10 backdrop-blur-lg rounded-lg border border-white/20 overflow-hidden"
       >
         {loadError && users.length === 0 ? (
-          <LoadError what="users" onRetry={() => retry.startRetry(fetchUsers)} />
+          <LoadError what="users" onRetry={() => retry.startRetry(() => fetchUsers({ quiet: true }))} />
         ) : (
           <>
             <div className="hidden md:block overflow-x-auto">

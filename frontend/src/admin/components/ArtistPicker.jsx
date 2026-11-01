@@ -138,7 +138,7 @@ export default function ArtistPicker({
           )
         })}
         {loadError && artists.length === 0 && !loading && (
-          <LoadError what="the roster" onRetry={() => retry.startRetry(onRetry)} />
+          <LoadError what="the roster" onRetry={() => retry.startRetry(() => onRetry({ quiet: true }))} />
         )}
         {filtered.length === 0 && query && !loading && !(loadError && artists.length === 0) && (
           <div className="p-8 text-center">

@@ -37,6 +37,10 @@ export const ACCEPTED_NPM_AUDIT = {
     "dev-only, via @lhci/cli > proxy-agent > pac-proxy-agent > get-uri. Client.list() runs only if LHCI is given a proxy whose PAC file is fetched over ftp://; quality.yml and lighthouserc.json set no proxy, so it is unreachable in our use. Accepted by Dre 2026-10-14; re-check if a proxy is ever configured or on the next @lhci/cli release",
   "frontend/package-lock.json|zod|GHSA-mrhx-c7xc-m3w5":
     "dev-only, zod@3 via lighthouse > puppeteer-core > chromium-bidi (Lighthouse CI). Every 3.x is in range and forcing zod 4 breaks chromium-bidi's schemas; zod@4 elsewhere is fixed. Accepted by Dre 2026-10-25; re-check on the next lighthouse / puppeteer-core release",
+  "package-lock.json|minimatch|GHSA-g3hv-75wg-m249":
+    "dev-only lint tooling: minimatch@3 via eslint-plugin-react and eslint-plugin-jsx-a11y, minimatch@10 via eslint. The advisory is a DoS from crafted glob patterns, and the only patterns minimatch sees here come from our committed ESLint config. The fix is 11.0.1 only; both plugins call `require('minimatch')` as a function, which 11 no longer exports, so forcing it breaks lint. Accepted by Dre 2026-10-31; re-check when eslint-plugin-react / eslint-plugin-jsx-a11y move off minimatch@3",
+  "frontend/package-lock.json|minimatch|GHSA-g3hv-75wg-m249":
+    "dev-only lint tooling: minimatch@3 via eslint-plugin-react and eslint-plugin-jsx-a11y, minimatch@10 via eslint. The advisory is a DoS from crafted glob patterns, and the only patterns minimatch sees here come from our committed ESLint config. The fix is 11.0.1 only; both plugins call `require('minimatch')` as a function, which 11 no longer exports, so forcing it breaks lint. Accepted by Dre 2026-10-31; re-check when eslint-plugin-react / eslint-plugin-jsx-a11y move off minimatch@3",
 };
 
 // The issue lists at most this many alerts. GitHub rejects an issue body over

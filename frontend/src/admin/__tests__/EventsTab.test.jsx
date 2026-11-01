@@ -331,7 +331,6 @@ describe('EventsTab — no subscriber notice', () => {
             date: '2026-10-11',
             status: 'published',
             band_count: 15,
-            scheduled_count: 0,
           },
         ]}
         onEventsChange={vi.fn()}

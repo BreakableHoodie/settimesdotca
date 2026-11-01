@@ -141,7 +141,7 @@ See Cloudflare's D1 Time Travel documentation for the retention window available
 
 ## Scheduled Maintenance
 
-Cloudflare Pages does not provide native cron triggers for this project. `.github/workflows/scheduled-jobs.yml` calls `/api/internal/run-scheduled` daily with `CRON_SECRET`. The job runs popularity aggregation, retention cleanup, share-link expiry, schedule-build anonymisation, and announcement digest delivery.
+Cloudflare Pages does not provide native cron triggers for this project. `.github/workflows/scheduled-jobs.yml` calls `/api/internal/run-scheduled` daily with `CRON_SECRET`. The job runs popularity aggregation, retention cleanup, share-link expiry and schedule-build anonymisation.
 
 The admin cleanup endpoint runs the same retention cleanup for expired sessions, MFA challenges, reset tokens, trusted devices, login attempts, unconfirmed consent rows, and short-lived API-key request audit rows. Retention is automatic: ordinary audit rows are kept for one year and `api_key.request` rows for 90 days.
 

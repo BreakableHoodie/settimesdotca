@@ -856,6 +856,24 @@ export const MUTATIONS = [
     tests: ["functions/api/feeds/__tests__/ical-band.test.js"],
   },
   {
+    id: "wizard-past-date-is-toronto-festival-day",
+    invariant:
+      "CLAUDE.md 'Server-side' (today/now is Toronto-local) — the event wizard's past-date cutoff is the Toronto festival day, so tonight's show is never refused after 8 PM or after midnight (#1417)",
+    file: "functions/api/admin/events/wizard.js",
+    find: "const cutoffStr = eventLocalFestivalToday();",
+    replace: "const cutoffStr = new Date().toISOString().slice(0, 10);",
+    tests: ["functions/api/admin/events/__tests__/wizard.test.js"],
+  },
+  {
+    id: "wizard-conflicts-via-detect-draft-conflicts",
+    invariant:
+      "CLAUDE.md 'Multi-row schedule saves check the FINAL state' — the wizard checks its whole new lineup through detectDraftConflicts, every row counted as changed (#1417)",
+    file: "functions/api/admin/events/wizard.js",
+    find: "changedIds: new Set(rows.map((r) => r.id))",
+    replace: "changedIds: new Set()",
+    tests: ["functions/api/admin/events/__tests__/wizard.test.js"],
+  },
+  {
     id: "no-utc-calendar-day-in-functions",
     invariant:
       "CLAUDE.md 'Server-side' (today/now is Toronto-local) — a UTC calendar day anywhere in functions/ fails the source-scanning guard",

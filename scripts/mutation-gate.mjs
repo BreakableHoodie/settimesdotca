@@ -562,10 +562,9 @@ export const MUTATIONS = [
     id: "outbound-fetch-fixed-address-only",
     invariant:
       "CLAUDE.md 'Outbound requests go only to fixed addresses (SSRF)' — every server fetch targets a hard-coded https URL or env.ASSETS",
-    file: "functions/utils/turnstile.js",
-    find: 'const SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";',
-    replace:
-      'const SITEVERIFY_URL = globalThis.SITEVERIFY_OVERRIDE || "https://challenges.cloudflare.com/turnstile/v0/siteverify";',
+    file: "functions/utils/email.js",
+    find: 'response = await fetch("https://api.resend.com/emails", {',
+    replace: 'response = await fetch(globalThis.RESEND_OVERRIDE || "https://api.resend.com/emails", {',
     tests: ["functions/utils/__tests__/outboundFetchGuard.test.js"],
   },
   {

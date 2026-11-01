@@ -8,7 +8,7 @@ export const SESSION_CONFIG = {
 };
 
 export function isDevRequest(request, env = null) {
-  // Secure by default: dev (insecure-over-http cookie / CSRF / Turnstile)
+  // Secure by default: dev (insecure-over-http cookie / CSRF)
   // behavior is enabled ONLY for an explicit, known dev ENVIRONMENT value.
   // Everything else fails CLOSED to secure — production, a typo/case/whitespace
   // variant of the prod value ("Production", "prod", " production\n"), an

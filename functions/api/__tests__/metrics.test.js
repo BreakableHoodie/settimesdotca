@@ -112,6 +112,20 @@ describe("POST /api/metrics", () => {
     expect(env.ANALYTICS.writeDataPoint).not.toHaveBeenCalled();
     expect(rawDb.prepare("SELECT COUNT(*) AS count FROM page_views_daily").get().count).toBe(0);
   });
+
+  test("drops retired turnstile_error events without storing or sending them", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.ANALYTICS = { writeDataPoint: vi.fn() };
+
+    const res = await onRequestPost({
+      request: makeRequest([{ event: "turnstile_error", props: { page: "/x" } }]),
+      env,
+    });
+
+    expect(res.status).toBe(200);
+    expect(env.ANALYTICS.writeDataPoint).not.toHaveBeenCalled();
+    expect(rawDb.prepare("SELECT COUNT(*) AS count FROM page_views_daily").get().count).toBe(0);
+  });
 });
 
 describe("POST /api/metrics — referrer buckets (#1246 Q3)", () => {
@@ -480,7 +494,7 @@ describe("POST /api/metrics — date key is Toronto-local, not UTC (#668)", () =
 });
 
 // Props flow into Analytics Engine blobs (16 KB per datapoint). The sanitizer
-// bounds every prop, not only the error_code #1230 added.
+// bounds every prop, not only one.
 describe("POST /api/metrics — prop values are bounded before Analytics Engine", () => {
   test("truncates a long string prop and drops a non-string, non-number one", async () => {
     const { env } = createTestEnv();
@@ -489,7 +503,7 @@ describe("POST /api/metrics — prop values are bounded before Analytics Engine"
 
     const res = await onRequestPost({
       request: makeRequest([
-        { event: "turnstile_error", props: { error_code: "x".repeat(20000) } },
+        { event: "page_view", props: { page: "x".repeat(20000) } },
         { event: "page_view", props: { page: { nested: "object" } } },
       ]),
       env,

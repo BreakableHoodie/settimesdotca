@@ -89,7 +89,7 @@ settimes.ca no longer sends email updates (band follows, event subscriptions and
 
 ### Public request notes
 
-- `POST /api/metrics` only persists allow-listed analytics events: `page_view`, `event_view`, `artist_profile_view`, `social_link_click`, `ticket_click`, `visit` (a coarse referrer bucket, once per browser session), and `turnstile_error`.
+- `POST /api/metrics` only persists allow-listed analytics events: `page_view`, `event_view`, `artist_profile_view`, `social_link_click`, `ticket_click`, and `visit` (a coarse referrer bucket, once per browser session).
 - `POST /api/schedule/build` accepts at most 50 performance IDs and validates `user_session` against a restricted `[A-Za-z0-9_-]+` pattern.
 - All public discovery routes listed in the first table are gated by `PUBLIC_DATA_PUBLISH_ENABLED`.
 

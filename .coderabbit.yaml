@@ -136,13 +136,12 @@ reviews:
         - Legitimate diffs here are regeneration output only — they should be exactly reproducible by running `node scripts/regenerate-setup-complete.mjs`. If a diff could not have been produced that way, treat it as a hand-edit.
 
     # Invariant: this is the browser-enforced CSP, not functions/_middleware.js;
-    # Turnstile + COEP + theme-flash hash constraints (CLAUDE.md
+    # COEP + theme-flash hash constraints (CLAUDE.md
     # "Content-Security-Policy").
     - path: "frontend/public/_headers"
       instructions: |
-        - This file — not functions/_middleware.js — is the CSP the browser enforces on document responses (HTML pages, Turnstile, the service worker, inline scripts).
-        - Turnstile requires `https://challenges.cloudflare.com` in both `script-src` and `frame-src`.
-        - `Cross-Origin-Embedder-Policy: require-corp` must NOT be set — it blocks the Turnstile iframe (Safari does not support `credentialless`).
+        - This file — not functions/_middleware.js — is the CSP the browser enforces on document responses (HTML pages, the service worker, inline scripts).
+        - `Cross-Origin-Embedder-Policy: require-corp` must NOT be set — it blocks cross-origin subresources that send no Cross-Origin-Resource-Policy, such as band photos served from `band-photos.settimes.ca`. The app needs no cross-origin isolation.
         - The inline theme-flash `<script>` in frontend/index.html is allowed by a `sha256-` hash in `script-src` here. If that script's body changes, the hash must be regenerated or the theme flash silently returns with no test coverage.
 
     # Invariant: third-party Actions must be SHA-pinned (repo convention;

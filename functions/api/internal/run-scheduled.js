@@ -31,7 +31,7 @@ function secretsMatch(a, b) {
  *   or            X-Cron-Secret: <CRON_SECRET>
  *
  * Fail-closed: if CRON_SECRET is unset the endpoint returns 503 and refuses
- * all requests, mirroring the Turnstile / CSRF fail-closed pattern.
+ * all requests, mirroring the CSRF fail-closed pattern.
  */
 export async function onRequestPost(context) {
   const { request, env } = context;

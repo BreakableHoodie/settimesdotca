@@ -13,10 +13,9 @@ const ALLOWED_EVENTS = new Set([
   'social_link_click',
   'ticket_click',
   'visit',
-  'turnstile_error',
 ])
 
-const SAFE_KEYS = new Set(['band_profile_id', 'event_id', 'link_type', 'page', 'error_code', 'referrer_bucket'])
+const SAFE_KEYS = new Set(['band_profile_id', 'event_id', 'link_type', 'page', 'referrer_bucket'])
 
 const VISIT_FLAG_KEY = 'settimes_visit_sent'
 

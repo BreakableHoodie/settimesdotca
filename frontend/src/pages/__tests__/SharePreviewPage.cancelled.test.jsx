@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { HelmetProvider } from 'react-helmet-async'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import SharePreviewPage from '../SharePreviewPage.jsx'
 import { ThemeProvider } from '../../components/ThemeProvider.jsx'
 import { fetchPublicJson } from '../../utils/publicApi'
@@ -30,14 +30,6 @@ function renderPage(slug = 'abc123') {
 // `bands.length`, never `band_names.length` — otherwise the heading and the
 // Add button disagree with the actual number of rows rendered.
 describe('SharePreviewPage — orphaned/cancelled performances (#733)', () => {
-  beforeEach(() => {
-    vi.stubEnv('VITE_TURNSTILE_SITE_KEY', '')
-  })
-
-  afterEach(() => {
-    vi.unstubAllEnvs()
-  })
-
   it('counts the route from bands, not the stale band_names snapshot, when a performance was hard-deleted', async () => {
     // band_names still has 3 entries (untouched snapshot); bands has only 2
     // because the endpoint omits the hard-deleted performance. If the

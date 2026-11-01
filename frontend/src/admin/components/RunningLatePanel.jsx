@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { eventsApi } from '../../utils/adminApi'
 import LoadError from './LoadError'
+import RetryRegion from '../../components/RetryRegion'
+import useRetryFocus from '../../hooks/useRetryFocus'
 
 // "Venue running late" (#1249): one tap moves every remaining set at a venue
 // and shows fans a banner. Built for a phone mid-show: presets, a custom
@@ -26,6 +28,7 @@ function describeError(err) {
 export default function RunningLatePanel({ eventId, readOnly = false, showToast, onShifted }) {
   const [delays, setDelays] = useState([])
   const [loadError, setLoadError] = useState(false)
+  const retry = useRetryFocus({ what: 'running-late status', error: loadError })
   // Requests in flight, keyed by EVENT and venue. A set, not one id: tapping
   // B while A is in flight must not let A's reply re-enable B. Keyed by event
   // and never reset on an event switch: A -> B -> A while A's shift is still
@@ -122,84 +125,90 @@ export default function RunningLatePanel({ eventId, readOnly = false, showToast,
     }
   }
 
-  if (loadError) return <LoadError what="running-late status" onRetry={load} />
-  if (delays.length === 0) return null
+  let content = null
+  if (loadError) content = <LoadError what="running-late status" onRetry={() => retry.startRetry(load)} />
+  else if (delays.length > 0)
+    content = (
+      <section aria-labelledby="running-late-heading" className="mb-6 rounded-lg border border-white/10 bg-white/5 p-4">
+        <h3 id="running-late-heading" className="text-base font-semibold text-white">
+          Running late?
+        </h3>
+        <p className="mb-3 text-sm text-white/70">
+          Moves every set at the venue that has not started yet, and tells fans on the event page.
+        </p>
+        <ul className="space-y-3">
+          {delays.map(row => {
+            const busy = pendingKeys.has(pendingKey(eventId, row.venueId))
+            const customValue = custom[row.venueId] ?? ''
+            const customMinutes = Number(customValue)
+            const customValid = customValue !== '' && Number.isInteger(customMinutes) && customMinutes !== 0
+            return (
+              <li key={row.venueId} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <span className="font-medium text-white">{row.venue}</span>{' '}
+                  <span className={row.minutes > 0 ? 'text-amber-300' : 'text-white/60'}>
+                    {row.minutes > 0 ? `running about ${row.minutes} min late` : 'on time'}
+                  </span>
+                </div>
+                {!readOnly && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {PRESETS.map(minutes => (
+                      <button
+                        key={minutes}
+                        type="button"
+                        disabled={busy}
+                        onClick={() => shift(row, minutes)}
+                        aria-label={`+${minutes} minutes later: ${row.venue}`}
+                        className="min-h-[44px] rounded bg-amber-500/20 px-3 text-sm font-semibold text-amber-200 hover:bg-amber-500/30 disabled:opacity-50"
+                      >
+                        +{minutes}
+                      </button>
+                    ))}
+                    <label className="sr-only" htmlFor={`late-custom-${row.venueId}`}>
+                      {`${row.venue}: custom minutes (negative moves sets earlier)`}
+                    </label>
+                    <input
+                      id={`late-custom-${row.venueId}`}
+                      type="number"
+                      inputMode="numeric"
+                      step="1"
+                      min="-180"
+                      max="180"
+                      value={customValue}
+                      onChange={event => setCustom(current => ({ ...current, [row.venueId]: event.target.value }))}
+                      placeholder="± min"
+                      className="min-h-[44px] w-20 rounded border border-white/20 bg-transparent px-2 text-sm text-white"
+                    />
+                    <button
+                      type="button"
+                      disabled={busy || !customValid}
+                      onClick={() => shift(row, customMinutes)}
+                      className="min-h-[44px] rounded bg-white/10 px-3 text-sm text-white hover:bg-white/20 disabled:opacity-50"
+                    >
+                      Shift
+                    </button>
+                    {row.minutes > 0 && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => clear(row)}
+                        className="min-h-[44px] rounded px-3 text-sm text-white/80 underline hover:text-white disabled:opacity-50"
+                      >
+                        Back on time
+                      </button>
+                    )}
+                  </div>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      </section>
+    )
 
   return (
-    <section aria-labelledby="running-late-heading" className="mb-6 rounded-lg border border-white/10 bg-white/5 p-4">
-      <h3 id="running-late-heading" className="text-base font-semibold text-white">
-        Running late?
-      </h3>
-      <p className="mb-3 text-sm text-white/70">
-        Moves every set at the venue that has not started yet, and tells fans on the event page.
-      </p>
-      <ul className="space-y-3">
-        {delays.map(row => {
-          const busy = pendingKeys.has(pendingKey(eventId, row.venueId))
-          const customValue = custom[row.venueId] ?? ''
-          const customMinutes = Number(customValue)
-          const customValid = customValue !== '' && Number.isInteger(customMinutes) && customMinutes !== 0
-          return (
-            <li key={row.venueId} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <span className="font-medium text-white">{row.venue}</span>{' '}
-                <span className={row.minutes > 0 ? 'text-amber-300' : 'text-white/60'}>
-                  {row.minutes > 0 ? `running about ${row.minutes} min late` : 'on time'}
-                </span>
-              </div>
-              {!readOnly && (
-                <div className="flex flex-wrap items-center gap-2">
-                  {PRESETS.map(minutes => (
-                    <button
-                      key={minutes}
-                      type="button"
-                      disabled={busy}
-                      onClick={() => shift(row, minutes)}
-                      aria-label={`+${minutes} minutes later: ${row.venue}`}
-                      className="min-h-[44px] rounded bg-amber-500/20 px-3 text-sm font-semibold text-amber-200 hover:bg-amber-500/30 disabled:opacity-50"
-                    >
-                      +{minutes}
-                    </button>
-                  ))}
-                  <label className="sr-only" htmlFor={`late-custom-${row.venueId}`}>
-                    {`${row.venue}: custom minutes (negative moves sets earlier)`}
-                  </label>
-                  <input
-                    id={`late-custom-${row.venueId}`}
-                    type="number"
-                    inputMode="numeric"
-                    step="1"
-                    min="-180"
-                    max="180"
-                    value={customValue}
-                    onChange={event => setCustom(current => ({ ...current, [row.venueId]: event.target.value }))}
-                    placeholder="± min"
-                    className="min-h-[44px] w-20 rounded border border-white/20 bg-transparent px-2 text-sm text-white"
-                  />
-                  <button
-                    type="button"
-                    disabled={busy || !customValid}
-                    onClick={() => shift(row, customMinutes)}
-                    className="min-h-[44px] rounded bg-white/10 px-3 text-sm text-white hover:bg-white/20 disabled:opacity-50"
-                  >
-                    Shift
-                  </button>
-                  {row.minutes > 0 && (
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => clear(row)}
-                      className="min-h-[44px] rounded px-3 text-sm text-white/80 underline hover:text-white disabled:opacity-50"
-                    >
-                      Back on time
-                    </button>
-                  )}
-                </div>
-              )}
-            </li>
-          )
-        })}
-      </ul>
-    </section>
+    <RetryRegion retry={retry} label="Running late">
+      {content}
+    </RetryRegion>
   )
 }

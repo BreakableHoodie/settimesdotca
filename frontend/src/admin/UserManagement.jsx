@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Key, Pencil, Plus, ShieldOff, Trash, UserCheck, UserX } from 'lucide-react'
 import LoadError from './components/LoadError'
+import RetryRegion from '../components/RetryRegion'
+import useRetryFocus from '../hooks/useRetryFocus'
 import RoleBadge from './components/RoleBadge'
 import UserFormModal from './components/UserFormModal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
@@ -33,6 +35,8 @@ export default function UserManagement({ showToast }) {
   const [pendingToggle, setPendingToggle] = useState(null)
   const [pendingMfaReset, setPendingMfaReset] = useState(null)
   const [pendingInviteUrl, setPendingInviteUrl] = useState(null)
+
+  const retry = useRetryFocus({ what: 'users', error: loadError })
 
   const resolveDisplayName = resolveUserDisplayName
 
@@ -263,9 +267,13 @@ export default function UserManagement({ showToast }) {
         </div>
       </div>
 
-      <div className="bg-white/10 backdrop-blur-lg rounded-lg border border-white/20 overflow-hidden">
+      <RetryRegion
+        retry={retry}
+        label="Users"
+        className="bg-white/10 backdrop-blur-lg rounded-lg border border-white/20 overflow-hidden"
+      >
         {loadError && users.length === 0 ? (
-          <LoadError what="users" onRetry={fetchUsers} />
+          <LoadError what="users" onRetry={() => retry.startRetry(fetchUsers)} />
         ) : (
           <>
             <div className="hidden md:block overflow-x-auto">
@@ -482,7 +490,7 @@ export default function UserManagement({ showToast }) {
             </div>
           </>
         )}
-      </div>
+      </RetryRegion>
 
       {/* User Form Modal — mounted only while open, so closing DISCARDS its state
           rather than leaving a hidden instance whose every field needs a manual

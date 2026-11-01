@@ -21,6 +21,8 @@ import {
 import { safeExternalHref } from '../utils/urlSafety'
 import { AFTER_MIDNIGHT_THRESHOLD_HOUR } from '../utils/festivalDays'
 import LoadError from './components/LoadError'
+import RetryRegion from '../components/RetryRegion'
+import useRetryFocus from '../hooks/useRetryFocus'
 
 const isEventLockedAsArchived = event => event?.status === 'archived' || isEventArchived(event?.date)
 const getAdminEventState = event => (event?.status === 'archived' ? 'archived' : getEventState(event?.date))
@@ -407,6 +409,10 @@ export default function EventsTab({
   canDeleteEvents = false,
 }) {
   const { refreshEvents } = useEventContext()
+  // Retry reloads in the BACKGROUND, like the post-upload refresh: a foreground
+  // reload swaps the whole panel for a spinner, which would unmount this tab and
+  // the focus the retry is about to hand back (#1420).
+  const retry = useRetryFocus({ what: 'events', error: loadError })
   const [showModal, setShowModal] = useState(false)
   const [showHistoricalImport, setShowHistoricalImport] = useState(false)
   const [editingEvent, setEditingEvent] = useState(null)
@@ -1128,9 +1134,13 @@ export default function EventsTab({
       )}
 
       {/* Events List */}
-      <div className="bg-bg-purple rounded-lg border border-accent-500/20 overflow-hidden">
+      <RetryRegion
+        retry={retry}
+        label="Events"
+        className="bg-bg-purple rounded-lg border border-accent-500/20 overflow-hidden"
+      >
         {loadError && events.length === 0 ? (
-          <LoadError what="events" onRetry={onEventsChange} />
+          <LoadError what="events" onRetry={() => retry.startRetry(() => onEventsChange({ background: true }))} />
         ) : filteredEvents.length === 0 ? (
           <div className="p-8 text-center text-white/50">
             {events.length === 0
@@ -1234,7 +1244,7 @@ export default function EventsTab({
             </div>
           </>
         )}
-      </div>
+      </RetryRegion>
 
       {/* Metrics Dashboard Modal */}
       {showMetrics && (

@@ -7,6 +7,8 @@ import BulkPreviewModal from './components/BulkPreviewModal'
 import BulkBandImport from './components/BulkBandImport'
 import ArtistPicker from './components/ArtistPicker'
 import LoadError from './components/LoadError'
+import RetryRegion from '../components/RetryRegion'
+import useRetryFocus from '../hooks/useRetryFocus'
 import ScheduleGrid from './components/ScheduleGrid'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { parseOrigin } from '../utils/parseOrigin'
@@ -56,6 +58,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
   const [loading, setLoading] = useState(true)
   const [rosterLoading, setRosterLoading] = useState(false)
   const [loadError, setLoadError] = useState(false)
+  const retry = useRetryFocus({ what: 'the lineup', error: loadError })
   const [rosterError, setRosterError] = useState(false)
 
   // Modes: 'list', 'picker', 'form', 'import', 'schedule'
@@ -812,11 +815,15 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
           </div>
 
           {/* List */}
-          <div className="bg-bg-purple rounded-lg border border-accent-500/20 overflow-hidden">
+          <RetryRegion
+            retry={retry}
+            label="Lineup"
+            className="bg-bg-purple rounded-lg border border-accent-500/20 overflow-hidden"
+          >
             {loading ? (
               <div className="p-8 text-center text-accent-400">Loading lineup...</div>
             ) : loadError && bands.length === 0 ? (
-              <LoadError what="the lineup" onRetry={loadData} />
+              <LoadError what="the lineup" onRetry={() => retry.startRetry(loadData)} />
             ) : filteredBands.length === 0 ? (
               <div className="p-8 text-center text-white/50">
                 {bands.length === 0 ? 'No performances scheduled yet.' : 'No performances match your filters.'}
@@ -1159,7 +1166,7 @@ export default function LineupTab({ selectedEventId, selectedEvent, events, show
                 </div>
               </>
             )}
-          </div>
+          </RetryRegion>
         </>
       )}
       <ConfirmDialog

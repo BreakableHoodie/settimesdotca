@@ -1,4 +1,6 @@
+import { useContext } from 'react'
 import PropTypes from 'prop-types'
+import { RetryContext } from '../../hooks/useRetryFocus'
 
 /**
  * Shown where a list would render when its fetch FAILED (#1323).
@@ -7,10 +9,15 @@ import PropTypes from 'prop-types'
  * that tells an admin the data is gone and invites them to recreate it. Each
  * view tracks a load error separately from "loaded and empty" and renders
  * this instead.
+ *
+ * Render it inside a <RetryRegion> and pass `() => retry.startRetry(load)` as
+ * `onRetry` (#1420). It announces itself as an alert when it first appears; after
+ * a retry the region's status message does that, so it goes quiet.
  */
 export default function LoadError({ what, onRetry }) {
+  const retried = useContext(RetryContext)
   return (
-    <div role="alert" className="p-8 text-center">
+    <div role={retried ? undefined : 'alert'} className="p-8 text-center">
       <p className="text-white mb-4">{`Couldn't load ${what}.`}</p>
       <button
         type="button"

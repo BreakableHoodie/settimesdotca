@@ -35,6 +35,11 @@ describe("path-filtered E2E jobs run on dependency changes", () => {
     [
       "edge-e2e.yml",
       [
+        // index.html, public/_headers and vite.config.js deploy too, not only src/.
+        "frontend/**",
+        "scripts/wait-for-preview.mjs",
+        "scripts/e2e-totp.mjs",
+        "scripts/smoke-probes.mjs",
         "package.json",
         "package-lock.json",
         "frontend/package.json",

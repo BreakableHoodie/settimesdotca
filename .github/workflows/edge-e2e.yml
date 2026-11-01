@@ -69,7 +69,9 @@ jobs:
           filters: |
             edge:
               - "functions/**"
-              - "frontend/src/**"
+              # All of frontend/, not just src/: index.html, public/_headers (the CSP)
+              # and the Vite config are built and deployed too.
+              - "frontend/**"
               - "migrations/**"
               - "database/**"
               - "e2e/**"
@@ -80,6 +82,9 @@ jobs:
               - "frontend/package.json"
               - "frontend/package-lock.json"
               - "scripts/reset-e2e-db.mjs"
+              - "scripts/wait-for-preview.mjs"
+              - "scripts/e2e-totp.mjs"
+              - "scripts/smoke-probes.mjs"
               - ".github/actions/playwright-image/**"
               - ".github/workflows/edge-e2e.yml"
 

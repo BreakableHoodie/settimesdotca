@@ -89,7 +89,6 @@ jobs:
                           - 'database/**'
                       ci:
                           - '.github/actions/e2e-env/**'
-                          - '.github/actions/apt-deb-cache/**'
                           - '.github/actions/playwright-image/**'
                           - '.github/workflows/e2e-tests.yml'
                       # Playwright is pinned in the root lockfile, and dependencies

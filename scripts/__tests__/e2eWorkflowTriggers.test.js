@@ -125,7 +125,6 @@ describe("dorny/paths-filter filters", () => {
       "migrations/**",
       "database/**",
       ".github/actions/e2e-env/**",
-      ".github/actions/apt-deb-cache/**",
       ".github/actions/playwright-image/**",
       "package-lock.json",
       "frontend/package-lock.json",

@@ -85,6 +85,8 @@ jobs:
               - "scripts/wait-for-preview.mjs"
               - "scripts/e2e-totp.mjs"
               - "scripts/smoke-probes.mjs"
+              - "scripts/seed-e2e-admin.mjs"
+              - "scripts/scrub-e2e-artifacts.mjs"
               - ".github/actions/playwright-image/**"
               - ".github/workflows/edge-e2e.yml"
 

@@ -40,6 +40,8 @@ describe("path-filtered E2E jobs run on dependency changes", () => {
         "scripts/wait-for-preview.mjs",
         "scripts/e2e-totp.mjs",
         "scripts/smoke-probes.mjs",
+        "scripts/seed-e2e-admin.mjs",
+        "scripts/scrub-e2e-artifacts.mjs",
         "package.json",
         "package-lock.json",
         "frontend/package.json",

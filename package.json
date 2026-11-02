@@ -32,7 +32,7 @@
     "@playwright/test": "^1.64.1",
     "@vitest/coverage-v8": "^5.0.5",
     "acorn": "^8.19.0",
-    "baseline-browser-mapping": "^2.11.29",
+    "baseline-browser-mapping": "^2.11.33",
     "better-sqlite3": "^13.0.3",
     "eslint": "^10.13.0",
     "eslint-config-prettier": "^10.1.5",
@@ -43,7 +43,7 @@
     "js-yaml": "^5.5.0",
     "prettier": "^3.9.10",
     "semver": "^7.8.5",
-    "vite": "^8.3.4",
+    "vite": "^8.3.5",
     "vitest": "^5.0.5"
   },
   "dependencies": {

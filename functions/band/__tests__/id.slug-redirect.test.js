@@ -88,14 +88,50 @@ describe("SSR /band/[id] — slug URLs redirect to the canonical id (#983)", () 
     expect(response.headers.get("Location")).not.toContain("settimes.ca");
   });
 
-  test("an unresolvable slug falls through to the shell rather than redirecting or 404ing", async () => {
+  test("an unresolvable slug answers a real 404 with noindex (#1446), not a redirect or a soft-404 200", async () => {
     const { env } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
 
     const response = await onRequest(makeContext({ env, id: "not-a-real-band" }));
+    const html = await response.text();
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get("Location")).toBeNull();
+    expect(html).toContain('<meta name="robots" content="noindex">');
+    expect(html).toContain("<title>Page not found | SetTimes</title>");
+  });
+
+  test("an unknown numeric band id answers a real 404 with noindex (#1446)", async () => {
+    const { env } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+
+    const response = await onRequest(makeContext({ env, id: "999999" }));
+    const html = await response.text();
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get("Cache-Control")).toBe("public, max-age=60");
+    expect(html).toContain('<meta name="robots" content="noindex">');
+    expect(html).toContain("<title>Page not found | SetTimes</title>");
+    expect(html).not.toContain("og:title");
+  });
+
+  test("a D1 failure on a numeric id serves the shell, never a 404 (#1446)", async () => {
+    const { env } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const context = makeContext({ env, id: "7" });
+    context.env.DB = {
+      prepare: () => ({
+        bind: () => ({
+          first: async () => {
+            throw new Error("D1_ERROR: connection lost");
+          },
+        }),
+      }),
+    };
+
+    const response = await onRequest(context);
 
     expect(response.status).toBe(200);
-    expect(response.headers.get("Location")).toBeNull();
   });
 
   test("a gated env serves the shell without revealing that the band exists", async () => {
@@ -170,7 +206,8 @@ describe("SSR /band/[id] — slug URLs redirect to the canonical id (#983)", () 
 
       const response = await onRequest(makeContext({ env, id: slug }));
 
-      expect(response.status).toBe(200);
+      // Never a redirect; now a real 404 rather than the soft-404 shell (#1446).
+      expect(response.status).toBe(404);
       expect(response.headers.get("Location")).toBeNull();
     },
   );

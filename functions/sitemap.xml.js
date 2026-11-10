@@ -222,3 +222,6 @@ ${rows.join("\n")}
     );
   }
 }
+
+// HEAD answers like GET: the catch-all is the only all-method route, so without this a HEAD would 404 (#1446).
+export const onRequestHead = onRequestGet;

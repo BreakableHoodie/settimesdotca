@@ -30,7 +30,7 @@ The `hooks` in `.claude/settings.local.json` automate the mechanical parts (pret
 
 ### The codebase report card — run it on a cadence
 
-`docs/REPORT_CARD_REVIEW.md` grades the whole repo across nine categories, fixes what is safe, and re-grades. It is **tracked in git** so a fresh clone, CI or a delegate can find it (#818's failure was an untracked tree), **and listed in `mkdocs.yml`'s `exclude_docs`**, because `docs/*.md` ships to docs.settimes.ca whatever the `nav` says and this file names past security gaps. Keep the exclusion even if the site is retired again, and never "fix" the missing nav entry: the file is meant to be absent from the site, not merely unlinked.
+`docs/REPORT_CARD_REVIEW.md` grades the whole repo across twelve categories (SEO added 2026-11), fixes what is safe, and re-grades. It is **tracked in git** so a fresh clone, CI or a delegate can find it (#818's failure was an untracked tree), **and listed in `mkdocs.yml`'s `exclude_docs`**, because `docs/*.md` ships to docs.settimes.ca whatever the `nav` says and this file names past security gaps. Keep the exclusion even if the site is retired again, and never "fix" the missing nav entry: the file is meant to be absent from the site, not merely unlinked.
 
 **Cadence: the start of a release cycle or roughly quarterly**, ideally after a season ends and before the next edition's build-out. It is deliberately not a per-PR gate. It catches drift no diff-scoped reviewer can see: a coverage ratchet ten points below actual, an exported constant imported by nothing while five endpoints copied its value, an override pinned inside its own vulnerable range, a security control with zero coverage (all found by the first run, 2026-08-20, #900–#917).
 

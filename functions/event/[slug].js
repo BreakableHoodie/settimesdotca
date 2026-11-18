@@ -2,7 +2,14 @@
 // JSON-LD for crawlers. See functions/utils/ssrMeta.js for rationale + fallback.
 
 import { isPublicDataEnabled } from "../utils/publicGate.js";
-import { escapeAttr, toPlainText, serveWithInjectedMeta, CANONICAL_HOST, DEFAULT_OG_IMAGE } from "../utils/ssrMeta.js";
+import {
+  escapeAttr,
+  toPlainText,
+  serveWithInjectedMeta,
+  serveNotFound,
+  CANONICAL_HOST,
+  DEFAULT_OG_IMAGE,
+} from "../utils/ssrMeta.js";
 import { normalizeHttpUrl } from "../utils/validation.js";
 import { sortableName } from "../utils/sortableName.js";
 import {
@@ -159,8 +166,13 @@ export async function onRequest(context) {
   const { params, env, request } = context;
   const slug = params.slug;
 
-  if (!/^[a-z0-9-]{1,64}$/i.test(slug || "") || !isPublicDataEnabled(env)) {
+  // Gate first (existence must not be observable while data is off), then a
+  // slug no event can have is a definite miss: 404, not a soft-404 shell (#1446).
+  if (!isPublicDataEnabled(env)) {
     return env.ASSETS.fetch(request);
+  }
+  if (!/^[a-z0-9-]{1,64}$/i.test(slug || "")) {
+    return serveNotFound(context);
   }
 
   let event;
@@ -176,7 +188,7 @@ export async function onRequest(context) {
     console.error("SSR event lookup failed:", slug, err);
     return env.ASSETS.fetch(request);
   }
-  if (!event) return env.ASSETS.fetch(request);
+  if (!event) return serveNotFound(context);
 
   // Fetch the event's performances (band + per-set festival day) and
   // distinct venues in parallel. Row-level (not DISTINCT bp.id) because

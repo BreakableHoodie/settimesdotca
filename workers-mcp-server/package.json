@@ -14,7 +14,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "wrangler": "^4.158.0"
+    "wrangler": "^4.163.0"
   },
   "overrides": {
     "esbuild": "0.28.2",

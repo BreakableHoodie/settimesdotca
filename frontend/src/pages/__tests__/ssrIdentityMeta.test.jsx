@@ -402,7 +402,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
       upcoming: [],
       past: [],
     })
-    seedSsrHead('/band/206', 'ALL — Punk in Waterloo Region | SetTimes')
+    seedSsrHead('/band/206', 'ALL — Punk | SetTimes')
     // Mirrors functions/band/[id].js's jsonLd: [musicGroup, breadcrumb] (#790).
     seedSsrJsonLd([
       { '@context': 'https://schema.org', '@type': 'MusicGroup', name: 'ALL', url: 'https://settimes.ca/band/206' },
@@ -423,7 +423,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
 
     expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
     expect(countJsonLdByType()).toEqual({ MusicGroup: 1, BreadcrumbList: 1 })
-    await waitFor(() => expect(document.title).toBe('ALL — Punk in Waterloo Region | SetTimes'))
+    await waitFor(() => expect(document.title).toBe('ALL — Punk | SetTimes'))
   })
 
   // #785: the SSR <title> must survive the whole load — the fetch is still
@@ -436,7 +436,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
         resolveFetch = resolve
       })
     )
-    seedSsrHead('/band/206', 'ALL — Punk in Waterloo Region | SetTimes')
+    seedSsrHead('/band/206', 'ALL — Punk | SetTimes')
     // Mirrors functions/band/[id].js's jsonLd: [musicGroup, breadcrumb] (#790).
     seedSsrJsonLd([
       { '@context': 'https://schema.org', '@type': 'MusicGroup', name: 'ALL', url: 'https://settimes.ca/band/206' },
@@ -455,7 +455,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
     )
 
     // Still loading: the title in the DOM is exactly what the server sent.
-    await waitFor(() => expect(document.title).toBe('ALL — Punk in Waterloo Region | SetTimes'))
+    await waitFor(() => expect(document.title).toBe('ALL — Punk | SetTimes'))
 
     resolveFetch({
       id: 206,
@@ -474,7 +474,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
 
     expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
     expect(countJsonLdByType()).toEqual({ MusicGroup: 1, BreadcrumbList: 1 })
-    await waitFor(() => expect(document.title).toBe('ALL — Punk in Waterloo Region | SetTimes'))
+    await waitFor(() => expect(document.title).toBe('ALL — Punk | SetTimes'))
   })
 
   // App.jsx is the /event/:slug route's own component (main.jsx routes it

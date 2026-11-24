@@ -230,8 +230,8 @@ describe("public performance queries use the reveal predicate", () => {
   const root = path.join(path.dirname(guardFile), "../../");
 
   const REVEAL_GATE_EXEMPT = {
-    "api/events/[id]/recap.js": "recap lineup includes unannounced sets pending a product decision (#1471)",
-    "events/[slug]/recap.js": "recap metadata counts unannounced sets pending a product decision (#1471)",
+    "api/events/[id]/recap.js": "a concluded edition's full lineup is public history (decision, #1471)",
+    "events/[slug]/recap.js": "a concluded edition's full lineup is public history (decision, #1471)",
     "utils/bandProfileResource.js": "admin-only profile deletion checks referential integrity",
     "utils/timeConflicts.js":
       "its SQL (checkConflicts, detectBulkConflicts) is reached only from admin routes; public importers take pure helpers",

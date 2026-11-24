@@ -735,6 +735,33 @@ export const MUTATIONS = [
     tests: ["functions/api/__tests__/reveal-gate-round2.test.js"],
   },
   {
+    id: "stats-public-band-total-reveal-gate",
+    invariant:
+      "CLAUDE.md 'Pulling a band from a live lineup' — the public bands total counts only public, revealed sets, so booking a secret act moves no number (#1471)",
+    file: "functions/api/stats/public.js",
+    find: 'bp.is_active = 1 AND ${publicRevealedPerformanceExistsSql("bp", "id", "band_profile_id")}',
+    replace: "bp.is_active = 1",
+    tests: ["functions/api/__tests__/reveal-gate-round2.test.js", "functions/api/stats/__tests__/public.test.js"],
+  },
+  {
+    id: "stats-public-venue-total-reveal-gate",
+    invariant:
+      "CLAUDE.md 'Pulling a band from a live lineup' — the public venues total counts only public, revealed sets, so booking a secret act moves no number (#1471)",
+    file: "functions/api/stats/public.js",
+    find: 'FROM venues v WHERE ${publicRevealedPerformanceExistsSql("v", "id", "venue_id")}',
+    replace: "FROM venues v WHERE 1 = 1",
+    tests: ["functions/api/__tests__/reveal-gate-round2.test.js", "functions/api/stats/__tests__/public.test.js"],
+  },
+  {
+    id: "stats-public-performance-total-reveal-gate",
+    invariant:
+      "CLAUDE.md 'Pulling a band from a live lineup' — the public performances total counts only public, revealed sets, so booking a secret act moves no number (#1471)",
+    file: "functions/api/stats/public.js",
+    find: 'WHERE ${publicEventStatusSql("e")} AND ${revealedPerformanceSql("e", "p")}',
+    replace: 'WHERE ${publicEventStatusSql("e")} AND 1 = 1',
+    tests: ["functions/api/__tests__/reveal-gate-round2.test.js", "functions/api/stats/__tests__/public.test.js"],
+  },
+  {
     id: "public-events-count-reveal-gate",
     invariant: "CLAUDE.md 'Pulling a band from a live lineup' — public event counts exclude unannounced performances",
     file: "functions/api/events/public.js",

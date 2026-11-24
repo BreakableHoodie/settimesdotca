@@ -31,6 +31,9 @@ function setup() {
   db.prepare("UPDATE events SET reveal_mode = 1 WHERE id = ?").run(reveal.id);
   const v = insertVenue(db, { name: "Rock & <Roll> Hall" });
   const hiddenVenue = insertVenue(db, { name: "Draft Venue" });
+  // The <script> payload is the test: it proves link text is escaped. The ids are
+  // fixture rows, not external input.
+  // nosemgrep: unknown-value-with-script-tag
   const bad = insertBand(db, { name: "Evil <script>alert(1)</script> & Co", event_id: archived.id, venue_id: v.id });
   const plain = insertBand(db, { name: "Plain Band", event_id: archived.id, venue_id: v.id });
   const draftBand = insertBand(db, { name: "Draft Band", event_id: draft.id, venue_id: hiddenVenue.id });

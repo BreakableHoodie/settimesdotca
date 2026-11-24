@@ -254,11 +254,14 @@ describe("round 2 public reveal gates", () => {
     expect((await genreResponse.json()).events).toEqual([]);
   });
 
-  it("L1 excludes hidden-only bands from top_bands without changing aggregate counts", async () => {
+  it("L1 excludes hidden-only bands from top_bands and from every aggregate count (#1471)", async () => {
     const { env, rawDb } = seedEnv();
     const event = seedPublishedRevealEvent(rawDb, "Stats Reveal", "stats-reveal-top");
     const venue = insertVenue(rawDb, { name: "Stats Venue" });
-    const hidden = insertBand(rawDb, { name: "Hidden Top Band", event_id: event.id, venue_id: venue.id });
+    // The hidden act plays a venue nothing else uses, so that venue exists only
+    // through an unannounced set and must not count either.
+    const secretVenue = insertVenue(rawDb, { name: "Secret Venue" });
+    const hidden = insertBand(rawDb, { name: "Hidden Top Band", event_id: event.id, venue_id: secretVenue.id });
     const visible = insertBand(rawDb, { name: "Visible Top Band", event_id: event.id, venue_id: venue.id });
     hidePerformance(rawDb, hidden.id);
     rawDb.prepare("UPDATE band_profiles SET popularity_score = 999 WHERE id = ?").run(hidden.band_profile_id);
@@ -270,7 +273,9 @@ describe("round 2 public reveal gates", () => {
     });
     const body = await response.json();
     expect(body.top_bands.map((band) => band.name)).toEqual(["Visible Top Band"]);
-    expect(body.bands).toBe(2);
-    expect(body.performances).toBe(2);
+    // Booking a secret act must move no public number.
+    expect(body.bands).toBe(1);
+    expect(body.venues).toBe(1);
+    expect(body.performances).toBe(1);
   });
 });

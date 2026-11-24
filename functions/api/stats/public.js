@@ -10,11 +10,17 @@
 //   - share_links/event_share_totals: aggregate counts and separate SUMs of
 //     views — never slug/band_names/performance_ids or visitor keys.
 //   - No IPs, emails, session IDs, tokens, or raw rows anywhere in the response.
-// Bands/venues/events are public data, so their names/counts are fine.
+// Bands/venues/events are public data, so their names/counts are fine, but
+// only what a fan can see: the band, venue and performance totals count
+// public, revealed sets, so booking a secret act moves no number (#1471).
 
 import { getPublicDataGateResponse } from "../../utils/publicGate.js";
 import { CACHE_BROWSE } from "../../utils/cacheHeaders.js";
-import { publicEventStatusSql, publicRevealedPerformanceExistsSql } from "../../utils/eventVisibility.js";
+import {
+  publicEventStatusSql,
+  publicRevealedPerformanceExistsSql,
+  revealedPerformanceSql,
+} from "../../utils/eventVisibility.js";
 
 const TOP_BANDS_LIMIT = 8;
 
@@ -45,14 +51,19 @@ export async function onRequestGet(context) {
   try {
     const [bandsRes, venuesRes, eventsRes, performancesRes, shareRes, shareTotalsRes, pageViewsRes, topBandsRes] =
       await DB.batch([
-        DB.prepare(`SELECT COUNT(*) AS count FROM band_profiles WHERE is_active = 1`),
-        DB.prepare(`SELECT COUNT(*) AS count FROM venues`),
+        DB.prepare(
+          `SELECT COUNT(*) AS count FROM band_profiles bp
+           WHERE bp.is_active = 1 AND ${publicRevealedPerformanceExistsSql("bp", "id", "band_profile_id")}`,
+        ),
+        DB.prepare(
+          `SELECT COUNT(*) AS count FROM venues v WHERE ${publicRevealedPerformanceExistsSql("v", "id", "venue_id")}`,
+        ),
         DB.prepare(`SELECT COUNT(*) AS count FROM events WHERE ${publicEventStatusSql()}`),
         DB.prepare(
           `SELECT COUNT(*) AS count
            FROM performances p
            JOIN events e ON e.id = p.event_id
-           WHERE ${publicEventStatusSql("e")}`,
+           WHERE ${publicEventStatusSql("e")} AND ${revealedPerformanceSql("e", "p")}`,
         ),
         // Keep the two share-view units separate: unique visitors versus
         // pre-cutover, undeduplicated raw fetches.

@@ -59,7 +59,9 @@ describe("Public aggregate stats - GET /api/stats/public", () => {
 
     expect(body.venues).toBe(2);
     expect(body.events).toBe(1); // only the published event
-    expect(body.bands).toBe(3); // Band A, B, C — Retired Band excluded (is_active = 0)
+    // Band A and B. Band C is only on the draft event and Retired Band is inactive;
+    // both are absent from /artists, so neither counts (#1471).
+    expect(body.bands).toBe(2);
     expect(body.performances).toBe(2); // only performances on the published event
     expect(body.routes_shared).toBe(2);
     expect(body.route_views).toBe(15);

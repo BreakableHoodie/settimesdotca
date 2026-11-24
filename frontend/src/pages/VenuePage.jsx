@@ -29,6 +29,8 @@ function VenuePerformerCard({ perf, venueName, currentTime }) {
   const [band] = prepareBands([
     {
       id: perf.band_id,
+      // band_id is bp.id (api/venues/[id].js): BandCard links by band_profile_id.
+      band_profile_id: perf.band_id,
       name: perf.band_name,
       // Feeds BandCard's aria-label (`${name} at ${venue}`) --
       // showVenue={false} below only hides the *visible* venue line, not this.

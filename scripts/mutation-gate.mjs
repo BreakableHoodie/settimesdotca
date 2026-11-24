@@ -98,10 +98,36 @@ export const MUTATIONS = [
   {
     id: "jsonld-after-midnight-end-is-next-calendar-day",
     invariant:
-      "CLAUDE.md 'After-midnight band sorting' — an end before 06:00 or before its start is on the next calendar day",
+      "CLAUDE.md 'After-midnight band sorting' — an end that wraps past midnight is on the next calendar day (23:50-00:20)",
     file: "functions/event/[slug].js",
-    find: "      return { date: afterMidnight ? nextCalendarDay(night) : night, time };",
-    replace: "      return { date: night, time };",
+    find: "        ? end < start\n          ? nextCalendarDay(startDate)\n          : startDate",
+    replace: "        ? end < start\n          ? startDate\n          : startDate",
+    tests: ["functions/event/__tests__/slug.test.js"],
+  },
+  {
+    id: "jsonld-pre-0600-start-is-next-morning",
+    invariant:
+      "CLAUDE.md 'After-midnight band sorting' — a festival-night time before 06:00 falls on the next calendar morning (05:00-07:00 ends the next day)",
+    file: "functions/event/[slug].js",
+    find: "  return Number(time.slice(0, 2)) < AFTER_MIDNIGHT_THRESHOLD_HOUR ? nextCalendarDay(night) : night;",
+    replace: "  return night;",
+    tests: ["functions/event/__tests__/slug.test.js"],
+  },
+  {
+    id: "jsonld-unknown-final-end-omits-enddate",
+    invariant:
+      "CLAUDE.md 'After-midnight band sorting' — an unknown end on the latest-starting set means no endDate, never an earlier set's end",
+    file: "functions/event/[slug].js",
+    find: "  if (lastStart && (!lastStartEnd || lastStart > latestEnd.key)) return null;",
+    replace: "  if (false) return null;",
+    tests: ["functions/event/__tests__/slug.test.js"],
+  },
+  {
+    id: "jsonld-first-night-ignores-later-nights",
+    invariant: "CLAUDE.md 'After-midnight band sorting' — the event's start is chosen from first-night sets only",
+    file: "functions/event/[slug].js",
+    find: "(row) => (row.performance_date || event.date) === event.date",
+    replace: "(row) => true",
     tests: ["functions/event/__tests__/slug.test.js"],
   },
   {

@@ -117,5 +117,8 @@ describe("SSR /venue/[id] — venue city threading (#840)", () => {
 
     const openResponse = await onRequest(makeContext({ env, id: openVenue.id }));
     expect(openResponse.status).toBe(200);
+    // The error fallback (ASSETS.fetch) is also a 200, so the status alone cannot
+    // tell "rendered" from "the lookup threw": the venue's name must be in the page.
+    expect(await openResponse.text()).toContain("Open SSR Venue");
   });
 });

@@ -782,8 +782,8 @@ export const MUTATIONS = [
     id: "public-stats-top-bands-reveal-gate",
     invariant: "CLAUDE.md 'Pulling a band from a live lineup' — public top bands exclude unannounced-only artists",
     file: "functions/api/stats/public.js",
-    find: 'AND ${publicRevealedPerformanceExistsSql("bp", "id", "band_profile_id")}',
-    replace: "AND 1 = 1",
+    find: '            WHERE bp.is_active = 1\n              AND ${publicRevealedPerformanceExistsSql("bp", "id", "band_profile_id")}',
+    replace: "            WHERE bp.is_active = 1\n              AND 1 = 1",
     tests: ["functions/api/__tests__/reveal-gate-round2.test.js"],
   },
   {

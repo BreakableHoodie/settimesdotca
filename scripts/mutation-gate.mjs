@@ -990,8 +990,8 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'SSR owns identity meta and JSON-LD' — a presenter URL is included only when the presenter exists and the URL sanitizes",
     file: "functions/event/[slug].js",
-    find: "...(safePresentedByUrl ? { url: safePresentedByUrl } : {}),",
-    replace: "url: safePresentedByUrl,",
+    find: "...(safePresentedByUrl || isSetTimesOrganizer ? { url: safePresentedByUrl || CANONICAL_HOST } : {}),",
+    replace: "url: safePresentedByUrl || (isSetTimesOrganizer ? CANONICAL_HOST : null),",
     tests: ["functions/event/__tests__/slug.presenter-age.test.js"],
   },
   {

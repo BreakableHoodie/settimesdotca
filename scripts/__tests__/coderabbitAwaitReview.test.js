@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
+import { execFileSync } from "node:child_process";
 import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -12,12 +13,14 @@ import {
   UNKNOWN_SETTLE_MS,
   CONFIRM_SETTLE_MS,
   awaitReview,
+  classifyReply,
   classifyStatus,
   confirmsCleanReview,
   countBodyFindings,
   ghDeps,
   limitCommentApplies,
   parseCooldownMs,
+  samePatchIn,
   remainingCooldownMs,
 } from "../coderabbit-await-review.mjs";
 
@@ -57,12 +60,18 @@ function fakeDeps({
   // After the default comment: unless a test says otherwise, the stock
   // rate-limit comment is about an EARLIER push (#1401).
   committedAt = 1000,
+  // #1470: CodeRabbit's newest comment ({kind, at}), the commit its newest
+  // review covers, and whether two commits share a tree.
+  reply = null,
+  lastReviewedSha = null,
+  sameTree = () => false,
+  samePatch = () => false,
 }) {
   let t = 0;
   let si = 0;
   let hi = 0;
   let last;
-  const calls = { requests: 0, sleeps: [], statusShas: [], findingShas: [], logs: [] };
+  const calls = { requests: 0, bodies: [], sleeps: [], statusShas: [], findingShas: [], logs: [] };
   return {
     calls,
     getPr: () => {
@@ -85,8 +94,13 @@ function fakeDeps({
       if (findings) return findings(sha);
       return { confirmed: last != null, outsideDiff: 0, nitpicks: 0, duplicates: 0, other: 0, url: null };
     },
-    requestReview: () => {
+    getLatestReply: () => (typeof reply === "function" ? reply() : reply),
+    getLastReviewedSha: () => lastReviewedSha,
+    sameTree: (a, b) => sameTree(a, b),
+    samePatch: (a, b) => samePatch(a, b),
+    requestReview: (full = false) => {
       calls.requests += 1;
+      calls.bodies.push(full ? "full" : "plain");
     },
     sleep: async (ms) => {
       calls.sleeps.push(ms);
@@ -767,6 +781,217 @@ describe("awaitReview: an absent review object needs confirmation", () => {
 // review). The fakeDeps tests above replace this dep wholesale, so its head
 // and author filters, ghList's page joining, and the no-review-object path
 // would otherwise run only against live GitHub.
+// #1470: two CodeRabbit replies made the waiter loop until its budget ran out.
+describe("classifyReply", () => {
+  it("reads 'Already reviewed the last commit' (#1445's text)", () => {
+    expect(
+      classifyReply(
+        "Action not completed Already reviewed the last commit. Use `@coderabbitai full review` to rerun a review of the entire changeset.",
+      ),
+    ).toBe("already_reviewed");
+  });
+
+  it("reads a bot-authored skip, and not a skip for any other reason", () => {
+    expect(
+      classifyReply("Review skipped. This PR was authored by a bot without an assigned CodeRabbit review seat."),
+    ).toBe("bot_skipped");
+    expect(classifyReply("Review skipped: all files are excluded by path filters.")).toBe("other");
+  });
+});
+
+describe("awaitReview: replies that end the wait (#1470)", () => {
+  const OLD = "oldoldold1";
+  const HEAD = "aaaaaaaa1";
+  // Comment times are ms-parsable ISO strings; the fake clock starts at 0 and
+  // the fake commit time is 1000, so these are comfortably "after the commit".
+  const AFTER = new Date(5_000_000).toISOString();
+  const BEFORE_COMMIT = new Date(500).toISOString();
+  const noStatus = { statuses: [null] };
+
+  it("treats the head as reviewed when the last reviewed commit has the same tree, with no extra request", async () => {
+    const seen = [];
+    const d = fakeDeps({
+      ...noStatus,
+      reply: { kind: "already_reviewed", at: AFTER },
+      lastReviewedSha: OLD,
+      sameTree: (a, b) => (seen.push([a, b]), true),
+      findings: (sha) => ({
+        confirmed: sha === OLD,
+        outsideDiff: 0,
+        nitpicks: 0,
+        duplicates: 0,
+        other: 0,
+        url: null,
+      }),
+    });
+    expect(await awaitReview(d, { pollMs: 1000 })).toBe(0);
+    expect(d.calls.requests).toBe(0);
+    expect(seen).toEqual([[OLD, HEAD]]);
+    // Judged on the covering review, not the (unreviewed) head.
+    expect(d.calls.findingShas).toContain(OLD);
+  });
+
+  it("still applies the body-findings check to the covering review (exit 5)", async () => {
+    const d = fakeDeps({
+      ...noStatus,
+      reply: { kind: "already_reviewed", at: AFTER },
+      lastReviewedSha: OLD,
+      sameTree: () => true,
+      findings: (sha) => ({
+        confirmed: sha === OLD,
+        outsideDiff: sha === OLD ? 2 : 0,
+        nitpicks: 0,
+        duplicates: 0,
+        other: 0,
+        url: null,
+      }),
+    });
+    expect(await awaitReview(d, { pollMs: 1000 })).toBe(5);
+  });
+
+  it("posts exactly one '@coderabbitai full review' when the trees differ, then keeps waiting", async () => {
+    const d = fakeDeps({
+      // The reply keeps being the newest comment across several polls; the
+      // full review must still be posted only once.
+      statuses: [null, null, null, null, COMPLETED],
+      reply: { kind: "already_reviewed", at: AFTER },
+      lastReviewedSha: OLD,
+      sameTree: () => false,
+    });
+    expect(await awaitReview(d, { pollMs: 1000, noStatusGraceMs: 10 ** 12 })).toBe(0);
+    expect(d.calls.bodies).toEqual(["full"]);
+  });
+
+  it("treats the head as reviewed when the trees differ but the patch is the same (rebase onto a moved main)", async () => {
+    const d = fakeDeps({
+      ...noStatus,
+      reply: { kind: "already_reviewed", at: AFTER },
+      lastReviewedSha: OLD,
+      sameTree: () => false,
+      samePatch: (a, b) => a === OLD && b === HEAD,
+      findings: (sha) => ({ confirmed: sha === OLD, outsideDiff: 0, nitpicks: 0, duplicates: 0, other: 0, url: null }),
+    });
+    expect(await awaitReview(d, { pollMs: 1000 })).toBe(0);
+    expect(d.calls.requests).toBe(0);
+  });
+
+  it("posts one full review when both the trees and the patches differ", async () => {
+    const d = fakeDeps({
+      statuses: [null, null, COMPLETED],
+      reply: { kind: "already_reviewed", at: AFTER },
+      lastReviewedSha: OLD,
+      sameTree: () => false,
+      samePatch: () => false,
+    });
+    expect(await awaitReview(d, { pollMs: 1000, noStatusGraceMs: 10 ** 12 })).toBe(0);
+    expect(d.calls.bodies).toEqual(["full"]);
+  });
+
+  it("falls back to a full review when no reviewed commit is known", async () => {
+    const d = fakeDeps({
+      statuses: [null, COMPLETED],
+      reply: { kind: "already_reviewed", at: AFTER },
+      lastReviewedSha: null,
+    });
+    expect(await awaitReview(d, { pollMs: 1000, noStatusGraceMs: 10 ** 12 })).toBe(0);
+    expect(d.calls.bodies).toEqual(["full"]);
+  });
+
+  it("ignores an 'Already reviewed' reply older than our own latest request", async () => {
+    // No reply until we have asked once; the one that then shows is stamped
+    // BEFORE that request (1.5 s; the grace-period request lands at t >= 2 s),
+    // so it answers an earlier request and says nothing about this one.
+    const holder = {};
+    const sameTreeCalls = [];
+    holder.d = fakeDeps({
+      statuses: [null, null, null, null, COMPLETED],
+      reply: () =>
+        holder.d.calls.requests > 0 ? { kind: "already_reviewed", at: new Date(1_500).toISOString() } : null,
+      committedAt: 1000,
+      lastReviewedSha: OLD,
+      sameTree: (a, b) => (sameTreeCalls.push([a, b]), true),
+    });
+    expect(await awaitReview(holder.d, { pollMs: 1000, noStatusGraceMs: 1500 })).toBe(0);
+    expect(holder.d.calls.bodies).toEqual(["plain"]);
+    expect(sameTreeCalls).toEqual([]);
+    expect(holder.d.calls.findingShas).not.toContain(OLD);
+  });
+
+  it("a bot-authored skip is terminal: exit 6, no review requested", async () => {
+    const d = fakeDeps({ ...noStatus, reply: { kind: "bot_skipped", at: AFTER } });
+    expect(await awaitReview(d, { pollMs: 1000 })).toBe(6);
+    expect(d.calls.requests).toBe(0);
+    expect(d.calls.logs.join("\n")).toMatch(/authored by a bot/);
+  });
+
+  it("a bot skip older than the head commit is stale and ignored", async () => {
+    const d = fakeDeps({
+      statuses: [null, COMPLETED],
+      reply: { kind: "bot_skipped", at: BEFORE_COMMIT },
+    });
+    expect(await awaitReview(d, { pollMs: 1000, noStatusGraceMs: 10 ** 12 })).toBe(0);
+  });
+
+  it("a skip for any other reason does not trigger exit 6", async () => {
+    const d = fakeDeps({
+      statuses: [null, COMPLETED],
+      reply: { kind: classifyReply("Review skipped: every file is path-filtered."), at: AFTER },
+    });
+    expect(await awaitReview(d, { pollMs: 1000, noStatusGraceMs: 10 ** 12 })).toBe(0);
+  });
+});
+
+describe("samePatchIn against a real git repository (#1470)", () => {
+  let repo;
+  const g = (...args) => execFileSync("git", args, { cwd: repo, encoding: "utf8" }).trim();
+  const commitFile = (file, text, msg) => {
+    writeFileSync(join(repo, file), text);
+    g("add", file);
+    g("-c", "user.name=t", "-c", "user.email=t@example.test", "commit", "-q", "-m", msg);
+    return g("rev-parse", "HEAD");
+  };
+  let oldPr;
+  let rebased;
+  let different;
+
+  beforeEach(() => {
+    repo = mkdtempSync(join(tmpdir(), "await-review-git-"));
+    g("init", "-q", "-b", "main");
+    commitFile("base.txt", "one\ntwo\nthree\n", "base");
+    g("checkout", "-q", "-b", "pr");
+    oldPr = commitFile("feature.txt", "feature X\n", "X");
+    oldPr = commitFile("second.txt", "second\n", "X2");
+    // A different change on the same base.
+    g("checkout", "-q", "-b", "other", "main");
+    different = commitFile("feature.txt", "feature Y\n", "Y");
+    // Same LAST commit as the PR, so only the whole range tells them apart.
+    different = commitFile("second.txt", "second\n", "X2");
+    // main moves on with an unrelated commit; X is rebased onto it.
+    g("checkout", "-q", "main");
+    commitFile("unrelated.txt", "moved\n", "main moves");
+    g("update-ref", "refs/remotes/origin/main", g("rev-parse", "main"));
+    g("checkout", "-q", "pr");
+    g("-c", "user.name=t", "-c", "user.email=t@example.test", "rebase", "-q", "main");
+    rebased = g("rev-parse", "HEAD");
+  });
+
+  afterEach(() => rmSync(repo, { recursive: true, force: true }));
+
+  it("sees a rebase onto a moved main as the same patch, though the trees differ", () => {
+    expect(g("rev-parse", `${oldPr}^{tree}`)).not.toBe(g("rev-parse", `${rebased}^{tree}`));
+    expect(rebased).not.toBe(oldPr);
+    expect(samePatchIn(oldPr, rebased, repo)).toBe(true);
+  });
+
+  it("sees a different change as a different patch", () => {
+    expect(samePatchIn(oldPr, different, repo)).toBe(false);
+  });
+
+  it("reads an unknown commit as different, never the same", () => {
+    expect(samePatchIn("f".repeat(40), "f".repeat(40), repo)).toBe(false);
+  });
+});
+
 describe("ghDeps.getHeadReviewFindings against a stubbed gh", () => {
   const HEAD_SHA = "3e7522c8c7de4bf0b12b35e682ed03f9cc89ef55";
   const OLD_SHA = "2e95c3336de5f2611d6702264c6c29cc0e590226";
@@ -870,6 +1095,24 @@ process.stdout.write(JSON.stringify([fixtures[args[1]] ?? []]));
     writeFileSync(join(dir, "gh"), "#!/usr/bin/env node\nprocess.exit(1)\n");
     chmodSync(join(dir, "gh"), 0o755);
     expect(ghDeps(7).headCommittedAt("f".repeat(40))).toBe(Infinity);
+  });
+
+  it("reads the newest CodeRabbit comment by creation time, and the last review's commit (#1470)", () => {
+    stubGh({
+      "repos/{owner}/{repo}/issues/7/comments": [
+        // The summary is edited in place: old created_at, newest updated_at.
+        { user: BOT, body: "summary", created_at: "2026-11-24T10:00:00Z", updated_at: "2026-11-24T12:00:00Z" },
+        { user: BOT, body: "Already reviewed the last commit.", created_at: "2026-11-24T11:00:00Z" },
+        { user: { login: "human" }, body: "Review skipped authored by a bot", created_at: "2026-11-24T11:30:00Z" },
+      ],
+      "repos/{owner}/{repo}/pulls/7/reviews": [
+        { user: BOT, commit_id: OLD_SHA, submitted_at: "2026-11-24T09:00:00Z" },
+        { user: BOT, commit_id: HEAD_SHA, submitted_at: "2026-11-24T10:00:00Z" },
+        { user: { login: "human" }, commit_id: "f".repeat(40), submitted_at: "2026-11-24T11:00:00Z" },
+      ],
+    });
+    expect(ghDeps(7).getLatestReply()).toEqual({ kind: "already_reviewed", at: "2026-11-24T11:00:00Z" });
+    expect(ghDeps(7).getLastReviewedSha()).toBe(HEAD_SHA);
   });
 
   it("finds a rate limit only among CodeRabbit's statuses on the requested head", () => {

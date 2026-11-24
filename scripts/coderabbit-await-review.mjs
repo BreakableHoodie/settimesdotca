@@ -50,6 +50,19 @@
  *   5  the head IS reviewed, but its review body carries findings no thread
  *      shows: outside-diff, nitpick, duplicate, or an unrecognised section.
  *      Address them, or pass --allow-findings having decided not to
+ *   6  CodeRabbit CANNOT review this PR: it replied "Review skipped" because the
+ *      PR was authored by a bot with no review seat (Dependabot, #1470). No
+ *      amount of waiting changes that; the merger decides deliberately, e.g.
+ *      with a local `make review`
+ *
+ * Two replies end a wait early (#1470). "Already reviewed the last commit"
+ * after a content-identical rebase: if the commit CodeRabbit last reviewed has
+ * the head's tree or patch, the head counts as reviewed and is judged on THAT review's
+ * body; otherwise one `@coderabbitai full review` is posted. "Same" means the
+ * same tree or the same patch (`git patch-id --stable` against the merge-base
+ * with origin/main), so a rebase onto a MOVED main does not spend a review. The reply must be
+ * the newest CodeRabbit comment and newer than our latest request (or, with no
+ * request yet, than the head commit).
  */
 import { execFileSync } from "node:child_process";
 
@@ -195,6 +208,61 @@ export function confirmsCleanReview(body, head) {
   return [...text.matchAll(/\band\s+([0-9a-f]{40})\b/gi)].some(([, sha]) => sha.toLowerCase() === head.toLowerCase());
 }
 
+/**
+ * Classify a CodeRabbit comment that answers a review request (#1470):
+ *   "already_reviewed"  "Already reviewed the last commit" (content-identical rebase)
+ *   "bot_skipped"       "Review skipped" because the PR author is a bot with no seat
+ *   "other"             anything else, including a skip for some other reason
+ */
+export function classifyReply(body) {
+  const text = String(body || "");
+  if (/already reviewed the last commit/i.test(text)) return "already_reviewed";
+  if (/review skipped/i.test(text) && /authored by a bot/i.test(text)) return "bot_skipped";
+  return "other";
+}
+
+function git(args, cwd, input) {
+  return execFileSync("git", args, {
+    encoding: "utf8",
+    cwd,
+    input,
+    maxBuffer: 256 * 1024 * 1024,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+}
+
+/**
+ * The stable patch-id of what `sha` changes relative to its merge-base with
+ * origin/main (#1470), or null when it cannot be computed. Two commits with the
+ * same patch-id carry the same PR changes, even if one sits on a main that has
+ * since moved. Missing objects are fetched once; no shell is involved.
+ */
+export function patchIdOf(sha, cwd) {
+  const compute = () => {
+    const base = git(["merge-base", "origin/main", sha], cwd).trim();
+    const diff = git(["diff", "--no-color", base, sha], cwd);
+    // An empty diff has no patch-id; it must never read as "same" as another.
+    const id = git(["patch-id", "--stable"], cwd, diff).trim().split(/\s+/)[0];
+    return id || null;
+  };
+  try {
+    return compute();
+  } catch {
+    try {
+      git(["fetch", "--quiet", "origin", "main", sha], cwd);
+      return compute();
+    } catch {
+      return null;
+    }
+  }
+}
+
+/** Same PR changes in both commits? Any failure reads as "different". */
+export function samePatchIn(a, b, cwd) {
+  const pa = patchIdOf(a, cwd);
+  return pa !== null && pa === patchIdOf(b, cwd);
+}
+
 function gh(args) {
   return execFileSync("gh", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 }
@@ -282,8 +350,52 @@ export function ghDeps(pr) {
       }
       return total;
     },
-    requestReview() {
-      gh(["pr", "comment", String(pr), "--body", "@coderabbitai review"]);
+    getLatestReply() {
+      // The newest CodeRabbit comment by CREATION time: its summary comment is
+      // edited in place, so updated_at would make that one always newest.
+      const last = ghList(`repos/{owner}/{repo}/issues/${pr}/comments`)
+        .filter((c) => c.user?.login === "coderabbitai[bot]")
+        .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at))
+        .at(-1);
+      return last ? { kind: classifyReply(last.body), at: last.created_at } : null;
+    },
+    getLastReviewedSha() {
+      // The commit of CodeRabbit's newest review object, or null when it has
+      // posted none (a clean incremental review posts only a summary).
+      const last = ghList(`repos/{owner}/{repo}/pulls/${pr}/reviews`)
+        .filter((r) => r.user?.login === "coderabbitai[bot]" && r.commit_id)
+        .sort((a, b) => Date.parse(a.submitted_at) - Date.parse(b.submitted_at))
+        .at(-1);
+      return last ? last.commit_id : null;
+    },
+    sameTree(a, b) {
+      // A content-identical rebase has a new SHA and the same tree. A tree we
+      // cannot obtain reads as different: that falls back to a full review.
+      const tree = (sha) => {
+        const read = () =>
+          execFileSync("git", ["rev-parse", `${sha}^{tree}`], {
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "pipe"],
+          }).trim();
+        try {
+          return read();
+        } catch {
+          try {
+            execFileSync("git", ["fetch", "--quiet", "origin", sha], { stdio: ["ignore", "pipe", "pipe"] });
+            return read();
+          } catch {
+            return null;
+          }
+        }
+      };
+      const ta = tree(a);
+      return ta !== null && ta === tree(b);
+    },
+    samePatch(a, b) {
+      return samePatchIn(a, b);
+    },
+    requestReview(full = false) {
+      gh(["pr", "comment", String(pr), "--body", full ? "@coderabbitai full review" : "@coderabbitai review"]);
     },
     sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
     now: () => Date.now(),
@@ -352,6 +464,9 @@ export async function awaitReview(deps, opts = {}) {
   let pausedRequestPosted = false;
   let unconfirmedSince = null;
   let lastRequestAt = null;
+  let fullReviewPosted = false;
+  // The commit whose review covers the head via an identical tree (#1470).
+  let coveredBy = null;
   // Every piece of PER-HEAD state resets here and only here. The three
   // head-change paths each once reset it by hand, and one forgot the skip
   // timer (#1200 review), letting an old head's skip time shorten the new
@@ -368,12 +483,14 @@ export async function awaitReview(deps, opts = {}) {
     pausedRequestPosted = false;
     unconfirmedSince = null;
     lastRequestAt = null;
+    fullReviewPosted = false;
+    coveredBy = null;
   };
   // Every review request goes through here, so a limit comment can be judged
   // against the latest one (#1401).
-  const requestReview = () => {
+  const requestReview = (full = false) => {
     lastRequestAt = deps.now();
-    deps.requestReview();
+    deps.requestReview(full);
   };
   let lastReported = "";
 
@@ -441,6 +558,44 @@ export async function awaitReview(deps, opts = {}) {
       const c = deps.getLatestRateLimitComment();
       if (c && limitCommentApplies(c.at, deps.headCommittedAt(head), lastRequestAt)) state = "rate_limited";
     }
+    if (state === "none" || state === "skipped") {
+      // #1470: CodeRabbit's replies to a request can end the wait early. Only
+      // the newest CodeRabbit comment counts, and only one newer than the head
+      // commit and than our own latest request.
+      const reply = deps.getLatestReply();
+      if (reply && limitCommentApplies(reply.at, deps.headCommittedAt(head), lastRequestAt)) {
+        if (reply.kind === "bot_skipped") {
+          deps.log(
+            `CodeRabbit cannot review head ${head.slice(0, 8)}: the PR was authored by a bot with no review seat, ` +
+              "so no review will ever come. Decide deliberately (e.g. `make review` locally) before merging.",
+          );
+          return 6;
+        }
+        if (reply.kind === "already_reviewed" && state === "none") {
+          const reviewed = deps.getLastReviewedSha();
+          if (reviewed && (deps.sameTree(reviewed, head) || deps.samePatch(reviewed, head))) {
+            // A content-identical rebase (same tree, or the same patch even
+            // onto a moved main): CodeRabbit's review of the old SHA covers this head. Judge that review's body, not the head's.
+            coveredBy = reviewed;
+            state = "reviewed";
+          } else if (!fullReviewPosted && requests < maxRequests && !once) {
+            const gone = refreshPr();
+            if (gone !== null) return gone;
+            if (pr.head !== head) {
+              switchHead(pr.head);
+              return undefined;
+            }
+            fullReviewPosted = true;
+            requests += 1;
+            requestReview(true);
+            deps.log(
+              `CodeRabbit says it already reviewed the last commit, but the tree changed; posted @coderabbitai full review (${requests}/${maxRequests}).`,
+            );
+            headSeenAt = deps.now();
+          }
+        }
+      }
+    }
     // What the head's status said, for messages; a review can now stand without one.
     const said = status ? `reads "${status.description}"` : "has no CodeRabbit status";
     const short = head.slice(0, 8);
@@ -464,7 +619,7 @@ export async function awaitReview(deps, opts = {}) {
       }
       // Read after the status: on #1364 CodeRabbit's summary comment landed 3 s
       // BEFORE "Review completed", so the review exists by the time it reads so.
-      const f = deps.getHeadReviewFindings(head);
+      const f = deps.getHeadReviewFindings(coveredBy ?? head);
       if (!f.confirmed) {
         // Reviewed by status, but nothing yet shows WHAT the review found.
         if (once) {

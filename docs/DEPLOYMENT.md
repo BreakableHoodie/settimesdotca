@@ -12,7 +12,7 @@ There is no supported `dev` branch or `dev.settimes.ca` environment. Do not conf
 
 ## Prerequisites
 
-- Node.js 22.12+ (or a version allowed by `package.json`)
+- Node.js 22.13+ (or a version allowed by `package.json`)
 - Cloudflare access to the Pages project and D1 database
 - GitHub access to merge to `main`
 - Wrangler, installed through the frontend dependencies

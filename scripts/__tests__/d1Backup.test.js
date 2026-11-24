@@ -45,6 +45,10 @@ const PRIVATE_EMAIL = "login-attempt-marker@example.test";
 const SEED = `
   INSERT INTO events (id, name, date, slug) VALUES (1, 'Backup Fest', '2026-02-14', 'backup-fest');
   INSERT INTO venues (id, name) VALUES (1, 'Backup Hall');
+  INSERT INTO users (id, email, password_hash, role, activation_token, totp_secret, totp_enabled, totp_pending_secret, totp_pending_set_at)
+    VALUES (1, 'invitee@example.test', 'x', 'editor', 'activation-token-marker', NULL, 0, 'enc-v1:pending', 1),
+           (2, 'legacy@example.test', 'x', 'admin', NULL, 'LEGACYTOTPSECRETMARKER', 1, NULL, NULL),
+           (3, 'current@example.test', 'x', 'admin', NULL, 'enc-v1:kept', 1, NULL, NULL);
   INSERT INTO auth_attempts (email, ip_address, success, attempt_type) VALUES ('${PRIVATE_EMAIL}', '203.0.113.9', 0, 'login');
 `;
 
@@ -107,6 +111,65 @@ describe("buildBackup", () => {
     expect(readFileSync(out).includes(PRIVATE_EMAIL)).toBe(false);
   });
 
+  it("clears credentials inside backed-up users, keeping encrypted TOTP secrets", () => {
+    const out = join(dir, "backup.db");
+    buildBackup(exportWith(SEED), out);
+
+    const backup = new DatabaseSync(out, { readOnly: true });
+    const users = backup
+      .prepare(
+        "SELECT id, activation_token, totp_secret, totp_enabled, totp_pending_secret, totp_pending_set_at FROM users ORDER BY id",
+      )
+      .all();
+    backup.close();
+    expect(users).toEqual([
+      {
+        id: 1,
+        activation_token: null,
+        totp_secret: null,
+        totp_enabled: 0,
+        totp_pending_secret: null,
+        totp_pending_set_at: null,
+      },
+      {
+        id: 2,
+        activation_token: null,
+        totp_secret: null,
+        totp_enabled: 0,
+        totp_pending_secret: null,
+        totp_pending_set_at: null,
+      },
+      {
+        id: 3,
+        activation_token: null,
+        totp_secret: "enc-v1:kept",
+        totp_enabled: 1,
+        totp_pending_secret: null,
+        totp_pending_set_at: null,
+      },
+    ]);
+    const bytes = readFileSync(out);
+    expect(bytes.includes("activation-token-marker")).toBe(false);
+    expect(bytes.includes("LEGACYTOTPSECRETMARKER")).toBe(false);
+  });
+
+  it("drops D1's own tables, which a restore cannot create", () => {
+    const out = join(dir, "backup.db");
+    buildBackup(exportWith(`${SEED} CREATE TABLE _cf_KV (key TEXT PRIMARY KEY, value BLOB);`), out);
+    const backup = new DatabaseSync(out, { readOnly: true });
+    expect(
+      backup.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name LIKE '\\_cf\\_%' ESCAPE '\\'").get().n,
+    ).toBe(0);
+    backup.close();
+  });
+
+  it("never quotes export text in its error", () => {
+    const out = join(dir, "backup.db");
+    expect(() => buildBackup("INSERT INTO nowhere VALUES ('row-data-marker' oops);", out)).toThrow(
+      /^the export did not load \(SQLite [^)]*\)$/,
+    );
+  });
+
   it("refuses an export with a table nobody classified, writing nothing", () => {
     const out = join(dir, "backup.db");
     expect(() => buildBackup(exportWith(`${SEED} CREATE TABLE fan_emails (email TEXT);`), out)).toThrow(
@@ -127,5 +190,6 @@ describe("buildBackup", () => {
     expect(() => buildBackup(exportWith(`${SEED} DROP TABLE event_hourly_views;`), out)).toThrow(
       /missing backed-up table\(s\): event_hourly_views/,
     );
+    expect(existsSync(out)).toBe(false);
   });
 });

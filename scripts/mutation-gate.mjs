@@ -1999,6 +1999,15 @@ export const MUTATIONS = [
     tests: ["scripts/__tests__/d1Backup.test.js"],
   },
   {
+    id: "d1-backup-clears-credentials-in-kept-tables",
+    invariant:
+      "CLAUDE.md 'Retention windows are a published promise' — the offsite copy carries no redeemable activation token or unencrypted TOTP secret (#1479)",
+    file: "scripts/d1-backup.mjs",
+    find: "    for (const { sql } of SCRUB_UPDATES) db.exec(sql);",
+    replace: "    for (const { sql } of []) db.exec(sql);",
+    tests: ["scripts/__tests__/d1Backup.test.js"],
+  },
+  {
     id: "d1-backup-refuses-unclassified-table",
     invariant:
       "CLAUDE.md 'Retention windows are a published promise' — a table nobody classified fails the offsite backup (#1479)",

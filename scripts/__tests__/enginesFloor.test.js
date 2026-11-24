@@ -28,6 +28,8 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const VERSION_GATED_APIS = [
   { pattern: /\bimport\.meta\.dirname\b/, since: "20.11.0", name: "import.meta.dirname" },
   { pattern: /\bimport\.meta\.filename\b/, since: "20.11.0", name: "import.meta.filename" },
+  // Loads without --experimental-sqlite from 22.13 (scripts/d1-backup.mjs, #1479).
+  { pattern: /["']node:sqlite["']/, since: "22.13.0", name: "node:sqlite" },
 ];
 
 function trackedJsFiles() {

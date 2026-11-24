@@ -63,6 +63,28 @@ export const EXCLUDED_TABLES = Object.freeze({
   trusted_devices: "deleted at expiry",
 });
 
+/**
+ * Credentials inside backed-up tables, cleared in the copy. Each would let
+ * whoever holds a leaked copy act as someone (the #1334/#1354 reasoning), and
+ * none is needed to rebuild the site: an unactivated invitee asks for a new
+ * link, a half-finished authenticator move starts again, and an account whose
+ * TOTP secret predates encryption re-enrols (admins and editors are made to).
+ */
+export const SCRUB_UPDATES = Object.freeze([
+  {
+    why: "activation tokens are stored in plaintext and redeemable, some with no expiry",
+    sql: "UPDATE users SET activation_token = NULL, activation_token_expires_at = NULL WHERE activation_token IS NOT NULL OR activation_token_expires_at IS NOT NULL",
+  },
+  {
+    why: "a pending authenticator move lives 15 minutes",
+    sql: "UPDATE users SET totp_pending_secret = NULL, totp_pending_set_at = NULL WHERE totp_pending_secret IS NOT NULL OR totp_pending_set_at IS NOT NULL",
+  },
+  {
+    why: "a TOTP secret from before encryption (no enc-v1: prefix) is a usable second factor",
+    sql: "UPDATE users SET totp_secret = NULL, totp_enabled = 0, totp_last_step = NULL WHERE totp_secret IS NOT NULL AND totp_secret NOT LIKE 'enc-v1:%'",
+  },
+]);
+
 /** SQLite and D1 bookkeeping, kept as is. `d1_migrations` records the schema level. */
 export function isInternalTable(name) {
   return name === "d1_migrations" || name.startsWith("sqlite_") || name.startsWith("_cf_");
@@ -88,7 +110,14 @@ export function buildBackup(exportSql, outPath) {
   // then proves every reference resolves.
   const db = new DatabaseSync(":memory:", { enableForeignKeyConstraints: false });
   try {
-    db.exec(exportSql);
+    try {
+      db.exec(exportSql);
+    } catch (error) {
+      // SQLite quotes the text near a syntax error, which could be row data,
+      // and this message reaches a public workflow log. Report the code only.
+      // The CLI below prints `message` only, never `cause`.
+      throw new Error(`the export did not load (SQLite ${error.errcode ?? error.code ?? "error"})`, { cause: error });
+    }
 
     const integrity = db.prepare("PRAGMA integrity_check").all();
     if (integrity.length !== 1 || integrity[0].integrity_check !== "ok") {
@@ -117,6 +146,11 @@ export function buildBackup(exportSql, outPath) {
     for (const name of tables) {
       if (name in EXCLUDED_TABLES) db.exec(`DELETE FROM ${quoteIdent(name)}`);
     }
+    for (const { sql } of SCRUB_UPDATES) db.exec(sql);
+    // D1's own tables (_cf_KV) cannot be created by a restore; D1 makes them.
+    for (const name of tables) {
+      if (name.startsWith("_cf_")) db.exec(`DROP TABLE ${quoteIdent(name)}`);
+    }
 
     // A backed-up row pointing at an emptied table would restore broken.
     const danglingAfterScrub = db.prepare("PRAGMA foreign_key_check").all();
@@ -133,6 +167,13 @@ export function buildBackup(exportSql, outPath) {
         throw new Error(`excluded table ${name} still has ${counts[name]} row(s) after the scrub`);
       }
     }
+
+    const leftover = db
+      .prepare(
+        "SELECT COUNT(*) AS n FROM users WHERE activation_token IS NOT NULL OR totp_pending_secret IS NOT NULL OR (totp_secret IS NOT NULL AND totp_secret NOT LIKE 'enc-v1:%')",
+      )
+      .get().n;
+    if (leftover !== 0) throw new Error(`${leftover} user row(s) still hold a credential after the scrub`);
 
     // VACUUM INTO writes a fresh file from live pages only, so the deleted
     // rows cannot survive in free pages of the copy.

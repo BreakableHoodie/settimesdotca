@@ -55,6 +55,12 @@ function makeContext({ env, slug }) {
   };
 }
 
+function extractJsonLd(html) {
+  return [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((match) =>
+    JSON.parse(match[1]),
+  );
+}
+
 describe("SSR /events/[slug]/recap", () => {
   test("injects the recap's own canonical + og:url, and strips the homepage's", async () => {
     const { env, rawDb } = createTestEnv();
@@ -154,6 +160,28 @@ describe("SSR /events/[slug]/recap", () => {
     expect(html).toContain(
       '<meta property="og:image" content="https://band-photos.settimes.ca/event-posters/recap.jpg" />',
     );
+  });
+
+  test("emits an absolute three-item History to edition to recap BreadcrumbList", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    insertEvent(rawDb, {
+      name: "Breadcrumb Event",
+      slug: "breadcrumb-event",
+      date: "2026-08-02",
+      status: "archived",
+    });
+
+    const response = await onRequestGet(makeContext({ env, slug: "breadcrumb-event" }));
+    const breadcrumb = extractJsonLd(await response.text()).find((item) => item["@type"] === "BreadcrumbList");
+    expect(breadcrumb.itemListElement).toHaveLength(3);
+    expect(breadcrumb.itemListElement.map((item) => item.name)).toEqual(["History", "Breadcrumb Event", "Recap"]);
+    expect(breadcrumb.itemListElement.map((item) => item.item)).toEqual([
+      "https://settimes.ca/history",
+      "https://settimes.ca/event/breadcrumb-event",
+      "https://settimes.ca/events/breadcrumb-event/recap",
+    ]);
+    for (const item of breadcrumb.itemListElement) expect(item.item).toMatch(/^https:\/\//);
   });
 
   test("answers a noindex 404 (#1446) for an unknown slug", async () => {

@@ -86,6 +86,69 @@ export const REPO_ROOT = path.join(__dirname, "..");
 /** @type {Mutation[]} */
 export const MUTATIONS = [
   {
+    id: "jsonld-after-midnight-stays-on-festival-night",
+    invariant:
+      "CLAUDE.md 'After-midnight band sorting' — performance_date is the festival night; a 00:35 set stays in that night's subEvent",
+    file: "functions/event/[slug].js",
+    find: "  const day = row.performance_date || event.date;\n  return festivalDays.includes(day) ? day : event.date;",
+    replace:
+      "  const day = (startHour(row.start_time) ?? 9) < 6 ? festivalDays[0] : row.performance_date || event.date;\n  return festivalDays.includes(day) ? day : event.date;",
+    tests: ["functions/event/__tests__/slug.test.js"],
+  },
+  {
+    id: "jsonld-after-midnight-end-is-next-calendar-day",
+    invariant:
+      "CLAUDE.md 'After-midnight band sorting' — an end that wraps past midnight is on the next calendar day (23:50-00:20)",
+    file: "functions/event/[slug].js",
+    find: "        ? end < start\n          ? nextCalendarDay(startDate)\n          : startDate",
+    replace: "        ? end < start\n          ? startDate\n          : startDate",
+    tests: ["functions/event/__tests__/slug.test.js"],
+  },
+  {
+    id: "jsonld-pre-0600-start-is-next-morning",
+    invariant:
+      "CLAUDE.md 'After-midnight band sorting' — a festival-night time before 06:00 falls on the next calendar morning (05:00-07:00 ends the next day)",
+    file: "functions/event/[slug].js",
+    find: "  return Number(time.slice(0, 2)) < AFTER_MIDNIGHT_THRESHOLD_HOUR ? nextCalendarDay(night) : night;",
+    replace: "  return night;",
+    tests: ["functions/event/__tests__/slug.test.js"],
+  },
+  {
+    id: "jsonld-unknown-final-end-omits-enddate",
+    invariant:
+      "CLAUDE.md 'After-midnight band sorting' — an unknown end on the latest-starting set means no endDate, never an earlier set's end",
+    file: "functions/event/[slug].js",
+    find: "  if (lastStart && (!lastStartEndsKnown || lastStart > latestEnd.key)) return null;",
+    replace: "  if (false) return null;",
+    tests: ["functions/event/__tests__/slug.test.js"],
+  },
+  {
+    id: "jsonld-utc-offset-from-the-time",
+    invariant:
+      "CLAUDE.md 'After-midnight band sorting' — the UTC offset is the one at that wall-clock time, not the date's noon (spring-forward night)",
+    file: "functions/event/[slug].js",
+    find: "  return time ? `${date}T${time}:00${torontoUtcOffsetAt(date, time)}` : date;",
+    replace: '  return time ? `${date}T${time}:00${torontoUtcOffsetAt(date, "12:00")}` : date;',
+    tests: ["functions/event/__tests__/slug.test.js"],
+  },
+  {
+    id: "jsonld-tied-latest-starts-all-need-an-end",
+    invariant:
+      "CLAUDE.md 'After-midnight band sorting' — every set tied for the latest start needs a known end, independent of row order",
+    file: "functions/event/[slug].js",
+    find: "        lastStartEndsKnown = lastStartEndsKnown && Boolean(endKey);",
+    replace: "        lastStartEndsKnown = lastStartEndsKnown;",
+    tests: ["functions/event/__tests__/slug.test.js"],
+  },
+  {
+    id: "jsonld-first-night-ignores-later-nights",
+    invariant: "CLAUDE.md 'After-midnight band sorting' — the event's start is chosen from first-night sets only",
+    file: "functions/event/[slug].js",
+    find: "(row) => (row.performance_date || event.date) === event.date",
+    replace: "(row) => true",
+    tests: ["functions/event/__tests__/slug.test.js"],
+  },
+  {
     id: "catch-all-delegates-home",
     invariant:
       "CLAUDE.md 'SSR owns identity meta and JSON-LD' — the catch-all hands / to index.js, or the splat 404s the home page (#1446)",
@@ -971,9 +1034,30 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'SSR owns identity meta and JSON-LD' — a presenter URL is included only when the presenter exists and the URL sanitizes",
     file: "functions/event/[slug].js",
-    find: "...(safePresentedByUrl ? { url: safePresentedByUrl } : {}),",
-    replace: "url: safePresentedByUrl,",
+    find: "...(safePresentedByUrl || isSetTimesOrganizer ? { url: safePresentedByUrl || CANONICAL_HOST } : {}),",
+    replace: "url: safePresentedByUrl || (isSetTimesOrganizer ? CANONICAL_HOST : null),",
     tests: ["functions/event/__tests__/slug.presenter-age.test.js"],
+  },
+  {
+    id: "event-jsonld-concluded-offer-availability",
+    invariant:
+      "CLAUDE.md 'SSR owns identity meta and JSON-LD' — a concluded event keeps its real Offer but omits availability instead of claiming tickets are InStock",
+    file: "functions/event/[slug].js",
+    find: '...(isConcluded ? {} : { availability: "https://schema.org/InStock" }),',
+    // Re-adds InStock to CONCLUDED events, keeping upcoming ones as they are, so
+    // it hits the invariant it names (CodeRabbit on #1475).
+    replace:
+      '...(isConcluded ? { availability: "https://schema.org/InStock" } : { availability: "https://schema.org/InStock" }),',
+    tests: ["functions/event/__tests__/slug.test.js"],
+  },
+  {
+    id: "recap-jsonld-breadcrumb",
+    invariant:
+      "CLAUDE.md 'SSR owns identity meta and JSON-LD' — the recap emits a BreadcrumbList for the existing History, edition, and Recap routes",
+    file: "functions/events/[slug]/recap.js",
+    find: "return serveWithInjectedMeta(context, { title, metaTags, jsonLd: [breadcrumb] });",
+    replace: "return serveWithInjectedMeta(context, { title, metaTags, jsonLd: [] });",
+    tests: ["functions/events/__tests__/recap.test.js"],
   },
   {
     id: "ical-after-midnight-calendar-date",

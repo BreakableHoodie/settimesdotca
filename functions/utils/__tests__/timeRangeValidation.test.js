@@ -85,3 +85,27 @@ describe("time validation has one canonical home (#1089)", () => {
     expect(SHAPE_REGEX.test("const iso = /^\\d{4}-\\d{2}-\\d{2}$/")).toBe(false);
   });
 });
+
+// isValidTime returns { valid, error } on every path, so `!isValidTime(x)` is
+// always false and silently skips the guard (#1475 review). Every negated call
+// must read .valid.
+describe("isValidTime is never used as a boolean", () => {
+  it("no file in functions/ negates isValidTime(...) without .valid", () => {
+    const pattern = /!isValidTime\([^()]*\)(?!\.valid)/;
+    expect(pattern.test("if (!isValidTime(t)) x();")).toBe(true);
+    expect(pattern.test("if (!isValidTime(t).valid) x();")).toBe(false);
+    const offenders = [];
+    const walk = (dir) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, e.name);
+        if (e.isDirectory()) {
+          if (e.name !== "__tests__" && e.name !== "node_modules") walk(full);
+        } else if (/\.(m?js|ts)$/.test(e.name) && pattern.test(readFileSync(full, "utf8"))) {
+          offenders.push(relative(FUNCTIONS_DIR, full));
+        }
+      }
+    };
+    walk(FUNCTIONS_DIR);
+    expect(offenders).toEqual([]);
+  });
+});

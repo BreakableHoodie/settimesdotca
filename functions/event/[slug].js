@@ -64,22 +64,54 @@ function earliestTime(values) {
   return values.filter(Boolean).sort()[0] ?? null;
 }
 
-function latestPerformanceEnd(rows, fallbackDate) {
-  return rows
-    .map((row) => {
-      const time = normalizeTime(row.end_time);
-      if (!time) return null;
-      // An end before 06:00, or before the set's own start, is on the next
-      // calendar day after the festival night (after-midnight convention).
-      const night = row.performance_date || fallbackDate;
-      const start = normalizeTime(row.start_time);
-      const afterMidnight =
-        Number(time.slice(0, 2)) < AFTER_MIDNIGHT_THRESHOLD_HOUR || (start !== null && time < start);
-      return { date: afterMidnight ? nextCalendarDay(night) : night, time };
-    })
-    .filter(Boolean)
-    .sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`))
-    .at(-1);
+// The calendar date a festival-night time falls on: before 06:00 is the next
+// morning (after-midnight convention; performance_date is the night).
+function calendarDateOf(night, time) {
+  return Number(time.slice(0, 2)) < AFTER_MIDNIGHT_THRESHOLD_HOUR ? nextCalendarDay(night) : night;
+}
+
+/**
+ * The night's closing time, or null when it is not known. Each set's start is
+ * placed on its calendar day, and its end relative to that start (a 05:00-07:00
+ * set ends the next morning; 23:50-00:20 rolls over). The closing time is known
+ * only when the LATEST-STARTING set has an end: otherwise an earlier set's end
+ * would "close" the night before its last set begins (#1475 review).
+ */
+function closingBoundary(rows, fallbackDate) {
+  let lastStart = null;
+  let lastStartEnd = null;
+  let latestEnd = null;
+  for (const row of rows) {
+    const night = row.performance_date || fallbackDate;
+    const start = normalizeTime(row.start_time);
+    const end = normalizeTime(row.end_time);
+    const startDate = start ? calendarDateOf(night, start) : null;
+    const endDate = end
+      ? startDate
+        ? end < start
+          ? nextCalendarDay(startDate)
+          : startDate
+        : calendarDateOf(night, end)
+      : null;
+    const endKey = end ? `${endDate}T${end}` : null;
+    if (endKey && (!latestEnd || endKey > latestEnd.key)) latestEnd = { key: endKey, date: endDate, time: end };
+    if (start) {
+      const startKey = `${startDate}T${start}`;
+      if (!lastStart || startKey > lastStart) {
+        lastStart = startKey;
+        lastStartEnd = endKey;
+      }
+    }
+  }
+  if (!latestEnd) return null;
+  if (lastStart && (!lastStartEnd || lastStart > latestEnd.key)) return null;
+  return { date: latestEnd.date, time: latestEnd.time };
+}
+
+// endDate takes startDate's precision (Google: same format): a date-only start
+// gets a date-only end.
+function endDateFor(boundary, startTime) {
+  return startTime ? dateTime(boundary.date, boundary.time) : boundary.date;
 }
 
 /**
@@ -403,19 +435,18 @@ export async function onRequest(context) {
       : undefined;
   const image = [safePosterUrl || DEFAULT_OG_IMAGE];
   const doors = parseDoors(event.doors_json);
-  const firstDayRows = performanceRows.filter(
-    (row) => festivalDayForPerformance(row, event, [event.date]) === event.date,
-  );
+  // Compared directly: festivalDayForPerformance's clamp would admit later nights.
+  const firstDayRows = performanceRows.filter((row) => (row.performance_date || event.date) === event.date);
   const startTime = earliestTime([
     normalizeTime(doors[event.date]),
     ...firstDayRows
       .filter((row) => (startHour(row.start_time) ?? AFTER_MIDNIGHT_THRESHOLD_HOUR) >= AFTER_MIDNIGHT_THRESHOLD_HOUR)
       .map((row) => normalizeTime(row.start_time)),
   ]);
-  const latestEnd = latestPerformanceEnd(performanceRows, event.date);
+  const latestEnd = closingBoundary(performanceRows, event.date);
   const startDateValue = dateTime(event.date, startTime);
   const endDateValue = latestEnd
-    ? dateTime(latestEnd.date, latestEnd.time)
+    ? endDateFor(latestEnd, startTime)
     : startTime
       ? undefined
       : event.end_date || event.date;
@@ -443,7 +474,7 @@ export async function onRequest(context) {
           )
           .map((row) => normalizeTime(row.start_time)),
       ]);
-      const dayEnd = latestPerformanceEnd(dayRows, day);
+      const dayEnd = closingBoundary(dayRows, day);
       const venueNames = [...new Set(dayRows.map((row) => row.venue_name).filter(Boolean))];
       const description =
         performers.length > 0 && venueNames.length > 0
@@ -453,7 +484,7 @@ export async function onRequest(context) {
         "@type": "MusicEvent",
         name: `${event.name} — ${festivalDayLabel(day)}`,
         ...(dayStartTime ? { startDate: dateTime(day, dayStartTime) } : { startDate: day }),
-        ...(dayEnd ? { endDate: dateTime(dayEnd.date, dayEnd.time) } : dayStartTime ? {} : { endDate: day }),
+        ...(dayEnd ? { endDate: endDateFor(dayEnd, dayStartTime) } : dayStartTime ? {} : { endDate: day }),
         eventStatus: "https://schema.org/EventScheduled",
         eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
         // Google requires `location` on every Event node, subEvents included;

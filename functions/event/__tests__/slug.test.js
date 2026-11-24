@@ -619,6 +619,56 @@ describe("SSR /event/[slug] — event structured-data dates and offers (#1448)",
     expect(musicEvent.endDate).toBe("2999-08-09T01:00:00-04:00");
   });
 
+  // CodeRabbit on #1475: four edges of the closing boundary.
+  async function jsonLdFor(sets, { date = "2999-08-01", endDate = null } = {}) {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const slug = `edge-${Math.random().toString(36).slice(2, 8)}`;
+    const event = insertEvent(rawDb, { name: "Edge Fest", slug, date, status: "published" });
+    if (endDate) rawDb.prepare("UPDATE events SET end_date = ? WHERE id = ?").run(endDate, event.id);
+    const venue = insertVenue(rawDb, { name: "Edge Room" });
+    for (const [name, night, start, end] of sets) {
+      const b = insertBand(rawDb, { name, event_id: event.id, venue_id: venue.id, start_time: start, end_time: end });
+      rawDb.prepare("UPDATE performances SET performance_date = ? WHERE id = ?").run(night, b.id);
+    }
+    const [musicEvent] = extractJsonLd(await (await onRequest(makeContext({ env, slug }))).text());
+    return musicEvent;
+  }
+
+  test("a 05:00-07:00 set on the festival night ends the next calendar morning", async () => {
+    const e = await jsonLdFor([
+      ["Evening", "2999-08-01", "20:00", "21:00"],
+      ["Dawn", "2999-08-01", "05:00", "07:00"],
+    ]);
+    expect(e.endDate).toBe("2999-08-02T07:00:00-04:00");
+  });
+
+  test("the first night's start ignores later nights' sets", async () => {
+    const e = await jsonLdFor(
+      [
+        ["Night One", "2999-08-01", "20:00", "21:00"],
+        ["Day Two Matinee", "2999-08-02", "10:00", "11:00"],
+      ],
+      { endDate: "2999-08-02" },
+    );
+    expect(e.startDate).toBe("2999-08-01T20:00:00-04:00");
+  });
+
+  test("an unknown end on the last set means no endDate, not an earlier set's end", async () => {
+    const e = await jsonLdFor([
+      ["Opener", "2999-08-01", "20:00", "21:00"],
+      ["Headliner", "2999-08-01", "23:00", null],
+    ]);
+    expect(e.startDate).toBe("2999-08-01T20:00:00-04:00");
+    expect(e).not.toHaveProperty("endDate");
+  });
+
+  test("a date-only start never sits beside a timestamped end", async () => {
+    const e = await jsonLdFor([["Only Late", "2999-08-01", "01:00", "02:00"]]);
+    expect(e.startDate.includes("T")).toBe(false);
+    if (e.endDate !== undefined) expect(e.endDate.includes("T")).toBe(false);
+  });
+
   test("a single-day show ending after midnight ends on the next calendar day", async () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";

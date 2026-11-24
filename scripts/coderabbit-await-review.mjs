@@ -221,9 +221,9 @@ export function classifyReply(body) {
   return "other";
 }
 
-function git(args, cwd, input) {
+function git(args, cwd, input, encoding = "utf8") {
   return execFileSync("git", args, {
-    encoding: "utf8",
+    encoding,
     cwd,
     input,
     maxBuffer: 256 * 1024 * 1024,
@@ -242,11 +242,21 @@ function git(args, cwd, input) {
 export function pullDiffOf(sha, main, cwd) {
   try {
     const base = git(["merge-base", main, sha], cwd).trim();
-    const diff = git(["diff", "--no-color", "--no-ext-diff", base, sha], cwd)
-      .split("\n")
-      .filter((line) => !line.startsWith("index "))
-      .join("\n");
-    return diff.trim() === "" ? null : diff;
+    // BYTES, not text: two commits adding different invalid UTF-8 bytes decode
+    // to the same U+FFFD. `--binary` puts a binary file's content in the diff;
+    // without it every binary replacement at one path is the same "Binary files
+    // differ" line once the `index` lines are gone.
+    const raw = git(["diff", "--no-color", "--no-ext-diff", "--binary", base, sha], cwd, undefined, "buffer");
+    const kept = [];
+    let start = 0;
+    while (start < raw.length) {
+      const nl = raw.indexOf(0x0a, start);
+      const end = nl === -1 ? raw.length : nl + 1;
+      if (!raw.subarray(start, end).toString("latin1").startsWith("index ")) kept.push(raw.subarray(start, end));
+      start = end;
+    }
+    const diff = Buffer.concat(kept);
+    return diff.toString("latin1").trim() === "" ? null : diff;
   } catch {
     return null;
   }
@@ -278,7 +288,8 @@ export function sameDiffIn(a, b, cwd, { onFirstDiff } = {}) {
   }
   const da = pullDiffOf(a, main, cwd);
   onFirstDiff?.();
-  return da !== null && da === pullDiffOf(b, main, cwd);
+  const db = pullDiffOf(b, main, cwd);
+  return da !== null && db !== null && da.equals(db);
 }
 
 function gh(args) {
@@ -318,7 +329,9 @@ export function ghDeps(pr) {
         (c) => c.user?.login === "coderabbitai[bot]" && /rate.?limit|review limit reached/i.test(c.body || ""),
       );
       const last = hits.at(-1);
-      return last ? { body: last.body || "", at: last.updated_at } : null;
+      // `at` feeds the cooldown math; `createdAt` orders it against replies,
+      // because an old limit comment can be EDITED after a newer reply.
+      return last ? { body: last.body || "", at: last.updated_at, createdAt: last.created_at } : null;
     },
     headCommittedAt(sha) {
       // When this commit was made, so a limit comment can be told apart from
@@ -601,7 +614,7 @@ export async function awaitReview(deps, opts = {}) {
       if (c && limitCommentApplies(c.at, deps.headCommittedAt(head), lastRequestAt)) {
         // A terminal reply NEWER than the limit comment wins: waiting out a
         // cooldown that CodeRabbit has since superseded would re-request forever.
-        if (!terminalReplyNewerThan(c.at)) state = "rate_limited";
+        if (!terminalReplyNewerThan(c.createdAt ?? c.at)) state = "rate_limited";
       }
     }
     if (state === "none" || state === "skipped") {
@@ -611,6 +624,15 @@ export async function awaitReview(deps, opts = {}) {
       const reply = latestReply();
       if (reply && limitCommentApplies(reply.at, deps.headCommittedAt(head), lastRequestAt)) {
         if (reply.kind === "bot_skipped") {
+          // Re-check the PR first, as the skipped-status exit does: a closed PR
+          // is 4 and a moved head is watched, never reported as terminal.
+          const gone = refreshPr();
+          if (gone !== null) return gone;
+          if (pr.head !== head) {
+            deps.log(`head moved ${head.slice(0, 8)} -> ${pr.head.slice(0, 8)}; watching the new head.`);
+            switchHead(pr.head);
+            return undefined;
+          }
           deps.log(
             `CodeRabbit cannot review head ${head.slice(0, 8)}: the PR was authored by a bot with no review seat, ` +
               "so no review will ever come. Decide deliberately (e.g. `make review` locally) before merging.",
@@ -624,6 +646,9 @@ export async function awaitReview(deps, opts = {}) {
             // onto a moved main): CodeRabbit's review of the old SHA covers this head. Judge that review's body, not the head's.
             coveredBy = reviewed;
             state = "reviewed";
+          } else if (!fullReviewPosted && requests < maxRequests && !once && deps.reviewInProgressElsewhere(head)) {
+            // Queued behind an earlier review: it is not lost, so spend nothing.
+            headSeenAt = deps.now();
           } else if (!fullReviewPosted && requests < maxRequests && !once) {
             const gone = refreshPr();
             if (gone !== null) return gone;

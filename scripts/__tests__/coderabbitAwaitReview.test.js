@@ -52,6 +52,8 @@ function fakeDeps({
   prState = () => "OPEN",
   comment = RL_COMMENT,
   commentAt = "1970-01-01T00:00:00Z",
+  // When the limit comment was CREATED; `commentAt` is its last edit.
+  commentCreatedAt = undefined,
   busy = () => false,
   // By default a review exists exactly when a status does, the shape before
   // #1393; tests of a review with no status pass their own.
@@ -85,7 +87,8 @@ function fakeDeps({
       last = s;
       return s;
     },
-    getLatestRateLimitComment: () => (comment === null ? null : { body: comment, at: commentAt }),
+    getLatestRateLimitComment: () =>
+      comment === null ? null : { body: comment, at: commentAt, createdAt: commentCreatedAt },
     reviewInProgressElsewhere: () => busy(),
     headWasRateLimited: (sha) => rateLimitedHeads.includes(sha),
     headCommittedAt: () => committedAt,
@@ -969,7 +972,9 @@ describe("awaitReview: replies that end the wait (#1470)", () => {
       comment: RL_COMMENT,
       commentAt: new Date(T("10:02")).toISOString(),
       committedAt: T("10:00"),
-      reply: { kind: "other", at: new Date(T("10:02")).toISOString() },
+      // A real, applicable bot skip, but OLDER than the limit comment: it must
+      // not end the wait.
+      reply: { kind: "bot_skipped", at: new Date(T("10:01")).toISOString() },
     });
     expect(await awaitReview(d, { pollMs: 1000 })).toBe(0);
     expect(d.calls.requests).toBe(1);
@@ -1083,6 +1088,50 @@ describe("awaitReview: replies that end the wait (#1470)", () => {
     expect(await awaitReview(d, { pollMs: 1000 })).toBe(5);
   });
 
+  it("orders a limit comment against replies by CREATION time, not its last edit", async () => {
+    // Limit comment created 10:01 (2000) but EDITED at 4000; bot skip at 3000.
+    const d = fakeDeps({
+      ...noStatus,
+      comment: RL_COMMENT,
+      commentAt: new Date(4000).toISOString(),
+      commentCreatedAt: new Date(2000).toISOString(),
+      committedAt: 1000,
+      reply: { kind: "bot_skipped", at: new Date(3000).toISOString() },
+    });
+    expect(await awaitReview(d, { pollMs: 1000 })).toBe(6);
+    expect(d.calls.requests).toBe(0);
+  });
+
+  it("exit 6 returns 4 when the PR was closed in the meantime", async () => {
+    const d = fakeDeps({
+      ...noStatus,
+      prState: (i) => (i >= 1 ? "CLOSED" : "OPEN"),
+      reply: { kind: "bot_skipped", at: AFTER },
+    });
+    expect(await awaitReview(d, { pollMs: 1000 })).toBe(4);
+  });
+
+  it("exit 6 watches the new head when the head moved, and only then reports 6", async () => {
+    const d = fakeDeps({
+      ...noStatus,
+      heads: ["aaaaaaaa1", "bbbbbbbb2"],
+      reply: { kind: "bot_skipped", at: AFTER },
+    });
+    expect(await awaitReview(d, { pollMs: 1000 })).toBe(6);
+    expect(d.calls.statusShas).toContain("bbbbbbbb2");
+  });
+
+  it("posts no full review while the head's review is queued behind an earlier one", async () => {
+    const d = fakeDeps({
+      statuses: [null, null, null, COMPLETED],
+      reply: { kind: "already_reviewed", at: AFTER },
+      lastReviewedSha: OLD,
+      busy: () => true,
+    });
+    expect(await awaitReview(d, { pollMs: 1000, noStatusGraceMs: 10 ** 12 })).toBe(0);
+    expect(d.calls.bodies).toEqual([]);
+  });
+
   it("a bot-authored skip is terminal: exit 6, no review requested", async () => {
     const d = fakeDeps({ ...noStatus, reply: { kind: "bot_skipped", at: AFTER } });
     expect(await awaitReview(d, { pollMs: 1000 })).toBe(6);
@@ -1123,6 +1172,9 @@ describe("sameDiffIn against a real git repository (#1470)", () => {
   beforeEach(() => {
     repo = mkdtempSync(join(tmpdir(), "await-review-git-"));
     g("init", "-q", "-b", "main");
+    // A contributor with commit.gpgSign=true must still be able to run the gate.
+    g("config", "commit.gpgSign", "false");
+    g("config", "tag.gpgSign", "false");
     commitFile("base.txt", "one\ntwo\nthree\n", "base");
     g("checkout", "-q", "-b", "pr");
     oldPr = commitFile("feature.txt", "feature X\n", "X");
@@ -1211,6 +1263,37 @@ describe("sameDiffIn against a real git repository (#1470)", () => {
       lines("top", "bottom").replace("line 15", "LINE 15"),
     );
     expect(sameDiffIn(near.before, near.after, repo)).toBe(false);
+  });
+
+  it("compares BYTES: different invalid UTF-8 bytes are different diffs", () => {
+    g("checkout", "-q", "main");
+    const commitBytes = (branch, bytes) => {
+      g("checkout", "-q", "-b", branch, "main");
+      writeFileSync(join(repo, "raw.txt"), Buffer.from(bytes));
+      g("add", "raw.txt");
+      g("-c", "user.name=t", "-c", "user.email=t@example.test", "commit", "-q", "-m", branch);
+      return g("rev-parse", "HEAD");
+    };
+    const e9 = commitBytes("raw-e9", [0x61, 0xe9, 0x0a]);
+    const ea = commitBytes("raw-ea", [0x61, 0xea, 0x0a]);
+    expect(sameDiffIn(e9, ea, repo)).toBe(false);
+    expect(sameDiffIn(e9, e9, repo)).toBe(true);
+  });
+
+  it("compares binary CONTENT: two binary replacements at one path are different diffs", () => {
+    g("checkout", "-q", "main");
+    const commitBin = (branch, bytes) => {
+      g("checkout", "-q", "-b", branch, "main");
+      writeFileSync(join(repo, "img.bin"), Buffer.from(bytes));
+      g("add", "img.bin");
+      g("-c", "user.name=t", "-c", "user.email=t@example.test", "commit", "-q", "-m", branch);
+      return g("rev-parse", "HEAD");
+    };
+    const one = commitBin("bin-1", [0, 1, 2, 3]);
+    const two = commitBin("bin-2", [0, 1, 2, 4]);
+    const same = commitBin("bin-3", [0, 1, 2, 3]);
+    expect(sameDiffIn(one, two, repo)).toBe(false);
+    expect(sameDiffIn(one, same, repo)).toBe(true);
   });
 
   it("reads an unknown commit as different, never the same", () => {

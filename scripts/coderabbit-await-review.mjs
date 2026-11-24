@@ -486,8 +486,11 @@ export async function awaitReview(deps, opts = {}) {
   // Every review request goes through here, so a limit comment can be judged
   // against the latest one (#1401).
   const requestReview = (full = false) => {
-    lastRequestAt = deps.now();
+    const at = deps.now();
     deps.requestReview(full);
+    // Stamped only once the post went out: a failed attempt must not move the
+    // window forward and hide a genuine reply to the REAL last request.
+    lastRequestAt = at;
   };
   let lastReported = "";
 
@@ -518,12 +521,23 @@ export async function awaitReview(deps, opts = {}) {
       }
       return replyValue;
     };
+    // A bot-skip reply that applies to this head and is newer than `at` (a
+    // rate-limit comment or skip status) supersedes it. ONE rule, used by both
+    // paths that turn a limit into `rate_limited` (#1470 review).
+    const terminalReplyNewerThan = (at) => {
+      const r = latestReply();
+      return (
+        r?.kind === "bot_skipped" &&
+        limitCommentApplies(r.at, deps.headCommittedAt(head), lastRequestAt) &&
+        Date.parse(r.at) > Date.parse(at)
+      );
+    };
     const status = deps.getStatus(head);
     let state = classifyStatus(status);
     if (state === "in_progress" && deps.now() - Date.parse(status.updated_at) > STALE_IN_PROGRESS_MS) {
       // The head's own review hung. Waiting on it only runs out the timeout.
       state = "stalled";
-    } else if (state === "skipped" && deps.headWasRateLimited?.(head)) {
+    } else if (state === "skipped" && deps.headWasRateLimited?.(head) && !terminalReplyNewerThan(status.updated_at)) {
       // #1374: "Review rate limited", then "Review skipped" on the same head.
       // Exit 3 is for a head CodeRabbit skips by design (every file filtered);
       // a skip that follows a rate limit is waited out and re-requested.
@@ -569,12 +583,7 @@ export async function awaitReview(deps, opts = {}) {
       if (c && limitCommentApplies(c.at, deps.headCommittedAt(head), lastRequestAt)) {
         // A terminal reply NEWER than the limit comment wins: waiting out a
         // cooldown that CodeRabbit has since superseded would re-request forever.
-        const r = latestReply();
-        const terminalNewer =
-          r?.kind === "bot_skipped" &&
-          limitCommentApplies(r.at, deps.headCommittedAt(head), lastRequestAt) &&
-          Date.parse(r.at) > Date.parse(c.at);
-        if (!terminalNewer) state = "rate_limited";
+        if (!terminalReplyNewerThan(c.at)) state = "rate_limited";
       }
     }
     if (state === "none" || state === "skipped") {

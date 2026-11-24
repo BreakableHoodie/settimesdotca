@@ -946,6 +946,53 @@ describe("awaitReview: replies that end the wait (#1470)", () => {
     expect(d.calls.requests).toBe(1);
   });
 
+  it("a bot skip NEWER than a 'Review skipped' status on a rate-limited head wins: exit 6", async () => {
+    const SKIPPED = { state: "success", description: "Review skipped", updated_at: new Date(3000).toISOString() };
+    const d = fakeDeps({
+      statuses: [SKIPPED],
+      rateLimitedHeads: [HEAD],
+      comment: null,
+      committedAt: 1000,
+      reply: { kind: "bot_skipped", at: new Date(5000).toISOString() },
+    });
+    expect(await awaitReview(d, { pollMs: 1000 })).toBe(6);
+    expect(d.calls.requests).toBe(0);
+    expect(d.calls.sleeps).toEqual([]);
+  });
+
+  it("a bot skip OLDER than that 'Review skipped' status keeps the cooldown handling", async () => {
+    const SKIPPED = { state: "success", description: "Review skipped", updated_at: new Date(3000).toISOString() };
+    const d = fakeDeps({
+      statuses: [SKIPPED, COMPLETED],
+      rateLimitedHeads: [HEAD],
+      comment: null,
+      committedAt: 1000,
+      reply: { kind: "bot_skipped", at: new Date(2000).toISOString() },
+    });
+    expect(await awaitReview(d, { pollMs: 1000 })).toBe(0);
+    expect(d.calls.requests).toBe(1);
+  });
+
+  it("a failed request post does not move the reply window: a reply between the real last request and the failed one still counts", async () => {
+    // Request 1 (grace) posts at t=2000. A genuine bot skip arrives at t=2500.
+    // Request 2 at t=4000 FAILS. If the failed attempt stamped t=4000, the
+    // reply (2500 < 4000) would be dropped as older than our request.
+    let calls = 0;
+    const holder = {};
+    holder.d = fakeDeps({
+      statuses: [null],
+      reply: () => (calls >= 2 ? { kind: "bot_skipped", at: new Date(2500).toISOString() } : null),
+      committedAt: 1000,
+    });
+    const real = holder.d.requestReview;
+    holder.d.requestReview = (full) => {
+      calls += 1;
+      if (calls === 2) throw new Error("gh blip");
+      return real(full);
+    };
+    expect(await awaitReview(holder.d, { pollMs: 1000, noStatusGraceMs: 1500 })).toBe(6);
+  });
+
   it("a thrown full-review request does not spend the once-per-head flag: the next pass retries, within maxRequests", async () => {
     let throwOnce = true;
     const d = fakeDeps({

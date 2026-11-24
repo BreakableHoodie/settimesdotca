@@ -1044,7 +1044,10 @@ export const MUTATIONS = [
       "CLAUDE.md 'SSR owns identity meta and JSON-LD' — a concluded event keeps its real Offer but omits availability instead of claiming tickets are InStock",
     file: "functions/event/[slug].js",
     find: '...(isConcluded ? {} : { availability: "https://schema.org/InStock" }),',
-    replace: "...(isConcluded ? {} : {}),",
+    // Re-adds InStock to CONCLUDED events, keeping upcoming ones as they are, so
+    // it hits the invariant it names (CodeRabbit on #1475).
+    replace:
+      '...(isConcluded ? { availability: "https://schema.org/InStock" } : { availability: "https://schema.org/InStock" }),',
     tests: ["functions/event/__tests__/slug.test.js"],
   },
   {

@@ -57,9 +57,9 @@
  *
  * Two replies end a wait early (#1470). "Already reviewed the last commit"
  * after a content-identical rebase: if the commit CodeRabbit last reviewed has
- * the head's tree or patch, the head counts as reviewed and is judged on THAT review's
+ * the head's tree or diff, the head counts as reviewed and is judged on THAT review's
  * body; otherwise one `@coderabbitai full review` is posted. "Same" means the
- * same tree or the same patch (`git patch-id --verbatim` against the merge-base
+ * same tree or the same diff, hunk positions included (`git diff` against the merge-base
  * with origin/main), so a rebase onto a MOVED main does not spend a review. The reply must be
  * the newest CodeRabbit comment and newer than our latest request (or, with no
  * request yet, than the head commit).
@@ -232,35 +232,53 @@ function git(args, cwd, input) {
 }
 
 /**
- * The verbatim patch-id of what `sha` changes relative to its merge-base with
- * origin/main (#1470), or null when it cannot be computed. Two commits with the
- * same patch-id carry the same PR changes, even if one sits on a main that has
- * since moved. Missing objects are fetched once; no shell is involved.
+ * What `sha` changes relative to its merge-base with `main`, as text (#1470):
+ * `git diff` with every `index ` line removed (blob ids change whenever main
+ * touches the file) and the `@@` hunk headers KEPT. `git patch-id` was tried
+ * and rejected: it ignores hunk line numbers, so the same edit made in the other
+ * copy of a duplicated block read as identical. Null when it cannot be computed
+ * or is empty (an empty diff must never read as "same" as another).
  */
-export function patchIdOf(sha, cwd) {
-  const compute = () => {
-    const base = git(["merge-base", "origin/main", sha], cwd).trim();
-    const diff = git(["diff", "--no-color", base, sha], cwd);
-    // An empty diff has no patch-id; it must never read as "same" as another.
-    const id = git(["patch-id", "--verbatim"], cwd, diff).trim().split(/\s+/)[0];
-    return id || null;
-  };
+export function pullDiffOf(sha, main, cwd) {
   try {
-    return compute();
+    const base = git(["merge-base", main, sha], cwd).trim();
+    const diff = git(["diff", "--no-color", "--no-ext-diff", base, sha], cwd)
+      .split("\n")
+      .filter((line) => !line.startsWith("index "))
+      .join("\n");
+    return diff.trim() === "" ? null : diff;
   } catch {
-    try {
-      git(["fetch", "--quiet", "origin", "main", sha], cwd);
-      return compute();
-    } catch {
-      return null;
-    }
+    return null;
   }
 }
 
-/** Same PR changes in both commits? Any failure reads as "different". */
-export function samePatchIn(a, b, cwd) {
-  const pa = patchIdOf(a, cwd);
-  return pa !== null && pa === patchIdOf(b, cwd);
+/**
+ * Same PR diff in both commits, hunk positions included? A rebase onto a moved
+ * main passes unless main edited the same file above the change, which shifts
+ * the hunks and fails safe into a full review. Any failure reads as different.
+ * `origin/main` is resolved ONCE, after any fetch, and both diffs are taken
+ * against that commit, so a moving main cannot give them different bases.
+ * `onFirstDiff` is a test seam, called after the first diff is computed.
+ */
+export function sameDiffIn(a, b, cwd, { onFirstDiff } = {}) {
+  const resolve = () => {
+    for (const sha of [a, b]) git(["rev-parse", "--verify", "--quiet", `${sha}^{commit}`], cwd);
+    return git(["rev-parse", "--verify", "origin/main^{commit}"], cwd).trim();
+  };
+  let main;
+  try {
+    main = resolve();
+  } catch {
+    try {
+      git(["fetch", "--quiet", "origin", "main", a, b], cwd);
+      main = resolve();
+    } catch {
+      return false;
+    }
+  }
+  const da = pullDiffOf(a, main, cwd);
+  onFirstDiff?.();
+  return da !== null && da === pullDiffOf(b, main, cwd);
 }
 
 function gh(args) {
@@ -391,8 +409,8 @@ export function ghDeps(pr) {
       const ta = tree(a);
       return ta !== null && ta === tree(b);
     },
-    samePatch(a, b) {
-      return samePatchIn(a, b);
+    sameDiff(a, b) {
+      return sameDiffIn(a, b);
     },
     requestReview(full = false) {
       gh(["pr", "comment", String(pr), "--body", full ? "@coderabbitai full review" : "@coderabbitai review"]);
@@ -601,8 +619,8 @@ export async function awaitReview(deps, opts = {}) {
         }
         if (reply.kind === "already_reviewed" && state === "none") {
           const reviewed = deps.getLastReviewedSha();
-          if (reviewed && (deps.sameTree(reviewed, head) || deps.samePatch(reviewed, head))) {
-            // A content-identical rebase (same tree, or the same patch even
+          if (reviewed && (deps.sameTree(reviewed, head) || deps.sameDiff(reviewed, head))) {
+            // A content-identical rebase (same tree, or the same diff, hunk positions included, even
             // onto a moved main): CodeRabbit's review of the old SHA covers this head. Judge that review's body, not the head's.
             coveredBy = reviewed;
             state = "reviewed";

@@ -20,7 +20,7 @@ import {
   ghDeps,
   limitCommentApplies,
   parseCooldownMs,
-  samePatchIn,
+  sameDiffIn,
   remainingCooldownMs,
 } from "../coderabbit-await-review.mjs";
 
@@ -65,7 +65,7 @@ function fakeDeps({
   reply = null,
   lastReviewedSha = null,
   sameTree = () => false,
-  samePatch = () => false,
+  sameDiff = () => false,
 }) {
   let t = 0;
   let si = 0;
@@ -97,7 +97,7 @@ function fakeDeps({
     getLatestReply: () => (typeof reply === "function" ? reply() : reply),
     getLastReviewedSha: () => lastReviewedSha,
     sameTree: (a, b) => sameTree(a, b),
-    samePatch: (a, b) => samePatch(a, b),
+    sameDiff: (a, b) => sameDiff(a, b),
     requestReview: (full = false) => {
       calls.requests += 1;
       calls.bodies.push(full ? "full" : "plain");
@@ -862,26 +862,26 @@ describe("awaitReview: replies that end the wait (#1470)", () => {
     expect(d.calls.bodies).toEqual(["full"]);
   });
 
-  it("treats the head as reviewed when the trees differ but the patch is the same (rebase onto a moved main)", async () => {
+  it("treats the head as reviewed when the trees differ but the diff is the same (rebase onto a moved main)", async () => {
     const d = fakeDeps({
       ...noStatus,
       reply: { kind: "already_reviewed", at: AFTER },
       lastReviewedSha: OLD,
       sameTree: () => false,
-      samePatch: (a, b) => a === OLD && b === HEAD,
+      sameDiff: (a, b) => a === OLD && b === HEAD,
       findings: (sha) => ({ confirmed: sha === OLD, outsideDiff: 0, nitpicks: 0, duplicates: 0, other: 0, url: null }),
     });
     expect(await awaitReview(d, { pollMs: 1000 })).toBe(0);
     expect(d.calls.requests).toBe(0);
   });
 
-  it("posts one full review when both the trees and the patches differ", async () => {
+  it("posts one full review when both the trees and the diffs differ", async () => {
     const d = fakeDeps({
       statuses: [null, null, COMPLETED],
       reply: { kind: "already_reviewed", at: AFTER },
       lastReviewedSha: OLD,
       sameTree: () => false,
-      samePatch: () => false,
+      sameDiff: () => false,
     });
     expect(await awaitReview(d, { pollMs: 1000, noStatusGraceMs: 10 ** 12 })).toBe(0);
     expect(d.calls.bodies).toEqual(["full"]);
@@ -1078,7 +1078,7 @@ describe("awaitReview: replies that end the wait (#1470)", () => {
   });
 });
 
-describe("samePatchIn against a real git repository (#1470)", () => {
+describe("sameDiffIn against a real git repository (#1470)", () => {
   let repo;
   const g = (...args) => execFileSync("git", args, { cwd: repo, encoding: "utf8" }).trim();
   const commitFile = (file, text, msg) => {
@@ -1114,29 +1114,78 @@ describe("samePatchIn against a real git repository (#1470)", () => {
 
   afterEach(() => rmSync(repo, { recursive: true, force: true }));
 
-  it("sees a rebase onto a moved main as the same patch, though the trees differ", () => {
+  it("sees a rebase onto a moved main as the same diff, though the trees differ", () => {
     expect(g("rev-parse", `${oldPr}^{tree}`)).not.toBe(g("rev-parse", `${rebased}^{tree}`));
     expect(rebased).not.toBe(oldPr);
-    expect(samePatchIn(oldPr, rebased, repo)).toBe(true);
+    expect(sameDiffIn(oldPr, rebased, repo)).toBe(true);
   });
 
-  it("sees a different change as a different patch", () => {
-    expect(samePatchIn(oldPr, different, repo)).toBe(false);
+  it("sees a different change as a different diff", () => {
+    expect(sameDiffIn(oldPr, different, repo)).toBe(false);
   });
 
-  it("does not equate patches that differ only by whitespace inside a string literal", () => {
+  it("does not equate diffs that differ only by whitespace inside a string literal", () => {
     const mk = (branch, text) => {
       g("checkout", "-q", "-b", branch, "main");
       return commitFile("s.js", text, branch);
     };
     const withSpace = mk("ws-a", 'const s = "a b";\n');
     const withoutSpace = mk("ws-b", 'const s = "ab";\n');
-    expect(samePatchIn(withSpace, withoutSpace, repo)).toBe(false);
-    expect(samePatchIn(withSpace, withSpace, repo)).toBe(true);
+    expect(sameDiffIn(withSpace, withoutSpace, repo)).toBe(false);
+    expect(sameDiffIn(withSpace, withSpace, repo)).toBe(true);
+  });
+
+  it("does not equate the same edit made in the FIRST and the SECOND of two identical blocks", () => {
+    // Padding on every side keeps each edit's three lines of context identical.
+    const pad = "p\nq\nr\n";
+    const blocks = (first, second) => `${pad}x\n${first}\ny\n${pad}${pad}x\n${second}\ny\n${pad}`;
+    g("checkout", "-q", "main");
+    commitFile("dup.txt", blocks("foo", "foo"), "dup");
+    g("update-ref", "refs/remotes/origin/main", g("rev-parse", "main"));
+    g("checkout", "-q", "-b", "dup-first", "main");
+    const first = commitFile("dup.txt", blocks("bar", "foo"), "first");
+    g("checkout", "-q", "-b", "dup-second", "main");
+    const second = commitFile("dup.txt", blocks("foo", "bar"), "second");
+    expect(sameDiffIn(first, second, repo)).toBe(false);
+  });
+
+  it("takes both diffs against ONE origin/main, even if it moves after the first lookup", () => {
+    // origin/main jumps onto the rebased commit (as if the PR just merged)
+    // right after the first diff. A second merge-base lookup against the moved
+    // ref would see an EMPTY diff for the rebased commit.
+    const moveMain = () => g("update-ref", "refs/remotes/origin/main", rebased);
+    expect(sameDiffIn(oldPr, rebased, repo, { onFirstDiff: moveMain })).toBe(true);
+  });
+
+  it("matches a rebase onto a main that edited the SAME file far below the change (blob ids differ), and fails safe when it edited above", () => {
+    const lines = (top, bottom) =>
+      `${top}\n${Array.from({ length: 30 }, (_, i) => `line ${i}`).join("\n")}\n${bottom}\n`;
+    const rebaseOnto = (file, mainText, prText) => {
+      g("checkout", "-q", "main");
+      commitFile(file, lines("top", "bottom"), `${file} base`);
+      g("checkout", "-q", "-b", `pr-${file}`, "main");
+      const before = commitFile(file, prText, "pr edit");
+      g("checkout", "-q", "main");
+      commitFile(file, mainText, "main edits the file");
+      g("update-ref", "refs/remotes/origin/main", g("rev-parse", "main"));
+      g("checkout", "-q", `pr-${file}`);
+      g("-c", "user.name=t", "-c", "user.email=t@example.test", "rebase", "-q", "main");
+      return { before, after: g("rev-parse", "HEAD") };
+    };
+    // PR edits the middle; main edits the bottom: hunks keep their positions.
+    const far = rebaseOnto("far.txt", lines("top", "BOTTOM"), lines("top", "bottom").replace("line 15", "LINE 15"));
+    expect(sameDiffIn(far.before, far.after, repo)).toBe(true);
+    // Main inserts a line at the top, above the PR's edit: the hunk moves, so a full review.
+    const near = rebaseOnto(
+      "near.txt",
+      `inserted\n${lines("top", "bottom")}`,
+      lines("top", "bottom").replace("line 15", "LINE 15"),
+    );
+    expect(sameDiffIn(near.before, near.after, repo)).toBe(false);
   });
 
   it("reads an unknown commit as different, never the same", () => {
-    expect(samePatchIn("f".repeat(40), "f".repeat(40), repo)).toBe(false);
+    expect(sameDiffIn("f".repeat(40), "f".repeat(40), repo)).toBe(false);
   });
 });
 

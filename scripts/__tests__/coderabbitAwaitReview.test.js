@@ -849,6 +849,35 @@ describe("awaitReview: replies that end the wait (#1470)", () => {
     expect(await awaitReview(d, { pollMs: 1000 })).toBe(5);
   });
 
+  it("a direct review of the head with a finding, landing after the first head lookup, blocks a covered verdict (exit 5)", async () => {
+    let headReads = 0;
+    const clean = { confirmed: true, outsideDiff: 0, nitpicks: 0, duplicates: 0, other: 0, url: null };
+    const d = fakeDeps({
+      ...noStatus,
+      reply: { kind: "already_reviewed", at: AFTER },
+      lastReviewedSha: OLD,
+      sameTree: () => true,
+      findings: (sha) => {
+        if (sha === OLD) return clean;
+        // First lookup: no review of the head yet. Later: one with a finding.
+        return headReads++ === 0 ? { ...clean, confirmed: false } : { ...clean, outsideDiff: 1 };
+      },
+    });
+    expect(await awaitReview(d, { pollMs: 1000 })).toBe(5);
+  });
+
+  it("control: a covered head that never gets a review of its own still returns 0", async () => {
+    const clean = { confirmed: true, outsideDiff: 0, nitpicks: 0, duplicates: 0, other: 0, url: null };
+    const d = fakeDeps({
+      ...noStatus,
+      reply: { kind: "already_reviewed", at: AFTER },
+      lastReviewedSha: OLD,
+      sameTree: () => true,
+      findings: (sha) => (sha === OLD ? clean : { ...clean, confirmed: false }),
+    });
+    expect(await awaitReview(d, { pollMs: 1000 })).toBe(0);
+  });
+
   it("posts exactly one '@coderabbitai full review' when the trees differ, then keeps waiting", async () => {
     const d = fakeDeps({
       // The reply keeps being the newest comment across several polls; the

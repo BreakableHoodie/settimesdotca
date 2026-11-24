@@ -686,15 +686,24 @@ export async function awaitReview(deps, opts = {}) {
         await deps.sleep(pollMs);
         return undefined;
       }
-      const found = f.outsideDiff + f.nitpicks + f.duplicates + f.other;
-      if (found > 0 && !allowFindings) {
+      const countFound = (x) => x.outsideDiff + x.nitpicks + x.duplicates + x.other;
+      const blockOn = (x) => {
         deps.log(
-          `head ${short} reviewed, with findings outside any thread: ${f.outsideDiff} outside-diff, ` +
-            `${f.nitpicks} nitpick, ${f.duplicates} duplicate, ${f.other} in an unrecognised section` +
-            `${f.url ? ` (${f.url})` : ""}. ` +
+          `head ${short} reviewed, with findings outside any thread: ${x.outsideDiff} outside-diff, ` +
+            `${x.nitpicks} nitpick, ${x.duplicates} duplicate, ${x.other} in an unrecognised section` +
+            `${x.url ? ` (${x.url})` : ""}. ` +
             "Address them, or re-run with --allow-findings once declined.",
         );
         return 5;
+      };
+      const found = countFound(f);
+      if (found > 0 && !allowFindings) return blockOn(f);
+      if (coveredBy && !allowFindings) {
+        // Judged through an equivalent older review: CodeRabbit may have posted
+        // a DIRECT review of the head since the first lookup. Read it last,
+        // right before the verdict, and let its findings block (#1470 review).
+        const own = deps.getHeadReviewFindings(head);
+        if (own.confirmed && countFound(own) > 0) return blockOn(own);
       }
       deps.log(
         `head ${short} reviewed (${status ? `"${status.description}"` : "by its review; no status"})${found > 0 ? `; ${found} body finding(s) allowed` : ""}.`,

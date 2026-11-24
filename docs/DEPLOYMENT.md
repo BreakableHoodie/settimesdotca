@@ -139,6 +139,10 @@ wrangler d1 time-travel restore settimes-production-db --timestamp=<ISO-8601-tim
 
 See Cloudflare's D1 Time Travel documentation for the retention window available on your plan. Confirm the target and recovery point before restoring.
 
+Before any `time-travel restore`, run `time-travel info` and keep the **current bookmark**: restoring to it undoes the restore.
+
+**An export is not read-only.** `wrangler d1 export --remote` locks production until it completes, so run one only with the owner's go-ahead and never on a show night. The export-and-restore round trip was rehearsed on 2026-11-24 (#1442): 27 tables and 4,458 rows restored into local SQLite with zero errors, matching production. Steps and timings are in `docs/field-notes/backup-restore.md`.
+
 ## Scheduled Maintenance
 
 Cloudflare Pages does not provide native cron triggers for this project. `.github/workflows/scheduled-jobs.yml` calls `/api/internal/run-scheduled` daily with `CRON_SECRET`. The job runs popularity aggregation, retention cleanup, share-link expiry and schedule-build anonymisation.

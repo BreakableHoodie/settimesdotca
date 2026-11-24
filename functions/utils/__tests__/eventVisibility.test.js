@@ -225,6 +225,54 @@ describe("public events queries use the shared visibility predicate", () => {
   });
 });
 
+describe("public performance queries use the reveal predicate", () => {
+  const guardFile = fileURLToPath(import.meta.url);
+  const root = path.join(path.dirname(guardFile), "../../");
+
+  const REVEAL_GATE_EXEMPT = {
+    "api/events/[id]/recap.js": "recap lineup includes unannounced sets pending a product decision (#1471)",
+    "events/[slug]/recap.js": "recap metadata counts unannounced sets pending a product decision (#1471)",
+    "utils/bandProfileResource.js": "admin-only profile deletion checks referential integrity",
+    "utils/timeConflicts.js":
+      "its SQL (checkConflicts, detectBulkConflicts) is reached only from admin routes; public importers take pure helpers",
+  };
+  const PERFORMANCE_SQL_RE = /\b(?:FROM|JOIN)\s+performances\b/i;
+  const REVEAL_GATE_RE = /revealedPerformanceSql|publicRevealedPerformanceExistsSql|is_announced\s*=\s*1/;
+
+  it("keeps every non-admin performance query behind the reveal gate or an explicit exemption", () => {
+    const scanned = [];
+    const offenders = [];
+    for (const absPath of walk(root)) {
+      const relPath = path.relative(root, absPath).split(path.sep).join("/");
+      if (relPath.startsWith("api/admin/")) continue;
+      if (relPath.split("/").includes("__tests__")) continue;
+      if (relPath === "api/test-utils.js" || relPath === "utils/eventVisibility.js") continue;
+
+      const source = readFileSync(absPath, "utf8");
+      if (!PERFORMANCE_SQL_RE.test(source)) continue;
+      scanned.push(relPath);
+      if (!REVEAL_GATE_EXEMPT[relPath] && !REVEAL_GATE_RE.test(source)) {
+        offenders.push(relPath);
+      }
+    }
+
+    expect(scanned.length).toBeGreaterThan(0);
+    expect(scanned).toContain("api/schedule.js");
+    expect(
+      offenders,
+      offenders.length > 0
+        ? `These non-admin performance queries have no reveal gate or documented exemption: ${offenders.join(", ")}`
+        : undefined,
+    ).toEqual([]);
+    expect(Object.keys(REVEAL_GATE_EXEMPT)).toEqual([
+      "api/events/[id]/recap.js",
+      "events/[slug]/recap.js",
+      "utils/bandProfileResource.js",
+      "utils/timeConflicts.js",
+    ]);
+  });
+});
+
 describe("is_published never read outside admin/test infrastructure", () => {
   const currentFile = fileURLToPath(import.meta.url);
   const functionsRoot = path.join(path.dirname(currentFile), "../../");

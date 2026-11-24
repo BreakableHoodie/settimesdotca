@@ -29,11 +29,8 @@ describe("GET /api/bands/stats/:name — reveal_mode gate", () => {
     const request = new Request("https://example.test/api/bands/stats/Stats%20Hidden%20Band");
     const response = await onRequestGet({ request, env });
 
-    expect(response.status).toBe(200);
-    const payload = await response.json();
-    // The embargoed performance must be absent from both upcoming and stats
-    expect(payload.upcoming).toHaveLength(0);
-    expect(payload.stats.total_performances).toBe(0);
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: "Band not found" });
   });
 
   test("announced performance in reveal_mode=1 event is shown in band stats", async () => {

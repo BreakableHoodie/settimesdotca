@@ -1,6 +1,6 @@
 import { getPublicDataGateResponse } from "../../utils/publicGate.js";
 import { CACHE_BROWSE } from "../../utils/cacheHeaders.js";
-import { publicEventStatusSql } from "../../utils/eventVisibility.js";
+import { publicEventStatusSql, revealedPerformanceSql } from "../../utils/eventVisibility.js";
 
 function splitGenres(genre) {
   return String(genre || "")
@@ -24,7 +24,8 @@ export async function onRequestGet(context) {
        JOIN events e ON e.id = p.event_id
        WHERE bp.is_active = 1
          AND bp.genre IS NOT NULL
-         AND ${publicEventStatusSql("e")}`,
+         AND ${publicEventStatusSql("e")}
+         AND ${revealedPerformanceSql("e", "p")}`,
     ).all();
 
     const tags = new Map();

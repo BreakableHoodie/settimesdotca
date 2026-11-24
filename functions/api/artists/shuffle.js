@@ -1,6 +1,6 @@
 import { getPublicDataGateResponse } from "../../utils/publicGate.js";
 import { safeReflectSocialLinks } from "../../utils/validation.js";
-import { publicEventStatusSql } from "../../utils/eventVisibility.js";
+import { publicEventStatusSql, revealedPerformanceSql } from "../../utils/eventVisibility.js";
 
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 20;
@@ -55,7 +55,8 @@ export async function onRequestGet(context) {
       JOIN performances p ON p.band_profile_id = bp.id
       JOIN events e ON e.id = p.event_id
       WHERE bp.is_active = 1
-        AND ${publicEventStatusSql("e")}
+         AND ${publicEventStatusSql("e")}
+         AND ${revealedPerformanceSql("e", "p")}
       GROUP BY bp.id
       -- 6 / 3 / 1, matching the spec's stated "six times less likely". The
       -- code used 9 for the unseen bucket while the merged spec said 6, in

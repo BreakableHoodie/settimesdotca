@@ -14,7 +14,7 @@
 
 import { getPublicDataGateResponse } from "../../utils/publicGate.js";
 import { CACHE_BROWSE } from "../../utils/cacheHeaders.js";
-import { publicEventStatusSql } from "../../utils/eventVisibility.js";
+import { publicEventStatusSql, publicRevealedPerformanceExistsSql } from "../../utils/eventVisibility.js";
 
 const TOP_BANDS_LIMIT = 8;
 
@@ -73,10 +73,11 @@ export async function onRequestGet(context) {
         // degrade gracefully to alphabetical order pre-event, when
         // popularity_score is all zero.
         DB.prepare(
-          `SELECT name, popularity_score
-           FROM band_profiles
-           WHERE is_active = 1
-           ORDER BY popularity_score DESC, name COLLATE NOCASE ASC
+          `SELECT bp.name, bp.popularity_score
+            FROM band_profiles bp
+            WHERE bp.is_active = 1
+              AND ${publicRevealedPerformanceExistsSql("bp", "id", "band_profile_id")}
+            ORDER BY bp.popularity_score DESC, bp.name COLLATE NOCASE ASC
            LIMIT ?`,
         ).bind(TOP_BANDS_LIMIT),
       ]);

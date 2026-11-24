@@ -3,7 +3,7 @@ import { CACHE_SHOW_CRITICAL } from "../../../utils/cacheHeaders.js";
 import { normalizeBandName } from "../../../utils/bandName.js";
 import { safeReflectSocialLinks } from "../../../utils/validation.js";
 import { eventLocalFestivalToday } from "../../../utils/eventDay.js";
-import { publicEventStatusSql } from "../../../utils/eventVisibility.js";
+import { publicEventStatusSql, publicRevealedPerformanceExistsSql } from "../../../utils/eventVisibility.js";
 import { BAND_LINK_FIELD_KEYS } from "../../../utils/bandLinkFields.js";
 import { isCanonicalPositiveId } from "../../../utils/validation/ids.js";
 import { publicPlannedCount } from "../../../utils/plannedCount.js";
@@ -74,7 +74,9 @@ export async function onRequestGet(context) {
         `
         SELECT id, name, origin, origin_city, origin_region, social_links,
                photo_url, photo_alt_text, description, genre, members, for_fans_of
-        FROM band_profiles WHERE id = ? LIMIT 1
+         FROM band_profiles bp
+         WHERE bp.id = ? AND ${publicRevealedPerformanceExistsSql("bp", "id", "band_profile_id")}
+         LIMIT 1
       `,
       )
         .bind(bandId)
@@ -85,10 +87,11 @@ export async function onRequestGet(context) {
         `
         SELECT id, name, origin, origin_city, origin_region, social_links,
                photo_url, photo_alt_text, description, genre, members, for_fans_of
-        FROM band_profiles
-        WHERE name_normalized = ?
-           OR LOWER(TRIM(name)) = LOWER(?)
-        LIMIT 1
+         FROM band_profiles bp
+         WHERE (bp.name_normalized = ?
+            OR LOWER(TRIM(bp.name)) = LOWER(?))
+           AND ${publicRevealedPerformanceExistsSql("bp", "id", "band_profile_id")}
+         LIMIT 1
       `,
       )
         .bind(normalized, searchName)

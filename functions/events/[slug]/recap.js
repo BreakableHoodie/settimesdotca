@@ -127,6 +127,30 @@ export async function onRequestGet(context) {
   const title = `${event.name} — Event Recap | SetTimes.ca`;
   const formattedDate = formatEventDate(event.date);
   const description = `Recap for ${event.name} on ${formattedDate}. ${stats.total_sets} sets across ${stats.venue_count} venues.`;
+  const breadcrumb = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "History",
+        item: `${CANONICAL_HOST}/history`,
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: event.name,
+        item: `${CANONICAL_HOST}/event/${event.slug}`,
+      },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: "Recap",
+        item: url,
+      },
+    ],
+  };
 
   // Read-path sanitize (#504 convention, #616): never reflect a
   // pre-validation legacy poster_url into og:image/twitter:image.
@@ -157,7 +181,7 @@ export async function onRequestGet(context) {
     `<meta name="twitter:image" content="${escapeAttr(ogImageUrl)}" />`,
   ];
 
-  return serveWithInjectedMeta(context, { title, metaTags });
+  return serveWithInjectedMeta(context, { title, metaTags, jsonLd: [breadcrumb] });
 }
 
 // HEAD answers like GET: the catch-all is the only all-method route, so without this a HEAD would 404 (#1446).

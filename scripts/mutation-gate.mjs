@@ -86,6 +86,25 @@ export const REPO_ROOT = path.join(__dirname, "..");
 /** @type {Mutation[]} */
 export const MUTATIONS = [
   {
+    id: "jsonld-after-midnight-stays-on-festival-night",
+    invariant:
+      "CLAUDE.md 'After-midnight band sorting' — performance_date is the festival night; a 00:35 set stays in that night's subEvent",
+    file: "functions/event/[slug].js",
+    find: "  const day = row.performance_date || event.date;\n  return festivalDays.includes(day) ? day : event.date;",
+    replace:
+      "  const day = (startHour(row.start_time) ?? 9) < 6 ? festivalDays[0] : row.performance_date || event.date;\n  return festivalDays.includes(day) ? day : event.date;",
+    tests: ["functions/event/__tests__/slug.test.js"],
+  },
+  {
+    id: "jsonld-after-midnight-end-is-next-calendar-day",
+    invariant:
+      "CLAUDE.md 'After-midnight band sorting' — an end before 06:00 or before its start is on the next calendar day",
+    file: "functions/event/[slug].js",
+    find: "      return { date: afterMidnight ? nextCalendarDay(night) : night, time };",
+    replace: "      return { date: night, time };",
+    tests: ["functions/event/__tests__/slug.test.js"],
+  },
+  {
     id: "catch-all-delegates-home",
     invariant:
       "CLAUDE.md 'SSR owns identity meta and JSON-LD' — the catch-all hands / to index.js, or the splat 404s the home page (#1446)",
@@ -974,6 +993,24 @@ export const MUTATIONS = [
     find: "...(safePresentedByUrl ? { url: safePresentedByUrl } : {}),",
     replace: "url: safePresentedByUrl,",
     tests: ["functions/event/__tests__/slug.presenter-age.test.js"],
+  },
+  {
+    id: "event-jsonld-concluded-offer-availability",
+    invariant:
+      "CLAUDE.md 'SSR owns identity meta and JSON-LD' — a concluded event keeps its real Offer but omits availability instead of claiming tickets are InStock",
+    file: "functions/event/[slug].js",
+    find: '...(isConcluded ? {} : { availability: "https://schema.org/InStock" }),',
+    replace: "...(isConcluded ? {} : {}),",
+    tests: ["functions/event/__tests__/slug.test.js"],
+  },
+  {
+    id: "recap-jsonld-breadcrumb",
+    invariant:
+      "CLAUDE.md 'SSR owns identity meta and JSON-LD' — the recap emits a BreadcrumbList for the existing History, edition, and Recap routes",
+    file: "functions/events/[slug]/recap.js",
+    find: "return serveWithInjectedMeta(context, { title, metaTags, jsonLd: [breadcrumb] });",
+    replace: "return serveWithInjectedMeta(context, { title, metaTags, jsonLd: [] });",
+    tests: ["functions/events/__tests__/recap.test.js"],
   },
   {
     id: "ical-after-midnight-calendar-date",

@@ -14,11 +14,11 @@ import { normalizeHttpUrl } from "../utils/validation.js";
 import { sortableName } from "../utils/sortableName.js";
 import {
   torontoUtcOffset,
+  eventLocalFestivalToday,
   AFTER_MIDNIGHT_THRESHOLD_HOUR,
   nextCalendarDay,
-  previousCalendarDay,
 } from "../utils/eventDay.js";
-import { publicEventStatusSql } from "../utils/eventVisibility.js";
+import { concludedEventSql, publicEventStatusSql } from "../utils/eventVisibility.js";
 
 // Sets starting before 06:00 are after-midnight sets that belong to the
 // PREVIOUS festival day (AFTER_MIDNIGHT_THRESHOLD_HOUR = 6 convention; the
@@ -35,6 +35,51 @@ function startHour(startTime) {
   const timePart = startTime.includes(" ") ? startTime.split(" ")[1] : startTime;
   const hour = Number.parseInt((timePart ?? "").slice(0, 2), 10);
   return Number.isFinite(hour) ? hour : null;
+}
+
+const HHMM_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+function normalizeTime(time) {
+  if (typeof time !== "string") return null;
+  const value = time.includes(" ") ? time.split(" ")[1] : time;
+  const hhmm = value?.slice(0, 5);
+  return HHMM_REGEX.test(hhmm) ? hhmm : null;
+}
+
+function parseDoors(doorsJson) {
+  if (!doorsJson) return {};
+  try {
+    const parsed = JSON.parse(doorsJson);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function dateTime(date, time) {
+  return time ? `${date}T${time}:00${torontoUtcOffset(date)}` : date;
+}
+
+function earliestTime(values) {
+  return values.filter(Boolean).sort()[0] ?? null;
+}
+
+function latestPerformanceEnd(rows, fallbackDate) {
+  return rows
+    .map((row) => {
+      const time = normalizeTime(row.end_time);
+      if (!time) return null;
+      // An end before 06:00, or before the set's own start, is on the next
+      // calendar day after the festival night (after-midnight convention).
+      const night = row.performance_date || fallbackDate;
+      const start = normalizeTime(row.start_time);
+      const afterMidnight =
+        Number(time.slice(0, 2)) < AFTER_MIDNIGHT_THRESHOLD_HOUR || (start !== null && time < start);
+      return { date: afterMidnight ? nextCalendarDay(night) : night, time };
+    })
+    .filter(Boolean)
+    .sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`))
+    .at(-1);
 }
 
 /**
@@ -154,11 +199,11 @@ function eventDateRangeLabel(dateStr, endDateStr) {
  * from every subEvent.
  */
 function festivalDayForPerformance(row, event, festivalDays) {
-  let day = row.performance_date || event.date;
-  const hour = startHour(row.start_time);
-  if (hour !== null && hour < AFTER_MIDNIGHT_THRESHOLD_HOUR) {
-    day = previousCalendarDay(day);
-  }
+  // performance_date already IS the festival night: production stores a 00:35
+  // set on the same date as the 23:50 set before it (BuddiesFest 2, checked
+  // 2026-11-24). Stepping a pre-06:00 start back a day put night 2's late sets
+  // into night 1 (#1448).
+  const day = row.performance_date || event.date;
   return festivalDays.includes(day) ? day : event.date;
 }
 
@@ -178,11 +223,12 @@ export async function onRequest(context) {
   let event;
   try {
     event = await env.DB.prepare(
-      `SELECT id, name, date, end_date, slug, description, city, ticket_url, ticket_price, poster_url, created_at, reveal_mode, age_restriction, presented_by, presented_by_url
+      `SELECT id, name, date, end_date, slug, description, city, ticket_url, ticket_price, poster_url, created_at, reveal_mode, age_restriction, presented_by, presented_by_url, doors_json,
+              CASE WHEN ${concludedEventSql()} THEN 1 ELSE 0 END AS is_concluded
        FROM events
        WHERE slug = ? AND ${publicEventStatusSql()}`,
     )
-      .bind(slug)
+      .bind(eventLocalFestivalToday(), slug)
       .first();
   } catch (err) {
     console.error("SSR event lookup failed:", slug, err);
@@ -208,9 +254,10 @@ export async function onRequest(context) {
   try {
     const [performancesResult, venuesResult] = await Promise.all([
       env.DB.prepare(
-        `SELECT bp.id, bp.name, p.performance_date, p.start_time
+        `SELECT bp.id, bp.name, v.name AS venue_name, p.performance_date, p.start_time, p.end_time
          FROM performances p
          JOIN band_profiles bp ON p.band_profile_id = bp.id
+         LEFT JOIN venues v ON p.venue_id = v.id
          WHERE p.event_id = ?
            AND (? = 0 OR p.is_announced = 1)
          ORDER BY bp.name`,
@@ -306,6 +353,8 @@ export async function onRequest(context) {
   // same treatment and, when it fails, the organizer simply has no url.
   const safeTicketUrl = normalizeHttpUrl(event.ticket_url);
   const safePresentedByUrl = normalizeHttpUrl(event.presented_by_url);
+  const isSetTimesOrganizer =
+    typeof event.presented_by === "string" && /^(?:settimes|settimes\.ca)$/i.test(event.presented_by.trim());
   // When a presenter is set, the presenting org takes the organizer slot;
   // otherwise it defaults to SetTimes. presented_by_url is ignored without a
   // presenter — it describes the presenter, not SetTimes.
@@ -313,7 +362,7 @@ export async function onRequest(context) {
     ? {
         "@type": "Organization",
         name: event.presented_by,
-        ...(safePresentedByUrl ? { url: safePresentedByUrl } : {}),
+        ...(safePresentedByUrl || isSetTimesOrganizer ? { url: safePresentedByUrl || CANONICAL_HOST } : {}),
       }
     : {
         "@type": "Organization",
@@ -329,6 +378,7 @@ export async function onRequest(context) {
     typeof event.created_at === "string" && /^\d{4}-\d{2}-\d{2}/.test(event.created_at)
       ? event.created_at.slice(0, 10)
       : null;
+  const isConcluded = event.is_concluded === 1;
   // An Offer exists when there is a ticket link OR a stored price (#1197
   // review): a price entered without a link -- a free show, pay at the door
   // -- is still a true, useful fact, and gating it on the link dropped it
@@ -341,7 +391,9 @@ export async function onRequest(context) {
           "@type": "Offer",
           ...(safeTicketUrl ? { url: safeTicketUrl } : {}),
           priceCurrency: "CAD",
-          availability: "https://schema.org/InStock",
+          // EventScheduled means the event will take place or has taken place;
+          // concluded events must not claim that tickets are still in stock.
+          ...(isConcluded ? {} : { availability: "https://schema.org/InStock" }),
           ...(validFromDate ? { validFrom: validFromDate } : {}),
           // Only a price an admin actually entered (#1196) — never a fallback.
           // Number.isFinite, not truthiness: 0 is a real price (a free show),
@@ -349,7 +401,24 @@ export async function onRequest(context) {
           ...(hasTicketPrice ? { price: event.ticket_price } : {}),
         }
       : undefined;
-  const image = safePosterUrl ? [safePosterUrl] : undefined;
+  const image = [safePosterUrl || DEFAULT_OG_IMAGE];
+  const doors = parseDoors(event.doors_json);
+  const firstDayRows = performanceRows.filter(
+    (row) => festivalDayForPerformance(row, event, [event.date]) === event.date,
+  );
+  const startTime = earliestTime([
+    normalizeTime(doors[event.date]),
+    ...firstDayRows
+      .filter((row) => (startHour(row.start_time) ?? AFTER_MIDNIGHT_THRESHOLD_HOUR) >= AFTER_MIDNIGHT_THRESHOLD_HOUR)
+      .map((row) => normalizeTime(row.start_time)),
+  ]);
+  const latestEnd = latestPerformanceEnd(performanceRows, event.date);
+  const startDateValue = dateTime(event.date, startTime);
+  const endDateValue = latestEnd
+    ? dateTime(latestEnd.date, latestEnd.time)
+    : startTime
+      ? undefined
+      : event.end_date || event.date;
   let subEvent = [];
   if (isMultiDay) {
     const festivalDays = eachCalendarDay(event.date, event.end_date);
@@ -365,12 +434,26 @@ export async function onRequest(context) {
       const performers = [...performersByDay.get(day).values()].sort((a, b) =>
         sortableName(a.name).localeCompare(sortableName(b.name)),
       );
+      const dayRows = performanceRows.filter((row) => festivalDayForPerformance(row, event, festivalDays) === day);
+      const dayStartTime = earliestTime([
+        normalizeTime(doors[day]),
+        ...dayRows
+          .filter(
+            (row) => (startHour(row.start_time) ?? AFTER_MIDNIGHT_THRESHOLD_HOUR) >= AFTER_MIDNIGHT_THRESHOLD_HOUR,
+          )
+          .map((row) => normalizeTime(row.start_time)),
+      ]);
+      const dayEnd = latestPerformanceEnd(dayRows, day);
+      const venueNames = [...new Set(dayRows.map((row) => row.venue_name).filter(Boolean))];
+      const description =
+        performers.length > 0 && venueNames.length > 0
+          ? `${performers.map((performer) => performer.name).join(", ")} at ${venueNames.join(", ")}, ${event.name}`
+          : undefined;
       return {
         "@type": "MusicEvent",
         name: `${event.name} — ${festivalDayLabel(day)}`,
-        // Same show-start convention as the top-level MusicEvent below.
-        startDate: `${day}T18:45:00${torontoUtcOffset(day)}`,
-        endDate: day,
+        ...(dayStartTime ? { startDate: dateTime(day, dayStartTime) } : { startDate: day }),
+        ...(dayEnd ? { endDate: dateTime(dayEnd.date, dayEnd.time) } : dayStartTime ? {} : { endDate: day }),
         eventStatus: "https://schema.org/EventScheduled",
         eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
         // Google requires `location` on every Event node, subEvents included;
@@ -379,7 +462,8 @@ export async function onRequest(context) {
         location,
         organizer,
         ...(offers ? { offers } : {}),
-        ...(image ? { image } : {}),
+        image,
+        ...(description ? { description } : {}),
         ...(performers.length > 0
           ? {
               performer: performers.map((b) => ({
@@ -429,15 +513,14 @@ export async function onRequest(context) {
     url,
     eventStatus: "https://schema.org/EventScheduled",
     eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
-    // Show doors at 6:30PM; set times start 6:45PM — use the show-start per
-    // spec. torontoUtcOffset is DST-aware (#542 PR-4, folded pre-existing
-    // bug): a hardcoded -04:00 (EDT) is wrong for a winter event (e.g. a
-    // February show is EST, -05:00).
-    ...(event.date ? { startDate: `${event.date}T18:45:00${torontoUtcOffset(event.date)}` } : {}),
-    ...(event.date ? { endDate: event.end_date || event.date } : {}),
+    // Use only stored doors/set times. When no time is known, a date-only value
+    // is honest; when a start time is known but no end time is stored, omit the
+    // end rather than inventing a closing time. torontoUtcOffset is DST-aware.
+    ...(event.date ? { startDate: startDateValue } : {}),
+    ...(endDateValue ? { endDate: endDateValue } : {}),
     location,
     ...(plainDesc ? { description: plainDesc } : {}),
-    ...(image ? { image } : {}),
+    image,
     organizer,
     // `audience.requiredMinAge`, NOT `typicalAgeRange`. schema.org defines
     // typicalAgeRange as "the typical expected age range, e.g. '7-9', '11-'"

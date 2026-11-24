@@ -701,6 +701,42 @@ export const MUTATIONS = [
     tests: ["functions/band/__tests__/id.slug-redirect.test.js"],
   },
   {
+    id: "ssr-band-title-uses-hometown",
+    invariant:
+      "CLAUDE.md 'SSR owns identity meta and JSON-LD' — an out-of-region band title uses its factual hometown, never Waterloo Region",
+    file: "functions/band/[id].js",
+    find: "  const title = buildBandTitle(band);",
+    replace: "  const title = `${band.name} in Waterloo Region | SetTimes`;",
+    tests: ["functions/band/__tests__/id.band-meta.test.js"],
+  },
+  {
+    id: "band-lineup-count-public-status",
+    invariant:
+      "CLAUDE.md 'SSR owns identity meta and JSON-LD' — the band page's lineup count uses public (published/archived) editions only",
+    file: "functions/band/[id].js",
+    find: '             AND ${publicEventStatusSql("e")}\n             AND ${revealedPerformanceSql("e", "p")}) AS played_editions_count,',
+    replace: '             AND ${revealedPerformanceSql("e", "p")}) AS played_editions_count,',
+    tests: ["functions/band/__tests__/id.band-meta.test.js"],
+  },
+  {
+    id: "band-latest-edition-public-status",
+    invariant:
+      "CLAUDE.md 'SSR owns identity meta and JSON-LD' — the band page's latest edition name uses public (published/archived) editions only",
+    file: "functions/band/[id].js",
+    find: '             AND ${publicEventStatusSql("e")}\n             AND ${revealedPerformanceSql("e", "p")}\n           ORDER BY',
+    replace: '             AND ${revealedPerformanceSql("e", "p")}\n           ORDER BY',
+    tests: ["functions/band/__tests__/id.band-meta.test.js"],
+  },
+  {
+    id: "ssr-band-edition-count-reveal-cancel-gate",
+    invariant:
+      "CLAUDE.md 'SSR owns identity meta and JSON-LD' — edition counts include only public, revealed, non-cancelled performances",
+    file: "functions/band/[id].js",
+    find: '             AND p.is_cancelled = 0\n             AND ${publicEventStatusSql("e")}\n             AND ${revealedPerformanceSql("e", "p")}) AS played_editions_count,',
+    replace: "             AND 1 = 1) AS played_editions_count,",
+    tests: ["functions/band/__tests__/id.band-meta.test.js"],
+  },
+  {
     id: "sitemap-venue-reveal-gate",
     invariant:
       "CLAUDE.md 'Pulling a band from a live lineup' — sitemap venue URLs require a public performance past the reveal gate",

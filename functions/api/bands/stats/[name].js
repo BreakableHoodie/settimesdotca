@@ -242,6 +242,8 @@ export async function onRequestGet(context) {
     const responseData = {
       id: bandProfile.id,
       name: bandProfile.name,
+      origin_city: bandProfile.origin_city,
+      origin_region: bandProfile.origin_region,
       photo_url: bandProfile.photo_url,
       photo_alt_text: bandProfile.photo_alt_text,
       description: bandProfile.description,

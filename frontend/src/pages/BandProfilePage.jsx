@@ -38,6 +38,7 @@ import { bandFeedPath, calendarLinks } from '../utils/calendarLinks'
 import { getSelectedBands, saveSelectedBands, hasAnySchedule, getScheduleEventSlug } from '../utils/scheduleStorage'
 import { formatPerformanceDayLabel, formatTimeRange } from '../utils/timeFormat'
 import { safeExternalHref, safeInstagramHref } from '../utils/urlSafety'
+import { buildBandTitle } from '../utils/bandMeta'
 
 const ZERO_WIDTH_ENTITY_REGEX = /&shy;|&#173;|&#xad;|&ZeroWidthSpace;|&#8203;|&#x200B;/gi
 
@@ -171,7 +172,7 @@ export default function BandProfilePage() {
       ? isNotFoundError
         ? 'Band Not Found | SetTimes'
         : 'Band Profile | SetTimes'
-      : `${profile.name}${profile.genre ? ` — ${profile.genre}` : ''} in Waterloo Region | SetTimes`
+      : buildBandTitle(profile)
 
   useEffect(() => {
     const loadProfile = async () => {

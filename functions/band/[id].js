@@ -13,7 +13,12 @@ import {
 } from "../utils/ssrMeta.js";
 import { normalizeHttpUrl } from "../utils/validation.js";
 import { normalizeBandName } from "../utils/bandName.js";
-import { publicRevealedPerformanceExistsSql } from "../utils/eventVisibility.js";
+import {
+  publicEventStatusSql,
+  publicRevealedPerformanceExistsSql,
+  revealedPerformanceSql,
+} from "../utils/eventVisibility.js";
+import { buildBandFallbackDescription, buildBandTitle } from "../utils/bandMeta.js";
 
 /**
  * Resolve a slug to its canonical /band/<id> and 301 there, or fall through to
@@ -131,7 +136,23 @@ export async function onRequest(context) {
       // yields EIGHT parts for FOUR members, emitting names like "vox)". Wrong
       // structured data is worse than none, so `member` is omitted until it earns
       // a real parser with its own tests.
-      `SELECT name, genre, origin, origin_city, origin_region, description, photo_url, social_links
+      `SELECT name, genre, origin, origin_city, origin_region, description, photo_url, social_links,
+          (SELECT COUNT(DISTINCT e.id)
+           FROM performances p
+           JOIN events e ON e.id = p.event_id
+           WHERE p.band_profile_id = bp.id
+             AND p.is_cancelled = 0
+             AND ${publicEventStatusSql("e")}
+             AND ${revealedPerformanceSql("e", "p")}) AS played_editions_count,
+          (SELECT e.name
+           FROM performances p
+           JOIN events e ON e.id = p.event_id
+           WHERE p.band_profile_id = bp.id
+             AND p.is_cancelled = 0
+             AND ${publicEventStatusSql("e")}
+             AND ${revealedPerformanceSql("e", "p")}
+           ORDER BY COALESCE(p.performance_date, e.date) DESC, e.id DESC
+           LIMIT 1) AS most_recent_edition_name
        FROM band_profiles bp
        WHERE bp.id = ? AND ${publicRevealedPerformanceExistsSql("bp", "id", "band_profile_id")}`,
     )
@@ -161,9 +182,7 @@ export async function onRequest(context) {
   // Derived from schemaDesc rather than a second toPlainText pass: the strip
   // work is identical and the 200-char cut is a prefix of the 5000-char one.
   const plainDesc = truncatePlainText(schemaDesc, 200);
-  const tagline = [band.genre, band.origin].filter(Boolean).join(" · ");
-  const description =
-    plainDesc || `${band.name}${tagline ? ` — ${tagline}` : ""} on SetTimes, Waterloo Region's live music platform.`;
+  const description = plainDesc || truncatePlainText(buildBandFallbackDescription(band), 200);
 
   const metaTags = [
     `<meta name="description" content="${escapeAttr(description)}" />`,
@@ -247,9 +266,7 @@ export async function onRequest(context) {
     ],
   };
 
-  // Geo title: include genre for local-query capture; omit cleanly when absent.
-  const titleGenre = band.genre ? ` — ${band.genre}` : "";
-  const title = `${band.name}${titleGenre} in Waterloo Region | SetTimes`;
+  const title = buildBandTitle(band);
 
   return serveWithInjectedMeta(context, { title, metaTags, jsonLd: [musicGroup, breadcrumb] });
 }

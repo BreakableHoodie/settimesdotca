@@ -276,4 +276,24 @@ describe("restoreSql", () => {
     expect(rows("SELECT name FROM sqlite_master WHERE name = 'idx_child_parent'")).toHaveLength(1);
     restored.close();
   });
+
+  it("keeps an AUTOINCREMENT counter beyond 2^53 exact", () => {
+    const path = join(dir, "big-seq.db");
+    const db = new DatabaseSync(path);
+    db.exec(`
+      CREATE TABLE t (id INTEGER PRIMARY KEY AUTOINCREMENT, v TEXT);
+      INSERT INTO t VALUES (9007199254740993, 'x');
+      DELETE FROM t;
+    `);
+    db.close();
+    expect(restoreSql(path)).toContain(`INSERT INTO "sqlite_sequence" VALUES('t',9007199254740993);`);
+  });
+
+  it("refuses text holding a NUL byte, which would restore truncated", () => {
+    const path = join(dir, "nul.db");
+    const db = new DatabaseSync(path);
+    db.exec("CREATE TABLE t (v TEXT); INSERT INTO t VALUES ('A' || char(0) || 'B');");
+    db.close();
+    expect(() => restoreSql(path)).toThrow(/t: 1 row\(s\) hold text with a NUL byte/);
+  });
 });

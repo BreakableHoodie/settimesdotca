@@ -217,6 +217,19 @@ export function restoreSql(backupPath) {
     const tables = objects.filter((o) => o.type === "table");
     for (const { sql } of tables) out.push(`${sql};`);
     for (const { name } of tables) {
+      // node:sqlite reads TEXT up to its first NUL byte, so such a value
+      // would restore truncated. Nothing here writes one; refuse rather than
+      // lose data silently if one ever appears.
+      const textCols = db
+        .prepare(`SELECT name FROM pragma_table_info(?)`)
+        .all(name)
+        .map(
+          (c) => `(typeof(${quoteIdent(c.name)}) = 'text' AND instr(CAST(${quoteIdent(c.name)} AS BLOB), X'00') > 0)`,
+        );
+      if (textCols.length > 0) {
+        const nul = db.prepare(`SELECT COUNT(*) AS n FROM ${quoteIdent(name)} WHERE ${textCols.join(" OR ")}`).get().n;
+        if (nul > 0) throw new Error(`${name}: ${nul} row(s) hold text with a NUL byte, which would restore truncated`);
+      }
       const rows = db.prepare(`SELECT * FROM ${quoteIdent(name)}`);
       rows.setReadBigInts(true);
       for (const row of rows.iterate()) {
@@ -227,7 +240,9 @@ export function restoreSql(backupPath) {
     const hasSequence = db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'sqlite_sequence'").get();
     if (hasSequence) {
       out.push("DELETE FROM sqlite_sequence;");
-      for (const { name, seq } of db.prepare("SELECT name, seq FROM sqlite_sequence").all()) {
+      const sequences = db.prepare("SELECT name, seq FROM sqlite_sequence");
+      sequences.setReadBigInts(true);
+      for (const { name, seq } of sequences.all()) {
         out.push(`INSERT INTO "sqlite_sequence" VALUES(${sqlLiteral(name)},${sqlLiteral(seq)});`);
       }
     }

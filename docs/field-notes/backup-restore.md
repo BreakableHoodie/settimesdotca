@@ -52,21 +52,24 @@ Decided 2026-11-24 (owner): monthly, private R2, short-lived data left out, so n
 
 Into a NEW database, never over production while it serves (that is what Time Travel is for):
 
-Save this as a script and run it with `bash`, so the first failed step stops it: run line by line, a failed download leaves `sqlite3` to create an empty `backup.db` that passes `integrity_check`.
+Save this as a script and run it with `bash` from the repository root (after `npm ci` in `frontend/`, so the pinned wrangler is used), so the first failed step stops it: run line by line, a failed download leaves `sqlite3` to create an empty `backup.db` that passes `integrity_check`.
 
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
 umask 077
 key="monthly/<key>.db.gz"; target="settimes-restore-<date>"
-npx wrangler r2 object get "settimes-d1-backups/$key" --remote --file backup.db.gz
+wrangler=./frontend/node_modules/.bin/wrangler
+"$wrangler" r2 object get "settimes-d1-backups/$key" --remote --file backup.db.gz
 gunzip backup.db.gz
 test "$(sqlite3 backup.db 'PRAGMA integrity_check;')" = ok
 # Not `sqlite3 .dump`: since SQLite 3.50 it escapes newlines with unistr(),
 # which D1 refuses, and it wraps everything in a transaction D1 also refuses.
 node scripts/d1-backup.mjs --restore-sql backup.db > restore.sql
-npx wrangler d1 create "$target"
-npx wrangler d1 execute "$target" --remote --file restore.sql
+"$wrangler" d1 create "$target"
+"$wrangler" d1 execute "$target" --remote --file restore.sql
 ```
 
 Then point a preview at it, check, and only then decide how to bring rows back to production. Excluded tables restore empty: everyone signs in again, and the login log, security logs and share links start fresh. Delete the local files with `command rm -f` afterwards.
+
+**If a step fails,** start clean before retrying: `command rm -f backup.db.gz backup.db restore.sql`, and if the target database was created, delete it (`"$wrangler" d1 delete "$target"`) or pick a new name. A half-imported database is not a restore.

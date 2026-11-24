@@ -16,7 +16,7 @@
 // unannounced act is never linked. A failed read yields NO links (logged at
 // error) and never fails the page.
 import { eventLocalFestivalToday } from "./eventDay.js";
-import { concludedEventSql, publicEventStatusSql } from "./eventVisibility.js";
+import { concludedEventSql, publicEventStatusSql, revealedPerformanceSql } from "./eventVisibility.js";
 import { isPublicDataEnabled } from "./publicGate.js";
 import { escapeAttr } from "./ssrMeta.js";
 
@@ -46,7 +46,8 @@ export function renderEventLinks(bands, venues) {
   return renderLinkList(bandLinkItems(bands), "Lineup") + renderLinkList(venueLinkItems(venues), "Venues");
 }
 
-const REVEAL_GATE = "(e.reveal_mode = 0 OR p.is_announced = 1)";
+// The shared rule (#1472), not a private copy of it.
+const REVEAL_GATE = revealedPerformanceSql("e", "p");
 
 async function historyLinks(env) {
   const { results } = await env.DB.prepare(

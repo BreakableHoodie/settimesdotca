@@ -1061,7 +1061,7 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'Pulling a band from a live lineup' — the hub link lists never name an act or venue whose only sets are unannounced on a reveal-mode event (#1447)",
     file: "functions/utils/crawlableLinks.js",
-    find: 'const REVEAL_GATE = "(e.reveal_mode = 0 OR p.is_announced = 1)";',
+    find: 'const REVEAL_GATE = revealedPerformanceSql("e", "p");',
     replace: 'const REVEAL_GATE = "(1 = 1)";',
     tests: ["functions/__tests__/crawlableHubLinks.test.js"],
   },
@@ -1118,8 +1118,8 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'SSR owns identity meta and JSON-LD' — the recap emits a BreadcrumbList for the existing History, edition, and Recap routes",
     file: "functions/events/[slug]/recap.js",
-    find: "return serveWithInjectedMeta(context, { title, metaTags, jsonLd: [breadcrumb] });",
-    replace: "return serveWithInjectedMeta(context, { title, metaTags, jsonLd: [] });",
+    find: "return serveWithInjectedMeta(context, { title, metaTags, jsonLd: [breadcrumb], pageLinks });",
+    replace: "return serveWithInjectedMeta(context, { title, metaTags, jsonLd: [], pageLinks });",
     tests: ["functions/events/__tests__/recap.test.js"],
   },
   {

@@ -8,7 +8,7 @@
  */
 import { describe, expect, test } from "vitest";
 import { onRequest } from "../[id].js";
-import { createTestEnv } from "../../api/test-utils.js";
+import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../api/test-utils.js";
 import { DEFAULT_OG_IMAGE } from "../../utils/ssrMeta.js";
 
 const STUB_HTML = `<!doctype html><html><head>
@@ -27,15 +27,24 @@ function makeContext({ env, id }) {
   };
 }
 
+function insertPublicBand(rawDb, options) {
+  const event = insertEvent(rawDb, {
+    name: "SSR Event",
+    slug: `ssr-${options.name.toLowerCase().replace(/\s+/g, "-")}`,
+    date: "2099-01-01",
+    status: "published",
+  });
+  const venue = insertVenue(rawDb, { name: "SSR Venue" });
+  return insertBand(rawDb, { ...options, event_id: event.id, venue_id: venue.id }).band_profile_id;
+}
+
 describe("SSR /band/[id] — default og:image fallback (#644)", () => {
   test("uses the branded default og:image when the band has no photo_url", async () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
-    const info = rawDb
-      .prepare("INSERT INTO band_profiles (name, name_normalized, photo_url) VALUES (?, ?, NULL)")
-      .run("No Photo Band", "nophotoband");
+    const id = insertPublicBand(rawDb, { name: "No Photo Band" });
 
-    const response = await onRequest(makeContext({ env, id: info.lastInsertRowid }));
+    const response = await onRequest(makeContext({ env, id }));
     expect(response.status).toBe(200);
     const html = await response.text();
 
@@ -47,11 +56,12 @@ describe("SSR /band/[id] — default og:image fallback (#644)", () => {
   test("still prefers the band's own photo_url when present", async () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
-    const info = rawDb
-      .prepare("INSERT INTO band_profiles (name, name_normalized, photo_url) VALUES (?, ?, ?)")
-      .run("Photo Band", "photoband", "https://r2.settimes.ca/bands/photo-band.jpg");
+    const id = insertPublicBand(rawDb, {
+      name: "Photo Band",
+      photo_url: "https://r2.settimes.ca/bands/photo-band.jpg",
+    });
 
-    const response = await onRequest(makeContext({ env, id: info.lastInsertRowid }));
+    const response = await onRequest(makeContext({ env, id }));
     const html = await response.text();
 
     expect(html).toContain('<meta property="og:image" content="https://r2.settimes.ca/bands/photo-band.jpg" />');
@@ -61,12 +71,10 @@ describe("SSR /band/[id] — default og:image fallback (#644)", () => {
   test("falls back to the branded default for a legacy javascript: photo_url (read-path sanitize)", async () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
-    const info = rawDb
-      .prepare("INSERT INTO band_profiles (name, name_normalized, photo_url) VALUES (?, ?, ?)")
-      // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #644-review read-path guard
-      .run("Unsafe Photo Band", "unsafephotoband", "javascript:alert(1)");
+    // eslint-disable-next-line no-script-url -- test fixture: intentional unsafe scheme, exercises the #644-review read-path guard
+    const id = insertPublicBand(rawDb, { name: "Unsafe Photo Band", photo_url: "javascript:alert(1)" });
 
-    const response = await onRequest(makeContext({ env, id: info.lastInsertRowid }));
+    const response = await onRequest(makeContext({ env, id }));
     const html = await response.text();
 
     // eslint-disable-next-line no-script-url -- assertion text, not an executed scheme
@@ -106,11 +114,9 @@ describe("SSR /band/[id] — og:site_name (#784 ownership sweep)", () => {
   test("emits exactly one og:site_name, not a duplicate of the homepage shell's", async () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
-    const info = rawDb
-      .prepare("INSERT INTO band_profiles (name, name_normalized, photo_url) VALUES (?, ?, NULL)")
-      .run("Site Name Band", "sitenameband");
+    const id = insertPublicBand(rawDb, { name: "Site Name Band" });
 
-    const response = await onRequest(makeContextWithDefaultsShell({ env, id: info.lastInsertRowid }));
+    const response = await onRequest(makeContextWithDefaultsShell({ env, id }));
     const html = await response.text();
 
     expect(html.match(/property="og:site_name"/g)?.length).toBe(1);

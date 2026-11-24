@@ -1,7 +1,7 @@
 import { getPublicDataGateResponse } from "../../../utils/publicGate.js";
 import { CACHE_BROWSE } from "../../../utils/cacheHeaders.js";
 import { normalizeBandName } from "../../../utils/bandName.js";
-import { publicEventStatusSql } from "../../../utils/eventVisibility.js";
+import { publicEventStatusSql, publicRevealedPerformanceExistsSql } from "../../../utils/eventVisibility.js";
 import { isCanonicalPositiveId } from "../../../utils/validation/ids.js";
 
 export async function onRequestGet(context) {
@@ -31,11 +31,18 @@ export async function onRequestGet(context) {
     }
 
     const bandProfile = bandId
-      ? await env.DB.prepare("SELECT id FROM band_profiles WHERE id = ? LIMIT 1").bind(bandId).first()
+      ? await env.DB.prepare(
+          `SELECT bp.id FROM band_profiles bp
+            WHERE bp.id = ? AND ${publicRevealedPerformanceExistsSql("bp", "id", "band_profile_id")}
+            LIMIT 1`,
+        )
+          .bind(bandId)
+          .first()
       : await env.DB.prepare(
-          `SELECT id FROM band_profiles
-           WHERE name_normalized = ? OR LOWER(TRIM(name)) = LOWER(?)
-           LIMIT 1`,
+          `SELECT bp.id FROM band_profiles bp
+            WHERE (bp.name_normalized = ? OR LOWER(TRIM(bp.name)) = LOWER(?))
+              AND ${publicRevealedPerformanceExistsSql("bp", "id", "band_profile_id")}
+            LIMIT 1`,
         )
           .bind(normalizeBandName(searchName), searchName)
           .first();

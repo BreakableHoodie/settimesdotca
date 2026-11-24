@@ -8,7 +8,7 @@ import { getPublicDataGateResponse } from "../../utils/publicGate.js";
 import { CACHE_SHOW_CRITICAL } from "../../utils/cacheHeaders.js";
 import { validateId } from "../../utils/validation.js";
 import { eventLocalFestivalToday } from "../../utils/eventDay.js";
-import { publicEventStatusSql } from "../../utils/eventVisibility.js";
+import { publicEventStatusSql, publicRevealedPerformanceExistsSql } from "../../utils/eventVisibility.js";
 
 function json(body, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(body), {
@@ -43,7 +43,12 @@ export async function onRequestGet(context) {
   }
 
   try {
-    const venue = await DB.prepare("SELECT * FROM venues WHERE id = ?").bind(id).first();
+    const venue = await DB.prepare(
+      `SELECT * FROM venues v
+       WHERE v.id = ? AND ${publicRevealedPerformanceExistsSql("v", "id", "venue_id")}`,
+    )
+      .bind(id)
+      .first();
     if (!venue) {
       return json({ error: "Venue not found" }, 404);
     }

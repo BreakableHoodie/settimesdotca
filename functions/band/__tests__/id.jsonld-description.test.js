@@ -10,7 +10,7 @@
  */
 import { describe, expect, test } from "vitest";
 import { onRequest } from "../[id].js";
-import { createTestEnv } from "../../api/test-utils.js";
+import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../api/test-utils.js";
 
 // Selects the schema by @type rather than by position. The route emits
 // jsonLd: [musicGroup, breadcrumb], so "the first block" happens to work today,
@@ -37,6 +37,17 @@ function makeContext({ env, id }) {
   };
 }
 
+function insertPublicBand(rawDb, options) {
+  const event = insertEvent(rawDb, {
+    name: "SSR Event",
+    slug: `ssr-${options.name.toLowerCase().replace(/\s+/g, "-")}`,
+    date: "2099-01-01",
+    status: "published",
+  });
+  const venue = insertVenue(rawDb, { name: "SSR Venue" });
+  return insertBand(rawDb, { ...options, event_id: event.id, venue_id: venue.id }).band_profile_id;
+}
+
 describe("SSR /band/[id] — JSON-LD description is not SERP-truncated (#790)", () => {
   test("meta description truncates at 200 chars but musicGroup.description carries the full bio", async () => {
     const { env, rawDb } = createTestEnv();
@@ -45,11 +56,9 @@ describe("SSR /band/[id] — JSON-LD description is not SERP-truncated (#790)", 
     // LENGTH being asserted, not toPlainText's markdown-stripping behavior
     // (already covered elsewhere).
     const longBio = "A".repeat(250);
-    const info = rawDb
-      .prepare("INSERT INTO band_profiles (name, name_normalized, description) VALUES (?, ?, ?)")
-      .run("Long Bio Band", "longbioband", longBio);
+    const id = insertPublicBand(rawDb, { name: "Long Bio Band", description: longBio });
 
-    const response = await onRequest(makeContext({ env, id: info.lastInsertRowid }));
+    const response = await onRequest(makeContext({ env, id }));
     const html = await response.text();
 
     const metaMatch = html.match(/<meta name="description" content="([^"]*)" \/>/);
@@ -74,11 +83,9 @@ describe("SSR /band/[id] — JSON-LD description is not SERP-truncated (#790)", 
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
     const hugeBio = "A".repeat(5001);
-    const info = rawDb
-      .prepare("INSERT INTO band_profiles (name, name_normalized, description) VALUES (?, ?, ?)")
-      .run("Huge Bio Band", "hugebioband", hugeBio);
+    const id = insertPublicBand(rawDb, { name: "Huge Bio Band", description: hugeBio });
 
-    const response = await onRequest(makeContext({ env, id: info.lastInsertRowid }));
+    const response = await onRequest(makeContext({ env, id }));
     const html = await response.text();
 
     const musicGroup = findSchema(html, "MusicGroup");
@@ -90,11 +97,9 @@ describe("SSR /band/[id] — JSON-LD description is not SERP-truncated (#790)", 
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
     const shortBio = "A punk band from Waterloo Region.";
-    const info = rawDb
-      .prepare("INSERT INTO band_profiles (name, name_normalized, description) VALUES (?, ?, ?)")
-      .run("Short Bio Band", "shortbioband", shortBio);
+    const id = insertPublicBand(rawDb, { name: "Short Bio Band", description: shortBio });
 
-    const response = await onRequest(makeContext({ env, id: info.lastInsertRowid }));
+    const response = await onRequest(makeContext({ env, id }));
     const html = await response.text();
 
     const metaMatch = html.match(/<meta name="description" content="([^"]*)" \/>/);

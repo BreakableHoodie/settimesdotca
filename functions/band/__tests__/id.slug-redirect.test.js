@@ -15,7 +15,7 @@
  */
 import { describe, expect, test } from "vitest";
 import { onRequest } from "../[id].js";
-import { createTestEnv } from "../../api/test-utils.js";
+import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../api/test-utils.js";
 
 const STUB_HTML = `<!doctype html><html><head>
     <title>SetTimes – Live Music Events &amp; Show Schedules</title>
@@ -33,8 +33,14 @@ function makeContext({ env, id, search = "" }) {
 }
 
 function seedBand(rawDb, name, normalized) {
-  return rawDb.prepare("INSERT INTO band_profiles (name, name_normalized) VALUES (?, ?)").run(name, normalized)
-    .lastInsertRowid;
+  const event = insertEvent(rawDb, {
+    name: `${name} Event`,
+    slug: `${normalized || "punctuated"}-event`,
+    date: "2099-01-01",
+  });
+  rawDb.prepare("UPDATE events SET status = 'published', reveal_mode = 1 WHERE id = ?").run(event.id);
+  const venue = insertVenue(rawDb, { name: `${name} Venue` });
+  return insertBand(rawDb, { name, event_id: event.id, venue_id: venue.id }).band_profile_id;
 }
 
 describe("SSR /band/[id] — slug URLs redirect to the canonical id (#983)", () => {
@@ -99,6 +105,64 @@ describe("SSR /band/[id] — slug URLs redirect to the canonical id (#983)", () 
     expect(response.headers.get("Location")).toBeNull();
     expect(html).toContain('<meta name="robots" content="noindex">');
     expect(html).toContain("<title>Page not found | SetTimes</title>");
+  });
+
+  test("an unannounced-only band's slug answers the same real 404 as an unknown slug (#1452)", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, { name: "Hidden Event", slug: "hidden-band-event", date: "2099-01-01" });
+    rawDb.prepare("UPDATE events SET status = 'published', reveal_mode = 1 WHERE id = ?").run(event.id);
+    const venue = insertVenue(rawDb, { name: "Hidden Venue" });
+    const perf = insertBand(rawDb, { name: "Hidden SSR Band", event_id: event.id, venue_id: venue.id });
+    rawDb.prepare("UPDATE performances SET is_announced = 0 WHERE id = ?").run(perf.id);
+
+    const response = await onRequest(makeContext({ env, id: "hidden-ssr-band" }));
+    const html = await response.text();
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get("Location")).toBeNull();
+    expect(html).toContain('<meta name="robots" content="noindex">');
+  });
+
+  // The numeric page is the leak #1452 opens with: the SSR <title>, description
+  // and MusicGroup JSON-LD named the act before its announcement.
+  test("an unannounced-only band's numeric page is a 404 that never names the act (#1452)", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, { name: "Hidden Event", slug: "hidden-id-event", date: "2099-01-01" });
+    rawDb.prepare("UPDATE events SET status = 'published', reveal_mode = 1 WHERE id = ?").run(event.id);
+    const venue = insertVenue(rawDb, { name: "Hidden Venue" });
+    const perf = insertBand(rawDb, { name: "Secret Headliner", event_id: event.id, venue_id: venue.id });
+    rawDb.prepare("UPDATE performances SET is_announced = 0 WHERE id = ?").run(perf.id);
+
+    const response = await onRequest(makeContext({ env, id: perf.band_profile_id }));
+    const html = await response.text();
+
+    expect(response.status).toBe(404);
+    expect(html).toContain('<meta name="robots" content="noindex">');
+    expect(html).not.toContain("Secret Headliner");
+    expect(html).not.toContain("MusicGroup");
+
+    // Announcing the set makes the same page public, so the 404 above is the gate.
+    rawDb.prepare("UPDATE performances SET is_announced = 1 WHERE id = ?").run(perf.id);
+    const announced = await onRequest(makeContext({ env, id: perf.band_profile_id }));
+    expect(announced.status).toBe(200);
+    expect(await announced.text()).toContain("Secret Headliner");
+  });
+
+  test("an unannounced performance remains public when reveal_mode=0", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, { name: "Open Event", slug: "open-band-event", date: "2099-01-01" });
+    rawDb.prepare("UPDATE events SET status = 'published', reveal_mode = 0 WHERE id = ?").run(event.id);
+    const venue = insertVenue(rawDb, { name: "Open Venue" });
+    const perf = insertBand(rawDb, { name: "Open SSR Band", event_id: event.id, venue_id: venue.id });
+    rawDb.prepare("UPDATE performances SET is_announced = 0 WHERE id = ?").run(perf.id);
+
+    const response = await onRequest(makeContext({ env, id: "open-ssr-band" }));
+
+    expect(response.status).toBe(301);
+    expect(response.headers.get("Location")).toBe(`/band/${perf.band_profile_id}`);
   });
 
   test("an unknown numeric band id answers a real 404 with noindex (#1446)", async () => {

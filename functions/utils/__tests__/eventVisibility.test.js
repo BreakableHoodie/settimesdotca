@@ -2,7 +2,13 @@ import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { publicEventStatusSql, archivedEventStatusSql, publishedEventStatusSql } from "../eventVisibility.js";
+import {
+  publicEventStatusSql,
+  archivedEventStatusSql,
+  publishedEventStatusSql,
+  revealedPerformanceSql,
+  publicRevealedPerformanceExistsSql,
+} from "../eventVisibility.js";
 
 // Module-level so both source-scanning guards below share one walker.
 // .ts is scanned even though functions/ is currently JS-only: a guard that
@@ -89,6 +95,37 @@ describe("alias validation rejects non-strings", () => {
     expect(() => publicEventStatusSql(value)).toThrow(/invalid table alias/);
     expect(() => archivedEventStatusSql(value)).toThrow(/invalid table alias/);
     expect(() => publishedEventStatusSql(value)).toThrow(/invalid table alias/);
+  });
+});
+
+describe("revealed performance predicates", () => {
+  it("returns the reveal gate and short-circuits reveal mode zero", () => {
+    expect(revealedPerformanceSql()).toBe("(e.reveal_mode = 0 OR p.is_announced = 1)");
+    expect(revealedPerformanceSql("event", "performance")).toBe(
+      "(event.reveal_mode = 0 OR performance.is_announced = 1)",
+    );
+  });
+
+  it("builds a public, revealed correlated EXISTS predicate", () => {
+    expect(publicRevealedPerformanceExistsSql("bp", "id", "band_profile_id")).toBe(
+      "EXISTS (SELECT 1 FROM performances p JOIN events e ON e.id = p.event_id WHERE p.band_profile_id = bp.id AND e.status IN ('published', 'archived') AND (e.reveal_mode = 0 OR p.is_announced = 1))",
+    );
+  });
+
+  it("rejects unsafe identifiers", () => {
+    expect(() => publicRevealedPerformanceExistsSql("bp; DROP TABLE events;--", "id", "band_profile_id")).toThrow();
+    expect(() => publicRevealedPerformanceExistsSql("bp", "id", "band_profile_id; DROP TABLE events;--")).toThrow();
+  });
+});
+
+describe("public profile existence uses the reveal helper", () => {
+  const guardFile = fileURLToPath(import.meta.url);
+  const root = path.join(path.dirname(guardFile), "../../");
+  const requiredFiles = ["sitemap.xml.js", "band/[id].js", "venue/[id].js", "api/artists.js", "api/venues.js"];
+
+  it.each(requiredFiles)("%s references the shared reveal helper", (relativePath) => {
+    const source = readFileSync(path.join(root, relativePath), "utf8");
+    expect(source).toMatch(/revealedPerformanceSql|publicRevealedPerformanceExistsSql/);
   });
 });
 
@@ -185,6 +222,54 @@ describe("public events queries use the shared visibility predicate", () => {
             `UNGATED_BY_DESIGN in this guard WITH a comment saying why.`
         : undefined,
     ).toEqual([]);
+  });
+});
+
+describe("public performance queries use the reveal predicate", () => {
+  const guardFile = fileURLToPath(import.meta.url);
+  const root = path.join(path.dirname(guardFile), "../../");
+
+  const REVEAL_GATE_EXEMPT = {
+    "api/events/[id]/recap.js": "recap lineup includes unannounced sets pending a product decision (#1471)",
+    "events/[slug]/recap.js": "recap metadata counts unannounced sets pending a product decision (#1471)",
+    "utils/bandProfileResource.js": "admin-only profile deletion checks referential integrity",
+    "utils/timeConflicts.js":
+      "its SQL (checkConflicts, detectBulkConflicts) is reached only from admin routes; public importers take pure helpers",
+  };
+  const PERFORMANCE_SQL_RE = /\b(?:FROM|JOIN)\s+performances\b/i;
+  const REVEAL_GATE_RE = /revealedPerformanceSql|publicRevealedPerformanceExistsSql|is_announced\s*=\s*1/;
+
+  it("keeps every non-admin performance query behind the reveal gate or an explicit exemption", () => {
+    const scanned = [];
+    const offenders = [];
+    for (const absPath of walk(root)) {
+      const relPath = path.relative(root, absPath).split(path.sep).join("/");
+      if (relPath.startsWith("api/admin/")) continue;
+      if (relPath.split("/").includes("__tests__")) continue;
+      if (relPath === "api/test-utils.js" || relPath === "utils/eventVisibility.js") continue;
+
+      const source = readFileSync(absPath, "utf8");
+      if (!PERFORMANCE_SQL_RE.test(source)) continue;
+      scanned.push(relPath);
+      if (!REVEAL_GATE_EXEMPT[relPath] && !REVEAL_GATE_RE.test(source)) {
+        offenders.push(relPath);
+      }
+    }
+
+    expect(scanned.length).toBeGreaterThan(0);
+    expect(scanned).toContain("api/schedule.js");
+    expect(
+      offenders,
+      offenders.length > 0
+        ? `These non-admin performance queries have no reveal gate or documented exemption: ${offenders.join(", ")}`
+        : undefined,
+    ).toEqual([]);
+    expect(Object.keys(REVEAL_GATE_EXEMPT)).toEqual([
+      "api/events/[id]/recap.js",
+      "events/[slug]/recap.js",
+      "utils/bandProfileResource.js",
+      "utils/timeConflicts.js",
+    ]);
   });
 });
 

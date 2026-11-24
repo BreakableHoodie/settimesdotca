@@ -9,6 +9,7 @@ import {
   CANONICAL_HOST,
   DEFAULT_OG_IMAGE,
 } from "../utils/ssrMeta.js";
+import { publicRevealedPerformanceExistsSql } from "../utils/eventVisibility.js";
 
 export async function onRequest(context) {
   const { params, env, request } = context;
@@ -36,7 +37,8 @@ export async function onRequest(context) {
     venue = await env.DB.prepare(
       `SELECT name, address, address_line1, city, region, postal_code, latitude, longitude,
               website, phone, instagram, facebook
-       FROM venues WHERE id = ?`,
+       FROM venues v
+        WHERE v.id = ? AND ${publicRevealedPerformanceExistsSql("v", "id", "venue_id")}`,
     )
       .bind(Number(id))
       .first();

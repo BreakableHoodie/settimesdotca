@@ -29,10 +29,8 @@ describe("GET /api/venues/:id — reveal_mode gate", () => {
       params: { id: String(venue.id) },
     });
 
-    expect(response.status).toBe(200);
-    const payload = await response.json();
-    expect(payload.upcoming).toHaveLength(0);
-    expect(payload.past).toHaveLength(0);
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: "Venue not found" });
   });
 
   test("announced performance in reveal_mode=1 event is shown in venue lineup", async () => {
@@ -247,6 +245,8 @@ describe("GET /api/venues/:id — coordinate projection (#742)", () => {
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
 
     const venue = insertVenue(rawDb, { name: "Room 47" });
+    const event = insertEvent(rawDb, { name: "Coordinate Event", slug: "coordinate-event", status: "published" });
+    insertBand(rawDb, { name: "Coordinate Band", event_id: event.id, venue_id: venue.id });
     rawDb.prepare("UPDATE venues SET latitude = ?, longitude = ? WHERE id = ?").run(43.466445, -80.522916, venue.id);
 
     const response = await onRequestGet({ env, params: { id: String(venue.id) } });
@@ -262,6 +262,8 @@ describe("GET /api/venues/:id — coordinate projection (#742)", () => {
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
 
     const venue = insertVenue(rawDb, { name: "No Coordinates Venue" });
+    const event = insertEvent(rawDb, { name: "Coordinate Event", slug: "coordinate-event", status: "published" });
+    insertBand(rawDb, { name: "Coordinate Band", event_id: event.id, venue_id: venue.id });
 
     const response = await onRequestGet({ env, params: { id: String(venue.id) } });
 

@@ -20,6 +20,27 @@ async function getArtists(env, query = "") {
 }
 
 describe("Public artists directory - GET /api/artists", () => {
+  it("hides unannounced-only artists on reveal-mode events and keeps reveal_mode=0 visible", async () => {
+    const { env, rawDb } = seedEnv();
+    const venue = insertVenue(rawDb, { name: "Main" });
+    const hiddenEvent = insertEvent(rawDb, { name: "Hidden", slug: "artists-hidden" });
+    const openEvent = insertEvent(rawDb, { name: "Open", slug: "artists-open" });
+    publish(rawDb, hiddenEvent.id);
+    publish(rawDb, openEvent.id);
+    rawDb.prepare("UPDATE events SET reveal_mode = 1 WHERE id = ?").run(hiddenEvent.id);
+
+    const hiddenBand = insertBand(rawDb, { name: "Hidden Artist", event_id: hiddenEvent.id, venue_id: venue.id });
+    rawDb.prepare("UPDATE performances SET is_announced = 0 WHERE id = ?").run(hiddenBand.id);
+    const openBand = insertBand(rawDb, { name: "Open Artist", event_id: openEvent.id, venue_id: venue.id });
+    rawDb.prepare("UPDATE performances SET is_announced = 0 WHERE id = ?").run(openBand.id);
+
+    const res = await getArtists(env);
+    const { artists: list } = await res.json();
+    const names = list.map((artist) => artist.name);
+    expect(names).not.toContain("Hidden Artist");
+    expect(names).toContain("Open Artist");
+  });
+
   it("lists only artists who performed at a published or archived event", async () => {
     const { env, rawDb } = seedEnv();
     const venue = insertVenue(rawDb, { name: "Main" });

@@ -5,7 +5,11 @@
 import { escapeHtml as escapeXml } from "./utils/html.js";
 import { getPublicDataGateResponse } from "./utils/publicGate.js";
 import { eventLocalFestivalToday } from "./utils/eventDay.js";
-import { concludedEventSql, publicEventStatusSql } from "./utils/eventVisibility.js";
+import {
+  concludedEventSql,
+  publicEventStatusSql,
+  publicRevealedPerformanceExistsSql,
+} from "./utils/eventVisibility.js";
 
 export async function onRequestGet(context) {
   const { env } = context;
@@ -51,18 +55,14 @@ export async function onRequestGet(context) {
         .bind(eventLocalFestivalToday())
         .all(),
       env.DB.prepare(
-        `SELECT DISTINCT bp.id
+        `SELECT bp.id
          FROM band_profiles bp
-         INNER JOIN performances p ON p.band_profile_id = bp.id
-         INNER JOIN events e ON e.id = p.event_id
-         WHERE ${publicEventStatusSql("e")}`,
+         WHERE ${publicRevealedPerformanceExistsSql("bp", "id", "band_profile_id")}`,
       ).all(),
       env.DB.prepare(
-        `SELECT DISTINCT v.id
+        `SELECT v.id
          FROM venues v
-         INNER JOIN performances p ON p.venue_id = v.id
-         INNER JOIN events e ON e.id = p.event_id
-         WHERE ${publicEventStatusSql("e")}`,
+         WHERE ${publicRevealedPerformanceExistsSql("v", "id", "venue_id")}`,
       ).all(),
     ]);
 

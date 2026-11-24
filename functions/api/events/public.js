@@ -5,7 +5,7 @@
 import { getPublicDataGateResponse } from "../../utils/publicGate.js";
 import { CACHE_BROWSE } from "../../utils/cacheHeaders.js";
 import { normalizeHttpUrl } from "../../utils/validation.js";
-import { publicEventStatusSql } from "../../utils/eventVisibility.js";
+import { publicEventStatusSql, revealedPerformanceSql } from "../../utils/eventVisibility.js";
 import { eventLocalFestivalToday } from "../../utils/eventDay.js";
 
 export async function onRequestGet(context) {
@@ -42,7 +42,7 @@ export async function onRequestGet(context) {
         COUNT(DISTINCT p.band_profile_id) as band_count,
         COUNT(DISTINCT p.venue_id) as venue_count
       FROM events e
-      LEFT JOIN performances p ON p.event_id = e.id
+       LEFT JOIN performances p ON p.event_id = e.id AND ${revealedPerformanceSql("e", "p")}
       WHERE ${publicEventStatusSql("e")}
     `;
 
@@ -63,9 +63,10 @@ export async function onRequestGet(context) {
     if (genre !== "all") {
       query += ` AND EXISTS (
         SELECT 1 FROM performances p2
-        JOIN band_profiles bp ON p2.band_profile_id = bp.id
-        WHERE p2.event_id = e.id
-        AND instr(LOWER(bp.genre), LOWER(?)) > 0
+         JOIN band_profiles bp ON p2.band_profile_id = bp.id
+         WHERE p2.event_id = e.id
+         AND ${revealedPerformanceSql("e", "p2")}
+         AND instr(LOWER(bp.genre), LOWER(?)) > 0
       )`;
       params.push(genre);
     }

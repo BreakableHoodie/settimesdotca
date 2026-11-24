@@ -6,7 +6,7 @@
 
 import { getPublicDataGateResponse } from "../utils/publicGate.js";
 import { CACHE_BROWSE } from "../utils/cacheHeaders.js";
-import { publicEventStatusSql } from "../utils/eventVisibility.js";
+import { publicEventStatusSql, revealedPerformanceSql } from "../utils/eventVisibility.js";
 
 const DEFAULT_LIMIT = 24;
 const MAX_LIMIT = 60;
@@ -49,6 +49,7 @@ export async function onRequestGet(context) {
       JOIN performances p ON p.venue_id = v.id
       JOIN events e ON e.id = p.event_id
       WHERE ${publicEventStatusSql("e")}
+        AND ${revealedPerformanceSql("e", "p")}
         AND (
           ? = ''
           OR v.name LIKE ? ESCAPE '\\'

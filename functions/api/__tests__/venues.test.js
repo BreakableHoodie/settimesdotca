@@ -21,6 +21,32 @@ async function getVenues(env, query = "") {
 }
 
 describe("Public venue directory - GET /api/venues", () => {
+  it("hides unannounced-only venues on reveal-mode events and keeps reveal_mode=0 visible", async () => {
+    const { env, rawDb } = seedEnv();
+    const hiddenVenue = insertVenue(rawDb, { name: "Hidden Venue" });
+    const openVenue = insertVenue(rawDb, { name: "Open Venue" });
+    const hiddenEvent = insertEvent(rawDb, { name: "Hidden", slug: "venues-hidden" });
+    const openEvent = insertEvent(rawDb, { name: "Open", slug: "venues-open" });
+    publish(rawDb, hiddenEvent.id);
+    publish(rawDb, openEvent.id);
+    rawDb.prepare("UPDATE events SET reveal_mode = 1 WHERE id = ?").run(hiddenEvent.id);
+
+    const hiddenBand = insertBand(rawDb, {
+      name: "Hidden Venue Band",
+      event_id: hiddenEvent.id,
+      venue_id: hiddenVenue.id,
+    });
+    rawDb.prepare("UPDATE performances SET is_announced = 0 WHERE id = ?").run(hiddenBand.id);
+    const openBand = insertBand(rawDb, { name: "Open Venue Band", event_id: openEvent.id, venue_id: openVenue.id });
+    rawDb.prepare("UPDATE performances SET is_announced = 0 WHERE id = ?").run(openBand.id);
+
+    const res = await getVenues(env);
+    const { venues: list } = await res.json();
+    const names = list.map((venue) => venue.name);
+    expect(names).not.toContain("Hidden Venue");
+    expect(names).toContain("Open Venue");
+  });
+
   it("lists only venues that hosted a performance at a published or archived event", async () => {
     const { env, rawDb } = seedEnv();
 

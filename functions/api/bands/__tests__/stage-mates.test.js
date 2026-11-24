@@ -114,8 +114,8 @@ describe("GET /api/bands/:name/stage-mates", () => {
       request: new Request("https://example.test/api/bands/Hidden-Act/stage-mates"),
       env,
     });
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual([]);
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Band not found" });
   });
 
   // "1.9", "1e2" and "0x10" all satisfied the old `!isNaN && parseInt > 0`

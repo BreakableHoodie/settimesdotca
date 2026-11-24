@@ -111,11 +111,12 @@ test.describe("Public Timeline Viewing", () => {
     await expect(page).toHaveURL(/\/band\//);
     // The LOADED title, not the pre-load fallback. BandProfilePage sets
     // 'Band Profile | SetTimes' while the fetch is in flight and only then
-    // replicates the SSR formula, `{name} — {genre} in Waterloo Region | SetTimes`
-    // (functions/band/[id].js). The old pattern matched the fallback, so it could
+    // replicates the SSR formula from the shared buildBandTitle helpers
+    // (`{name} — {genre} from {hometown} | SetTimes`, parts dropped when absent). The old pattern matched the fallback, so it could
     // only ever pass while the page was still loading — which is the opposite of
     // the "wait until settled" this line is here to do.
-    await expect(page).toHaveTitle(/ in Waterloo Region \| SetTimes$/);
+    // Any formula title, never the in-flight fallback (#1476 changed the formula).
+    await expect(page).toHaveTitle(/^(?!Band Profile \| SetTimes$).+ \| SetTimes$/);
     // Scoping to main h1 avoids the Header's "SetTimes" h1 (strict mode violation).
     const heading = page.locator("main h1");
     await expect(heading).toBeVisible();

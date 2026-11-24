@@ -8,7 +8,7 @@
  */
 import { describe, expect, test } from "vitest";
 import { onRequest } from "../[id].js";
-import { createTestEnv, insertVenue } from "../../api/test-utils.js";
+import { createTestEnv, insertEvent, insertVenue, insertBand } from "../../api/test-utils.js";
 import { DEFAULT_OG_IMAGE } from "../../utils/ssrMeta.js";
 
 const STUB_HTML = `<!doctype html><html><head>
@@ -27,11 +27,23 @@ function makeContext({ env, id }) {
   };
 }
 
+function insertPublicVenue(rawDb, options) {
+  const venue = insertVenue(rawDb, options);
+  const event = insertEvent(rawDb, {
+    name: "SSR Venue Event",
+    slug: `ssr-venue-${venue.id}`,
+    date: "2099-01-01",
+    status: "published",
+  });
+  insertBand(rawDb, { name: `SSR Venue Band ${venue.id}`, event_id: event.id, venue_id: venue.id });
+  return venue;
+}
+
 describe("SSR /venue/[id] — default og:image fallback (#644)", () => {
   test("always uses the branded default og:image", async () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
-    const venue = insertVenue(rawDb, { name: "Room 47", city: "Waterloo" });
+    const venue = insertPublicVenue(rawDb, { name: "Room 47", city: "Waterloo" });
 
     const response = await onRequest(makeContext({ env, id: venue.id }));
     expect(response.status).toBe(200);
@@ -70,7 +82,7 @@ describe("SSR /venue/[id] — og:site_name (#784 ownership sweep)", () => {
   test("emits exactly one og:site_name, not a duplicate of the homepage shell's", async () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
-    const venue = insertVenue(rawDb, { name: "Prohibition", city: "Waterloo" });
+    const venue = insertPublicVenue(rawDb, { name: "Prohibition", city: "Waterloo" });
 
     const response = await onRequest(makeContextWithDefaultsShell({ env, id: venue.id }));
     const html = await response.text();

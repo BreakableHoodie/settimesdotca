@@ -52,6 +52,55 @@ describe("GET /sitemap.xml — recap entries (#555)", () => {
   });
 });
 
+describe("GET /sitemap.xml — profile reveal gate (#1452)", () => {
+  test("omits unannounced-only bands and venues, but keeps announced profiles", async () => {
+    const { env, rawDb } = createTestEnv();
+    const announcedEvent = insertEvent(rawDb, { name: "Announced", slug: "announced", date: "2099-01-01" });
+    const hiddenEvent = insertEvent(rawDb, { name: "Hidden", slug: "hidden", date: "2099-01-02" });
+    publish(rawDb, announcedEvent.id);
+    publish(rawDb, hiddenEvent.id);
+    rawDb.prepare("UPDATE events SET reveal_mode = 1 WHERE id = ?").run(hiddenEvent.id);
+
+    const announcedVenue = rawDb.prepare("INSERT INTO venues (name) VALUES (?) RETURNING id").get("Announced Venue");
+    const hiddenVenue = rawDb.prepare("INSERT INTO venues (name) VALUES (?) RETURNING id").get("Hidden Venue");
+    const announced = rawDb
+      .prepare("INSERT INTO band_profiles (name, name_normalized) VALUES (?, ?) RETURNING id")
+      .get("Announced Band", "announcedband");
+    const hidden = rawDb
+      .prepare("INSERT INTO band_profiles (name, name_normalized) VALUES (?, ?) RETURNING id")
+      .get("Hidden Band", "hiddenband");
+    rawDb
+      .prepare("INSERT INTO performances (event_id, venue_id, band_profile_id, is_announced) VALUES (?, ?, ?, ?)")
+      .run(announcedEvent.id, announcedVenue.id, announced.id, 1);
+    rawDb
+      .prepare("INSERT INTO performances (event_id, venue_id, band_profile_id, is_announced) VALUES (?, ?, ?, ?)")
+      .run(hiddenEvent.id, hiddenVenue.id, hidden.id, 0);
+
+    const xml = await fetchSitemap(env);
+    expect(xml).toContain(`/band/${announced.id}`);
+    expect(xml).toContain(`/venue/${announcedVenue.id}`);
+    expect(xml).not.toContain(`/band/${hidden.id}`);
+    expect(xml).not.toContain(`/venue/${hiddenVenue.id}`);
+  });
+
+  test("includes an unannounced profile on a reveal_mode=0 event", async () => {
+    const { env, rawDb } = createTestEnv();
+    const event = insertEvent(rawDb, { name: "Open Reveal", slug: "open-reveal", date: "2099-01-01" });
+    publish(rawDb, event.id);
+    const venue = rawDb.prepare("INSERT INTO venues (name) VALUES (?) RETURNING id").get("Open Venue");
+    const band = rawDb
+      .prepare("INSERT INTO band_profiles (name, name_normalized) VALUES (?, ?) RETURNING id")
+      .get("Open Band", "openband");
+    rawDb
+      .prepare("INSERT INTO performances (event_id, venue_id, band_profile_id, is_announced) VALUES (?, ?, ?, 0)")
+      .run(event.id, venue.id, band.id);
+
+    const xml = await fetchSitemap(env);
+    expect(xml).toContain(`/band/${band.id}`);
+    expect(xml).toContain(`/venue/${venue.id}`);
+  });
+});
+
 describe("GET /sitemap.xml — lastmod reflects CONTENT changes, not the event date", () => {
   // loc is interpolated into a RegExp, so it must be escaped: the dots in
   // "settimes.ca" are wildcards otherwise, and the pattern would match a host

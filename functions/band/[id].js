@@ -13,6 +13,7 @@ import {
 } from "../utils/ssrMeta.js";
 import { normalizeHttpUrl } from "../utils/validation.js";
 import { normalizeBandName } from "../utils/bandName.js";
+import { publicRevealedPerformanceExistsSql } from "../utils/eventVisibility.js";
 
 /**
  * Resolve a slug to its canonical /band/<id> and 301 there, or fall through to
@@ -64,7 +65,7 @@ async function redirectSlugToId(context, slug) {
   let match;
   try {
     match = await env.DB.prepare(
-      `SELECT id FROM band_profiles WHERE (name_normalized = ? AND ? <> '') OR LOWER(TRIM(name)) = LOWER(?) LIMIT 1`,
+      `SELECT bp.id FROM band_profiles bp WHERE ((name_normalized = ? AND ? <> '') OR LOWER(TRIM(name)) = LOWER(?)) AND ${publicRevealedPerformanceExistsSql("bp", "id", "band_profile_id")} LIMIT 1`,
     )
       .bind(lookupKey, lookupKey, rawName)
       .first();
@@ -131,7 +132,8 @@ export async function onRequest(context) {
       // structured data is worse than none, so `member` is omitted until it earns
       // a real parser with its own tests.
       `SELECT name, genre, origin, origin_city, origin_region, description, photo_url, social_links
-       FROM band_profiles WHERE id = ?`,
+       FROM band_profiles bp
+       WHERE bp.id = ? AND ${publicRevealedPerformanceExistsSql("bp", "id", "band_profile_id")}`,
     )
       .bind(Number(id))
       .first();

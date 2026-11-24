@@ -2,7 +2,13 @@ import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { publicEventStatusSql, archivedEventStatusSql, publishedEventStatusSql } from "../eventVisibility.js";
+import {
+  publicEventStatusSql,
+  archivedEventStatusSql,
+  publishedEventStatusSql,
+  revealedPerformanceSql,
+  publicRevealedPerformanceExistsSql,
+} from "../eventVisibility.js";
 
 // Module-level so both source-scanning guards below share one walker.
 // .ts is scanned even though functions/ is currently JS-only: a guard that
@@ -89,6 +95,37 @@ describe("alias validation rejects non-strings", () => {
     expect(() => publicEventStatusSql(value)).toThrow(/invalid table alias/);
     expect(() => archivedEventStatusSql(value)).toThrow(/invalid table alias/);
     expect(() => publishedEventStatusSql(value)).toThrow(/invalid table alias/);
+  });
+});
+
+describe("revealed performance predicates", () => {
+  it("returns the reveal gate and short-circuits reveal mode zero", () => {
+    expect(revealedPerformanceSql()).toBe("(e.reveal_mode = 0 OR p.is_announced = 1)");
+    expect(revealedPerformanceSql("event", "performance")).toBe(
+      "(event.reveal_mode = 0 OR performance.is_announced = 1)",
+    );
+  });
+
+  it("builds a public, revealed correlated EXISTS predicate", () => {
+    expect(publicRevealedPerformanceExistsSql("bp", "id", "band_profile_id")).toBe(
+      "EXISTS (SELECT 1 FROM performances p JOIN events e ON e.id = p.event_id WHERE p.band_profile_id = bp.id AND e.status IN ('published', 'archived') AND (e.reveal_mode = 0 OR p.is_announced = 1))",
+    );
+  });
+
+  it("rejects unsafe identifiers", () => {
+    expect(() => publicRevealedPerformanceExistsSql("bp; DROP TABLE events;--", "id", "band_profile_id")).toThrow();
+    expect(() => publicRevealedPerformanceExistsSql("bp", "id", "band_profile_id; DROP TABLE events;--")).toThrow();
+  });
+});
+
+describe("public profile existence uses the reveal helper", () => {
+  const guardFile = fileURLToPath(import.meta.url);
+  const root = path.join(path.dirname(guardFile), "../../");
+  const requiredFiles = ["sitemap.xml.js", "band/[id].js", "venue/[id].js", "api/artists.js", "api/venues.js"];
+
+  it.each(requiredFiles)("%s references the shared reveal helper", (relativePath) => {
+    const source = readFileSync(path.join(root, relativePath), "utf8");
+    expect(source).toMatch(/revealedPerformanceSql|publicRevealedPerformanceExistsSql/);
   });
 });
 

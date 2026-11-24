@@ -9,7 +9,7 @@ import { getPublicDataGateResponse } from "../utils/publicGate.js";
 import { CACHE_BROWSE } from "../utils/cacheHeaders.js";
 import { safeReflectSocialLinks } from "../utils/validation.js";
 import { sortableName } from "../utils/sortableName.js";
-import { publicEventStatusSql } from "../utils/eventVisibility.js";
+import { publicEventStatusSql, revealedPerformanceSql } from "../utils/eventVisibility.js";
 import { BAND_LINK_FIELD_KEYS } from "../utils/bandLinkFields.js";
 
 const DEFAULT_LIMIT = 24;
@@ -68,6 +68,7 @@ export async function onRequestGet(context) {
       JOIN performances p ON p.band_profile_id = bp.id
       JOIN events e ON e.id = p.event_id
       WHERE ${publicEventStatusSql("e")}
+        AND ${revealedPerformanceSql("e", "p")}
         AND (
           ? = ''
           OR bp.name LIKE ? ESCAPE '\\'

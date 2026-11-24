@@ -49,6 +49,54 @@ function columnRef(alias) {
   return alias ? `${alias}.status` : "status";
 }
 
+function assertValidIdentifier(identifier, label) {
+  if (typeof identifier !== "string" || !IDENTIFIER_RE.test(identifier)) {
+    throw new Error(`eventVisibility: invalid ${label} "${identifier}"`);
+  }
+}
+
+/**
+ * SQL predicate for a performance that has passed its event's reveal gate.
+ *
+ * @param {string} [eventAlias] - events alias, e.g. "e"
+ * @param {string} [performanceAlias] - performances alias, e.g. "p"
+ * @returns {string} e.g. "(e.reveal_mode = 0 OR p.is_announced = 1)"
+ */
+export function revealedPerformanceSql(eventAlias = "e", performanceAlias = "p") {
+  assertValidAlias(eventAlias);
+  assertValidAlias(performanceAlias);
+  if (!eventAlias || !performanceAlias) {
+    throw new Error("eventVisibility: reveal predicates require both table aliases");
+  }
+  return `(${eventAlias}.reveal_mode = 0 OR ${performanceAlias}.is_announced = 1)`;
+}
+
+/**
+ * SQL EXISTS fragment for a profile/entity with at least one public, revealed
+ * performance. The foreign-key column is validated because it is interpolated.
+ *
+ * @param {string} entityAlias - alias for the entity being tested
+ * @param {string} entityColumn - entity id column
+ * @param {string} performanceForeignKey - performances foreign-key column
+ * @param {string} [performanceAlias] - performances alias
+ * @param {string} [eventAlias] - events alias
+ * @returns {string} a correlated public-performance EXISTS predicate
+ */
+export function publicRevealedPerformanceExistsSql(
+  entityAlias,
+  entityColumn,
+  performanceForeignKey,
+  performanceAlias = "p",
+  eventAlias = "e",
+) {
+  assertValidAlias(entityAlias);
+  assertValidIdentifier(entityColumn, "entity column");
+  assertValidIdentifier(performanceForeignKey, "performance foreign-key column");
+  assertValidAlias(performanceAlias);
+  assertValidAlias(eventAlias);
+  return `EXISTS (SELECT 1 FROM performances ${performanceAlias} JOIN events ${eventAlias} ON ${eventAlias}.id = ${performanceAlias}.event_id WHERE ${performanceAlias}.${performanceForeignKey} = ${entityAlias}.${entityColumn} AND ${publicEventStatusSql(eventAlias)} AND ${revealedPerformanceSql(eventAlias, performanceAlias)})`;
+}
+
 /**
  * SQL predicate for "this event is publicly visible" — published or
  * archived. Pass the table alias in use at the call site (e.g. "e"); omit it

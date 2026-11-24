@@ -135,8 +135,9 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'SSR owns identity meta and JSON-LD' — a band whose name normalizes to empty (\"!!!\") still resolves from its exact name, as the band API finds it",
     file: "functions/band/[id].js",
-    find: "OR LOWER(TRIM(name)) = LOWER(?) LIMIT 1",
-    replace: "OR (LOWER(TRIM(name)) = LOWER(?) AND 0) LIMIT 1",
+    find: 'OR LOWER(TRIM(name)) = LOWER(?)) AND ${publicRevealedPerformanceExistsSql("bp", "id", "band_profile_id")} LIMIT 1',
+    replace:
+      'OR (LOWER(TRIM(name)) = LOWER(?) AND 0)) AND ${publicRevealedPerformanceExistsSql("bp", "id", "band_profile_id")} LIMIT 1',
     tests: ["functions/band/__tests__/id.slug-redirect.test.js"],
   },
   {
@@ -599,6 +600,80 @@ export const MUTATIONS = [
     find: "AND (? = 0 OR p.is_announced = 1)",
     replace: "AND (? = 0 OR 1 = 1)",
     tests: ["functions/api/__tests__/schedule-reveal.test.js"],
+  },
+  {
+    id: "sitemap-profile-reveal-gate",
+    invariant:
+      "CLAUDE.md 'Pulling a band from a live lineup' — sitemap profile URLs require a public performance past the reveal gate",
+    file: "functions/sitemap.xml.js",
+    find: 'WHERE ${publicRevealedPerformanceExistsSql("bp", "id", "band_profile_id")}',
+    replace: "WHERE 1 = 1",
+    tests: ["functions/__tests__/sitemap.test.js"],
+  },
+  {
+    id: "ssr-band-profile-reveal-gate",
+    invariant:
+      "CLAUDE.md 'Pulling a band from a live lineup' — SSR band slugs do not redirect an unannounced-only artist",
+    file: "functions/band/[id].js",
+    find: ')) AND ${publicRevealedPerformanceExistsSql("bp", "id", "band_profile_id")} LIMIT 1',
+    replace: ")) AND 1 = 1 LIMIT 1",
+    tests: ["functions/band/__tests__/id.slug-redirect.test.js"],
+  },
+  {
+    id: "ssr-venue-profile-reveal-gate",
+    invariant:
+      "CLAUDE.md 'Pulling a band from a live lineup' — SSR venue pages 404 when every performance is unannounced",
+    file: "functions/venue/[id].js",
+    find: 'WHERE v.id = ? AND ${publicRevealedPerformanceExistsSql("v", "id", "venue_id")}',
+    replace: "WHERE v.id = ? AND 1 = 1",
+    tests: ["functions/venue/__tests__/id.locality.test.js"],
+  },
+  {
+    id: "ssr-band-page-reveal-gate",
+    invariant:
+      "CLAUDE.md 'Pulling a band from a live lineup' — the SSR band page never names an unannounced-only artist in its title or JSON-LD",
+    file: "functions/band/[id].js",
+    find: 'WHERE bp.id = ? AND ${publicRevealedPerformanceExistsSql("bp", "id", "band_profile_id")}',
+    replace: "WHERE bp.id = ? AND 1 = 1",
+    tests: ["functions/band/__tests__/id.slug-redirect.test.js"],
+  },
+  {
+    id: "sitemap-venue-reveal-gate",
+    invariant:
+      "CLAUDE.md 'Pulling a band from a live lineup' — sitemap venue URLs require a public performance past the reveal gate",
+    file: "functions/sitemap.xml.js",
+    find: 'WHERE ${publicRevealedPerformanceExistsSql("v", "id", "venue_id")}',
+    replace: "WHERE 1 = 1",
+    tests: ["functions/__tests__/sitemap.test.js"],
+  },
+  {
+    id: "reveal-exists-helper-checks-announcement",
+    invariant:
+      "CLAUDE.md 'Pulling a band from a live lineup' — the shared reveal predicate hides an unannounced set on a reveal-mode event",
+    file: "functions/utils/eventVisibility.js",
+    find: "OR ${performanceAlias}.is_announced = 1)",
+    replace: "OR 1 = 1)",
+    tests: [
+      "functions/__tests__/sitemap.test.js",
+      "functions/band/__tests__/id.slug-redirect.test.js",
+      "functions/utils/__tests__/eventVisibility.test.js",
+    ],
+  },
+  {
+    id: "artists-directory-reveal-gate",
+    invariant: "CLAUDE.md 'Pulling a band from a live lineup' — the artist directory excludes unannounced-only artists",
+    file: "functions/api/artists.js",
+    find: 'AND ${revealedPerformanceSql("e", "p")}',
+    replace: "AND 1 = 1",
+    tests: ["functions/api/__tests__/artists.test.js"],
+  },
+  {
+    id: "venues-directory-reveal-gate",
+    invariant: "CLAUDE.md 'Pulling a band from a live lineup' — the venue directory excludes unannounced-only venues",
+    file: "functions/api/venues.js",
+    find: 'AND ${revealedPerformanceSql("e", "p")}',
+    replace: "AND 1 = 1",
+    tests: ["functions/api/__tests__/venues.test.js"],
   },
   {
     id: "ical-no-fabricated-start-time",

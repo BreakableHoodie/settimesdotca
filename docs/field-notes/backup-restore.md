@@ -72,4 +72,4 @@ node scripts/d1-backup.mjs --restore-sql backup.db > restore.sql
 
 Then point a preview at it, check, and only then decide how to bring rows back to production. Excluded tables restore empty: everyone signs in again, and the login log, security logs and share links start fresh. Delete the local files with `command rm -f` afterwards.
 
-**If a step fails,** start clean before retrying: `command rm -f backup.db.gz backup.db restore.sql`, and if the target database was created, delete it (`"$wrangler" d1 delete "$target"`) or pick a new name. A half-imported database is not a restore.
+**If a step fails,** start clean before retrying: `command rm -f backup.db.gz backup.db restore.sql`, and if the target database was created, delete it by its literal name (`./frontend/node_modules/.bin/wrangler d1 delete settimes-restore-<date>`; the script's variables are gone once it exits) or pick a new name. A half-imported database is not a restore.

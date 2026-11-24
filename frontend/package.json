@@ -95,7 +95,6 @@
     },
     "@babel/core": "7.29.6",
     "@puppeteer/browsers": "3.2.0",
-    "basic-ftp": "5.3.1",
     "esbuild": "0.28.2",
     "js-yaml": "^4.3.2",
     "body-parser": {

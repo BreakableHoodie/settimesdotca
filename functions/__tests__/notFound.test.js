@@ -11,6 +11,7 @@ import { onRequest as catchAll } from "../[[path]].js";
 import { serveNotFound } from "../utils/ssrMeta.js";
 import { isClientOnlyRoute } from "../utils/clientRoutes.js";
 import { createTestEnv } from "../api/test-utils.js";
+import { MARKER_FILE } from "../../scripts/wait-for-preview.mjs";
 
 const STUB_HTML = `<!doctype html><html><head>
     <meta name="description" content="Homepage description" />
@@ -173,12 +174,22 @@ describe("every client route is reachable (not swallowed by the catch-all)", () 
     walk(path.join(root, "frontend/public"));
     // Pages 308s /x.html to /x, and sw.js precaches /offline: check that URL too.
     for (const f of [...files]) if (f.endsWith(".html")) files.push(f.slice(0, -5));
-    const globToRe = (g) => new RegExp(`^${g.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`);
-    const excluded = routes.exclude.map(globToRe);
+    // edge-e2e.yml writes this marker into dist/ after the build, so it is never
+    // in frontend/public. With include ["/*"] the catch-all 404ed it and the
+    // preview never looked ready (#1451's first edge run).
+    files.push(`/${MARKER_FILE}`);
+    // Pages globs here use at most one "*", so a prefix/suffix check is exact
+    // and needs no RegExp built from data (Semgrep detect-non-literal-regexp).
+    expect(routes.exclude.filter((g) => g.split("*").length > 2)).toEqual([]);
+    const globMatch = (g, f) => {
+      const [head, tail] = g.split("*");
+      if (tail === undefined) return f === g;
+      return f.length >= head.length + tail.length && f.startsWith(head) && f.endsWith(tail);
+    };
     const unserved = files.filter(
       (f) =>
         !["/_headers", "/_routes.json"].includes(f) &&
-        !excluded.some((re) => re.test(f)) &&
+        !routes.exclude.some((g) => globMatch(g, f)) &&
         !fnRoutes.includes(f.replace(/\.xml$/, ".xml")),
     );
     // sitemap.xml is owned by functions/sitemap.xml.js

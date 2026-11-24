@@ -1,5 +1,5 @@
 {
   "version": 1,
   "include": ["/*"],
-  "exclude": ["/admin/*", "/assets/*", "/.well-known/*", "/fonts/*", "/index.html", "/og-default.png", "/favicon.ico", "/favicon.svg", "/favicon-*.png", "/apple-touch-icon.png", "/android-chrome-*.png", "/manifest.json", "/robots.txt", "/sw.js", "/offline.html", "/offline"]
+  "exclude": ["/admin/*", "/assets/*", "/.well-known/*", "/fonts/*", "/index.html", "/og-default.png", "/favicon.ico", "/favicon.svg", "/favicon-*.png", "/apple-touch-icon.png", "/android-chrome-*.png", "/manifest.json", "/robots.txt", "/sw.js", "/offline.html", "/offline", "/edge-e2e-deployment.txt"]
 }

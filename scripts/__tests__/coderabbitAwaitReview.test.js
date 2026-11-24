@@ -917,6 +917,96 @@ describe("awaitReview: replies that end the wait (#1470)", () => {
     expect(holder.d.calls.findingShas).not.toContain(OLD);
   });
 
+  it("a bot skip NEWER than a rate-limit comment wins: exit 6, not a cooldown (head 10:00, limit 10:01, skip 10:02)", async () => {
+    // Fake-clock milliseconds: head "10:00" = 1000, "10:01" = 2000, "10:02" = 3000.
+    const T = (hhmm) => ({ "10:00": 1000, "10:01": 2000, "10:02": 3000 })[hhmm];
+    const d = fakeDeps({
+      ...noStatus,
+      comment: RL_COMMENT,
+      commentAt: new Date(T("10:01")).toISOString(),
+      committedAt: T("10:00"),
+      reply: { kind: "bot_skipped", at: new Date(T("10:02")).toISOString() },
+    });
+    expect(await awaitReview(d, { pollMs: 1000 })).toBe(6);
+    expect(d.calls.requests).toBe(0);
+    expect(d.calls.sleeps).toEqual([]);
+  });
+
+  it("a rate-limit comment NEWER than the bot skip keeps the cooldown handling", async () => {
+    // Fake-clock milliseconds: head "10:00" = 1000, "10:01" = 2000, "10:02" = 3000.
+    const T = (hhmm) => ({ "10:00": 1000, "10:01": 2000, "10:02": 3000 })[hhmm];
+    const d = fakeDeps({
+      statuses: [null, null, COMPLETED],
+      comment: RL_COMMENT,
+      commentAt: new Date(T("10:02")).toISOString(),
+      committedAt: T("10:00"),
+      reply: { kind: "other", at: new Date(T("10:02")).toISOString() },
+    });
+    expect(await awaitReview(d, { pollMs: 1000 })).toBe(0);
+    expect(d.calls.requests).toBe(1);
+  });
+
+  it("a thrown full-review request does not spend the once-per-head flag: the next pass retries, within maxRequests", async () => {
+    let throwOnce = true;
+    const d = fakeDeps({
+      statuses: [null, null, null, COMPLETED],
+      reply: { kind: "already_reviewed", at: AFTER },
+      lastReviewedSha: OLD,
+    });
+    const real = d.requestReview;
+    d.requestReview = (full) => {
+      if (throwOnce) {
+        throwOnce = false;
+        throw new Error("gh blip");
+      }
+      return real(full);
+    };
+    expect(await awaitReview(d, { pollMs: 1000, noStatusGraceMs: 10 ** 12 })).toBe(0);
+    expect(d.calls.bodies).toEqual(["full"]);
+  });
+
+  it("a thrown full-review request still counts against maxRequests", async () => {
+    const d = fakeDeps({
+      statuses: [null],
+      reply: { kind: "already_reviewed", at: AFTER },
+      lastReviewedSha: OLD,
+    });
+    let attempts = 0;
+    d.requestReview = () => {
+      attempts += 1;
+      throw new Error("gh blip");
+    };
+    // maxRequests 1: one failed attempt spends it; then the wait gives up or errors, never retries forever.
+    await awaitReview(d, { pollMs: 1000, maxRequests: 1, timeoutMs: 20_000, noStatusGraceMs: 10 ** 12 }).catch(
+      () => {},
+    );
+    expect(attempts).toBe(1);
+  });
+
+  it("does not leak coverage from a pass that threw into the next pass (head reviewed with findings returns 5)", async () => {
+    let replied = false;
+    let headReads = 0;
+    let oldReads = 0;
+    const clean = { confirmed: true, outsideDiff: 0, nitpicks: 0, duplicates: 0, other: 0, url: null };
+    const d = fakeDeps({
+      statuses: [null, COMPLETED],
+      // Pass 1: the reply adopts OLD's coverage, then reading OLD's findings throws.
+      // Pass 2: no reply; the head itself is reviewed and carries a finding.
+      reply: () => (replied ? null : ((replied = true), { kind: "already_reviewed", at: AFTER })),
+      lastReviewedSha: OLD,
+      sameTree: () => true,
+      findings: (sha) => {
+        if (sha === OLD) {
+          if (oldReads++ === 0) throw new Error("gh blip");
+          return clean; // a leaked coverage would read this clean review and return 0
+        }
+        // The head: unconfirmed on the first read, reviewed with a finding after.
+        return headReads++ === 0 ? { ...clean, confirmed: false } : { ...clean, outsideDiff: 1 };
+      },
+    });
+    expect(await awaitReview(d, { pollMs: 1000 })).toBe(5);
+  });
+
   it("a bot-authored skip is terminal: exit 6, no review requested", async () => {
     const d = fakeDeps({ ...noStatus, reply: { kind: "bot_skipped", at: AFTER } });
     expect(await awaitReview(d, { pollMs: 1000 })).toBe(6);
@@ -985,6 +1075,17 @@ describe("samePatchIn against a real git repository (#1470)", () => {
 
   it("sees a different change as a different patch", () => {
     expect(samePatchIn(oldPr, different, repo)).toBe(false);
+  });
+
+  it("does not equate patches that differ only by whitespace inside a string literal", () => {
+    const mk = (branch, text) => {
+      g("checkout", "-q", "-b", branch, "main");
+      return commitFile("s.js", text, branch);
+    };
+    const withSpace = mk("ws-a", 'const s = "a b";\n');
+    const withoutSpace = mk("ws-b", 'const s = "ab";\n');
+    expect(samePatchIn(withSpace, withoutSpace, repo)).toBe(false);
+    expect(samePatchIn(withSpace, withSpace, repo)).toBe(true);
   });
 
   it("reads an unknown commit as different, never the same", () => {

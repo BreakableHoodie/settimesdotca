@@ -59,7 +59,7 @@
  * after a content-identical rebase: if the commit CodeRabbit last reviewed has
  * the head's tree or patch, the head counts as reviewed and is judged on THAT review's
  * body; otherwise one `@coderabbitai full review` is posted. "Same" means the
- * same tree or the same patch (`git patch-id --stable` against the merge-base
+ * same tree or the same patch (`git patch-id --verbatim` against the merge-base
  * with origin/main), so a rebase onto a MOVED main does not spend a review. The reply must be
  * the newest CodeRabbit comment and newer than our latest request (or, with no
  * request yet, than the head commit).
@@ -232,7 +232,7 @@ function git(args, cwd, input) {
 }
 
 /**
- * The stable patch-id of what `sha` changes relative to its merge-base with
+ * The verbatim patch-id of what `sha` changes relative to its merge-base with
  * origin/main (#1470), or null when it cannot be computed. Two commits with the
  * same patch-id carry the same PR changes, even if one sits on a main that has
  * since moved. Missing objects are fetched once; no shell is involved.
@@ -242,7 +242,7 @@ export function patchIdOf(sha, cwd) {
     const base = git(["merge-base", "origin/main", sha], cwd).trim();
     const diff = git(["diff", "--no-color", base, sha], cwd);
     // An empty diff has no patch-id; it must never read as "same" as another.
-    const id = git(["patch-id", "--stable"], cwd, diff).trim().split(/\s+/)[0];
+    const id = git(["patch-id", "--verbatim"], cwd, diff).trim().split(/\s+/)[0];
     return id || null;
   };
   try {
@@ -465,8 +465,6 @@ export async function awaitReview(deps, opts = {}) {
   let unconfirmedSince = null;
   let lastRequestAt = null;
   let fullReviewPosted = false;
-  // The commit whose review covers the head via an identical tree (#1470).
-  let coveredBy = null;
   // Every piece of PER-HEAD state resets here and only here. The three
   // head-change paths each once reset it by hand, and one forgot the skip
   // timer (#1200 review), letting an old head's skip time shorten the new
@@ -484,7 +482,6 @@ export async function awaitReview(deps, opts = {}) {
     unconfirmedSince = null;
     lastRequestAt = null;
     fullReviewPosted = false;
-    coveredBy = null;
   };
   // Every review request goes through here, so a limit comment can be judged
   // against the latest one (#1401).
@@ -508,6 +505,19 @@ export async function awaitReview(deps, opts = {}) {
 
   /** One poll. Returns an exit code to stop, or undefined to poll again. */
   async function step() {
+    // Per PASS, never per head: a pass that throws after setting it must not
+    // leak an old review's clean verdict into the next one (#1470 review).
+    let coveredBy = null;
+    // One read of CodeRabbit's newest comment per pass.
+    let replyRead = false;
+    let replyValue = null;
+    const latestReply = () => {
+      if (!replyRead) {
+        replyValue = deps.getLatestReply();
+        replyRead = true;
+      }
+      return replyValue;
+    };
     const status = deps.getStatus(head);
     let state = classifyStatus(status);
     if (state === "in_progress" && deps.now() - Date.parse(status.updated_at) > STALE_IN_PROGRESS_MS) {
@@ -556,13 +566,22 @@ export async function awaitReview(deps, opts = {}) {
       // otherwise the stale comment would re-trigger its cooldown after every
       // request while the requested review is still under way.
       const c = deps.getLatestRateLimitComment();
-      if (c && limitCommentApplies(c.at, deps.headCommittedAt(head), lastRequestAt)) state = "rate_limited";
+      if (c && limitCommentApplies(c.at, deps.headCommittedAt(head), lastRequestAt)) {
+        // A terminal reply NEWER than the limit comment wins: waiting out a
+        // cooldown that CodeRabbit has since superseded would re-request forever.
+        const r = latestReply();
+        const terminalNewer =
+          r?.kind === "bot_skipped" &&
+          limitCommentApplies(r.at, deps.headCommittedAt(head), lastRequestAt) &&
+          Date.parse(r.at) > Date.parse(c.at);
+        if (!terminalNewer) state = "rate_limited";
+      }
     }
     if (state === "none" || state === "skipped") {
       // #1470: CodeRabbit's replies to a request can end the wait early. Only
       // the newest CodeRabbit comment counts, and only one newer than the head
       // commit and than our own latest request.
-      const reply = deps.getLatestReply();
+      const reply = latestReply();
       if (reply && limitCommentApplies(reply.at, deps.headCommittedAt(head), lastRequestAt)) {
         if (reply.kind === "bot_skipped") {
           deps.log(
@@ -585,9 +604,12 @@ export async function awaitReview(deps, opts = {}) {
               switchHead(pr.head);
               return undefined;
             }
-            fullReviewPosted = true;
+            // Budget is spent before the call (a failed attempt still counts);
+            // the once-per-head flag only after the request went out, so a
+            // thrown request leaves the next pass free to try again.
             requests += 1;
             requestReview(true);
+            fullReviewPosted = true;
             deps.log(
               `CodeRabbit says it already reviewed the last commit, but the tree changed; posted @coderabbitai full review (${requests}/${maxRequests}).`,
             );

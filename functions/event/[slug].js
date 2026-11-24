@@ -13,7 +13,7 @@ import {
 import { normalizeHttpUrl } from "../utils/validation.js";
 import { sortableName } from "../utils/sortableName.js";
 import {
-  torontoUtcOffset,
+  torontoUtcOffsetAt,
   eventLocalFestivalToday,
   AFTER_MIDNIGHT_THRESHOLD_HOUR,
   nextCalendarDay,
@@ -57,7 +57,7 @@ function parseDoors(doorsJson) {
 }
 
 function dateTime(date, time) {
-  return time ? `${date}T${time}:00${torontoUtcOffset(date)}` : date;
+  return time ? `${date}T${time}:00${torontoUtcOffsetAt(date, time)}` : date;
 }
 
 function earliestTime(values) {
@@ -79,7 +79,7 @@ function calendarDateOf(night, time) {
  */
 function closingBoundary(rows, fallbackDate) {
   let lastStart = null;
-  let lastStartEnd = null;
+  let lastStartEndsKnown = false;
   let latestEnd = null;
   for (const row of rows) {
     const night = row.performance_date || fallbackDate;
@@ -97,14 +97,18 @@ function closingBoundary(rows, fallbackDate) {
     if (endKey && (!latestEnd || endKey > latestEnd.key)) latestEnd = { key: endKey, date: endDate, time: end };
     if (start) {
       const startKey = `${startDate}T${start}`;
+      // Every set tied for the latest start must have an end; otherwise the
+      // answer would depend on row order (#1475 review).
       if (!lastStart || startKey > lastStart) {
         lastStart = startKey;
-        lastStartEnd = endKey;
+        lastStartEndsKnown = Boolean(endKey);
+      } else if (startKey === lastStart) {
+        lastStartEndsKnown = lastStartEndsKnown && Boolean(endKey);
       }
     }
   }
   if (!latestEnd) return null;
-  if (lastStart && (!lastStartEnd || lastStart > latestEnd.key)) return null;
+  if (lastStart && (!lastStartEndsKnown || lastStart > latestEnd.key)) return null;
   return { date: latestEnd.date, time: latestEnd.time };
 }
 

@@ -118,8 +118,26 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'After-midnight band sorting' — an unknown end on the latest-starting set means no endDate, never an earlier set's end",
     file: "functions/event/[slug].js",
-    find: "  if (lastStart && (!lastStartEnd || lastStart > latestEnd.key)) return null;",
+    find: "  if (lastStart && (!lastStartEndsKnown || lastStart > latestEnd.key)) return null;",
     replace: "  if (false) return null;",
+    tests: ["functions/event/__tests__/slug.test.js"],
+  },
+  {
+    id: "jsonld-utc-offset-from-the-time",
+    invariant:
+      "CLAUDE.md 'After-midnight band sorting' — the UTC offset is the one at that wall-clock time, not the date's noon (spring-forward night)",
+    file: "functions/event/[slug].js",
+    find: "  return time ? `${date}T${time}:00${torontoUtcOffsetAt(date, time)}` : date;",
+    replace: '  return time ? `${date}T${time}:00${torontoUtcOffsetAt(date, "12:00")}` : date;',
+    tests: ["functions/event/__tests__/slug.test.js"],
+  },
+  {
+    id: "jsonld-tied-latest-starts-all-need-an-end",
+    invariant:
+      "CLAUDE.md 'After-midnight band sorting' — every set tied for the latest start needs a known end, independent of row order",
+    file: "functions/event/[slug].js",
+    find: "        lastStartEndsKnown = lastStartEndsKnown && Boolean(endKey);",
+    replace: "        lastStartEndsKnown = lastStartEndsKnown;",
     tests: ["functions/event/__tests__/slug.test.js"],
   },
   {

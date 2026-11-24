@@ -1,10 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, test, expect } from "vitest";
 import {
   eventLocalToday,
   eventLocalClock,
   eventLocalFestivalToday,
   AFTER_MIDNIGHT_THRESHOLD_HOUR,
   AFTER_MIDNIGHT_THRESHOLD_TIME,
+  torontoUtcOffset,
+  torontoUtcOffsetAt,
 } from "../eventDay.js";
 
 // The FESTIVAL day, not the calendar day. A set before 6 AM belongs to the
@@ -136,5 +138,24 @@ describe("eventLocalClock", () => {
     expect(clock.date).toBe("2026-07-10");
     expect(clock.time).toBe("00:00");
     expect(clock.date).toBe(eventLocalToday(new Date("2026-07-10T04:00:00Z")));
+  });
+});
+
+// #1475 review: the offset of a wall-clock TIME, not the date's noon offset.
+describe("torontoUtcOffsetAt", () => {
+  test.each([
+    ["2026-07-10", "21:00", "-04:00"], // summer
+    ["2026-02-15", "21:00", "-05:00"], // winter
+    ["2027-03-14", "00:20", "-05:00"], // spring-forward day, before 02:00
+    ["2027-03-14", "03:30", "-04:00"], // spring-forward day, after the jump
+    ["2027-03-14", "02:30", torontoUtcOffset("2027-03-14")], // skipped hour: the date's offset
+    ["2026-11-01", "01:30", "-04:00"], // repeated fall-back hour: first occurrence
+    ["2026-11-01", "03:00", "-05:00"], // fall-back day, after
+  ])("%s %s is %s", (date, time, expected) => {
+    expect(torontoUtcOffsetAt(date, time)).toBe(expected);
+  });
+
+  test("a malformed time falls back to the date's offset", () => {
+    expect(torontoUtcOffsetAt("2026-07-10", "25:99")).toBe("-04:00");
   });
 });

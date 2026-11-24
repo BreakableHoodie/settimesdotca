@@ -669,6 +669,26 @@ describe("SSR /event/[slug] — event structured-data dates and offers (#1448)",
     if (e.endDate !== undefined) expect(e.endDate.includes("T")).toBe(false);
   });
 
+  // 2027-03-14 is spring-forward (02:00). A 23:50 start on the 13th is -05:00,
+  // and 00:20 on the 14th is still before 02:00, so it is -05:00 too.
+  test("the UTC offset belongs to the time, not just the date (spring-forward night)", async () => {
+    const e = await jsonLdFor([["Late", "2027-03-13", "23:50", "00:20"]], { date: "2027-03-13" });
+    expect(e.startDate).toBe("2027-03-13T23:50:00-05:00");
+    expect(e.endDate).toBe("2027-03-14T00:20:00-05:00");
+    expect(Date.parse(e.endDate)).toBeGreaterThan(Date.parse(e.startDate));
+  });
+
+  test.each([[["A Known", "Z Unknown"]], [["Z Known", "A Unknown"]]])(
+    "sets tied for the latest start: one unknown end means no endDate (%j)",
+    async ([known, unknown]) => {
+      const e = await jsonLdFor([
+        [known, "2999-08-01", "23:00", "00:00"],
+        [unknown, "2999-08-01", "23:00", null],
+      ]);
+      expect(e).not.toHaveProperty("endDate");
+    },
+  );
+
   test("a single-day show ending after midnight ends on the next calendar day", async () => {
     const { env, rawDb } = createTestEnv();
     env.PUBLIC_DATA_PUBLISH_ENABLED = "true";

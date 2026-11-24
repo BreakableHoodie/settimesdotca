@@ -1,3 +1,5 @@
+import { isValidTime } from "./validation/datetime.js";
+
 // "Today" for event-day classification, anchored to the events' local timezone.
 //
 // The platform's events are Ontario-local (Waterloo Region and southern
@@ -137,6 +139,42 @@ export function torontoUtcOffset(dateStr) {
   const probe = new Date(`${dateStr}T12:00:00Z`);
   const gmt = TORONTO_OFFSET.formatToParts(probe).find((p) => p.type === "timeZoneName")?.value;
   return gmt ? gmt.replace("GMT", "") : "-05:00";
+}
+
+const TORONTO_WALL = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Toronto",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+function torontoWallClock(instantMs) {
+  const parts = Object.fromEntries(TORONTO_WALL.formatToParts(new Date(instantMs)).map((p) => [p.type, p.value]));
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+}
+
+/**
+ * The Toronto UTC offset at a wall-clock DATE AND TIME, not just a date.
+ * `torontoUtcOffset(date)` probes noon, so on a DST-change date it reports the
+ * day's afternoon offset: 00:20 on spring-forward day is still -05:00, but
+ * that function says -04:00 (#1475 review). The candidate whose wall clock
+ * round-trips wins; in the repeated fall-back hour the first occurrence (EDT)
+ * wins, and an hour skipped by spring-forward falls back to the date's offset.
+ *
+ * @param {string} dateStr - YYYY-MM-DD
+ * @param {string} time - HH:MM, Toronto wall clock
+ * @returns {string} e.g. "-05:00"
+ */
+export function torontoUtcOffsetAt(dateStr, time) {
+  if (!isValidTime(time)) return torontoUtcOffset(dateStr);
+  for (const candidate of ["-04:00", "-05:00"]) {
+    const instant = Date.parse(`${dateStr}T${time}:00${candidate}`);
+    if (Number.isFinite(instant) && torontoWallClock(instant) === `${dateStr}T${time}`) return candidate;
+  }
+  return torontoUtcOffset(dateStr);
 }
 
 /**

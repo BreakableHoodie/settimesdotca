@@ -82,3 +82,30 @@ describe('the shell ships a crawlable link graph', () => {
     }
   })
 })
+
+// Hub and edition pages server-render their entity links (#1447). Between
+// seasons the sitemap was the only referrer of every band, venue, event and
+// recap page. Source scans again: the property is what the SERVER sends.
+describe('hub pages server-render entity links (#1447)', () => {
+  const FUNCTIONS = path.join(path.dirname(currentFile), '../../../functions')
+  const read = rel => readFileSync(path.join(FUNCTIONS, rel), 'utf8')
+
+  test('the shell has the marker inside <noscript>', () => {
+    expect(/<noscript>[\s\S]*<!-- page-links -->[\s\S]*<\/noscript>/.test(shell)).toBe(true)
+  })
+
+  test('/history, /artists and /venues each have a link loader', () => {
+    const src = read('utils/crawlableLinks.js')
+    for (const hub of ['/history', '/artists', '/venues']) {
+      expect(src, `no loader for ${hub}`).toMatch(new RegExp(`"${hub}":\\s*\\w+Links`))
+    }
+    // Whether the hubs actually inject the links is proven behaviourally by
+    // functions/__tests__/crawlableHubLinks.test.js; a source scan here could be
+    // satisfied by a comment.
+  })
+
+  test('event and recap pages pass their lineup links to the shell', () => {
+    expect(read('event/[slug].js')).toMatch(/pageLinks:\s*renderEventLinks\(/)
+    expect(read('events/[slug]/recap.js')).toMatch(/loadEventLinks\(/)
+  })
+})

@@ -1057,6 +1057,33 @@ export const MUTATIONS = [
     tests: ["functions/__tests__/homepage.test.js"],
   },
   {
+    id: "hub-links-respect-reveal-gate",
+    invariant:
+      "CLAUDE.md 'Pulling a band from a live lineup' — the hub link lists never name an act or venue whose only sets are unannounced on a reveal-mode event (#1447)",
+    file: "functions/utils/crawlableLinks.js",
+    find: 'const REVEAL_GATE = revealedPerformanceSql("e", "p");',
+    replace: 'const REVEAL_GATE = "(1 = 1)";',
+    tests: ["functions/__tests__/crawlableHubLinks.test.js"],
+  },
+  {
+    id: "hub-history-recap-only-when-concluded",
+    invariant:
+      "CLAUDE.md 'The sitemap is the event-discovery signal — spend it (#1158)' — /history links a recap only once the edition has concluded, the sitemap's rule (#1447)",
+    file: "functions/utils/crawlableLinks.js",
+    find: "    if (e.is_concluded) items.push(",
+    replace: "    if (true) items.push(",
+    tests: ["functions/__tests__/crawlableHubLinks.test.js"],
+  },
+  {
+    id: "hub-artists-links-dropped",
+    invariant:
+      "CLAUDE.md 'The sitemap is the event-discovery signal — spend it (#1158)' — /artists server-renders its artist links (#1447)",
+    file: "functions/utils/crawlableLinks.js",
+    find: 'const HUB_LOADERS = { "/history": historyLinks, "/artists": artistLinks, "/venues": venueLinks };',
+    replace: 'const HUB_LOADERS = { "/history": historyLinks, "/venues": venueLinks };',
+    tests: ["functions/__tests__/crawlableHubLinks.test.js"],
+  },
+  {
     id: "event-jsonld-price-zero",
     invariant:
       "CLAUDE.md 'SSR owns identity meta and JSON-LD' — a stored free-event price is emitted as 0 rather than omitted by a truthiness check",
@@ -1091,8 +1118,8 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'SSR owns identity meta and JSON-LD' — the recap emits a BreadcrumbList for the existing History, edition, and Recap routes",
     file: "functions/events/[slug]/recap.js",
-    find: "return serveWithInjectedMeta(context, { title, metaTags, jsonLd: [breadcrumb] });",
-    replace: "return serveWithInjectedMeta(context, { title, metaTags, jsonLd: [] });",
+    find: "return serveWithInjectedMeta(context, { title, metaTags, jsonLd: [breadcrumb], pageLinks });",
+    replace: "return serveWithInjectedMeta(context, { title, metaTags, jsonLd: [], pageLinks });",
     tests: ["functions/events/__tests__/recap.test.js"],
   },
   {

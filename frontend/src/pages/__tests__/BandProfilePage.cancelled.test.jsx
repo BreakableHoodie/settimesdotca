@@ -9,11 +9,11 @@ import { fetchPublicJson } from '../../utils/publicApi'
 
 vi.mock('../../utils/publicApi', () => ({ fetchPublicJson: vi.fn() }))
 
-function renderPage(id = '206') {
+function renderPage(id = '206', state) {
   return render(
     <ThemeProvider>
       <HelmetProvider>
-        <MemoryRouter initialEntries={[`/band/${id}`]}>
+        <MemoryRouter initialEntries={[{ pathname: `/band/${id}`, state }]}>
           <Routes>
             <Route path="/band/:id" element={<BandProfilePage />} />
           </Routes>
@@ -126,6 +126,31 @@ describe('BandProfilePage — cancelled set rendering (#732)', () => {
     expect(screen.queryByRole('button', { name: /in schedule/i })).not.toBeInTheDocument()
     // The "View event" link must still be there -- only the schedule toggle is suppressed.
     expect(screen.getByRole('link', { name: /view event/i })).toBeInTheDocument()
+  })
+
+  it('uses router state for the back-to-event link without a query parameter', async () => {
+    fetchPublicJson.mockReset()
+    fetchPublicJson.mockResolvedValue({
+      id: 209,
+      name: 'State Context Band',
+      photo_url: null,
+      photo_alt_text: null,
+      description: null,
+      genre: null,
+      origin: null,
+      social: {},
+      stats: null,
+      upcoming: [performance()],
+      past: [],
+    })
+
+    // vol-18, not the fixture's own vol-17: only the router-state path can produce it.
+    renderPage('209', { fromEventSlug: 'vol-18' })
+    expect(await screen.findByRole('heading', { level: 1, name: 'State Context Band' })).toBeInTheDocument()
+
+    for (const link of screen.getAllByRole('link', { name: /back to schedule/i })) {
+      expect(link).toHaveAttribute('href', '/event/vol-18')
+    }
   })
 
   // #732 MINOR 3 (Copilot) — the previous version of this fixture combined

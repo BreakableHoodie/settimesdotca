@@ -1,12 +1,13 @@
 import { slugifyBandName } from './slugify'
 
-export function buildBandProfileHref(bandName, eventSlug) {
-  const href = `/band/${slugifyBandName(bandName)}`
-
-  if (!eventSlug) {
-    return href
+export function buildBandProfileHref(band) {
+  if (Number.isInteger(band?.id) || (typeof band?.id === 'string' && /^\d+$/.test(band.id))) {
+    return `/band/${band.id}`
   }
 
-  const params = new URLSearchParams({ fromEvent: eventSlug })
-  return `${href}?${params.toString()}`
+  return `/band/${slugifyBandName(band?.name)}`
+}
+
+export function buildBandProfileState(eventSlug) {
+  return eventSlug ? { fromEventSlug: eventSlug } : undefined
 }

@@ -4,7 +4,7 @@ import { Helmet } from 'react-helmet-async'
 import { Link, useParams } from 'react-router-dom'
 import { Alert, ImageLightbox, Loading } from '../components/ui'
 import PosterImage from '../components/PosterImage'
-import { buildBandProfileHref } from '../utils/bandProfileLink'
+import { buildBandProfileHref, buildBandProfileState } from '../utils/bandProfileLink'
 import { fetchPublicJson } from '../utils/publicApi'
 import { trackVisitOnce } from '../utils/metrics'
 import { parseLocalDate } from '../utils/timeFormat'
@@ -269,7 +269,8 @@ export default function EventRecapPage() {
                     {savedBands.map(band => (
                       <li key={band.performance_id} className="rounded-lg border border-border bg-surface p-3">
                         <Link
-                          to={buildBandProfileHref(band.name, event.slug)}
+                          to={buildBandProfileHref(band)}
+                          state={buildBandProfileState(event.slug)}
                           className="font-medium text-accent-400 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
                         >
                           {band.name}
@@ -293,7 +294,8 @@ export default function EventRecapPage() {
                     {missedBands.slice(0, 6).map(band => (
                       <li key={band.performance_id} className="rounded-lg border border-border bg-surface p-3">
                         <Link
-                          to={buildBandProfileHref(band.name, event.slug)}
+                          to={buildBandProfileHref(band)}
+                          state={buildBandProfileState(event.slug)}
                           className="font-medium text-accent-400 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
                         >
                           {band.name}
@@ -352,7 +354,8 @@ export default function EventRecapPage() {
                         className="flex items-start justify-between gap-3 rounded-lg bg-surface px-3 py-2"
                       >
                         <Link
-                          to={buildBandProfileHref(band.name, event.slug)}
+                          to={buildBandProfileHref(band)}
+                          state={buildBandProfileState(event.slug)}
                           className="min-w-0 truncate text-accent-400 hover:underline"
                         >
                           {band.name}
@@ -385,7 +388,8 @@ export default function EventRecapPage() {
                   >
                     <div className="flex-1 min-w-0">
                       <Link
-                        to={buildBandProfileHref(band.name, event.slug)}
+                        to={buildBandProfileHref(band)}
+                        state={buildBandProfileState(event.slug)}
                         className="text-accent-400 font-medium hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400 rounded"
                       >
                         {band.name}

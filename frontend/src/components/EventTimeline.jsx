@@ -2,7 +2,7 @@ import { Archive, CalendarDays, Clock, Funnel, History, MapPin, Navigation, Tria
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { Link } from 'react-router-dom'
 import { fetchPublicJson } from '../utils/publicApi'
-import { buildBandProfileHref } from '../utils/bandProfileLink'
+import { buildBandProfileHref, buildBandProfileState } from '../utils/bandProfileLink'
 import { BAND_PHOTO_CROP } from '../utils/bandPhoto'
 import { buildDirectionsHref } from '../utils/directions'
 import { formatPerformanceDayLabel, formatTimeRange, parseLocalDate } from '../utils/timeFormat'
@@ -869,7 +869,8 @@ function EventCard({
                     // a 301 to /band/<id> -- a redirect hop on top of it, on the
                     // highest-traffic page we have.
                     as={Link}
-                    to={buildBandProfileHref(band.name, event.slug)}
+                    to={buildBandProfileHref(band)}
+                    state={buildBandProfileState(event.slug)}
                     variant={isCancelled ? 'warning' : 'default'}
                     size="md"
                     className="hover:bg-primary-500/20 cursor-pointer transition-colors inline-flex items-center gap-1.5"
@@ -987,7 +988,8 @@ function EventCard({
                     <Card
                       key={band.performance_id ?? band.id}
                       as={Link}
-                      to={buildBandProfileHref(band.name, event.slug)}
+                      to={buildBandProfileHref(band)}
+                      state={buildBandProfileState(event.slug)}
                       padding="sm"
                       hoverable
                       className="group"

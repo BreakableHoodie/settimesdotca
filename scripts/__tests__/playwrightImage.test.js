@@ -84,7 +84,9 @@ describe("Playwright jobs run in the lockfile's Playwright image (#1391)", () =>
       .filter(([, p]) => p.hasInstallScript)
       .map(([k]) => k)
       .sort();
-    expect(withScripts).toEqual(["node_modules/better-sqlite3", "node_modules/fsevents"]);
+    // better-sqlite3 >= 13.2 ships prebuilt binaries in its tarball (prebuilds/),
+    // so it no longer needs an install script.
+    expect(withScripts).toEqual(["node_modules/fsevents"]);
     const env = readFileSync(join(REPO_ROOT, ".github/actions/e2e-env/action.yml"), "utf8");
     expect(env).toContain("run: npm ci --ignore-scripts");
     const edge = readFileSync(join(WORKFLOWS, "edge-e2e.yml"), "utf8");

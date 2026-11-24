@@ -426,6 +426,49 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
     await waitFor(() => expect(document.title).toBe('ALL — Punk | SetTimes'))
   })
 
+  // The client must SET the title, not inherit it: seed a different title and a
+  // profile with a hometown, and require the hometown formula (#1476).
+  it('BandProfilePage sets the hometown title once data arrives', async () => {
+    fetchPublicJson.mockResolvedValue({
+      id: 207,
+      name: 'Teenage Head',
+      photo_url: null,
+      photo_alt_text: null,
+      description: null,
+      genre: 'Punk',
+      origin: null,
+      origin_city: 'Hamilton',
+      origin_region: 'Ontario',
+      social: {},
+      stats: null,
+      upcoming: [],
+      past: [],
+    })
+    seedSsrHead('/band/207', 'Stale Title | SetTimes')
+    seedSsrJsonLd([
+      {
+        '@context': 'https://schema.org',
+        '@type': 'MusicGroup',
+        name: 'Teenage Head',
+        url: 'https://settimes.ca/band/207',
+      },
+      { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [] },
+    ])
+
+    render(
+      withProviders(
+        <MemoryRouter initialEntries={['/band/207']}>
+          <Routes>
+            <Route path="/band/:id" element={<BandProfilePage />} />
+          </Routes>
+        </MemoryRouter>,
+        { themed: true }
+      )
+    )
+    await screen.findByRole('heading', { level: 1, name: 'Teenage Head' })
+    await waitFor(() => expect(document.title).toBe('Teenage Head — Punk from Hamilton | SetTimes'))
+  })
+
   // #785: the SSR <title> must survive the whole load — the fetch is still
   // in flight when the component mounts, and the loading skeleton must not
   // clobber the server-sent title with a generic placeholder.

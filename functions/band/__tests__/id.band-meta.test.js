@@ -54,6 +54,15 @@ test("fallback description counts only public, revealed, non-cancelled editions"
     .prepare("UPDATE performances SET is_announced = 0 WHERE id = ?")
     .run(rawDb.prepare("SELECT id FROM performances WHERE event_id = ?").get(hiddenEvent.id).id);
   rawDb.prepare("UPDATE performances SET is_cancelled = 1 WHERE id = ?").run(cancelled.id);
+  // A LATER draft edition with an announced, live set: not public, so it must
+  // change neither the count nor the "latest" name (CodeRabbit on #1476).
+  const draftEvent = insertEvent(rawDb, {
+    name: "Draft Edition",
+    slug: "draft-edition",
+    date: "2099-02-01",
+    status: "draft",
+  });
+  insertBand(rawDb, { name: "Hamilton Act", event_id: draftEvent.id, venue_id: venue.id });
   rawDb
     .prepare("UPDATE band_profiles SET origin_city = ?, origin_region = ? WHERE id = ?")
     .run("Hamilton", "Ontario", visible.band_profile_id);

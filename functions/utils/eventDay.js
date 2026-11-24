@@ -169,7 +169,8 @@ function torontoWallClock(instantMs) {
  * @returns {string} e.g. "-05:00"
  */
 export function torontoUtcOffsetAt(dateStr, time) {
-  if (!isValidTime(time)) return torontoUtcOffset(dateStr);
+  // isValidTime returns { valid, error }, always truthy: read .valid.
+  if (!isValidTime(time).valid) return torontoUtcOffset(dateStr);
   for (const candidate of ["-04:00", "-05:00"]) {
     const instant = Date.parse(`${dateStr}T${time}:00${candidate}`);
     if (Number.isFinite(instant) && torontoWallClock(instant) === `${dateStr}T${time}`) return candidate;

@@ -158,4 +158,14 @@ describe("torontoUtcOffsetAt", () => {
   test("a malformed time falls back to the date's offset", () => {
     expect(torontoUtcOffsetAt("2026-07-10", "25:99")).toBe("-04:00");
   });
+
+  // A non-string must reach the guard, not be coerced into "00:20" by the
+  // template literal: on spring-forward day the date's offset is -04:00, while
+  // a coerced 00:20 would round-trip as -05:00 (CodeRabbit on #1475).
+  test.each([[["00:20"]], [undefined], [null], [2020]])(
+    "a non-string time %j falls back to the date's offset",
+    (time) => {
+      expect(torontoUtcOffsetAt("2027-03-14", time)).toBe(torontoUtcOffset("2027-03-14"));
+    },
+  );
 });

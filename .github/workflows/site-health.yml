@@ -52,6 +52,9 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           PROBE_OUTCOME: ${{ steps.probes.outcome }}
         run: |
+          # Without pipefail a failed `gh issue list | head` reads as "no open
+          # issue": a duplicate on failure, or a missed close on recovery.
+          set -o pipefail
           issue_title="Site down: production smoke probes failing"
           issue_number=$(gh issue list --repo "$REPOSITORY" --state open --search "\"$issue_title\" in:title" --limit 100 --json number,title --jq ".[] | select(.title == \"$issue_title\") | .number" | head -n 1)
 

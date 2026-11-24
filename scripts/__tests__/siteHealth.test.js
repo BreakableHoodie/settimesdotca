@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -41,14 +41,14 @@ describe("production site health workflow", () => {
 describe("site health reporting, executed", () => {
   const step = loadYaml(source).jobs["smoke-probes"].steps.find((s) => s.name === "Report probe status");
 
-  function report(outcome, openIssue) {
+  function report(outcome, openIssue, { listFails = false } = {}) {
     const dir = mkdtempSync(path.join(tmpdir(), "site-health-"));
     try {
       const log = path.join(dir, "gh.log");
       const gh = path.join(dir, "gh");
       writeFileSync(
         gh,
-        `#!/usr/bin/env bash\necho "$*" | tr "\\n" " " >> "${log}"\necho >> "${log}"\nif [ "$1 $2" = "issue list" ]; then echo "$OPEN_ISSUE"; fi\n`,
+        `#!/usr/bin/env bash\necho "$*" | tr "\\n" " " >> "${log}"\necho >> "${log}"\nif [ "$1 $2" = "issue list" ]; then [ -n "$GH_LIST_FAILS" ] && exit 1; echo "$OPEN_ISSUE"; fi\n`,
       );
       chmodSync(gh, 0o755);
       writeFileSync(path.join(dir, "smoke-probes.log"), "FAIL sitemap: expected HTTP 200, got 503\n");
@@ -60,6 +60,7 @@ describe("site health reporting, executed", () => {
           RUN_URL: "https://example.test/run/1",
           PROBE_OUTCOME: outcome,
           OPEN_ISSUE: openIssue,
+          GH_LIST_FAILS: listFails ? "1" : "",
         },
         encoding: "utf8",
       });
@@ -106,5 +107,36 @@ describe("site health reporting, executed", () => {
     const r = report(outcome, "42");
     expect(r.status).toBe(1);
     expect(r.writes).toEqual([]);
+  });
+
+  // Without pipefail, a failed lookup reads as "no open issue" (CodeRabbit on #1469).
+  it.each(["failure", "success"])("a failed issue lookup stops the %s path before any write", (outcome) => {
+    const r = report(outcome, "42", { listFails: true });
+    expect(r.status).not.toBe(0);
+    expect(r.writes).toEqual([]);
+  });
+});
+
+// Every workflow that reads an issue number out of a gh pipeline must fail when
+// gh does, or the next line treats "lookup failed" as "no issue" (#1469 sweep).
+describe("gh lookups piped inside $(...) run under pipefail", () => {
+  const dir = fileURLToPath(new URL("../../.github/workflows/", import.meta.url));
+  const runs = readdirSync(dir)
+    .filter((f) => /\.ya?ml$/.test(f))
+    .flatMap((f) =>
+      Object.values(loadYaml(readFileSync(path.join(dir, f), "utf8")).jobs ?? {}).flatMap((job) =>
+        (job.steps ?? [])
+          .filter((step) => typeof step.run === "string" && /\$\(gh [^)]*\|/.test(step.run))
+          .map((step) => ({ file: f, step: step.name, run: step.run, shell: step.shell ?? job.defaults?.run?.shell })),
+      ),
+    );
+
+  it("finds the lookups it guards", () => {
+    expect(runs.map((r) => r.file).sort()).toEqual(["edge-e2e.yml", "site-health.yml"]);
+  });
+
+  it.each(runs.map((r) => [`${r.file} / ${r.step}`, r]))("%s sets pipefail", (_, r) => {
+    // An explicit `shell: bash` already runs with -eo pipefail.
+    expect(r.shell === "bash" || /^\s*set -[a-z]*o pipefail/m.test(r.run)).toBe(true);
   });
 });

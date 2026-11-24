@@ -86,6 +86,7 @@ function BandCard({
           {bandProfileHref ? (
             <Link
               to={bandProfileHref}
+              state={buildBandProfileState(eventSlug)}
               className="block truncate font-display text-lg leading-tight text-text-primary hover:underline"
             >
               {isCancelled ? <s>{displayName}</s> : displayName}

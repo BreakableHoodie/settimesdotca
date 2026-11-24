@@ -144,11 +144,12 @@ describe('BandProfilePage — cancelled set rendering (#732)', () => {
       past: [],
     })
 
-    renderPage('209', { fromEventSlug: 'vol-17' })
+    // vol-18, not the fixture's own vol-17: only the router-state path can produce it.
+    renderPage('209', { fromEventSlug: 'vol-18' })
     expect(await screen.findByRole('heading', { level: 1, name: 'State Context Band' })).toBeInTheDocument()
 
     for (const link of screen.getAllByRole('link', { name: /back to schedule/i })) {
-      expect(link).toHaveAttribute('href', '/event/vol-17')
+      expect(link).toHaveAttribute('href', '/event/vol-18')
     }
   })
 

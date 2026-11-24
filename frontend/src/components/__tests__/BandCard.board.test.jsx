@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { axe, toHaveNoViolations } from 'jest-axe'
 import { describe, expect, it, vi } from 'vitest'
 import BandCard from '../BandCard'
@@ -238,5 +238,41 @@ describe('BandCard variant="board"', () => {
   it('has no axe violations', async () => {
     const { container } = renderBoard()
     expect(await axe(container)).toHaveNoViolations()
+  })
+})
+
+// #1474: links no longer carry the event in a query string, so the board row's profile link must
+// hand the event over as router state, or the profile loses "back to event".
+describe('BandCard board row profile link', () => {
+  function StateProbe() {
+    const location = useLocation()
+    return <p>{`at ${location.pathname} from ${location.state?.fromEventSlug ?? 'nowhere'}`}</p>
+  }
+
+  it('links to the canonical id and carries the event in router state', () => {
+    render(
+      <MemoryRouter initialEntries={['/event/lwbc19']}>
+        <Routes>
+          <Route
+            path="/event/:slug"
+            element={
+              <BandCard
+                band={{ ...band, band_profile_id: 42 }}
+                variant="board"
+                boardVenue
+                showVenue
+                currentTime={new Date()}
+                eventSlug="lwbc19"
+              />
+            }
+          />
+          <Route path="/band/:id" element={<StateProbe />} />
+        </Routes>
+      </MemoryRouter>
+    )
+
+    fireEvent.click(screen.getByRole('link', { name: /Dolly Sods/ }))
+
+    expect(screen.getByText('at /band/42 from lwbc19')).toBeInTheDocument()
   })
 })

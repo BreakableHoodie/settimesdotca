@@ -1,0 +1,127 @@
+name: Offsite D1 backup
+
+# Monthly copy of production D1 to the private R2 bucket settimes-d1-backups
+# (#1479). Time Travel covers 30 days; this covers a mistake noticed later.
+#
+# - Every export LOCKS production while it runs (about 4 s at 1 MB;
+#   docs/field-notes/backup-restore.md). Hence monthly, at about 3:43 AM
+#   Toronto, away from scheduled-jobs.yml (07:17 UTC), and skipped while any
+#   published event is running.
+# - The copy never leaves the runner except into R2: no artifact, no log of
+#   row contents (this repository is public). Tables whose rows the privacy
+#   policy deletes sooner are emptied first (scripts/d1-backup.mjs).
+# - The bucket's lifecycle rule (expire-monthly, prefix monthly/) deletes each
+#   copy after 400 days, so about 13 exist at once. The rule lives in
+#   Cloudflare, not here.
+
+on:
+  schedule:
+    - cron: "43 8 1 * *"
+  workflow_dispatch:
+
+concurrency:
+  group: d1-backup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: 22
+  D1_DATABASE_NAME: settimes-production-db
+  R2_BUCKET: settimes-d1-backups
+
+jobs:
+  backup:
+    name: Back up production D1 to R2
+    # Hosted on purpose: the copy holds account data, and a self-hosted
+    # runner keeps its workspace between jobs.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install wrangler
+        working-directory: frontend
+        run: npm ci
+
+      - name: Skip while an event is running
+        id: guard
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_PAGES_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          # A day of margin each side covers after-midnight sets and the
+          # Toronto/UTC offset. The export lock must never land on a show.
+          running=$(./frontend/node_modules/.bin/wrangler d1 execute "$D1_DATABASE_NAME" --remote --json --command \
+            "SELECT COUNT(*) AS n FROM events WHERE status = 'published' AND date <= date('now', '+1 day') AND COALESCE(end_date, date) >= date('now', '-2 day')" \
+            | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const n=JSON.parse(s)[0].results[0].n;if(!Number.isInteger(n))process.exit(1);console.log(n)})')
+          if [ "$running" -gt 0 ]; then
+            echo "::warning::$running published event(s) running; no export this month. Run this workflow by hand after the show."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Export, verify, scrub and upload
+        if: steps.guard.outputs.skip == 'false'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_PAGES_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          umask 077
+          work="$RUNNER_TEMP/d1-backup"
+          mkdir -p "$work"
+          trap 'rm -rf "$work"' EXIT
+          wrangler=./frontend/node_modules/.bin/wrangler
+
+          start=$(date +%s)
+          "$wrangler" d1 export "$D1_DATABASE_NAME" --remote --output "$work/export.sql" >/dev/null
+          echo "Export (production locked): $(( $(date +%s) - start )) s, $(wc -c < "$work/export.sql") bytes"
+
+          # Restores the export, checks integrity and every foreign key,
+          # refuses an unclassified table, empties the excluded ones.
+          node scripts/d1-backup.mjs "$work/export.sql" "$work/backup.db"
+
+          gzip -9 -n -c "$work/backup.db" > "$work/backup.db.gz"
+          key="monthly/$(date -u +%Y-%m)-${GITHUB_SHA::12}.db.gz"
+          "$wrangler" r2 object put "$R2_BUCKET/$key" --remote \
+            --file "$work/backup.db.gz" --content-type application/gzip >/dev/null
+          echo "Uploaded $key ($(wc -c < "$work/backup.db.gz") bytes)"
+          echo "### Offsite D1 backup: \`$key\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report a failed backup
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title="Offsite D1 backup failed"
+          open=$(gh issue list --repo "$REPOSITORY" --state open --search "\"$title\" in:title" --json number,title \
+            --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)
+          body="The monthly offsite D1 backup failed: $RUN_URL
+
+          Time Travel still covers the last 30 days. Fix the cause, then run the workflow by hand (Actions > Offsite D1 backup > Run workflow). Restore steps: docs/field-notes/backup-restore.md."
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --repo "$REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$REPOSITORY" --title "$title" --label "bug,priority:p2" --body "$body"
+          fi

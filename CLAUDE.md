@@ -154,7 +154,7 @@ Edition details, the between-seasons table and the 2026-09 private-repo period: 
 - **Storage**: Cloudflare R2 (band photos, posters) · **Email**: Postmark/Resend/MailChannels
 - **Tests**: Vitest (unit, frontend), Playwright (E2E + a11y + visual regression)
 - **CI/CD**: GitHub Actions, Dependabot, Snyk, GitGuardian, CodeRabbit
-  - **Runners are GitHub-hosted.** Jobs read `runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}`, except two that pin `ubuntu-latest` on purpose: `zap-baseline.yml` (needs Docker) and `quality.yml`'s **Lighthouse CI** (its floor was calibrated on hosted hardware). **Never set the `RUNS_ON` repo variable while this repo is public:** any fork PR would execute on Dre's homelab runner (setup in the private `BreakableHoodie/gh-runner` repo), and the runner sync stops runners for public repos, so every job would queue forever.
+  - **Runners are GitHub-hosted.** Jobs read `runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}`, except three that pin `ubuntu-latest` on purpose: `zap-baseline.yml` (needs Docker), `quality.yml`'s **Lighthouse CI** (its floor was calibrated on hosted hardware) and `d1-backup.yml` (its copy holds account data; a self-hosted runner keeps its workspace). **Never set the `RUNS_ON` repo variable while this repo is public:** any fork PR would execute on Dre's homelab runner (setup in the private `BreakableHoodie/gh-runner` repo), and the runner sync stops runners for public repos, so every job would queue forever.
   - **Dependabot merges do not deploy on their own** (#1209): GitHub starts no push workflows for a push made with `GITHUB_TOKEN`. `deploy-reconcile.yml` runs every 30 minutes, runs edge E2E on the merge commit first, and dispatches production only after it passes. A failed edge run opens an issue and holds deploy until a human re-runs it; deploy failures are never retried automatically.
 
 ---
@@ -922,6 +922,8 @@ A failed retention or anonymisation step must turn the daily run red. The workfl
 is the operational check that these published deletion promises actually ran; a
 log-only failure would leave personal data past its promised window while still
 reporting a successful run.
+
+**Backups count too (#1479).** `.github/workflows/d1-backup.yml` copies production monthly to the private R2 bucket `settimes-d1-backups`, kept 400 days. Any table whose rows the policy deletes sooner is emptied in the copy (`EXCLUDED_TABLES`, `scripts/d1-backup.mjs`); a table nobody classified fails the backup, and `d1Backup.test.js` fails the build first. A new table needs a decision: backed up, or excluded with its reason. Every export locks production, so the job skips while an event is running. Restore: `docs/field-notes/backup-restore.md`.
 
 ### Content-Security-Policy (strict, no `unsafe-inline`) — TWO sources
 

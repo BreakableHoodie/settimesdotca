@@ -143,6 +143,8 @@ See Cloudflare's D1 Time Travel documentation for the retention window available
 
 **An export is not read-only.** `wrangler d1 export --remote` locks production until it completes, so run one only with the owner's go-ahead and never on a show night. The export-and-restore round trip was rehearsed on 2026-11-24 (#1442): 27 tables and 4,458 rows restored into local SQLite with zero errors, matching production. Steps and timings are in `docs/field-notes/backup-restore.md`.
 
+**Beyond 30 days:** `.github/workflows/d1-backup.yml` copies production monthly to the private R2 bucket `settimes-d1-backups` (each copy kept 400 days), leaving out the tables whose rows the privacy policy deletes sooner. Restore steps: `docs/field-notes/backup-restore.md` (#1479).
+
 ## Scheduled Maintenance
 
 Cloudflare Pages does not provide native cron triggers for this project. `.github/workflows/scheduled-jobs.yml` calls `/api/internal/run-scheduled` daily with `CRON_SECRET`. The job runs popularity aggregation, retention cleanup, share-link expiry and schedule-build anonymisation.

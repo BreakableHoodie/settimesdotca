@@ -687,8 +687,8 @@ export const MUTATIONS = [
     id: "band-stats-name-reveal-gate",
     invariant: "CLAUDE.md 'Pulling a band from a live lineup' — band stats by name 404s an unannounced-only band",
     file: "functions/api/bands/stats/[name].js",
-    find: 'AND ${publicRevealedPerformanceExistsSql("bp", "id", "band_profile_id")}\n         LIMIT 1',
-    replace: "AND 1 = 1\n         LIMIT 1",
+    find: 'OR LOWER(TRIM(bp.name)) = LOWER(?))\n           AND ${publicRevealedPerformanceExistsSql("bp", "id", "band_profile_id")}',
+    replace: "OR LOWER(TRIM(bp.name)) = LOWER(?))\n           AND 1 = 1",
     tests: ["functions/api/__tests__/reveal-gate-round2.test.js"],
   },
   {
@@ -723,6 +723,15 @@ export const MUTATIONS = [
     file: "functions/api/bands/[name]/stage-mates.js",
     find: 'WHERE bp.id = ? AND ${publicRevealedPerformanceExistsSql("bp", "id", "band_profile_id")}',
     replace: "WHERE bp.id = ? AND 1 = 1",
+    tests: ["functions/api/__tests__/reveal-gate-round2.test.js"],
+  },
+  {
+    id: "stage-mates-name-reveal-gate",
+    invariant:
+      "CLAUDE.md 'Pulling a band from a live lineup' — stage-mates by name 404s an unannounced-only band like a missing one",
+    file: "functions/api/bands/[name]/stage-mates.js",
+    find: 'WHERE (bp.name_normalized = ? OR LOWER(TRIM(bp.name)) = LOWER(?))\n              AND ${publicRevealedPerformanceExistsSql("bp", "id", "band_profile_id")}',
+    replace: "WHERE (bp.name_normalized = ? OR LOWER(TRIM(bp.name)) = LOWER(?))\n              AND 1 = 1",
     tests: ["functions/api/__tests__/reveal-gate-round2.test.js"],
   },
   {

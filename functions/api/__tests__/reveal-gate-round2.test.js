@@ -201,6 +201,12 @@ describe("round 2 public reveal gates", () => {
       getStageMates("Missing-Stage-Act"),
       JSON.stringify({ error: "Band not found" }),
     );
+    // The numeric branch is a separate lookup: walking ids must not find the act either.
+    await expectSameNotFound(
+      getStageMates(String(hidden.band_profile_id)),
+      getStageMates("999999"),
+      JSON.stringify({ error: "Band not found" }),
+    );
   });
 
   it("I3 gates genre filtering and counts only revealed performances", async () => {

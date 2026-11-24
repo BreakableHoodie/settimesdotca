@@ -38,6 +38,9 @@ jobs:
       - name: Run production smoke probes
         id: probes
         continue-on-error: true
+        # Below the job's limit: a step timeout is a failure outcome and still
+        # files the issue, while a job timeout cancels and reports nothing.
+        timeout-minutes: 5
         env:
           SMOKE_URL: ${{ vars.CF_PRODUCTION_SMOKE_URL || 'https://settimes.ca' }}
         run: |

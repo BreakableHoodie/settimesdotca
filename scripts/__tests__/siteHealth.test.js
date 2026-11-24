@@ -18,6 +18,13 @@ describe("production site health workflow", () => {
     expect(source).not.toContain("/api/metrics");
   });
 
+  it("times the probe step out before the job, so a hang still files the issue", () => {
+    const job = loadYaml(source).jobs["smoke-probes"];
+    const probe = job.steps.find((s) => s.id === "probes");
+    expect(probe["timeout-minutes"]).toBeGreaterThan(0);
+    expect(probe["timeout-minutes"]).toBeLessThan(job["timeout-minutes"]);
+  });
+
   it("grants issue writes only to the reporting job", () => {
     expect(source).toContain("permissions:\n  contents: read");
     expect(source).toContain("permissions:\n      contents: read\n      issues: write");

@@ -190,7 +190,7 @@ describe("every client route is reachable (not swallowed by the catch-all)", () 
       (f) =>
         !["/_headers", "/_routes.json"].includes(f) &&
         !routes.exclude.some((g) => globMatch(g, f)) &&
-        !fnRoutes.includes(f.replace(/\.xml$/, ".xml")),
+        !fnRoutes.includes(f),
     );
     // sitemap.xml is owned by functions/sitemap.xml.js
     expect(unserved.filter((f) => f !== "/sitemap.xml")).toEqual([]);

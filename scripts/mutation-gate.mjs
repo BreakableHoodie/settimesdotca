@@ -122,6 +122,24 @@ export const MUTATIONS = [
     tests: ["functions/band/__tests__/id.slug-redirect.test.js"],
   },
   {
+    id: "band-slug-empty-key-never-matches",
+    invariant:
+      "CLAUDE.md 'SSR owns identity meta and JSON-LD' — a punctuation-only slug never 301s to a row whose name also normalizes to empty",
+    file: "functions/band/[id].js",
+    find: "(name_normalized = ? AND ? <> '')",
+    replace: "(name_normalized = ? AND (? <> '' OR 1))",
+    tests: ["functions/band/__tests__/id.slug-redirect.test.js"],
+  },
+  {
+    id: "band-slug-exact-name-fallback",
+    invariant:
+      "CLAUDE.md 'SSR owns identity meta and JSON-LD' — a band whose name normalizes to empty (\"!!!\") still resolves from its exact name, as the band API finds it",
+    file: "functions/band/[id].js",
+    find: "OR LOWER(TRIM(name)) = LOWER(?) LIMIT 1",
+    replace: "OR (LOWER(TRIM(name)) = LOWER(?) AND 0) LIMIT 1",
+    tests: ["functions/band/__tests__/id.slug-redirect.test.js"],
+  },
+  {
     id: "catch-all-unknown-path-is-404",
     invariant:
       "CLAUDE.md 'SSR owns identity meta and JSON-LD' — an unknown top-level path answers 404 with noindex through the catch-all (#1446)",

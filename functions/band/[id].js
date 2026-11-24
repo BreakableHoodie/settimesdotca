@@ -53,12 +53,20 @@ async function redirectSlugToId(context, slug) {
   // rather than impossible. The UNIQUE index makes it worse, not better: there
   // can only ever be one such row, so the wrong mapping would be perfectly stable
   // and every cached 301 would keep pointing at it.
-  if (!lookupKey) return serveNotFound(context);
+  //
+  // So the normalized match never runs on an empty key. The exact-name match
+  // beside it mirrors GET /api/bands/stats/:name's LOWER(name) fallback, so a
+  // band literally named "!!!" still resolves from /band/!!! while /band/---
+  // matches nothing.
+  const rawName = String(slug).trim();
+  if (!rawName) return serveNotFound(context);
 
   let match;
   try {
-    match = await env.DB.prepare(`SELECT id FROM band_profiles WHERE name_normalized = ? LIMIT 1`)
-      .bind(lookupKey)
+    match = await env.DB.prepare(
+      `SELECT id FROM band_profiles WHERE (name_normalized = ? AND ? <> '') OR LOWER(TRIM(name)) = LOWER(?) LIMIT 1`,
+    )
+      .bind(lookupKey, lookupKey, rawName)
       .first();
   } catch (err) {
     // Same posture as the SSR lookup below: a D1 failure degrades to the shell,
@@ -74,9 +82,9 @@ async function redirectSlugToId(context, slug) {
   }
 
   // The lookup SUCCEEDED and found nothing. The client resolves a slug through
-  // GET /api/bands/stats/:name, whose name_normalized/LOWER(name) match is
-  // subsumed by this same name_normalized lookup, so the SPA cannot find an
-  // artist the server cannot. A real 404 (the shell is still the body, so the
+  // GET /api/bands/stats/:name, whose name_normalized/LOWER(name) match is the
+  // same pair of conditions as this lookup, so the SPA cannot find an artist
+  // the server cannot. A real 404 (the shell is still the body, so the
   // client NotFound state renders) rather than a soft-404 200 (#1446).
   if (!match) return serveNotFound(context);
 

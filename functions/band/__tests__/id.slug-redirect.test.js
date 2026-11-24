@@ -193,7 +193,7 @@ describe("SSR /band/[id] — slug URLs redirect to the canonical id (#983)", () 
   // taken literally it normalizes to "20", not "" -- so it would sit here looking
   // like a case this guard handles while actually passing for an unrelated reason
   // (no artist named "20"). The decoded form, a bare space, is covered instead.
-  test.each([["---"], ["."], ["-"], ["   "], ["!!!"], ["..."]])(
+  test.each([["---"], ["."], ["-"], ["   "], ["..."]])(
     "a punctuation-only slug (%s) never redirects, even when an empty-key row exists",
     async (slug) => {
       const { env, rawDb } = createTestEnv();
@@ -211,6 +211,19 @@ describe("SSR /band/[id] — slug URLs redirect to the canonical id (#983)", () 
       expect(response.headers.get("Location")).toBeNull();
     },
   );
+
+  // ...but the band literally named "!!!" is still found from its own name, the
+  // way GET /api/bands/stats/:name finds it (CodeRabbit on #1451).
+  test("a band whose name normalizes to empty resolves from its exact name", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const id = seedBand(rawDb, "!!!", "");
+
+    const response = await onRequest(makeContext({ env, id: "!!!" }));
+
+    expect(response.status).toBe(301);
+    expect(response.headers.get("Location")).toBe(`/band/${id}`);
+  });
 
   test("a numeric id is still server-rendered, not redirected", async () => {
     const { env, rawDb } = createTestEnv();

@@ -42,7 +42,7 @@ function StatCard({ label, value, legacyValue }) {
 function TopBandRow({ band, rank }) {
   return (
     <Link
-      to={buildBandProfileHref(band.name)}
+      to={buildBandProfileHref(band)}
       className="flex items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3 transition hover:border-accent-400/50 hover:bg-surface-hover focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
     >
       <span className="w-5 shrink-0 text-sm font-semibold text-text-tertiary">{rank}</span>

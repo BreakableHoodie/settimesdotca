@@ -1,7 +1,7 @@
 import { CalendarDays, Plus, TriangleAlert, X, Zap } from 'lucide-react'
 import { memo } from 'react'
 import { Link } from 'react-router-dom'
-import { buildBandProfileHref } from '../utils/bandProfileLink'
+import { buildBandProfileHref, buildBandProfileState } from '../utils/bandProfileLink'
 import { BAND_PHOTO_CROP } from '../utils/bandPhoto'
 import { getTimeDescription, isHappeningNow, isStartingSoon } from '../utils/timeFilter'
 import { formatTime } from '../utils/timeFormat'
@@ -40,7 +40,7 @@ function BandCard({
   // card. Caught by Copilot on #1085.
   const displayName = band.name || 'Unnamed artist'
   const labelBase = isSelected ? `Remove ${displayName} from my route` : `Add ${displayName} to my route`
-  const bandProfileHref = band.name ? buildBandProfileHref(band.name, eventSlug) : null
+  const bandProfileHref = band.name ? buildBandProfileHref({ id: band.band_profile_id, name: band.name }) : null
 
   // First tag only: a 390px row cannot hold "Punk Rock, Skatepunk, Melodic Punk"
   // without wrapping to three lines. The first is the one the artist led with.
@@ -218,7 +218,7 @@ function BandCard({
           {band.name ? (
             <Link
               to={bandProfileHref}
-              state={eventSlug ? { fromEventSlug: eventSlug } : undefined}
+              state={buildBandProfileState(eventSlug)}
               onClick={e => e.stopPropagation()}
               className={`font-display font-bold text-base md:text-lg leading-snug transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent-500 ${
                 onAmber

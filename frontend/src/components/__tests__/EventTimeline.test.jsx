@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import EventTimeline from '../EventTimeline'
 import { POSTER_IMAGE_HOST } from '../../utils/posterImage'
 import { formatPerformanceDayLabel } from '../../utils/timeFormat'
@@ -26,6 +26,11 @@ function jsonResponse(data) {
     },
     json: vi.fn().mockResolvedValue(data),
   }
+}
+
+function LocationState() {
+  const location = useLocation()
+  return <output data-testid="location-state">{JSON.stringify(location.state)}</output>
 }
 
 describe('EventTimeline', () => {
@@ -1840,15 +1845,18 @@ describe('EventTimeline artist links navigate client-side (#985 follow-up)', () 
     render(
       <MemoryRouter>
         <EventTimeline />
+        <LocationState />
       </MemoryRouter>
     )
 
     expect(await screen.findByText('Link Event')).toBeInTheDocument()
 
     const link = await screen.findByRole('link', { name: /Routed Band/ })
-    expect(link).toHaveAttribute('href', '/band/routed-band?fromEvent=link-event')
+    expect(link).toHaveAttribute('href', '/band/9')
 
     // false === the default was prevented === react-router handled it.
     expect(fireEvent.click(link)).toBe(false)
+    expect(screen.getByTestId('location-state')).toHaveTextContent('fromEventSlug')
+    expect(screen.getByTestId('location-state')).toHaveTextContent('link-event')
   })
 })

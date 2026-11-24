@@ -71,7 +71,7 @@ function ArtistCard({ artist }) {
   return (
     <div className="rounded-xl border border-border bg-surface p-4 transition hover:border-accent-400/50">
       <Link
-        to={buildBandProfileHref(artist.name)}
+        to={buildBandProfileHref(artist)}
         className="flex min-w-0 items-center gap-4 rounded-lg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-400"
       >
         {artist.photo_url ? (

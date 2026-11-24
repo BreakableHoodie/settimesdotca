@@ -113,7 +113,7 @@ describe('ArtistsPage', () => {
     expect(instagramLink).toHaveAttribute('href', 'https://instagram.com/crossdogband')
 
     const profileLink = screen.getByRole('heading', { name: 'Cross Dog' }).closest('a')
-    expect(profileLink).toHaveAttribute('href', '/band/cross-dog')
+    expect(profileLink).toHaveAttribute('href', '/band/7')
   })
 
   it('shows ALL platform icons from link_fields (no cap) — piece 5 of #1098', async () => {

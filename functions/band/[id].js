@@ -7,6 +7,7 @@ import {
   toPlainText,
   truncatePlainText,
   serveWithInjectedMeta,
+  serveNotFound,
   CANONICAL_HOST,
   DEFAULT_OG_IMAGE,
 } from "../utils/ssrMeta.js";
@@ -52,12 +53,20 @@ async function redirectSlugToId(context, slug) {
   // rather than impossible. The UNIQUE index makes it worse, not better: there
   // can only ever be one such row, so the wrong mapping would be perfectly stable
   // and every cached 301 would keep pointing at it.
-  if (!lookupKey) return env.ASSETS.fetch(request);
+  //
+  // So the normalized match never runs on an empty key. The exact-name match
+  // beside it mirrors GET /api/bands/stats/:name's LOWER(name) fallback, so a
+  // band literally named "!!!" still resolves from /band/!!! while /band/---
+  // matches nothing.
+  const rawName = String(slug).trim();
+  if (!rawName) return serveNotFound(context);
 
   let match;
   try {
-    match = await env.DB.prepare(`SELECT id FROM band_profiles WHERE name_normalized = ? LIMIT 1`)
-      .bind(lookupKey)
+    match = await env.DB.prepare(
+      `SELECT id FROM band_profiles WHERE (name_normalized = ? AND ? <> '') OR LOWER(TRIM(name)) = LOWER(?) LIMIT 1`,
+    )
+      .bind(lookupKey, lookupKey, rawName)
       .first();
   } catch (err) {
     // Same posture as the SSR lookup below: a D1 failure degrades to the shell,
@@ -72,10 +81,12 @@ async function redirectSlugToId(context, slug) {
     return env.ASSETS.fetch(request);
   }
 
-  // An unresolvable slug is not necessarily junk -- it may be a renamed or
-  // deleted artist -- so it keeps the previous behaviour and renders the shell
-  // instead of 404ing a URL that may still be linked.
-  if (!match) return env.ASSETS.fetch(request);
+  // The lookup SUCCEEDED and found nothing. The client resolves a slug through
+  // GET /api/bands/stats/:name, whose name_normalized/LOWER(name) match is the
+  // same pair of conditions as this lookup, so the SPA cannot find an artist
+  // the server cannot. A real 404 (the shell is still the body, so the
+  // client NotFound state renders) rather than a soft-404 200 (#1446).
+  if (!match) return serveNotFound(context);
 
   // Carry the query string: ?fromEvent=<slug> drives the "back to event"
   // context, and the client redirect this replaces preserved location.search.
@@ -128,7 +139,7 @@ export async function onRequest(context) {
     console.error("SSR band lookup failed:", id, err);
     return env.ASSETS.fetch(request);
   }
-  if (!band) return env.ASSETS.fetch(request);
+  if (!band) return serveNotFound(context);
 
   // Pin to the production host — preview deploys must not self-canonicalise.
   const url = `${CANONICAL_HOST}/band/${id}`;

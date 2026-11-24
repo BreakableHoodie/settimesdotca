@@ -11,6 +11,7 @@ import { fetchPublicJson } from '../utils/publicApi'
 import { trackPageView } from '../utils/metrics'
 import { safeExternalHref } from '../utils/urlSafety'
 import { buildDirectionsHref } from '../utils/directions'
+import { useNoindex } from '../utils/useNoindex'
 
 // Read-only performer card (#742). Selection (add-to-route) deliberately
 // isn't wired up here -- that pulls in scheduleStorage and the `end_date ||
@@ -104,6 +105,7 @@ export default function VenuePage() {
   // response is applied, so a slow older response cannot overwrite newer data
   // (e.g. put a cancelled set back on screen).
   const requestSeqRef = useRef(0)
+  useNoindex(!loading && error?.status === 404)
 
   // BandCard derives "Starts in Nm" / "Live Now" from this prop, so a frozen
   // value strands a fan on a stale countdown -- and this is the page someone

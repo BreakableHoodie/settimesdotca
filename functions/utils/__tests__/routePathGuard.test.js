@@ -6,15 +6,11 @@ import { describe, expect, it } from "vitest";
 
 const FUNCTIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), "../..");
 
-// These are narrow exceptions, not file-wide exemptions. The root gate is safe because
-// Pages never dispatches /API/ to Functions; getUrlId uses the raw path only to extract a
+// These are narrow exceptions, not file-wide exemptions. The root API gate is NOT among
+// them: since _routes.json includes "/*" (#1446), /API/ does reach Functions, so
+// _middleware.js decides with isApiRoute(). getUrlId uses the raw path only to extract a
 // segment, and invalid casing fails validation with 400 rather than selecting a resource.
 const ALLOWLIST = [
-  {
-    file: "_middleware.js",
-    snippet: 'url.pathname.startsWith("/api/")',
-    reason: "Pages never dispatches /API/ to Functions",
-  },
   {
     file: "utils/request.js",
     snippet: 'url.pathname.split("/")',

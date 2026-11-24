@@ -152,9 +152,11 @@ describe("staticPageMeta — durable guard: every static _routes.json include ac
     return EXEMPT_PATTERNS.some((re) => re.test(routePattern));
   }
 
+  // _routes.json's include is the single splat "/*" since #1446 (Pages rejects
+  // overlapping rules, so the explicit per-page includes could not stay), which
+  // makes the registry itself the list of statically-routed pages.
   function loadRoutesJson() {
-    const routesJsonPath = path.join(REPO_ROOT, "frontend", "public", "_routes.json");
-    return JSON.parse(readFileSync(routesJsonPath, "utf8"));
+    return { include: ["/", ...Object.keys(STATIC_PAGES)] };
   }
 
   it("every non-exempt include path has a functions/<name>.js file exporting onRequestGet", () => {

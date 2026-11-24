@@ -86,6 +86,78 @@ export const REPO_ROOT = path.join(__dirname, "..");
 /** @type {Mutation[]} */
 export const MUTATIONS = [
   {
+    id: "catch-all-delegates-home",
+    invariant:
+      "CLAUDE.md 'SSR owns identity meta and JSON-LD' — the catch-all hands / to index.js, or the splat 404s the home page (#1446)",
+    file: "functions/[[path]].js",
+    find: '  if (path === "/") return serveHome(context);',
+    replace: "  if (false) return serveHome(context);",
+    tests: ["functions/__tests__/notFound.test.js"],
+  },
+  {
+    id: "venue-db-error-serves-shell-not-404",
+    invariant:
+      "CLAUDE.md 'SSR owns identity meta and JSON-LD' — a transient D1 error serves the shell, never a 404 that would drop a real page (#1446)",
+    file: "functions/venue/[id].js",
+    find: '    console.error("SSR venue lookup failed:", id, err);\n    return env.ASSETS.fetch(request);',
+    replace: '    console.error("SSR venue lookup failed:", id, err);\n    return serveNotFound(context);',
+    tests: ["functions/__tests__/notFound.test.js"],
+  },
+  {
+    id: "api-gate-is-case-insensitive",
+    invariant:
+      "CLAUDE.md 'Routes match case-insensitively; path checks must too' — /API/ is the API: the middleware gate uses the normalised path (#1446)",
+    file: "functions/_middleware.js",
+    find: "  if (!isApiRoute(request)) {",
+    replace: '  if (!url.pathname.startsWith("/api/")) {',
+    tests: ["functions/__tests__/middlewareApiCaseInsensitive.test.js"],
+  },
+  {
+    id: "band-missing-entity-is-404",
+    invariant:
+      "CLAUDE.md 'SSR owns identity meta and JSON-LD' — a band id that does not exist answers 404 with noindex, not a soft-404 200 shell (#1446)",
+    file: "functions/band/[id].js",
+    find: "  if (!band) return serveNotFound(context);",
+    replace: "  if (!band) return env.ASSETS.fetch(request);",
+    tests: ["functions/band/__tests__/id.slug-redirect.test.js"],
+  },
+  {
+    id: "band-slug-empty-key-never-matches",
+    invariant:
+      "CLAUDE.md 'SSR owns identity meta and JSON-LD' — a punctuation-only slug never 301s to a row whose name also normalizes to empty",
+    file: "functions/band/[id].js",
+    find: "(name_normalized = ? AND ? <> '')",
+    replace: "(name_normalized = ? AND (? <> '' OR 1))",
+    tests: ["functions/band/__tests__/id.slug-redirect.test.js"],
+  },
+  {
+    id: "band-slug-exact-name-fallback",
+    invariant:
+      "CLAUDE.md 'SSR owns identity meta and JSON-LD' — a band whose name normalizes to empty (\"!!!\") still resolves from its exact name, as the band API finds it",
+    file: "functions/band/[id].js",
+    find: "OR LOWER(TRIM(name)) = LOWER(?) LIMIT 1",
+    replace: "OR (LOWER(TRIM(name)) = LOWER(?) AND 0) LIMIT 1",
+    tests: ["functions/band/__tests__/id.slug-redirect.test.js"],
+  },
+  {
+    id: "catch-all-unknown-path-is-404",
+    invariant:
+      "CLAUDE.md 'SSR owns identity meta and JSON-LD' — an unknown top-level path answers 404 with noindex through the catch-all (#1446)",
+    file: "functions/[[path]].js",
+    find: "  return serveNotFound(context);",
+    replace: "  return context.env.ASSETS.fetch(context.request);",
+    tests: ["functions/__tests__/notFound.test.js"],
+  },
+  {
+    id: "page-route-error-is-html-500",
+    invariant:
+      "CLAUDE.md 'SSR owns identity meta and JSON-LD' — a thrown error on a page route answers an HTML 500 with noindex, not raw JSON (#1446)",
+    file: "functions/_middleware.js",
+    find: "  if (isPage && wantsHtml) {",
+    replace: "  if (false && isPage && wantsHtml) {",
+    tests: ["functions/__tests__/middlewarePageError.test.js"],
+  },
+  {
     id: "case-insensitive-route-path-decisions",
     invariant:
       "CLAUDE.md 'Routes match case-insensitively; path checks must too' — path-based security decisions normalize Pages route paths before comparison",

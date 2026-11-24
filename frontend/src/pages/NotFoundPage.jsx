@@ -3,10 +3,12 @@ import { useEffect } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { Link } from 'react-router-dom'
 import Footer from '../components/Footer'
+import { useNoindex } from '../utils/useNoindex'
 
 export default function NotFoundPage() {
   // react-helmet-async does not reliably set document.title in React 19 — set it
   // directly to match the <Helmet> title below. See BandProfilePage.jsx.
+  useNoindex()
   useEffect(() => {
     document.title = 'Page Not Found | SetTimes'
   }, [])

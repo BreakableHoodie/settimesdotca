@@ -12,7 +12,7 @@ There is no supported `dev` branch or `dev.settimes.ca` environment. Do not conf
 
 ## Prerequisites
 
-- Node.js 22.12+ (or a version allowed by `package.json`)
+- Node.js 22.13+ (or a version allowed by `package.json`)
 - Cloudflare access to the Pages project and D1 database
 - GitHub access to merge to `main`
 - Wrangler, installed through the frontend dependencies
@@ -142,6 +142,8 @@ See Cloudflare's D1 Time Travel documentation for the retention window available
 `time-travel restore` prints the **previous bookmark**, the database's state just before the restore. Record it: restoring to that bookmark is the undo. (A bookmark from an earlier `time-travel info` would miss any write made between `info` and the restore.) **The undo is itself an in-place restore:** any write accepted after the first restore is lost when you restore the bookmark. Pause writes first (see Scheduled Maintenance for the daily job), and export or note anything written since the first restore so it can be reconciled.
 
 **An export is not read-only.** `wrangler d1 export --remote` locks production until it completes, so run one only with the owner's go-ahead and never on a show night. The export-and-restore round trip was rehearsed on 2026-11-24 (#1442): 27 tables and 4,458 rows restored into local SQLite with zero errors, matching production. Steps and timings are in `docs/field-notes/backup-restore.md`.
+
+**Beyond 30 days:** `.github/workflows/d1-backup.yml` copies production monthly to the private R2 bucket `settimes-d1-backups` (each copy kept 400 days), leaving out the tables whose rows the privacy policy deletes sooner. Restore steps: `docs/field-notes/backup-restore.md` (#1479).
 
 ## Scheduled Maintenance
 

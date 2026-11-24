@@ -139,7 +139,7 @@ describe("gh lookups piped inside $(...) run under pipefail", () => {
     );
 
   it("finds the lookups it guards", () => {
-    expect(runs.map((r) => r.file).sort()).toEqual(["edge-e2e.yml", "site-health.yml"]);
+    expect(runs.map((r) => r.file).sort()).toEqual(["d1-backup.yml", "edge-e2e.yml", "site-health.yml"]);
   });
 
   it.each(runs.map((r) => [`${r.file} / ${r.step}`, r]))("%s sets pipefail", (_, r) => {

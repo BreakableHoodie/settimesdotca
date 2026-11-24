@@ -33,7 +33,7 @@ export default function PrivacyPage() {
         </div>
 
         <h1 className="text-text-primary text-3xl font-bold mb-2">Privacy Policy</h1>
-        <p className="text-text-tertiary text-sm mb-10">Last updated: October 2026</p>
+        <p className="text-text-tertiary text-sm mb-10">Last updated: November 2026</p>
 
         <div className="space-y-8 text-text-secondary leading-relaxed">
           <section>
@@ -90,7 +90,10 @@ export default function PrivacyPage() {
               We store your email address, hashed password (PBKDF2-SHA256, 100,000 iterations), and session tokens.
               Login attempts and admin actions may include security metadata such as IP address and user agent for
               account protection, abuse investigation, and session management. These records are retained for limited
-              periods and deleted automatically according to our retention rules (see below).
+              periods and deleted automatically according to our retention rules (see below). Organiser accounts and the
+              event catalogue are also copied to a private monthly backup, and each copy is deleted after about 13
+              months, so a deleted organiser account can remain in a backup for that long. Login attempts, security
+              logs, sessions and visitor codes are left out of these copies.
             </p>
           </section>
 

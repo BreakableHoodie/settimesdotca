@@ -1989,6 +1989,33 @@ export const MUTATIONS = [
     replace: "       WHERE 1",
     tests: ["functions/api/admin/events/__tests__/metrics.test.js"],
   },
+  {
+    id: "d1-backup-scrubs-excluded-tables",
+    invariant:
+      "CLAUDE.md 'Retention windows are a published promise' — the offsite backup empties every table the policy deletes sooner (#1479)",
+    file: "scripts/d1-backup.mjs",
+    find: "      if (name in EXCLUDED_TABLES) db.exec(`DELETE FROM ${quoteIdent(name)}`);",
+    replace: "      if (false) db.exec(`DELETE FROM ${quoteIdent(name)}`);",
+    tests: ["scripts/__tests__/d1Backup.test.js"],
+  },
+  {
+    id: "d1-backup-clears-credentials-in-kept-tables",
+    invariant:
+      "CLAUDE.md 'Retention windows are a published promise' — the offsite copy carries no redeemable activation token or unencrypted TOTP secret (#1479)",
+    file: "scripts/d1-backup.mjs",
+    find: "    for (const { sql } of SCRUB_UPDATES) db.exec(sql);",
+    replace: "    for (const { sql } of []) db.exec(sql);",
+    tests: ["scripts/__tests__/d1Backup.test.js"],
+  },
+  {
+    id: "d1-backup-refuses-unclassified-table",
+    invariant:
+      "CLAUDE.md 'Retention windows are a published promise' — a table nobody classified fails the offsite backup (#1479)",
+    file: "scripts/d1-backup.mjs",
+    find: "    if (unknown.length > 0) {",
+    replace: "    if (false) {",
+    tests: ["scripts/__tests__/d1Backup.test.js"],
+  },
   // ==========================================================================
   // Frontend entries (#1416). `stack: "frontend"`: file and tests are relative
   // to frontend/, and vitest runs from there with the frontend's own config.

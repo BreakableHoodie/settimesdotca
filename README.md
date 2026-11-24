@@ -25,7 +25,7 @@ SetTimes.ca is a Cloudflare Pages application for managing and publishing multi-
 
 ### Prerequisites
 
-- Node.js 22.12+ (or 24.x / 26+; the `engines` range in `package.json`)
+- Node.js 22.13+ (or 24.x / 26+; the `engines` range in `package.json`)
 - npm
 - `sqlite3` CLI for the local database bootstrap scripts
 - A Cloudflare account only if you need remote D1 or Pages deployment

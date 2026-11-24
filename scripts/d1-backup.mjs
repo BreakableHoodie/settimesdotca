@@ -138,9 +138,10 @@ export function buildBackup(exportSql, outPath) {
         `unclassified table(s): ${unknown.join(", ")}. Add each to BACKED_UP_TABLES or EXCLUDED_TABLES in scripts/d1-backup.mjs.`,
       );
     }
-    const missing = BACKED_UP_TABLES.filter((name) => !tables.includes(name));
+    // Excluded tables too: the copy promises the complete schema.
+    const missing = [...BACKED_UP_TABLES, ...Object.keys(EXCLUDED_TABLES)].filter((name) => !tables.includes(name));
     if (missing.length > 0) {
-      throw new Error(`export is missing backed-up table(s): ${missing.join(", ")}`);
+      throw new Error(`export is missing table(s): ${missing.join(", ")}`);
     }
 
     for (const name of tables) {
@@ -185,7 +186,64 @@ export function buildBackup(exportSql, outPath) {
   }
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+function sqlLiteral(value) {
+  if (value === null) return "NULL";
+  if (typeof value === "bigint") return value.toString();
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw new Error("cannot write a non-finite number as SQL");
+    return String(value);
+  }
+  if (value instanceof Uint8Array) return `X'${Buffer.from(value).toString("hex")}'`;
+  // Newlines stay raw inside the literal: valid SQL, and D1 refuses the
+  // unistr() escapes that the sqlite3 CLI's .dump writes since 3.50.
+  return `'${String(value).replaceAll("'", "''")}'`;
+}
+
+/**
+ * SQL that rebuilds the backup in a fresh D1 (`wrangler d1 execute --file`),
+ * in the shape of D1's own export: deferred foreign keys, no explicit
+ * transaction, tables, rows, then indexes, triggers and views, then the
+ * AUTOINCREMENT counters so restored ids are never reused.
+ */
+export function restoreSql(backupPath) {
+  const db = new DatabaseSync(backupPath, { readOnly: true });
+  try {
+    const objects = db
+      .prepare(
+        "SELECT type, name, sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\' AND name NOT LIKE '\\_cf\\_%' ESCAPE '\\' ORDER BY rowid",
+      )
+      .all();
+    const out = ["PRAGMA defer_foreign_keys=TRUE;"];
+    const tables = objects.filter((o) => o.type === "table");
+    for (const { sql } of tables) out.push(`${sql};`);
+    for (const { name } of tables) {
+      const rows = db.prepare(`SELECT * FROM ${quoteIdent(name)}`);
+      rows.setReadBigInts(true);
+      for (const row of rows.iterate()) {
+        out.push(`INSERT INTO ${quoteIdent(name)} VALUES(${Object.values(row).map(sqlLiteral).join(",")});`);
+      }
+    }
+    for (const { sql } of objects.filter((o) => o.type !== "table")) out.push(`${sql};`);
+    const hasSequence = db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'sqlite_sequence'").get();
+    if (hasSequence) {
+      out.push("DELETE FROM sqlite_sequence;");
+      for (const { name, seq } of db.prepare("SELECT name, seq FROM sqlite_sequence").all()) {
+        out.push(`INSERT INTO "sqlite_sequence" VALUES(${sqlLiteral(name)},${sqlLiteral(seq)});`);
+      }
+    }
+    return `${out.join("\n")}\n`;
+  } finally {
+    db.close();
+  }
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv[2] === "--restore-sql") {
+  if (!process.argv[3]) {
+    console.error("usage: node scripts/d1-backup.mjs --restore-sql <backup.db> > restore.sql");
+    process.exit(2);
+  }
+  process.stdout.write(restoreSql(process.argv[3]));
+} else if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const [exportPath, outPath] = process.argv.slice(2);
   if (!exportPath || !outPath) {
     console.error("usage: node scripts/d1-backup.mjs <export.sql> <backup.db>");

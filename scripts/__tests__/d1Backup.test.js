@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { BACKED_UP_TABLES, buildBackup, EXCLUDED_TABLES, unclassifiedTables } from "../d1-backup.mjs";
+import { BACKED_UP_TABLES, buildBackup, EXCLUDED_TABLES, restoreSql, unclassifiedTables } from "../d1-backup.mjs";
 
 const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
 const SCHEMA_SQL = read("database/setup-complete.sql");
@@ -188,8 +188,92 @@ describe("buildBackup", () => {
   it("refuses an export missing a backed-up table", () => {
     const out = join(dir, "backup.db");
     expect(() => buildBackup(exportWith(`${SEED} DROP TABLE event_hourly_views;`), out)).toThrow(
-      /missing backed-up table\(s\): event_hourly_views/,
+      /missing table\(s\): event_hourly_views/,
     );
     expect(existsSync(out)).toBe(false);
+  });
+
+  it("refuses an export missing an excluded table, whose schema the copy promises", () => {
+    const out = join(dir, "backup.db");
+    expect(() => buildBackup(exportWith(`${SEED} DROP TABLE auth_attempts;`), out)).toThrow(
+      /missing table\(s\): auth_attempts/,
+    );
+    expect(existsSync(out)).toBe(false);
+  });
+});
+
+describe("restoreSql", () => {
+  let dir;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "d1-restore-"));
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  // A description holding a line that reads COMMIT; and a quote: what broke
+  // line-based stripping of a .dump, and what unistr() escapes D1 refuses.
+  const TRICKY = "First line\nCOMMIT;\nO'Brien's last line";
+
+  it("rebuilds the backup exactly, with D1-compatible SQL", () => {
+    const out = join(dir, "backup.db");
+    const seed = `${SEED} INSERT INTO band_profiles (id, name, name_normalized, description) VALUES (7, 'Tricky', 'tricky', '${TRICKY.replaceAll("'", "''")}');`;
+    buildBackup(exportWith(seed), out);
+    const sql = restoreSql(out);
+
+    expect(sql).not.toMatch(/unistr\(|BEGIN TRANSACTION|_cf_/);
+    expect(sql.startsWith("PRAGMA defer_foreign_keys=TRUE;\n")).toBe(true);
+
+    const restored = new DatabaseSync(":memory:");
+    restored.exec(sql);
+    const original = new DatabaseSync(out, { readOnly: true });
+    const tables = original
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
+      .all()
+      .map((r) => r.name);
+    expect(tables.length).toBeGreaterThan(20);
+    for (const name of tables) {
+      const q = `SELECT * FROM "${name}" ORDER BY rowid`;
+      expect(restored.prepare(q).all(), name).toEqual(original.prepare(q).all());
+    }
+    expect(restored.prepare("SELECT description FROM band_profiles WHERE id = 7").get().description).toBe(TRICKY);
+    expect(restored.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+    original.close();
+    restored.close();
+  });
+
+  it("copies every row of every table, blobs, big integers and counters included", () => {
+    const path = join(dir, "synthetic.db");
+    const db = new DatabaseSync(path);
+    db.exec(`
+      CREATE TABLE parent (id INTEGER PRIMARY KEY AUTOINCREMENT, label TEXT);
+      CREATE TABLE child (id INTEGER PRIMARY KEY, parent_id INTEGER REFERENCES parent(id), data BLOB, big INTEGER, ratio REAL);
+      CREATE INDEX idx_child_parent ON child(parent_id);
+      INSERT INTO parent (label) VALUES ('a'), ('b'), ('c');
+      DELETE FROM parent WHERE id = 3;
+      INSERT INTO child VALUES (1, 2, X'00ff10', 9007199254740993, 0.25), (2, 1, NULL, -1, 1e-7);
+    `);
+    db.close();
+
+    const restored = new DatabaseSync(":memory:");
+    restored.exec(restoreSql(path));
+    const rows = (q) => {
+      const st = restored.prepare(q);
+      st.setReadBigInts(true);
+      return st.all();
+    };
+    expect(rows("SELECT id, label FROM parent ORDER BY id")).toEqual([
+      { id: 1n, label: "a" },
+      { id: 2n, label: "b" },
+    ]);
+    expect(rows("SELECT id, hex(data) AS data, big, ratio FROM child ORDER BY id")).toEqual([
+      { id: 1n, data: "00FF10", big: 9007199254740993n, ratio: 0.25 },
+      { id: 2n, data: "", big: -1n, ratio: 1e-7 },
+    ]);
+    // The AUTOINCREMENT counter survives, so a deleted id is never reused.
+    restored.exec("INSERT INTO parent (label) VALUES ('d')");
+    expect(rows("SELECT MAX(id) AS id FROM parent")[0].id).toBe(4n);
+    expect(rows("SELECT name FROM sqlite_master WHERE name = 'idx_child_parent'")).toHaveLength(1);
+    restored.close();
   });
 });

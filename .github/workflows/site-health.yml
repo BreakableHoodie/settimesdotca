@@ -1,0 +1,86 @@
+name: Production site health
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: site-health-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: 22
+
+jobs:
+  smoke-probes:
+    name: Production smoke probes
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Run production smoke probes
+        id: probes
+        continue-on-error: true
+        env:
+          SMOKE_URL: ${{ vars.CF_PRODUCTION_SMOKE_URL || 'https://settimes.ca' }}
+        run: |
+          set -o pipefail
+          node scripts/smoke-probes.mjs "$SMOKE_URL" 2>&1 | tee "$RUNNER_TEMP/smoke-probes.log"
+
+      - name: Report probe status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PROBE_OUTCOME: ${{ steps.probes.outcome }}
+        run: |
+          issue_title="Site down: production smoke probes failing"
+          issue_number=$(gh issue list --repo "$REPOSITORY" --state open --search "\"$issue_title\" in:title" --limit 100 --json number,title --jq ".[] | select(.title == \"$issue_title\") | .number" | head -n 1)
+
+          if [ "$PROBE_OUTCOME" != "success" ] && [ "$PROBE_OUTCOME" != "failure" ]; then
+            # The probes never ran (checkout or setup failed, or the run was
+            # cancelled). That is not a recovery: leave any open issue alone.
+            echo "::error::Smoke probes did not run (outcome: $PROBE_OUTCOME); site-down issue left as is."
+            exit 1
+          fi
+
+          if [ "$PROBE_OUTCOME" = "failure" ]; then
+            body="Production smoke probes failed.
+
+          Run: $RUN_URL
+
+          Output:
+          $(cat "$RUNNER_TEMP/smoke-probes.log")"
+            if [ -n "$issue_number" ]; then
+              gh issue comment "$issue_number" --repo "$REPOSITORY" --body "$body"
+              gh issue edit "$issue_number" --repo "$REPOSITORY" --add-label "bug,priority:p1"
+            else
+              gh issue create --repo "$REPOSITORY" --title "$issue_title" --label "bug,priority:p1" --body "$body"
+            fi
+            exit 1
+          fi
+
+          if [ -n "$issue_number" ]; then
+            gh issue comment "$issue_number" --repo "$REPOSITORY" --body "Recovered: production smoke probes passed.
+
+          Run: $RUN_URL"
+            gh issue close "$issue_number" --repo "$REPOSITORY" --reason completed
+          fi

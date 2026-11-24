@@ -29,8 +29,8 @@ So `wrangler d1 export … --remote` **blocks production** while it runs: fan re
 
 ## What this does and does not prove
 
-- **Proves:** an export of production restores into SQLite, complete and consistent, in seconds.
-- **Does not prove:** a Time Travel restore. That only restores **in place**, onto production, so it cannot be rehearsed without risk. Before running `time-travel restore` in an incident, run `wrangler d1 time-travel info` and keep the **current bookmark**. Restoring to that bookmark is the undo ([Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/)).
+- **Proves (for what was checked):** an export of production restores into SQLite in seconds, with zero errors. Every table's row count matches; integrity and foreign-key checks pass; and the selected content fingerprints match (ids, names, description lengths, slugs and statuses, set times). It does not compare every column of every table: an unchecked column could differ while all of these pass. A full comparison would hash each table's complete contents on both sides; do that next time, before deleting the export.
+- **Does not prove:** a Time Travel restore. That only restores **in place**, onto production, so it cannot be rehearsed without risk. In an incident, `wrangler d1 time-travel restore` prints the **previous bookmark**, the state just before the restore. Record it: restoring to it is the undo ([Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/)). A bookmark taken earlier with `time-travel info` would miss writes made between `info` and the restore.
 - **Time Travel's window** is 30 days on Workers Paid (7 on Free). Anything older needs an offsite copy; the decision is tracked separately.
 
 ## To repeat it

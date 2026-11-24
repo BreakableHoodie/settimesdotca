@@ -327,6 +327,9 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           COMMIT_SHA: ${{ github.sha }}
         run: |
+          # Without pipefail a failed `gh issue list | head` reads as "no open
+          # issue" and a second issue gets created.
+          set -o pipefail
           short_sha="${COMMIT_SHA:0:8}"
           issue_title="Edge E2E failed on main: $short_sha"
           body="Edge E2E run: $RUN_URL

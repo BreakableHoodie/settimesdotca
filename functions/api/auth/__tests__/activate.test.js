@@ -7,6 +7,27 @@ import * as resendActivationHandler from "../resend-activation.js";
 
 const BASE_URL = "https://example.test/api/auth/activate";
 
+// Captures the activation link the handler actually emails (Resend stubbed at
+// fetch), so the round trip redeems what the user receives, not a value the
+// test derived itself.
+function captureActivationEmails(env) {
+  const tokens = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url, init) => {
+      if (new URL(String(url)).hostname === "api.resend.com") {
+        const { text } = JSON.parse(init.body);
+        const link = text.match(/https?:\/\/\S+\/activate\?\S+/)?.[0];
+        if (link) tokens.push(new URL(link).searchParams.get("token"));
+        return new Response(JSON.stringify({ id: "x" }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ success: true }), { status: 200 });
+    }),
+  );
+  Object.assign(env, { EMAIL_PROVIDER: "resend", RESEND_API_KEY: "test-key", EMAIL_FROM: "noreply@example.test" });
+  return tokens;
+}
+
 // The column holds the digest (#1482); tests submit the plaintext.
 async function insertPendingUser(rawDb, { email = "pending@example.com", token = "tok-123", expiresAt } = {}) {
   const stored = await hashStoredToken(token);
@@ -259,16 +280,14 @@ describe("POST /api/auth/activate — tokens are stored hashed (#1482)", () => {
     }
   });
 
-  it("resend-activation stores only the digest, and the emailed plaintext activates the account", async () => {
+  it("resend-activation stores only the digest, and the emailed link activates the account", async () => {
     const { env, rawDb } = createTestEnv();
+    const emailed = captureActivationEmails(env);
     rawDb
       .prepare(
         "INSERT INTO users (email, password_hash, name, role, is_active, activated_at) VALUES (?, ?, ?, ?, 0, NULL)",
       )
       .run("roundtrip@example.com", "hash", "Round Trip", "editor");
-    const uuid = "11111111-2222-4333-8444-555555555555";
-    const spy = vi.spyOn(crypto, "randomUUID").mockReturnValue(uuid);
-    const plaintext = uuid + uuid.replace(/-/g, "");
     try {
       const response = await resendActivationHandler.onRequestPost({
         request: new Request("https://example.test/api/auth/resend-activation", {
@@ -279,15 +298,22 @@ describe("POST /api/auth/activate — tokens are stored hashed (#1482)", () => {
         env,
       });
       expect(response.status).toBe(200);
+      expect(emailed).toHaveLength(1);
+      const [plaintext] = emailed;
+
+      const stored = rawDb.prepare("SELECT activation_token FROM users WHERE email = ?").get("roundtrip@example.com");
+      expect(stored.activation_token).not.toBe(plaintext);
+      expect(stored.activation_token).toBe(await hashStoredToken(plaintext));
+
+      const activated = await activateHandler.onRequestPost({ request: activateRequest(plaintext), env });
+      expect(activated.status).toBe(200);
+      const user = rawDb
+        .prepare("SELECT is_active, activation_token FROM users WHERE email = ?")
+        .get("roundtrip@example.com");
+      expect(user.is_active).toBe(1);
+      expect(user.activation_token).toBeNull();
     } finally {
-      spy.mockRestore();
+      vi.unstubAllGlobals();
     }
-
-    const stored = rawDb.prepare("SELECT activation_token FROM users WHERE email = ?").get("roundtrip@example.com");
-    expect(stored.activation_token).not.toBe(plaintext);
-    expect(stored.activation_token).toBe(await hashStoredToken(plaintext));
-
-    const activated = await activateHandler.onRequestPost({ request: activateRequest(plaintext), env });
-    expect(activated.status).toBe(200);
   });
 });

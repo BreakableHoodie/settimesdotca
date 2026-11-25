@@ -72,6 +72,10 @@ export const EXCLUDED_TABLES = Object.freeze({
  */
 export const SCRUB_UPDATES = Object.freeze([
   {
+    why: "an invitee's address is cleared from the live table 30 days after the invite finishes (#1498); the 400-day copy never holds one the live table would have dropped. Same predicate as retention.js",
+    sql: "UPDATE invite_codes SET email = NULL WHERE email IS NOT NULL AND ((used_at IS NOT NULL AND datetime(used_at) < datetime('now', '-30 days')) OR datetime(expires_at) < datetime('now', '-30 days') OR (used_at IS NULL AND is_active = 0 AND datetime(created_at) < datetime('now', '-30 days')))",
+  },
+  {
     why: "pending activation links are dropped from the copy (an invitee asks for a new one); before #1484 they were plaintext and redeemable",
     sql: "UPDATE users SET activation_token = NULL, activation_token_expires_at = NULL WHERE activation_token IS NOT NULL OR activation_token_expires_at IS NOT NULL",
   },

@@ -1087,6 +1087,33 @@ export const MUTATIONS = [
     tests: ["functions/api/admin/maintenance/__tests__/retentionWindows.test.js"],
   },
   {
+    id: "retention-invite-email-30-days",
+    invariant:
+      "CLAUDE.md 'Retention windows are a published promise' — an invitee's email is cleared 30 days after the invite is used, expired or revoked, as the privacy policy states",
+    file: "functions/api/admin/maintenance/retention.js",
+    find: "OR datetime(expires_at) < datetime('now', '-30 days')",
+    replace: "OR datetime(expires_at) < datetime('now', '-3000 days')",
+    tests: ["functions/api/admin/maintenance/__tests__/retentionWindows.test.js"],
+  },
+  {
+    id: "retention-invite-email-used-30-days",
+    invariant:
+      "CLAUDE.md 'Retention windows are a published promise' — a used invite's email is cleared 30 days after used_at",
+    file: "functions/api/admin/maintenance/retention.js",
+    find: "datetime(used_at) < datetime('now', '-30 days')",
+    replace: "datetime(used_at) < datetime('now', '-3000 days')",
+    tests: ["functions/api/admin/maintenance/__tests__/retentionWindows.test.js"],
+  },
+  {
+    id: "retention-invite-email-revoked-30-days",
+    invariant:
+      "CLAUDE.md 'Retention windows are a published promise' — a revoked invite's email is cleared once the invite is 30 days old",
+    file: "functions/api/admin/maintenance/retention.js",
+    find: "is_active = 0 AND datetime(created_at) < datetime('now', '-30 days')",
+    replace: "is_active = 0 AND datetime(created_at) < datetime('now', '-3000 days')",
+    tests: ["functions/api/admin/maintenance/__tests__/retentionWindows.test.js"],
+  },
+  {
     id: "retention-api-key-request-90-days",
     invariant:
       "CLAUDE.md 'Retention windows are a published promise' — api_key.request audit rows are pruned at 90 days, the rest of audit_log at 1 year",

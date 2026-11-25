@@ -92,7 +92,8 @@ export default function PrivacyPage() {
               account protection, abuse investigation, and session management. These records are retained for limited
               periods and deleted automatically according to our retention rules (see below). Organiser accounts and the
               event catalogue are also copied to a private monthly backup, and each copy is deleted after about 13
-              months, so a deleted organiser account can remain in a backup for that long. Login attempts, security
+              months, so a deleted organiser account can remain in a backup for that long. A copy made before an invited
+              email address is cleared (see below) keeps that address for the life of the copy. Login attempts, security
               logs, sessions and visitor codes are left out of these copies.
             </p>
           </section>
@@ -155,6 +156,16 @@ export default function PrivacyPage() {
                       Visit counts by kind of referring site (totals only, no personal data)
                     </td>
                     <td className="py-2">Kept indefinitely</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 pr-4">
+                      Email address of someone invited to be an organiser (whether or not they ever sign up)
+                    </td>
+                    <td className="py-2">
+                      Cleared 30 days after the invitation is used or expires. An invitation revoked before it was used
+                      is cleared once it is 30 days old, so never more than 30 days after revoking and possibly sooner.
+                      The invitation record itself (without the address) is kept as an account audit trail
+                    </td>
                   </tr>
                   <tr>
                     <td className="py-2 pr-4">Admin action log</td>

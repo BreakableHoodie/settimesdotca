@@ -164,8 +164,10 @@ describe("security digest", () => {
       now: NOW,
       accepted,
       npmAudit: [{ lockfile: "package-lock.json", findings: [ACCEPTED], moderate: 1 }],
+      analyses: HEALTHY_SCANNERS,
     });
     expect(digest.shouldOpen).toBe(true);
+    expect(digest.problems.join("\n")).toContain("basic-ftp GHSA-c475-qrg2-pj4r");
   });
 
   it("lists accepted entries that are no longer flagged, so the list can shrink", () => {
@@ -342,7 +344,12 @@ describe("ACCEPTED_NPM_AUDIT", () => {
         },
       ],
       accepted: Object.create({ "frontend/package-lock.json|x|GHSA-aaaa-bbbb-cccc": "inherited" }),
+      analyses: HEALTHY_SCANNERS,
     });
+    // Healthy scanners, so the advisory is the only possible problem.
+    expect(digest.problems).toEqual([
+      "frontend/package-lock.json: 1 npm audit advisory not on the accepted list: x GHSA-aaaa-bbbb-cccc (high)",
+    ]);
     expect(digest.shouldOpen).toBe(true);
   });
 });

@@ -42,7 +42,7 @@ console.log("═".repeat(60));
 if (isLocal) {
   console.log("\n📝 To use this invite code locally:");
   console.log("\n1. Insert into your local database:");
-  console.log("\n   wrangler d1 execute settimes-db --local --command=\\");
+  console.log("\n   wrangler d1 execute settimes-production-db --local --command=\\");
   console.log(
     `   "INSERT INTO invite_codes (code, code_prefix, role, expires_at, is_active) VALUES ('${storedCode}', '${storedPrefix}', 'admin', '${expiryDate}', 1);"`,
   );
@@ -50,7 +50,7 @@ if (isLocal) {
 } else {
   console.log("\n📝 To use this invite code in production:");
   console.log("\n1. Insert into your production database:");
-  console.log("\n   wrangler d1 execute settimes-db --command=\\");
+  console.log("\n   wrangler d1 execute settimes-production-db --remote --command=\\");
   console.log(
     `   "INSERT INTO invite_codes (code, code_prefix, role, expires_at, is_active) VALUES ('${storedCode}', '${storedPrefix}', 'admin', '${expiryDate}', 1);"`,
   );

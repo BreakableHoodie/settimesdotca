@@ -54,11 +54,8 @@ This application implements defense-in-depth security with multiple layers of pr
 
 **Usage:**
 ```bash
-# Create invite code
+# Prints the code once, plus the INSERT to run; only its sha256 digest is stored (#1334)
 node scripts/create-admin-invite.js --prod
-
-# Insert into database
-wrangler d1 execute settimes-production-db --command="INSERT INTO invite_codes..."
 
 # Use during signup
 POST /api/admin/auth/signup

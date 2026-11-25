@@ -164,7 +164,16 @@ export async function onRequestPost(context) {
         .bind(newEvent.id, eventId)
         .run();
     } catch (copyError) {
-      await DB.prepare("DELETE FROM events WHERE id = ?").bind(newEvent.id).run();
+      // Guard the compensation: if it throws, the copy error is still the
+      // diagnosis and must not be replaced by the DELETE's error.
+      try {
+        await DB.prepare("DELETE FROM events WHERE id = ?").bind(newEvent.id).run();
+      } catch (rollbackError) {
+        console.error("Event duplicate failed AND its rollback failed; an empty draft may remain:", {
+          eventId: newEvent.id,
+          rollbackError,
+        });
+      }
       throw copyError;
     }
 

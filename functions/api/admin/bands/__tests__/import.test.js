@@ -223,7 +223,10 @@ describe("POST /api/admin/bands/import", () => {
     try {
       const res = await importRequest(env, payload);
       expect(res.status).toBe(500);
-      expect((await res.json()).error).toBe("Import failed");
+      const body = await res.json();
+      expect(body.error).toBe("Import failed");
+      // The rollback did not finish, so the caller must not be told nothing was imported.
+      expect(body.message).not.toMatch(/No bands were imported/);
 
       const detail = errorSpy.mock.calls.flat().find((a) => a && typeof a === "object" && "rollbackError" in a);
       expect(detail, "the rollback failure is logged").toBeTruthy();

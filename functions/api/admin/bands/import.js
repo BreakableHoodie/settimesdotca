@@ -163,9 +163,15 @@ export async function onRequestPost(context) {
         performanceIds: insertedPerformanceIds,
         profileIds: createdProfileIds,
       });
-    } else {
-      console.error("Bulk import failed, rolled back:", err);
+      return json(
+        {
+          error: "Import failed",
+          message: "The import failed and could not be fully undone. Check the lineup before retrying.",
+        },
+        500,
+      );
     }
+    console.error("Bulk import failed, rolled back:", err);
     return json({ error: "Import failed", message: "No bands were imported" }, 500);
   }
 

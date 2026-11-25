@@ -1068,6 +1068,39 @@ describe("Event API - handler integration", () => {
     expect(data.bands_copied).toBeGreaterThanOrEqual(2);
   });
 
+  it("a duplicate whose copy AND rollback both fail still reports the copy error", async () => {
+    const rawDb = createTestDB();
+    const original = insertEvent(rawDb, { name: "Original", slug: "original" });
+    insertBand(rawDb, { name: "CopyBand1", event_id: original.id });
+    const base = createDBEnv(rawDb);
+    const env = {
+      DB: {
+        ...base,
+        prepare(sql) {
+          if (sql.includes("INSERT INTO performances")) throw new Error("copy exploded");
+          if (sql.startsWith("DELETE FROM events")) throw new Error("rollback exploded");
+          return base.prepare(sql);
+        },
+      },
+    };
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const request = new Request(`https://example.test/api/admin/events/${original.id}/duplicate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+        body: JSON.stringify({ name: "Copy", date: "2026-01-01", slug: "original-copy" }),
+      });
+      const res = await duplicateHandler.onRequestPost({ request, env, params: { id: String(original.id) } });
+      expect(res.status).toBe(500);
+      const reported = errorSpy.mock.calls.find((c) => c[0] === "Error duplicating event:");
+      expect(reported?.[1]?.message).toBe("copy exploded");
+      const rollback = errorSpy.mock.calls.flat().find((a) => a && typeof a === "object" && "rollbackError" in a);
+      expect(String(rollback?.rollbackError?.message)).toBe("rollback exploded");
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
   it("duplicate endpoint rejects a markup-bearing slug with 400 and creates no event (#1276)", async () => {
     const rawDb = createTestDB();
     const env = { DB: createDBEnv(rawDb) };

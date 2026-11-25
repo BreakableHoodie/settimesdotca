@@ -25,7 +25,9 @@ async function resetFreshUser({ emailConfigured = true, delivered = true } = {})
     .run("resetme@test.com", "viewer", "Reset Me", "oldhash");
   const user = rawDb.prepare("SELECT id FROM users WHERE email = ?").get("resetme@test.com");
   rawDb
-    .prepare("INSERT INTO lucia_sessions (id, user_id, expires_at) VALUES ('sha256:target-session', ?, ?)")
+    .prepare(
+      "INSERT INTO lucia_sessions (id, user_id, expires_at) VALUES ('sha256:7461726765742d73657373696f6e000000000000000000000000000000000000', ?, ?)",
+    )
     .run(user.id, Math.floor(Date.now() / 1000) + 3600);
   const response = await resetHandler.onRequestPost({
     request: new Request(`https://example.test/api/admin/users/${user.id}/reset-password`, {
@@ -62,7 +64,7 @@ describe("no side effects before the email can be sent (#1353)", () => {
     const { response, tokens, sessions, sent } = await resetFreshUser({ emailConfigured: false });
     expect(response.status).toBe(500);
     expect(tokens).toEqual([]);
-    expect(sessions).toEqual([{ id: "sha256:target-session" }]);
+    expect(sessions).toEqual([{ id: "sha256:7461726765742d73657373696f6e000000000000000000000000000000000000" }]);
     expect(sent).toEqual([]);
   });
 

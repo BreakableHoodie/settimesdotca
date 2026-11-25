@@ -265,7 +265,9 @@ describe("mfa/enable while re-enrolling (#1318)", () => {
     const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
     rawDb.prepare("UPDATE users SET backup_codes = ? WHERE id = 1").run(JSON.stringify(["old-hash"]));
     rawDb
-      .prepare("INSERT INTO lucia_sessions (id, user_id, expires_at) VALUES ('sha256:other-session', 1, ?)")
+      .prepare(
+        "INSERT INTO lucia_sessions (id, user_id, expires_at) VALUES ('sha256:6f746865722d73657373696f6e00000000000000000000000000000000000000', 1, ?)",
+      )
       .run(Math.floor(Date.now() / 1000) + 3600);
     const newSecret = await startReenrol(env, headers);
 

@@ -62,14 +62,16 @@ export async function onRequestGet(context) {
         .bind(eventLocalFestivalToday())
         .all(),
       env.DB.prepare(
-        // lastmod = the newer of the profile's own edit and the newest edit of
+        // lastmod = the newer of the profile's creation and the newest edit of
         // any performance that is PUBLIC and REVEALED (the same predicate that
         // lets the URL be listed at all). A performance in a draft event, or an
         // unannounced one under reveal_mode, must not leak its date into a
-        // public signal. One correlated aggregate per row of this single query.
+        // public signal. NOT bp.updated_at: a trigger stamps it on every UPDATE
+        // and the daily aggregate-stats job rewrites every profile's counters,
+        // so it reads "today" for all of them (measured 2026-11-24: 228 of 228).
         `SELECT bp.id,
                 MAX(
-                  COALESCE(bp.updated_at, bp.created_at, ''),
+                  COALESCE(bp.created_at, ''),
                   COALESCE((SELECT MAX(COALESCE(p.updated_at, p.created_at))
                             FROM performances p JOIN events e ON e.id = p.event_id
                             WHERE p.band_profile_id = bp.id

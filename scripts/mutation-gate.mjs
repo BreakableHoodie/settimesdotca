@@ -365,6 +365,15 @@ export const MUTATIONS = [
     tests: ["functions/__tests__/sitemap.test.js"],
   },
   {
+    id: "sitemap-band-lastmod-ignores-stats-stamped-updated-at",
+    invariant:
+      "CLAUDE.md 'The sitemap is the event-discovery signal — spend it (#1158)' — a band's lastmod never reads band_profiles.updated_at, which the daily stats job stamps on every row",
+    file: "functions/sitemap.xml.js",
+    find: "COALESCE(bp.created_at, '')",
+    replace: "COALESCE(bp.updated_at, bp.created_at, '')",
+    tests: ["functions/__tests__/sitemap.test.js"],
+  },
+  {
     id: "sitemap-upcoming-event-changefreq",
     invariant:
       "CLAUDE.md 'The sitemap is the event-discovery signal — spend it (#1158)' — an upcoming event is crawled daily, not weekly",

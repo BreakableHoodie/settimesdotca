@@ -224,18 +224,34 @@ describe("GET /sitemap.xml — band and venue lastmod", () => {
     expect(lastmodFor(xml, `https://settimes.ca/venue/${venueId}`)).toBe("2026-03-05");
   });
 
-  test("the entity's own edit wins when it is newer than every performance", async () => {
+  test("a venue's own edit wins when it is newer than every performance", async () => {
     const { env, rawDb } = createTestEnv();
     const ev = insertEvent(rawDb, { name: "LM Own", slug: "lm-own", date: "2099-01-01" });
     publish(rawDb, ev.id);
     const venueId = addVenue(rawDb, "Own Venue", "2027-06-01 00:00:00");
-    const bandId = addBand(rawDb, "Own Band", "2027-07-01 00:00:00");
+    const bandId = addBand(rawDb, "Own Band", "2026-01-01 00:00:00");
     addPerf(rawDb, ev.id, venueId, bandId, "2026-03-05 12:00:00");
 
     const xml = await fetchSitemap(env);
 
-    expect(lastmodFor(xml, `https://settimes.ca/band/${bandId}`)).toBe("2027-07-01");
     expect(lastmodFor(xml, `https://settimes.ca/venue/${venueId}`)).toBe("2027-06-01");
+  });
+
+  // band_profiles.updated_at is stamped by a trigger on EVERY update, and the
+  // daily aggregate-stats job rewrites every profile's counters, so it reads
+  // "today" for all of them. It must never become a band's lastmod.
+  test("a band's updated_at (bumped daily by the stats job) never sets its lastmod", async () => {
+    const { env, rawDb } = createTestEnv();
+    const ev = insertEvent(rawDb, { name: "LM Stats", slug: "lm-stats", date: "2099-01-01" });
+    publish(rawDb, ev.id);
+    const venueId = addVenue(rawDb, "Stats Venue", "2026-01-01 00:00:00");
+    const bandId = addBand(rawDb, "Stats Band", "2026-01-01 00:00:00");
+    addPerf(rawDb, ev.id, venueId, bandId, "2026-03-05 12:00:00");
+    rawDb.prepare("UPDATE band_profiles SET updated_at = '2027-07-01 00:00:00' WHERE id = ?").run(bandId);
+
+    const xml = await fetchSitemap(env);
+
+    expect(lastmodFor(xml, `https://settimes.ca/band/${bandId}`)).toBe("2026-03-05");
   });
 
   test("a performance in an unpublished (draft) event does not set band or venue lastmod", async () => {

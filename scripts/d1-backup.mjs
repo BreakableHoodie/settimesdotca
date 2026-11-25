@@ -72,7 +72,7 @@ export const EXCLUDED_TABLES = Object.freeze({
  */
 export const SCRUB_UPDATES = Object.freeze([
   {
-    why: "activation tokens are stored in plaintext and redeemable, some with no expiry",
+    why: "activation tokens are stored hashed since #1484; this clears any legacy plaintext (redeemable) value or one with no expiry",
     sql: "UPDATE users SET activation_token = NULL, activation_token_expires_at = NULL WHERE activation_token IS NOT NULL OR activation_token_expires_at IS NOT NULL",
   },
   {

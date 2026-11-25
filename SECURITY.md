@@ -1,6 +1,6 @@
 # Security Documentation - SetTimes.ca
 
-**Last Updated:** 2026-04-30
+**Last Updated:** 2026-11-24
 **Version:** 2.2 (April 2026 Review)
 
 ---
@@ -48,7 +48,7 @@ This application implements defense-in-depth security with multiple layers of pr
 **Solution:** Implemented invite code system requiring valid, unexpired invite codes for all signups.
 
 **Files Changed:**
-- `database/migration-invite-codes.sql` - Invite codes table
+- `migrations/0009_migration-invite-codes.sql` - Invite codes table
 - `functions/api/admin/invite-codes.js` - Admin invite management
 - `functions/api/admin/auth/signup.js` - Invite code validation
 
@@ -58,7 +58,7 @@ This application implements defense-in-depth security with multiple layers of pr
 node scripts/create-admin-invite.js --prod
 
 # Insert into database
-wrangler d1 execute settimes-db --command="INSERT INTO invite_codes..."
+wrangler d1 execute settimes-production-db --command="INSERT INTO invite_codes..."
 
 # Use during signup
 POST /api/admin/auth/signup
@@ -77,7 +77,7 @@ POST /api/admin/auth/signup
 **Solution:** Removed plaintext credentials. Demo passwords are now set locally via environment variables during setup.
 
 **Files Changed:**
-- `database/migration-rbac-sprint-1-1.sql` - Removed default admin
+- `migrations/0004_migration-rbac-sprint-1-1.sql` - Removed default admin
 - `scripts/create-admin-invite.js` - Helper script for first-time setup
 
 ### P0-3: HTTPOnly Cookies + CSRF Protection

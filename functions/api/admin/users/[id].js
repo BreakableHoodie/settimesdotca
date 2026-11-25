@@ -241,8 +241,7 @@ export async function onRequestPatch(context) {
         updates.push("deactivated_at = NULL");
         updates.push("deactivated_by = NULL");
         updates.push("activated_at = COALESCE(activated_at, datetime('now'))");
-        updates.push("activation_token = NULL");
-        updates.push("activation_token_expires_at = NULL");
+        updates.push("activation_token = NULL, activation_token_expires_at = NULL");
       }
     }
 

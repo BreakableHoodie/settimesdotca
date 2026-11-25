@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createTestEnv, grantStepUp } from "../../../test-utils.js";
 import * as userItemHandler from "../[id].js";
 import * as toggleStatusHandler from "../[id]/toggle-status.js";
-import * as activateHandler from "../../../auth/activate.js";
 import * as resendHandler from "../../../auth/resend-activation.js";
 import { hashStoredToken } from "../../../../utils/tokens.js";
 import { toSqliteDateTime } from "../../../../utils/authAttempts.js";

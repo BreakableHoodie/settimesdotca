@@ -205,6 +205,38 @@ function sqlLiteral(value) {
  * transaction, tables, rows, then indexes, triggers and views, then the
  * AUTOINCREMENT counters so restored ids are never reused.
  */
+// Tables ordered so each comes after every table its foreign keys reference.
+// A self-reference is ignored (rows keep rowid order); a cycle between
+// tables, which this schema does not have, falls back to creation order.
+function parentsFirst(db, tables) {
+  const names = new Set(tables.map((t) => t.name));
+  const parents = new Map(
+    tables.map(({ name }) => [
+      name,
+      new Set(
+        db
+          .prepare('SELECT DISTINCT "table" AS t FROM pragma_foreign_key_list(?)')
+          .all(name)
+          .map((r) => r.t)
+          .filter((t) => t !== name && names.has(t)),
+      ),
+    ]),
+  );
+  const ordered = [];
+  const placed = new Set();
+  let progress = true;
+  while (progress) {
+    progress = false;
+    for (const table of tables) {
+      if (placed.has(table.name) || [...parents.get(table.name)].some((p) => !placed.has(p))) continue;
+      ordered.push(table);
+      placed.add(table.name);
+      progress = true;
+    }
+  }
+  return [...ordered, ...tables.filter((t) => !placed.has(t.name))];
+}
+
 export function restoreSql(backupPath) {
   const db = new DatabaseSync(backupPath, { readOnly: true });
   try {
@@ -216,7 +248,11 @@ export function restoreSql(backupPath) {
     const out = ["PRAGMA defer_foreign_keys=TRUE;"];
     const tables = objects.filter((o) => o.type === "table");
     for (const { sql } of tables) out.push(`${sql};`);
-    for (const { name } of tables) {
+    // Rows go in parents-first order. The pragma above is only a backstop:
+    // it holds until a transaction commits, and D1's remote import does not
+    // apply the file as one transaction, so a child row written before its
+    // parent fails (#1486: events, created before users, restored first).
+    for (const { name } of parentsFirst(db, tables)) {
       // node:sqlite reads TEXT up to its first NUL byte, so such a value
       // would restore truncated. Nothing here writes one; refuse rather than
       // lose data silently if one ever appears.

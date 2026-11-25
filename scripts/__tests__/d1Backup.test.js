@@ -277,6 +277,31 @@ describe("restoreSql", () => {
     restored.close();
   });
 
+  // D1's remote import does not apply the file as one transaction, so the
+  // deferral cannot be relied on (#1486). Without it, every statement checks
+  // its foreign keys at once: the worst case of D1 committing in pieces.
+  it("restores with no deferred foreign keys, a child table created before its parent", () => {
+    const path = join(dir, "order.db");
+    const db = new DatabaseSync(path);
+    db.exec(`
+      CREATE TABLE events (id INTEGER PRIMARY KEY, created_by INTEGER REFERENCES users(id));
+      CREATE TABLE users (id INTEGER PRIMARY KEY, invited_by INTEGER REFERENCES users(id));
+      CREATE TABLE performances (id INTEGER PRIMARY KEY, event_id INTEGER REFERENCES events(id));
+      INSERT INTO users VALUES (1, NULL), (2, 1);
+      INSERT INTO events VALUES (10, 2);
+      INSERT INTO performances VALUES (100, 10);
+    `);
+    db.close();
+
+    const sql = restoreSql(path);
+    expect(sql.startsWith("PRAGMA defer_foreign_keys=TRUE;\n")).toBe(true);
+    const restored = new DatabaseSync(":memory:", { enableForeignKeyConstraints: true });
+    restored.exec(sql.replace("PRAGMA defer_foreign_keys=TRUE;\n", ""));
+    expect(restored.prepare("SELECT COUNT(*) AS n FROM performances").get().n).toBe(1);
+    expect(restored.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+    restored.close();
+  });
+
   it("keeps an AUTOINCREMENT counter beyond 2^53 exact", () => {
     const path = join(dir, "big-seq.db");
     const db = new DatabaseSync(path);

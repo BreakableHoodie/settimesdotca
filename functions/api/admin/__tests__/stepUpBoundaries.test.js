@@ -349,7 +349,12 @@ describe("conditional step-up routes: only identity changes need it (#1324)", ()
   const PATCH = "PATCH /api/admin/users/[id]";
   const TOGGLE = "POST /api/admin/users/[id]/toggle-status";
 
-  const inactive = (s) => s.rawDb.prepare("UPDATE users SET is_active = 0 WHERE id = ?").run(Number(s.params.id));
+  // A once-activated user an admin deactivated. activated_at matters: toggle-status
+  // refuses a never-activated invitee (INVITE_PENDING), which is not what this tests.
+  const inactive = (s) =>
+    s.rawDb
+      .prepare("UPDATE users SET is_active = 0, activated_at = COALESCE(activated_at, datetime('now')) WHERE id = ?")
+      .run(Number(s.params.id));
 
   for (const body of [{ role: "editor" }, { isActive: 0 }, { isActive: false }]) {
     it(`PATCH ${JSON.stringify(body)} needs step-up and writes nothing without it`, async () => {

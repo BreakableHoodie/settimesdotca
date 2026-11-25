@@ -230,6 +230,18 @@ export async function onRequestPatch(context) {
         updates.push("deactivated_at = datetime('now')");
         updates.push("deactivated_by = ?");
         values.push(currentUser.userId);
+        // An invitee deactivated before activating must not keep a redeemable link.
+        updates.push("activation_token = NULL");
+        updates.push("activation_token_expires_at = NULL");
+      } else {
+        // Activating sets is_active = 1, so this is an explicit admin activation, not a
+        // return to "invited": clear the stamp, record activated_at if the person never
+        // clicked their link (toggle-status reads a NULL activated_at as a pending
+        // invitee), and drop any leftover link. No token is minted.
+        updates.push("deactivated_at = NULL");
+        updates.push("deactivated_by = NULL");
+        updates.push("activated_at = COALESCE(activated_at, datetime('now'))");
+        updates.push("activation_token = NULL, activation_token_expires_at = NULL");
       }
     }
 

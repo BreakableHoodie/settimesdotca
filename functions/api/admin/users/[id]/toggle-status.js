@@ -40,7 +40,7 @@ export async function onRequestPost(context) {
     // Get target user
     const targetUser = await DB.prepare(
       `
-      SELECT id, email, name, is_active
+      SELECT id, email, name, is_active, activated_at
       FROM users
       WHERE id = ?
     `,
@@ -63,6 +63,22 @@ export async function onRequestPost(context) {
       });
     }
 
+    // An invitee who never activated is is_active = 0, so the toggle below would flip
+    // them ACTIVE without the email-verified activation link. Refused before any write,
+    // session delete or key revoke. Deactivating (is_active = 1) is unaffected, and
+    // revoking a pending invitee goes through PATCH, which clears the token.
+    if (Number(targetUser.is_active) === 0 && !targetUser.activated_at) {
+      return new Response(
+        JSON.stringify({
+          error: "Invitation pending",
+          code: "INVITE_PENDING",
+          message:
+            "This user has not activated their account. Toggle cannot activate them; use the user edit to deactivate or reactivate.",
+        }),
+        { status: 409, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
     // Toggle user status
     const newStatus = targetUser.is_active === 1 ? 0 : 1;
 
@@ -70,10 +86,14 @@ export async function onRequestPost(context) {
       DB.prepare(
         `
       UPDATE users
-      SET is_active = ?, updated_at = datetime('now')
+      SET is_active = ?, updated_at = datetime('now'),
+          deactivated_at = CASE WHEN ? = 0 THEN datetime('now') ELSE NULL END,
+          deactivated_by = CASE WHEN ? = 0 THEN ? ELSE NULL END,
+          activation_token = CASE WHEN ? = 0 THEN NULL ELSE activation_token END,
+          activation_token_expires_at = CASE WHEN ? = 0 THEN NULL ELSE activation_token_expires_at END
       WHERE id = ?
     `,
-      ).bind(newStatus, userId),
+      ).bind(newStatus, newStatus, newStatus, user.userId, newStatus, newStatus, userId),
     ];
 
     if (newStatus === 0) {

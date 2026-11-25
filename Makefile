@@ -165,7 +165,7 @@ test-frontend: ## Frontend unit tests
 
 test: test-backend test-frontend ## All unit tests
 
-mutation-gate: ## Convert documented invariants into executable proof (~8s; NOT part of `gate` -- see .github/workflows/quality.yml)
+mutation-gate: ## Convert documented invariants into executable proof (~160 s; NOT part of `gate` -- see .github/workflows/quality.yml)
 	node scripts/mutation-gate.mjs
 
 coverage-floor: ## Fail if any functions/api handler has 0% coverage (runs the coverage suite first)

@@ -2,7 +2,7 @@
 
 Canonical active roadmap for SetTimes.ca. Use this file for handoffs between Claude, OpenCode, and humans.
 
-Last updated: 2026-10-28
+Last updated: 2026-11-24
 
 ## Mission
 
@@ -28,33 +28,20 @@ Build SetTimes.ca into the best lean, multi-venue and multi-artist event platfor
 
 - Public event lifecycle, archive history, live schedule, My Route, offline/PWA behavior, and venue-aware navigation.
 - SSR identity metadata and JSON-LD for band, event, and venue pages, plus sitemap and internal-link coverage.
-- Admin bulk operations, reveal mode, per-follower announcement tracking and resend, batch follows, digest email, and reversible per-set cancellation.
+- Admin bulk operations, reveal mode, and reversible per-set cancellation. Follower announcements, batch follows and digest email were delivered, then retired 2026-10-31 (account mail only); per-artist iCal subscriptions replace them.
 - Four theme palettes with semantic tokens and a light-theme accessibility sweep.
 - Multi-day event dates, day-aware schedule conflict checks, and the unified six-o'clock festival-day boundary.
 - CI schema migration and verification, D1 batch atomicity tests, mutation gate, coverage floor, security scanning, and edge E2E authentication coverage.
 
 ## Open Work
 
-### Privacy and security (from the 2026-10-28 report card)
+### Security
 
-- #1415 — CASL sender footer, a dead `sessions` table holding IPs, the last plaintext email tokens
+- #1465 — security digest: action required
 
 ### Performance and metrics
 
 - #1246 — question-driven metrics plan
-- #1411 — the metrics beacon awaits six sequential D1 writes; the artist batch is not isolated
-- #1412 — the home timeline re-downloads every past edition every 60 s between seasons
-
-### CI and tests
-
-- #1410 — Dependabot merges skip the edge suite; it is not required; iCal rendering is not exercised on the edge
-- #1416 — a frontend mutation gate
-- #1395 — ci(e2e): remove the hosted-runner apt path once the Playwright image has been stable
-- #1409 — ci(edge-e2e): pages stuck on the "Loading..." shell on the preview (one occurrence)
-
-### Code health
-
-- #1417 — the event wizard's private conflict checker and UTC date cutoff
 
 ## Reference Docs
 

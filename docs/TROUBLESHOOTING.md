@@ -726,7 +726,7 @@ fetch('https://settimes.ca/api/admin/events');
 1. **Check D1 database status:**
 
    ```bash
-   wrangler d1 info settimes-db
+   wrangler d1 info settimes-production-db
    ```
 
 2. **Check error logs:**
@@ -742,7 +742,7 @@ fetch('https://settimes.ca/api/admin/events');
 4. **Test database connection:**
 
    ```bash
-   wrangler d1 execute settimes-db --command="SELECT 1"
+   wrangler d1 execute settimes-production-db --remote --command="SELECT 1"
    ```
 
 ---

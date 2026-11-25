@@ -19,7 +19,7 @@ SetTimes.ca is a Cloudflare Pages application for managing and publishing multi-
 - Event, venue, band profile, and performance management
 - Public event discovery, timeline, details, and calendar-feed endpoints
 - MFA, trusted devices, backup codes, and session self-service flows
-- Email activation, password reset, and subscription workflows
+- Email activation, password reset, and per-artist calendar feeds (iCal subscriptions)
 
 ## Quick Start
 
@@ -57,7 +57,7 @@ Important defaults for local development:
 - `PUBLIC_URL=http://localhost:8788`
 - `PUBLIC_DATA_PUBLISH_ENABLED=false`
 
-If you need activation, reset, or subscription email flows locally, also configure the email section in `.dev.vars`.
+If you need activation or password-reset email flows locally, also configure the email section in `.dev.vars`.
 
 ### 3. Build the frontend
 

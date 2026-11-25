@@ -176,7 +176,31 @@ export default function PrivacyPage() {
                 personal schedule; selected sets are sent when schedule-build metrics are recorded
               </li>
               <li>
-                <code className="text-accent-400 text-sm">theme</code> — your preferred colour theme
+                <code className="text-accent-400 text-sm">settimes-theme</code> — your preferred colour theme
+              </li>
+              <li>
+                <code className="text-accent-400 text-sm">timeFiltersByEvent</code> — the time-of-day filter you last
+                chose on each event page
+              </li>
+              <li>
+                <code className="text-accent-400 text-sm">scheduleHintDismissed</code> — whether you have dismissed the
+                schedule tip
+              </li>
+              <li>
+                <code className="text-accent-400 text-sm">currentEventId</code> — the event you last viewed, so the site
+                can reopen it
+              </li>
+              <li>
+                <code className="text-accent-400 text-sm">debugScheduleTime</code> — a pretend clock, set only if you
+                open a page with a <code className="text-accent-400 text-sm">debugTime</code> address parameter
+              </li>
+              <li>
+                <code className="text-accent-400 text-sm">userEmail</code>,{' '}
+                <code className="text-accent-400 text-sm">userName</code>,{' '}
+                <code className="text-accent-400 text-sm">userFirstName</code>,{' '}
+                <code className="text-accent-400 text-sm">userLastName</code> and{' '}
+                <code className="text-accent-400 text-sm">userRole</code> — your name, email address and role, kept only
+                for signed-in organisers so the admin area can show who is signed in
               </li>
               <li>
                 <code className="text-accent-400 text-sm">scheduleSessionId</code> — an anonymous session identifier
@@ -186,19 +210,19 @@ export default function PrivacyPage() {
               <li>Privacy banner acknowledgement</li>
             </ul>
             <p className="mt-3">
-              Theme and saved route state stay on your device. Your selected sets are sent when schedule-build metrics
-              are recorded or when you create a share link. The random schedule session id is sent only with
-              schedule-build metrics, never with a share link.
+              Theme, filter, tip and saved route state stay on your device. Your selected sets are sent when
+              schedule-build metrics are recorded or when you create a share link. The random schedule session id is
+              sent only with schedule-build metrics, never with a share link.
             </p>
           </section>
 
           <section>
             <h2 className="text-text-primary text-lg font-semibold mb-3">Cookies</h2>
             <p>
-              Admin accounts use a secure, HTTP-only session cookie. Public pages use a{' '}
+              Admin accounts use a secure, HTTP-only session cookie. Signed-in organisers in the admin area also get a{' '}
               <code className="text-accent-400 text-sm">csrf_token</code> cookie for cross-site request forgery
-              protection when you interact with forms. Cloudflare (our hosting provider) may also set security and
-              anti-abuse cookies as part of its infrastructure. The privacy banner acknowledgement is stored in{' '}
+              protection; public pages set no cookie of our own. Cloudflare (our hosting provider) may also set security
+              and anti-abuse cookies as part of its infrastructure. The privacy banner acknowledgement is stored in{' '}
               <code className="text-accent-400 text-sm">localStorage</code>, not a cookie.
             </p>
           </section>

@@ -13,14 +13,7 @@ import {
   sanitizeString,
 } from "../../../utils/validation.js";
 import { getClientIP, getUrlId, parseJsonObjectBody } from "../../../utils/request.js";
-
-function formatVenueAddress(venue) {
-  if (!venue) return "";
-  const line1 = [venue.address_line1, venue.address_line2].filter(Boolean).join(", ");
-  const line2 = [venue.city, venue.region].filter(Boolean).join(", ");
-  const line3 = [venue.postal_code, venue.country].filter(Boolean).join(" ").trim();
-  return [line1, line2, line3].filter(Boolean).join(", ");
-}
+import { formatVenueAddress } from "../../../utils/formatPlace.js";
 
 // PUT - Update venue
 export async function onRequestPut(context) {

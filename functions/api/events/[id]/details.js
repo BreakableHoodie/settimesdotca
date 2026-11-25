@@ -2,6 +2,7 @@ import { getPublicDataGateResponse } from "../../../utils/publicGate.js";
 import { CACHE_SHOW_CRITICAL } from "../../../utils/cacheHeaders.js";
 import { normalizeHttpUrl, validateId } from "../../../utils/validation.js";
 import { publicEventStatusSql } from "../../../utils/eventVisibility.js";
+import { formatVenueAddress } from "../../../utils/formatPlace.js";
 
 /**
  * Public API: Get event details (bands + venues) for a single published event
@@ -16,14 +17,6 @@ export async function onRequestGet(context) {
     return gate;
   }
   const { DB } = env;
-
-  const formatVenueAddress = (venue) => {
-    if (!venue) return null;
-    const line1 = [venue.address_line1, venue.address_line2].filter(Boolean).join(", ");
-    const line2 = [venue.city, venue.region].filter(Boolean).join(", ");
-    const line3 = [venue.postal_code, venue.country].filter(Boolean).join(" ").trim();
-    return [line1, line2, line3].filter(Boolean).join(", ");
-  };
 
   // Standing convention: every params.id from a Pages Functions route goes
   // through validateId() before it reaches a query. Number.isFinite() alone

@@ -227,7 +227,7 @@ export default function VenuePage() {
           <title> here renders its fallback on the very first paint — and React
           19 hoists it straight into document.title, beating the !loading guard
           on the effect above. That silently replaced the server-sent title with
-          'Venue – SetTimes' for the whole fetch window (#785, caught in review
+          'Venue | SetTimes' for the whole fetch window (#785, caught in review
           on #859). Emitting no <title> while loading leaves the SSR one intact,
           which is exactly what it is there for. */}
       {venue ? (

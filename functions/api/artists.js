@@ -11,6 +11,7 @@ import { safeReflectSocialLinks } from "../utils/validation.js";
 import { sortableName } from "../utils/sortableName.js";
 import { publicEventStatusSql, revealedPerformanceSql } from "../utils/eventVisibility.js";
 import { BAND_LINK_FIELD_KEYS } from "../utils/bandLinkFields.js";
+import { formatOrigin } from "../utils/formatPlace.js";
 
 const DEFAULT_LIMIT = 24;
 const MAX_LIMIT = 60;
@@ -22,11 +23,6 @@ const MAX_LIMIT = 60;
 // boundaries — this is the primary public artist directory, so pagination
 // must stay globally consistent.
 const FETCH_CAP = 2000;
-
-function formatOrigin(row) {
-  const parts = [row.origin_city, row.origin_region].filter(Boolean);
-  return parts.length ? parts.join(", ") : row.origin || null;
-}
 
 export async function onRequestGet(context) {
   const { request, env } = context;

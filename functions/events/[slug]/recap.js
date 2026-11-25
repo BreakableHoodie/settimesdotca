@@ -125,7 +125,7 @@ export async function onRequestGet(context) {
   // Pin to the production host -- preview deploys must not self-canonicalise.
   const url = `${CANONICAL_HOST}/events/${event.slug}/recap`;
   // Verbatim shape of EventRecapPage.jsx's <Helmet> title/description.
-  const title = `${event.name} — Event Recap | SetTimes.ca`;
+  const title = `${event.name} — Event Recap | SetTimes`;
   const formattedDate = formatEventDate(event.date);
   const description = `Recap for ${event.name} on ${formattedDate}. ${stats.total_sets} sets across ${stats.venue_count} venues.`;
   const breadcrumb = {

@@ -8,6 +8,7 @@ import {
   AFTER_MIDNIGHT_THRESHOLD_TIME,
 } from "../../utils/eventDay.js";
 import { concludedEventSql, publishedEventStatusSql } from "../../utils/eventVisibility.js";
+import { formatOrigin, formatVenueAddress } from "../../utils/formatPlace.js";
 
 // Bucket membership is a lifecycle question before it is a date question.
 // `status = 'archived'` MEANS "this edition is concluded", so it outranks the
@@ -106,20 +107,6 @@ export async function onRequestGet(context) {
     return gate;
   }
   const { DB } = env;
-
-  const formatOrigin = (band) => {
-    if (!band) return null;
-    const parts = [band.origin_city, band.origin_region].filter(Boolean);
-    return parts.length ? parts.join(", ") : band.origin || null;
-  };
-
-  const formatVenueAddress = (venue) => {
-    if (!venue) return null;
-    const line1 = [venue.address_line1, venue.address_line2].filter(Boolean).join(", ");
-    const line2 = [venue.city, venue.region].filter(Boolean).join(", ");
-    const line3 = [venue.postal_code, venue.country].filter(Boolean).join(" ").trim();
-    return [line1, line2, line3].filter(Boolean).join(", ");
-  };
 
   try {
     const url = new URL(request.url);

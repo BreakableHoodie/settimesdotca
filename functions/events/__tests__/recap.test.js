@@ -117,7 +117,7 @@ describe("SSR /events/[slug]/recap", () => {
     const response = await onRequestGet(makeContext({ env, slug: "lwbc-vol16" }));
     const html = await response.text();
 
-    expect(html).toContain("<title>Long Weekend Band Crawl Vol. 16 — Event Recap | SetTimes.ca</title>");
+    expect(html).toContain("<title>Long Weekend Band Crawl Vol. 16 — Event Recap | SetTimes</title>");
     // 2 sets, 1 distinct venue — same COUNT(*)/COUNT(DISTINCT venue_id) shape
     // as EventRecapPage.jsx's stats.total_sets / stats.venue_count.
     expect(html).toContain(

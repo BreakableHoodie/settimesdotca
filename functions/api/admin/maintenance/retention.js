@@ -25,6 +25,15 @@
 //                    rule they would vanish half an hour after the last email,
 //                    and the cap would reset itself. The predicates are disjoint
 //                    (LIKE vs NOT LIKE), in one statement.
+//   invite_codes.email: the invitee's address is CLEARED (column set NULL, row kept
+//                    as the audit trail of who minted which account) 30 days after the
+//                    invite is finished. No revoke timestamp exists, so "finished" is:
+//                      used     -> used_at
+//                      expired  -> expires_at
+//                      revoked  -> is_active = 0 and never used: created_at (an upper
+//                                  bound on the revoke time, so never kept longer than
+//                                  30 days after revoking; may be cleared sooner).
+//                    A live invite keeps its address: signup matches against it.
 
 import { RECIPIENT_KEY_PREFIX, RECIPIENT_KEY_RETENTION_SECONDS } from "../../../utils/recipientEmailCap.js";
 
@@ -76,6 +85,19 @@ export async function runRetentionCleanup(env) {
               OR (key LIKE '${RECIPIENT_KEY_PREFIX}%' AND updated_at < unixepoch() - ${RECIPIENT_KEY_RETENTION_SECONDS})`,
         ).run(),
     ],
+    [
+      "invite_codes",
+      () =>
+        DB.prepare(
+          `UPDATE invite_codes SET email = NULL
+           WHERE email IS NOT NULL
+             AND (
+               (used_at IS NOT NULL AND datetime(used_at) < datetime('now', '-30 days'))
+               OR datetime(expires_at) < datetime('now', '-30 days')
+               OR (used_at IS NULL AND is_active = 0 AND datetime(created_at) < datetime('now', '-30 days'))
+             )`,
+        ).run(),
+    ],
   ];
   const results = await Promise.allSettled(deletes.map(([, run]) => Promise.resolve().then(run)));
   const failedTables = [
@@ -103,6 +125,7 @@ export async function runRetentionCleanup(env) {
     adminAudit,
     apiKeyRequests,
     rateLimits,
+    inviteEmails,
   ] = results.map((result) => result.value);
 
   return {
@@ -116,5 +139,6 @@ export async function runRetentionCleanup(env) {
     audit_log_deleted: adminAudit.meta.changes,
     api_key_requests_deleted: apiKeyRequests.meta.changes,
     rate_limits_deleted: rateLimits.meta.changes,
+    invite_emails_cleared: inviteEmails.meta.changes,
   };
 }

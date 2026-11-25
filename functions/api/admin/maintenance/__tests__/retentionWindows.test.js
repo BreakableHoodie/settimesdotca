@@ -105,4 +105,57 @@ describe("retention windows published in the privacy policy", () => {
     expect(prepareSpy.mock.calls.some(([sql]) => sql.includes("DELETE FROM rate_limits"))).toBe(true);
     prepareSpy.mockRestore();
   });
+  describe("invitee email addresses (#1498)", () => {
+    function seedInvite(rawDb, tag, { usedDaysAgo, expiresInDays, active = 1, createdDaysAgo = 0 }) {
+      rawDb
+        .prepare(
+          `INSERT INTO invite_codes (code, code_prefix, email, role, created_at, used_at, expires_at, is_active)
+           VALUES (?, 'abcd1234', ?, 'editor', datetime('now', ?),
+                   CASE WHEN ? IS NULL THEN NULL ELSE datetime('now', ?) END, datetime('now', ?), ?)`,
+        )
+        .run(
+          `sha256:${tag}`,
+          `${tag}@example.test`,
+          `-${createdDaysAgo} days`,
+          usedDaysAgo ?? null,
+          `-${usedDaysAgo} days`,
+          `${expiresInDays >= 0 ? "+" : ""}${expiresInDays} days`,
+          active,
+        );
+    }
+    const emails = (rawDb) =>
+      Object.fromEntries(
+        rawDb
+          .prepare("SELECT code, email FROM invite_codes")
+          .all()
+          .map((r) => [r.code.replace("sha256:", ""), r.email]),
+      );
+
+    test("cleared 30 days after used, expired or revoked; kept before, and while live; the row stays", async () => {
+      const { env, rawDb } = createTestEnv({ role: "admin" });
+      rawDb.prepare("DELETE FROM invite_codes").run();
+      seedInvite(rawDb, "used31", { usedDaysAgo: 31, expiresInDays: 100, createdDaysAgo: 40 });
+      seedInvite(rawDb, "used29", { usedDaysAgo: 29, expiresInDays: 100, createdDaysAgo: 40 });
+      seedInvite(rawDb, "expired31", { expiresInDays: -31, createdDaysAgo: 40 });
+      seedInvite(rawDb, "expired29", { expiresInDays: -29, createdDaysAgo: 40 });
+      seedInvite(rawDb, "revoked31", { expiresInDays: 100, active: 0, createdDaysAgo: 31 });
+      seedInvite(rawDb, "revoked29", { expiresInDays: 100, active: 0, createdDaysAgo: 29 });
+      seedInvite(rawDb, "live", { expiresInDays: 5, createdDaysAgo: 2 });
+      seedInvite(rawDb, "liveold", { expiresInDays: 100, createdDaysAgo: 60 });
+
+      const result = await runRetentionCleanup(env);
+
+      expect(result.invite_emails_cleared).toBe(3);
+      expect(emails(rawDb)).toEqual({
+        used31: null,
+        used29: "used29@example.test",
+        expired31: null,
+        expired29: "expired29@example.test",
+        revoked31: null,
+        revoked29: "revoked29@example.test",
+        live: "live@example.test",
+        liveold: "liveold@example.test",
+      });
+    });
+  });
 });

@@ -270,7 +270,7 @@ describe("security digest", () => {
       return { status: 0, stdout: "[]" };
     };
     collectSecurityData({ runner, root: "/repo" });
-    expect(npmCwds).toEqual(["/repo", "/repo/frontend", "/repo/workers-mcp-server"]);
+    expect(npmCwds).toEqual(["/repo", "/repo/frontend", "/repo/workers-mcp-server", "/repo/workers-cron"]);
   });
 
   it("parses npm audit JSON even when npm audit exits non-zero", () => {

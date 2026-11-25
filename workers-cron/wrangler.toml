@@ -1,0 +1,24 @@
+# Starts GitHub workflows on time. GitHub's own `schedule:` runs hours late or
+# not at all under load (#1489); Cloudflare Cron Triggers do not. The Worker only
+# POSTs workflow_dispatch to the GitHub API. It binds no database and no storage.
+#
+# GH_DISPATCH_TOKEN is a Cloudflare secret and is deliberately absent here. Set
+# it with `npx wrangler secret put GH_DISPATCH_TOKEN`. Rotation:
+# docs/field-notes/scheduled-dispatch.md.
+name = "settimes-cron"
+main = "src/index.js"
+compatibility_date = "2025-10-08"
+
+# Cron-only: no public URL. (The fetch handler still answers 404 if one is
+# ever enabled by mistake.)
+workers_dev = false
+preview_urls = false
+
+# Each expression must match a key in CRON_WORKFLOWS (src/index.js) exactly. The
+# same three stay in the workflows' own `schedule:` blocks as the fallback.
+[triggers]
+crons = [
+  "0 * * * *",    # site-health.yml
+  "*/30 * * * *", # deploy-reconcile.yml
+  "17 7 * * *",   # scheduled-jobs.yml
+]

@@ -70,6 +70,28 @@ updates:
         patterns:
           - "*"
 
+  # The cron-dispatch Worker (#1489). Same rule: every tracked lockfile needs an
+  # npm entry (lockfileCoverage.test.js).
+  - package-ecosystem: "npm"
+    directory: "/workers-cron"
+    cooldown:
+      default-days: 7
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:30"
+      timezone: "America/Toronto"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "npm"
+    commit-message:
+      prefix: "deps"
+    groups:
+      cron-npm-all:
+        patterns:
+          - "*"
+
   - package-ecosystem: "github-actions"
     directory: "/"
     # Wait 7 days before proposing a newly published version -- same

@@ -279,6 +279,59 @@ describe("SSR /event/[slug] — poster_url image + og:image/twitter:image (#616)
   });
 });
 
+describe("SSR /event/[slug] — parent endDate vs subEvents (BLR3 shape)", () => {
+  async function jsonLdFor(slug, setup) {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, { name: "Span Fest", slug, date: "2026-07-10" });
+    rawDb.prepare("UPDATE events SET status = 'published', end_date = ? WHERE id = ?").run("2026-07-12", event.id);
+    const venue = insertVenue(rawDb, { name: "Span Stage" });
+    setup({ rawDb, event, venue });
+    const response = await onRequest(makeContext({ env, slug }));
+    return extractJsonLd(await response.text())[0];
+  }
+  const addSet = (rawDb, event, venue, name, night, start, end) => {
+    const band = insertBand(rawDb, { name, event_id: event.id, venue_id: venue.id, start_time: start, end_time: end });
+    rawDb.prepare("UPDATE performances SET performance_date=? WHERE id=?").run(night, band.id);
+  };
+
+  test("a trailing day with no sets and no doors gets no subEvent, and endDate does not precede any subEvent", async () => {
+    const musicEvent = await jsonLdFor("slug-span-empty-day", ({ rawDb, event, venue }) => {
+      addSet(rawDb, event, venue, "Fri Band", "2026-07-10", "20:00", "22:00");
+      addSet(rawDb, event, venue, "Sat Band", "2026-07-11", "20:00", "22:00");
+    });
+    expect(musicEvent.subEvent.map((d) => d.startDate.slice(0, 10))).toEqual(["2026-07-10", "2026-07-11"]);
+    expect(musicEvent.endDate.slice(0, 10)).toBe("2026-07-11");
+    for (const node of musicEvent.subEvent) {
+      expect(musicEvent.endDate >= node.startDate).toBe(true);
+    }
+  });
+
+  test("the parent endDate is lifted to a doors-only day that starts after the last set ends", async () => {
+    const musicEvent = await jsonLdFor("slug-span-doors-day", ({ rawDb, event, venue }) => {
+      addSet(rawDb, event, venue, "Fri Band", "2026-07-10", "20:00", "22:00");
+      addSet(rawDb, event, venue, "Sat Band", "2026-07-11", "20:00", "22:00");
+      rawDb.prepare("UPDATE events SET doors_json = ? WHERE id = ?").run('{"2026-07-12":"16:00"}', event.id);
+    });
+    const last = musicEvent.subEvent.at(-1);
+    expect(last.startDate.slice(0, 10)).toBe("2026-07-12");
+    expect(Date.parse(musicEvent.endDate)).toBeGreaterThanOrEqual(Date.parse(last.startDate));
+  });
+
+  // endDate takes startDate's precision. A timed parent whose later day is
+  // date-only (a set with no times) has no honest closing time: omit it,
+  // never mix a date-only end with a timed start.
+  test("a timed parent never takes a date-only endDate from a later untimed day", async () => {
+    const musicEvent = await jsonLdFor("slug-span-untimed-day", ({ rawDb, event, venue }) => {
+      addSet(rawDb, event, venue, "Fri Band", "2026-07-10", "20:00", "22:00");
+      addSet(rawDb, event, venue, "Sun Band", "2026-07-12", null, null);
+    });
+    expect(musicEvent.startDate.length).toBeGreaterThan(10);
+    expect(musicEvent.subEvent.at(-1).startDate).toBe("2026-07-12");
+    expect(musicEvent.endDate).toBeUndefined();
+  });
+});
+
 describe("SSR /event/[slug] — per-day subEvent JSON-LD (#542 PR-4)", () => {
   test("multi-day event: subEvent array, one per festival day, each with that day's performers + dates", async () => {
     const { env, rawDb } = createTestEnv();
@@ -435,10 +488,10 @@ describe("SSR /event/[slug] — per-day subEvent JSON-LD (#542 PR-4)", () => {
     expect(day1.performer).toHaveLength(1);
     expect(day1.performer[0].name).toBe("Announced Band");
 
-    // Day 2 has no announced performances at all — performer key is omitted
-    // entirely (mirrors the top-level bands.length > 0 convention).
+    // Day 2 has no announced performances at all, so it gets no node (an empty
+    // day would start after the parent's closing time).
     const day2 = musicEvent.subEvent.find((d) => d.name.endsWith("August 2"));
-    expect(day2.performer).toBeUndefined();
+    expect(day2).toBeUndefined();
   });
 
   test("an after-midnight set (start before 06:00) buckets into its festival night's subEvent", async () => {
@@ -471,7 +524,7 @@ describe("SSR /event/[slug] — per-day subEvent JSON-LD (#542 PR-4)", () => {
     const day1 = musicEvent.subEvent.find((d) => d.name.endsWith("August 1"));
     const day2 = musicEvent.subEvent.find((d) => d.name.endsWith("August 2"));
     expect(day1.performer?.map((p) => p.name)).toEqual(["After Midnight Band"]);
-    expect(day2.performer).toBeUndefined();
+    expect(day2).toBeUndefined();
   });
 
   test("startDate uses the correct America/Toronto offset: -04:00 (EDT) in summer, -05:00 (EST) in winter (#542 PR-4, folded pre-existing bug)", async () => {

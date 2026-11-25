@@ -44,6 +44,34 @@ export function checkIcal(body, status = 200) {
   return pass();
 }
 
+// The per-artist subscription feed: same calendar rules as the main feed, so
+// reuse checkIcal, and also require the content type a calendar app keys on.
+export function checkBandIcal(body, status = 200, contentType = "") {
+  if (status === 200 && !/^text\/calendar\s*(;|$)/i.test(contentType)) {
+    return fail(`expected Content-Type text/calendar, got ${contentType || "none"}`);
+  }
+  return checkIcal(body, status);
+}
+
+// A non-numeric ?band= must be refused, not answered with a calendar or a 5xx.
+export function checkInvalidBandRefused(_body, status) {
+  return status === 400 ? pass() : fail(`expected HTTP 400, got ${status}`);
+}
+
+// Fan email is retired; the old emailed URLs stay alive as a static 410 page.
+export const RETIRED_PATHS = [
+  "/api/bands/x/unfollow",
+  "/api/bands/x/confirm-follow",
+  "/api/bands/confirm-follow-batch",
+  "/api/subscriptions/unsubscribe",
+  "/api/subscriptions/verify",
+  "/subscribe",
+];
+
+export function checkRetired(_body, status) {
+  return status === 410 ? pass() : fail(`expected HTTP 410, got ${status}`);
+}
+
 export function extractSitemapUrls(body) {
   return [...body.matchAll(/<loc>\s*([^<]+?)\s*<\/loc>/gi)].map((match) => match[1]);
 }
@@ -138,6 +166,36 @@ export async function runProbes(baseUrl, options = {}) {
     results.push(["sitemap", checkSitemap(sitemapBody, sitemapStatus)]);
   } catch (error) {
     results.push(["sitemap", fail(`fetch failed after ${MAX_ATTEMPTS} attempts: ${error.message}`)]);
+  }
+
+  // Per-artist iCal: pick a band id from the sitemap at probe time (it lists
+  // only bands with a public, revealed set), never a hard-coded id.
+  const sitemapBandId = (sitemapBody ? extractSitemapUrls(sitemapBody) : [])
+    .map((url) => url.match(/^https:\/\/settimes\.ca\/band\/(\d+)$/)?.[1])
+    .find(Boolean);
+  if (!sitemapBandId) {
+    results.push(["per-artist iCal", fail("sitemap has no band URL to derive a band id from")]);
+  } else {
+    try {
+      const response = await retryFetch(new URL(`/api/feeds/ical?band=${sitemapBandId}`, base), options);
+      results.push([
+        "per-artist iCal",
+        checkBandIcal(await response.text(), response.status, response.headers.get("content-type") ?? ""),
+      ]);
+    } catch (error) {
+      results.push(["per-artist iCal", fail(`fetch failed after ${MAX_ATTEMPTS} attempts: ${error.message}`)]);
+    }
+  }
+  results.push([
+    "per-artist iCal rejects invalid band",
+    await fetchChecked(new URL("/api/feeds/ical?band=abc", base), checkInvalidBandRefused, options),
+  ]);
+
+  for (const retiredPath of RETIRED_PATHS) {
+    results.push([
+      `retired ${retiredPath} is 410`,
+      await fetchChecked(new URL(retiredPath, base), checkRetired, options),
+    ]);
   }
 
   let homepageTitle;

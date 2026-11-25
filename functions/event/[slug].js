@@ -119,6 +119,16 @@ function endDateFor(boundary, startTime) {
   return startTime ? dateTime(boundary.date, boundary.time) : boundary.date;
 }
 
+// Orders two JSON-LD date / dateTime values: by calendar date first (a date-only
+// value is a whole day), then by instant when both carry a time.
+function compareJsonLdInstants(a, b) {
+  const dayA = a.slice(0, 10);
+  const dayB = b.slice(0, 10);
+  if (dayA !== dayB) return dayA < dayB ? -1 : 1;
+  if (a.length > 10 && b.length > 10) return Date.parse(a) - Date.parse(b);
+  return 0;
+}
+
 /**
  * Every calendar day from startDate to endDate inclusive, ascending.
  * Lexicographic YYYY-MM-DD comparison is safe (repo convention, see
@@ -456,6 +466,7 @@ export async function onRequest(context) {
       ? undefined
       : event.end_date || event.date;
   let subEvent = [];
+  let topEndDate = endDateValue;
   if (isMultiDay) {
     const festivalDays = eachCalendarDay(event.date, event.end_date);
     const performersByDay = new Map(festivalDays.map((d) => [d, new Map()]));
@@ -466,7 +477,15 @@ export async function onRequest(context) {
       if (!bucket.has(row.id)) bucket.set(row.id, { id: row.id, name: row.name });
     }
 
-    subEvent = festivalDays.map((day) => {
+    // A day with no sets and no doors time has nothing to say: emitting it gave
+    // a bare date-only node that could start after the parent's closing time
+    // (BLR3: endDate 2026-07-11T22:00 vs an empty 2026-07-12 subEvent).
+    const daysWithContent = festivalDays.filter(
+      (day) =>
+        normalizeTime(doors[day]) ||
+        performanceRows.some((row) => festivalDayForPerformance(row, event, festivalDays) === day),
+    );
+    subEvent = daysWithContent.map((day) => {
       const performers = [...performersByDay.get(day).values()].sort((a, b) =>
         sortableName(a.name).localeCompare(sortableName(b.name)),
       );
@@ -511,6 +530,24 @@ export async function onRequest(context) {
           : {}),
       };
     });
+    // Never let the parent end before a child it contains: lift it to the latest
+    // subEvent boundary (a later day's closing time, or its start when no end is
+    // stored). Only an existing endDate is lifted: an omitted one stays omitted.
+    // The lifted value keeps the parent's precision (endDateFor's rule): a
+    // date-only parent takes the boundary's date; a timed parent whose later
+    // boundary is date-only has no honest closing time, so it omits endDate.
+    if (topEndDate) {
+      const parentTimed = startDateValue.length > 10;
+      for (const node of subEvent) {
+        for (const boundary of [node.startDate, node.endDate]) {
+          if (!topEndDate || !boundary || compareJsonLdInstants(boundary, topEndDate) <= 0) continue;
+          const boundaryTimed = boundary.length > 10;
+          if (parentTimed === boundaryTimed) topEndDate = boundary;
+          else if (!parentTimed) topEndDate = boundary.slice(0, 10);
+          else topEndDate = undefined;
+        }
+      }
+    }
   }
 
   // Pin to the production host — preview deploys must not self-canonicalise.
@@ -553,7 +590,7 @@ export async function onRequest(context) {
     // is honest; when a start time is known but no end time is stored, omit the
     // end rather than inventing a closing time. torontoUtcOffset is DST-aware.
     ...(event.date ? { startDate: startDateValue } : {}),
-    ...(endDateValue ? { endDate: endDateValue } : {}),
+    ...(topEndDate ? { endDate: topEndDate } : {}),
     location,
     ...(plainDesc ? { description: plainDesc } : {}),
     image,

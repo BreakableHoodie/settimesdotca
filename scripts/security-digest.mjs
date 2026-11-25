@@ -32,16 +32,11 @@ const REPOSITORY = "BreakableHoodie/settimesdotca";
 // the September decision to accept the Lighthouse CI toolchain (#1208) would
 // have covered basic-ftp and compression advisories published in October.
 
-export const ACCEPTED_NPM_AUDIT = {
-  "frontend/package-lock.json|basic-ftp|GHSA-c475-qrg2-pj4r":
-    "dev-only, via @lhci/cli > proxy-agent > pac-proxy-agent > get-uri. Client.list() runs only if LHCI is given a proxy whose PAC file is fetched over ftp://; quality.yml and lighthouserc.json set no proxy, so it is unreachable in our use. Accepted by Dre 2026-10-14; re-check if a proxy is ever configured or on the next @lhci/cli release",
-  "frontend/package-lock.json|zod|GHSA-mrhx-c7xc-m3w5":
-    "dev-only, zod@3 via lighthouse > puppeteer-core > chromium-bidi (Lighthouse CI). Every 3.x is in range and forcing zod 4 breaks chromium-bidi's schemas; zod@4 elsewhere is fixed. Accepted by Dre 2026-10-25; re-check on the next lighthouse / puppeteer-core release",
-  "package-lock.json|minimatch|GHSA-g3hv-75wg-m249":
-    "dev-only lint tooling: minimatch@3 via eslint-plugin-react and eslint-plugin-jsx-a11y, minimatch@10 via eslint. The advisory is a DoS from crafted glob patterns, and the only patterns minimatch sees here come from our committed ESLint config. The fix is 11.0.1 only; both plugins call `require('minimatch')` as a function, which 11 no longer exports, so forcing it breaks lint. Accepted by Dre 2026-10-31; re-check when eslint-plugin-react / eslint-plugin-jsx-a11y move off minimatch@3",
-  "frontend/package-lock.json|minimatch|GHSA-g3hv-75wg-m249":
-    "dev-only lint tooling: minimatch@3 via eslint-plugin-react and eslint-plugin-jsx-a11y, minimatch@10 via eslint. The advisory is a DoS from crafted glob patterns, and the only patterns minimatch sees here come from our committed ESLint config. The fix is 11.0.1 only; both plugins call `require('minimatch')` as a function, which 11 no longer exports, so forcing it breaks lint. Accepted by Dre 2026-10-31; re-check when eslint-plugin-react / eslint-plugin-jsx-a11y move off minimatch@3",
-};
+// Empty since 2026-11-24: every lockfile audits clean, so the four entries
+// recorded in October (basic-ftp, zod, minimatch x2) no longer matched
+// anything. A stale entry is not harmless: it would silently accept the same
+// advisory if a later lockfile change brought it back.
+export const ACCEPTED_NPM_AUDIT = {};
 
 // The issue lists at most this many alerts. GitHub rejects an issue body over
 // 65,536 characters (~400 alert lines), which would fail the digest exactly
@@ -93,7 +88,14 @@ function formatCount(label, alerts, now) {
   return `- ${label}: ${alerts.length} open (${old} older than 7 days, ${fresh} newer)`;
 }
 
-export function buildDigest({ now, dependabot = [], codeScanning = [], analyses = [], npmAudit = [] }) {
+export function buildDigest({
+  now,
+  dependabot = [],
+  codeScanning = [],
+  analyses = [],
+  npmAudit = [],
+  accepted = ACCEPTED_NPM_AUDIT,
+}) {
   const currentTime = now instanceof Date ? now : new Date(now);
   const dependabotAlerts = dependabot.map(dependabotDetails);
   const codeScanningAlerts = codeScanning.map(codeScanningDetails);
@@ -126,7 +128,7 @@ export function buildDigest({ now, dependabot = [], codeScanning = [], analyses 
     const findings = summary.findings ?? [];
     const keyOf = ({ name, advisory }) => `${summary.lockfile}|${name}|${advisory}`;
     // A finding with no advisory id can never match an acceptance.
-    const unaccepted = findings.filter((finding) => !finding.advisory || !(keyOf(finding) in ACCEPTED_NPM_AUDIT));
+    const unaccepted = findings.filter((finding) => !finding.advisory || !Object.hasOwn(accepted, keyOf(finding)));
     if (unaccepted.length > 0) {
       problems.push(
         `${summary.lockfile}: ${unaccepted.length} npm audit advisor${unaccepted.length === 1 ? "y" : "ies"} not on the accepted list: ` +
@@ -140,7 +142,7 @@ export function buildDigest({ now, dependabot = [], codeScanning = [], analyses 
       problems.push(`${summary.lockfile} reports ${total} npm audit vulnerabilities with no advisory detail`);
     }
     const flagged = new Set(findings.map(keyOf));
-    for (const key of Object.keys(ACCEPTED_NPM_AUDIT)) {
+    for (const key of Object.keys(accepted)) {
       if (key.startsWith(`${summary.lockfile}|`) && !flagged.has(key)) acceptedNoLongerFlagged.push(key);
     }
   }

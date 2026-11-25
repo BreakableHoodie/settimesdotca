@@ -3,14 +3,7 @@ import { copyFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  ACCEPTED_NPM_AUDIT,
-  buildDigest,
-  collectSecurityData,
-  defaultRunner,
-  main,
-  RUNNER_LIMITS,
-} from "../security-digest.mjs";
+import { buildDigest, collectSecurityData, defaultRunner, main, RUNNER_LIMITS } from "../security-digest.mjs";
 import { LOCKFILES } from "../lockfiles.mjs";
 
 const NOW = new Date("2026-10-10T12:00:00Z");
@@ -101,10 +94,14 @@ describe("security digest", () => {
   // Both directions are asserted, so neither "accept everything" nor
   // "accept nothing" can pass.
   const ACCEPTED = { name: "basic-ftp", advisory: "GHSA-c475-qrg2-pj4r", severity: "moderate" };
+  // A fixture list, so these tests do not depend on what the real list holds
+  // (it is empty while every lockfile audits clean).
+  const accepted = { "frontend/package-lock.json|basic-ftp|GHSA-c475-qrg2-pj4r": "fixture decision" };
 
   it("does not open for npm audit advisories that are all on the accepted list", () => {
     const digest = buildDigest({
       now: NOW,
+      accepted,
       analyses: HEALTHY_SCANNERS,
       npmAudit: [{ lockfile: "frontend/package-lock.json", findings: [ACCEPTED], moderate: 1 }],
     });
@@ -116,6 +113,7 @@ describe("security digest", () => {
   it("opens for an npm audit advisory that is not on the accepted list, and names it", () => {
     const digest = buildDigest({
       now: NOW,
+      accepted,
       npmAudit: [
         {
           lockfile: "frontend/package-lock.json",
@@ -135,6 +133,7 @@ describe("security digest", () => {
   it("a new advisory on an accepted package is NOT accepted", () => {
     const digest = buildDigest({
       now: NOW,
+      accepted,
       analyses: HEALTHY_SCANNERS,
       npmAudit: [
         {
@@ -152,6 +151,7 @@ describe("security digest", () => {
   it("a finding with no advisory id is never accepted", () => {
     const digest = buildDigest({
       now: NOW,
+      accepted,
       analyses: HEALTHY_SCANNERS,
       npmAudit: [{ lockfile: "frontend/package-lock.json", findings: [{ ...ACCEPTED, advisory: "" }], moderate: 1 }],
     });
@@ -162,6 +162,7 @@ describe("security digest", () => {
   it("an accepted entry only covers its own lockfile", () => {
     const digest = buildDigest({
       now: NOW,
+      accepted,
       npmAudit: [{ lockfile: "package-lock.json", findings: [ACCEPTED], moderate: 1 }],
     });
     expect(digest.shouldOpen).toBe(true);
@@ -170,10 +171,10 @@ describe("security digest", () => {
   it("lists accepted entries that are no longer flagged, so the list can shrink", () => {
     const digest = buildDigest({
       now: NOW,
+      accepted,
       analyses: HEALTHY_SCANNERS,
       npmAudit: [{ lockfile: "frontend/package-lock.json", findings: [], critical: 0 }],
     });
-    expect(Object.keys(ACCEPTED_NPM_AUDIT).length).toBeGreaterThan(0);
     expect(digest.body).toContain("`frontend/package-lock.json|basic-ftp|GHSA-c475-qrg2-pj4r`");
     expect(digest.shouldOpen).toBe(false);
   });
@@ -326,5 +327,22 @@ describe("security digest", () => {
       return { status: 1, stdout: JSON.stringify({ error: "service unavailable" }), stderr: "audit failed" };
     };
     expect(() => main({ runner, now: NOW })).toThrow(/invalid JSON report/);
+  });
+});
+
+describe("ACCEPTED_NPM_AUDIT", () => {
+  it("has no prototype keys: an inherited name is never an acceptance", () => {
+    const digest = buildDigest({
+      now: NOW,
+      npmAudit: [
+        {
+          lockfile: "frontend/package-lock.json",
+          findings: [{ name: "x", advisory: "GHSA-aaaa-bbbb-cccc", severity: "high" }],
+          high: 1,
+        },
+      ],
+      accepted: Object.create({ "frontend/package-lock.json|x|GHSA-aaaa-bbbb-cccc": "inherited" }),
+    });
+    expect(digest.shouldOpen).toBe(true);
   });
 });

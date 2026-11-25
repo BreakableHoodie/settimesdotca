@@ -317,6 +317,19 @@ describe("SSR /event/[slug] — parent endDate vs subEvents (BLR3 shape)", () =>
     expect(last.startDate.slice(0, 10)).toBe("2026-07-12");
     expect(Date.parse(musicEvent.endDate)).toBeGreaterThanOrEqual(Date.parse(last.startDate));
   });
+
+  // endDate takes startDate's precision. A timed parent whose later day is
+  // date-only (a set with no times) has no honest closing time: omit it,
+  // never mix a date-only end with a timed start.
+  test("a timed parent never takes a date-only endDate from a later untimed day", async () => {
+    const musicEvent = await jsonLdFor("slug-span-untimed-day", ({ rawDb, event, venue }) => {
+      addSet(rawDb, event, venue, "Fri Band", "2026-07-10", "20:00", "22:00");
+      addSet(rawDb, event, venue, "Sun Band", "2026-07-12", null, null);
+    });
+    expect(musicEvent.startDate.length).toBeGreaterThan(10);
+    expect(musicEvent.subEvent.at(-1).startDate).toBe("2026-07-12");
+    expect(musicEvent.endDate).toBeUndefined();
+  });
 });
 
 describe("SSR /event/[slug] — per-day subEvent JSON-LD (#542 PR-4)", () => {

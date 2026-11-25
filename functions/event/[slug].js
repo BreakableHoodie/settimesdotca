@@ -533,10 +533,18 @@ export async function onRequest(context) {
     // Never let the parent end before a child it contains: lift it to the latest
     // subEvent boundary (a later day's closing time, or its start when no end is
     // stored). Only an existing endDate is lifted: an omitted one stays omitted.
+    // The lifted value keeps the parent's precision (endDateFor's rule): a
+    // date-only parent takes the boundary's date; a timed parent whose later
+    // boundary is date-only has no honest closing time, so it omits endDate.
     if (topEndDate) {
+      const parentTimed = startDateValue.length > 10;
       for (const node of subEvent) {
         for (const boundary of [node.startDate, node.endDate]) {
-          if (boundary && compareJsonLdInstants(boundary, topEndDate) > 0) topEndDate = boundary;
+          if (!topEndDate || !boundary || compareJsonLdInstants(boundary, topEndDate) <= 0) continue;
+          const boundaryTimed = boundary.length > 10;
+          if (parentTimed === boundaryTimed) topEndDate = boundary;
+          else if (!parentTimed) topEndDate = boundary.slice(0, 10);
+          else topEndDate = undefined;
         }
       }
     }

@@ -47,7 +47,7 @@ export function checkIcal(body, status = 200) {
 // The per-artist subscription feed: same calendar rules as the main feed, so
 // reuse checkIcal, and also require the content type a calendar app keys on.
 export function checkBandIcal(body, status = 200, contentType = "") {
-  if (status === 200 && !/^text\/calendar\b/i.test(contentType)) {
+  if (status === 200 && !/^text\/calendar\s*(;|$)/i.test(contentType)) {
     return fail(`expected Content-Type text/calendar, got ${contentType || "none"}`);
   }
   return checkIcal(body, status);

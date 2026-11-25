@@ -132,6 +132,8 @@ describe("smoke probe checkers", () => {
 describe("per-artist iCal and retired-URL probes", () => {
   it("accepts a text/calendar band feed and rejects another content type", () => {
     expect(checkBandIcal(validIcal, 200, "text/calendar; charset=utf-8")).toEqual({ ok: true });
+    expect(checkBandIcal(validIcal, 200, "text/calendar")).toEqual({ ok: true });
+    expect(checkBandIcal(validIcal, 200, "text/calendar-backup").ok).toBe(false);
     expect(checkBandIcal(validIcal, 200, "text/html").ok).toBe(false);
     expect(checkBandIcal(validIcal, 404, "text/calendar").ok).toBe(false);
   });

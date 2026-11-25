@@ -213,10 +213,18 @@ describe("POST /api/admin/bands/import", () => {
     const { env, payload } = seedMidImportFailure();
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const realPrepare = env.DB.prepare.bind(env.DB);
+    const attempted = [];
     env.DB = {
       ...env.DB,
       prepare(sql) {
-        if (sql.startsWith("DELETE FROM performances")) throw new Error("rollback DELETE exploded");
+        if (sql.startsWith("DELETE FROM")) attempted.push(sql);
+        // Only the FIRST performance DELETE throws; later ones must still be attempted.
+        if (
+          sql.startsWith("DELETE FROM performances") &&
+          attempted.filter((q) => q.startsWith("DELETE FROM performances")).length === 1
+        ) {
+          throw new Error("rollback DELETE exploded");
+        }
         return realPrepare(sql);
       },
     };
@@ -228,10 +236,18 @@ describe("POST /api/admin/bands/import", () => {
       // The rollback did not finish, so the caller must not be told nothing was imported.
       expect(body.message).not.toMatch(/No bands were imported/);
 
+      // The failure did not stop the rollback: the second performance and the profiles were still attempted.
+      expect(attempted.filter((q) => q.startsWith("DELETE FROM performances")).length).toBe(2);
+      expect(attempted.filter((q) => q.startsWith("DELETE FROM band_profiles")).length).toBeGreaterThan(0);
+
       const detail = errorSpy.mock.calls.flat().find((a) => a && typeof a === "object" && "rollbackError" in a);
       expect(detail, "the rollback failure is logged").toBeTruthy();
       expect(String(detail.error.message)).toMatch(/forced mid-import failure/);
       expect(String(detail.rollbackError.message)).toMatch(/rollback DELETE exploded/);
+      // Outcomes, not intentions: exactly the performance whose DELETE threw is listed. The
+      // first row reuses Alpha (not created here), so no created profile is blocked.
+      expect(detail.failedPerformanceIds).toHaveLength(1);
+      expect(detail.failedProfileIds).toEqual([]);
     } finally {
       errorSpy.mockRestore();
     }

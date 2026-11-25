@@ -166,20 +166,48 @@ export async function onRequestPost(context) {
     } catch (copyError) {
       // Guard the compensation: if it throws, the copy error is still the
       // diagnosis and must not be replaced by the DELETE's error.
+      let rollbackFailed = false;
       try {
         await DB.prepare("DELETE FROM events WHERE id = ?").bind(newEvent.id).run();
       } catch (rollbackError) {
+        rollbackFailed = true;
         console.error("Event duplicate failed AND its rollback failed; an empty draft may remain:", {
           eventId: newEvent.id,
+          slug,
+          copyError,
           rollbackError,
         });
+      }
+      if (rollbackFailed) {
+        // The draft is still there, so a retry with the same slug would hit a
+        // uniqueness error that looks like a different bug. Say so.
+        console.error("Error duplicating event:", copyError);
+        return json(
+          {
+            error: "Database error",
+            message: `Failed to duplicate event, and the new draft "${slug}" may remain. Delete it before retrying.`,
+          },
+          500,
+        );
       }
       throw copyError;
     }
 
-    const bandCount = await DB.prepare("SELECT COUNT(*) as count FROM performances WHERE event_id = ?")
-      .bind(newEvent.id)
-      .first();
+    // The duplicate is COMMITTED from here on. Nothing below may turn it into a
+    // failure response: the event and its lineup exist, and a 500 would invite a
+    // retry that dies on the slug. (auditLog catches its own errors.)
+    let bandsCopied = null;
+    try {
+      const bandCount = await DB.prepare("SELECT COUNT(*) as count FROM performances WHERE event_id = ?")
+        .bind(newEvent.id)
+        .first();
+      bandsCopied = bandCount?.count ?? null;
+    } catch (countError) {
+      console.error("Event duplicated, but counting the copied bands failed:", {
+        eventId: newEvent.id,
+        countError,
+      });
+    }
 
     await auditLog(
       env,
@@ -190,7 +218,7 @@ export async function onRequestPost(context) {
       {
         name: newEvent.name,
         originalEventId: eventId,
-        bandsCopied: bandCount.count,
+        bandsCopied,
       },
       ipAddress,
     );
@@ -199,8 +227,11 @@ export async function onRequestPost(context) {
       {
         success: true,
         event: newEvent,
-        bands_copied: bandCount.count,
-        message: `Event duplicated successfully with ${bandCount.count} bands`,
+        bands_copied: bandsCopied,
+        message:
+          bandsCopied === null
+            ? "Event duplicated successfully"
+            : `Event duplicated successfully with ${bandsCopied} bands`,
       },
       201,
     );

@@ -1068,6 +1068,39 @@ describe("Event API - handler integration", () => {
     expect(data.bands_copied).toBeGreaterThanOrEqual(2);
   });
 
+  it("a failure AFTER the duplicate committed is still a 201, with bands_copied null", async () => {
+    const rawDb = createTestDB();
+    const original = insertEvent(rawDb, { name: "Original", slug: "original" });
+    insertBand(rawDb, { name: "CopyBand1", event_id: original.id });
+    const base = createDBEnv(rawDb);
+    const env = {
+      DB: {
+        ...base,
+        prepare(sql) {
+          if (sql.startsWith("SELECT COUNT(*) as count FROM performances")) throw new Error("count exploded");
+          return base.prepare(sql);
+        },
+      },
+    };
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const request = new Request(`https://example.test/api/admin/events/${original.id}/duplicate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-test-role": "editor" },
+        body: JSON.stringify({ name: "Copy", date: "2026-01-01", slug: "original-copy" }),
+      });
+      const res = await duplicateHandler.onRequestPost({ request, env, params: { id: String(original.id) } });
+      expect(res.status).toBe(201);
+      const body = await res.json();
+      expect(body.success).toBe(true);
+      expect(body.bands_copied).toBeNull();
+      expect(rawDb.prepare("SELECT COUNT(*) AS c FROM events WHERE slug = 'original-copy'").get().c).toBe(1);
+      expect(errorSpy.mock.calls.some((c) => /counting the copied bands failed/.test(String(c[0])))).toBe(true);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
   it("a duplicate whose copy AND rollback both fail still reports the copy error", async () => {
     const rawDb = createTestDB();
     const original = insertEvent(rawDb, { name: "Original", slug: "original" });
@@ -1092,10 +1125,16 @@ describe("Event API - handler integration", () => {
       });
       const res = await duplicateHandler.onRequestPost({ request, env, params: { id: String(original.id) } });
       expect(res.status).toBe(500);
+      // The draft survives, so the admin must be told its name before retrying.
+      const body = await res.json();
+      expect(body.message).toMatch(/original-copy/);
+      expect(body.message).toMatch(/Delete it before retrying/);
+      expect(rawDb.prepare("SELECT COUNT(*) AS c FROM events WHERE slug = 'original-copy'").get().c).toBe(1);
       const reported = errorSpy.mock.calls.find((c) => c[0] === "Error duplicating event:");
       expect(reported?.[1]?.message).toBe("copy exploded");
       const rollback = errorSpy.mock.calls.flat().find((a) => a && typeof a === "object" && "rollbackError" in a);
       expect(String(rollback?.rollbackError?.message)).toBe("rollback exploded");
+      expect(String(rollback?.copyError?.message)).toBe("copy exploded");
     } finally {
       errorSpy.mockRestore();
     }

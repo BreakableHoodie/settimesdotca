@@ -2343,8 +2343,8 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'D1 transactions: no BEGIN/COMMIT, but DB.batch() is atomic' — a failing rollback is caught and logged beside the original error; the import still answers 500",
     file: "functions/api/admin/bands/import.js",
-    find: "rollbackError = rollbackErr;",
-    replace: "void rollbackErr;",
+    find: "if (rollbackErrors.length > 0) {",
+    replace: "if (false) {",
     tests: ["functions/api/admin/bands/__tests__/import.test.js"],
   },
   {
@@ -2374,6 +2374,33 @@ export const MUTATIONS = [
     find: "bearer && !bearer.startsWith(API_KEY_PREFIX) ? bearer : null",
     replace: "bearer ? bearer : null",
     tests: ["functions/utils/__tests__/csrf.test.js"],
+  },
+  {
+    id: "import-rollback-deletes-profiles",
+    invariant:
+      "CLAUDE.md 'D1 transactions: no BEGIN/COMMIT, but DB.batch() is atomic' — the bulk import's compensating delete also removes the band profiles it created",
+    file: "functions/api/admin/bands/import.js",
+    find: 'await DB.prepare("DELETE FROM band_profiles WHERE id = ?").bind(id).run();',
+    replace: "void id;",
+    tests: ["functions/api/admin/bands/__tests__/import.test.js"],
+  },
+  {
+    id: "duplicate-rollback-failure-names-the-leftover-draft",
+    invariant:
+      "CLAUDE.md 'D1 transactions: no BEGIN/COMMIT, but DB.batch() is atomic' — when an event duplicate's copy AND rollback both fail, the answer says the draft may remain",
+    file: "functions/api/admin/events/[id]/duplicate.js",
+    find: "rollbackFailed = true;",
+    replace: "rollbackFailed = false;",
+    tests: ["functions/api/admin/events/__tests__/events.test.js"],
+  },
+  {
+    id: "duplicate-post-commit-failure-is-not-a-failure",
+    invariant:
+      "CLAUDE.md 'D1 transactions: no BEGIN/COMMIT, but DB.batch() is atomic' — a throw after the duplicate committed (the band count) is logged, never turned into a 500",
+    file: "functions/api/admin/events/[id]/duplicate.js",
+    find: "} catch (countError) {",
+    replace: "} catch (countError) {\n      throw countError;",
+    tests: ["functions/api/admin/events/__tests__/events.test.js"],
   },
 ];
 

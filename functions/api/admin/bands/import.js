@@ -145,23 +145,36 @@ export async function onRequestPost(context) {
     // has its own guard: if a DELETE throws, the ORIGINAL failure must still be
     // logged (it is the diagnosis) and the caller still gets the failure
     // response, not an unhandled throw from inside this catch.
-    let rollbackError = null;
-    try {
-      for (const id of insertedPerformanceIds) {
+    // Every DELETE is attempted on its own: one failure must not leave later
+    // rows untouched. Performances first (profiles are referenced by them, so a
+    // profile whose performance survived fails its DELETE, which is correct and
+    // is reported). The log lists what FAILED to delete, not what was intended.
+    const failedPerformanceIds = [];
+    const failedProfileIds = [];
+    const rollbackErrors = [];
+    for (const id of insertedPerformanceIds) {
+      try {
         await DB.prepare("DELETE FROM performances WHERE id = ?").bind(id).run();
+      } catch (rollbackErr) {
+        failedPerformanceIds.push(id);
+        rollbackErrors.push(rollbackErr);
       }
-      for (const id of createdProfileIds) {
-        await DB.prepare("DELETE FROM band_profiles WHERE id = ?").bind(id).run();
-      }
-    } catch (rollbackErr) {
-      rollbackError = rollbackErr;
     }
-    if (rollbackError) {
+    for (const id of createdProfileIds) {
+      try {
+        await DB.prepare("DELETE FROM band_profiles WHERE id = ?").bind(id).run();
+      } catch (rollbackErr) {
+        failedProfileIds.push(id);
+        rollbackErrors.push(rollbackErr);
+      }
+    }
+    if (rollbackErrors.length > 0) {
       console.error("Bulk import failed AND rollback failed; the lineup may be half-imported:", {
         error: err,
-        rollbackError,
-        performanceIds: insertedPerformanceIds,
-        profileIds: createdProfileIds,
+        rollbackError: rollbackErrors[0],
+        rollbackErrors,
+        failedPerformanceIds,
+        failedProfileIds,
       });
       return json(
         {

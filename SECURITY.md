@@ -54,7 +54,8 @@ This application implements defense-in-depth security with multiple layers of pr
 
 **Usage:**
 ```bash
-# Prints the code once, plus the INSERT to run; only its sha256 digest is stored (#1334)
+# Prints the code once, plus the INSERT to run. The table stores its sha256 digest
+# and its first 8 characters (code_prefix, for display), never the whole code (#1334)
 node scripts/create-admin-invite.js --prod
 
 # Use during signup

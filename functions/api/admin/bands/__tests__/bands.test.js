@@ -25,6 +25,37 @@ describe("Admin bands API - CRUD operations", () => {
     expect(data.band.name).toBe("New Band");
   });
 
+  it("a band create whose performance insert AND rollback both fail still reports the insert error", async () => {
+    const { env, rawDb, headers } = createTestEnv({ role: "editor" });
+    const ev = insertEvent(rawDb, { name: "RollbackEvent", slug: "rollback-event" });
+    const venue = insertVenue(rawDb, { name: "Rollback Venue" });
+    const realPrepare = env.DB.prepare.bind(env.DB);
+    env.DB = {
+      ...env.DB,
+      prepare(sql) {
+        if (sql.includes("INSERT INTO performances")) throw new Error("perf insert exploded");
+        if (sql.startsWith("DELETE FROM band_profiles")) throw new Error("rollback exploded");
+        return realPrepare(sql);
+      },
+    };
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const request = new Request("https://example.test/api/admin/bands", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({ eventId: ev.id, venueId: venue.id, name: "Orphan Band", startTime: "18:00" }),
+      });
+      const res = await bandsHandler.onRequestPost({ request, env, data: { user: { role: "editor" } } });
+      expect(res.status).toBe(500);
+      const reported = errorSpy.mock.calls.find((c) => c[0] === "Failed to create band:");
+      expect(reported?.[1]?.message).toBe("perf insert exploded");
+      const rollback = errorSpy.mock.calls.flat().find((a) => a && typeof a === "object" && "rollbackError" in a);
+      expect(String(rollback?.rollbackError?.message)).toBe("rollback exploded");
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
   it("GET /api/admin/bands?event_id returns bands with venue and event names", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "editor" });
     const ev = insertEvent(rawDb, { name: "ListEvent", slug: "list-event" });

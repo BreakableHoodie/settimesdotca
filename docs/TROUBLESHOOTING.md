@@ -742,7 +742,7 @@ fetch('https://settimes.ca/api/admin/events');
 4. **Test database connection:**
 
    ```bash
-   wrangler d1 execute settimes-production-db --command="SELECT 1"
+   wrangler d1 execute settimes-production-db --remote --command="SELECT 1"
    ```
 
 ---

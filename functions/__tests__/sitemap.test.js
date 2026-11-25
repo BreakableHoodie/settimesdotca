@@ -188,6 +188,95 @@ describe("GET /sitemap.xml — lastmod reflects CONTENT changes, not the event d
   });
 });
 
+describe("GET /sitemap.xml — band and venue lastmod", () => {
+  const lastmodFor = (xml, loc) => {
+    const block = xml.split("<url>").find((chunk) => chunk.includes(`<loc>${loc}</loc>`));
+    return block?.match(/<lastmod>([^<]*)<\/lastmod>/)?.[1];
+  };
+  const addVenue = (rawDb, name, ts) =>
+    rawDb.prepare("INSERT INTO venues (name, created_at, updated_at) VALUES (?, ?, ?) RETURNING id").get(name, ts, ts)
+      .id;
+  const addBand = (rawDb, name, ts) =>
+    rawDb
+      .prepare(
+        "INSERT INTO band_profiles (name, name_normalized, created_at, updated_at) VALUES (?, ?, ?, ?) RETURNING id",
+      )
+      .get(name, name.toLowerCase(), ts, ts).id;
+  const addPerf = (rawDb, eventId, venueId, bandId, ts) =>
+    rawDb
+      .prepare(
+        "INSERT INTO performances (event_id, venue_id, band_profile_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+      )
+      .run(eventId, venueId, bandId, ts, ts);
+
+  test("band and venue lastmod is the newest of the entity and its public performances", async () => {
+    const { env, rawDb } = createTestEnv();
+    const ev = insertEvent(rawDb, { name: "LM Pub", slug: "lm-pub", date: "2099-01-01" });
+    publish(rawDb, ev.id);
+    const venueId = addVenue(rawDb, "LM Venue", "2026-01-01 00:00:00");
+    const bandId = addBand(rawDb, "LM Band", "2026-02-01 00:00:00");
+    addPerf(rawDb, ev.id, venueId, bandId, "2026-03-05 12:00:00");
+    addPerf(rawDb, ev.id, venueId, bandId, "2026-03-01 12:00:00");
+
+    const xml = await fetchSitemap(env);
+
+    expect(lastmodFor(xml, `https://settimes.ca/band/${bandId}`)).toBe("2026-03-05");
+    expect(lastmodFor(xml, `https://settimes.ca/venue/${venueId}`)).toBe("2026-03-05");
+  });
+
+  test("the entity's own edit wins when it is newer than every performance", async () => {
+    const { env, rawDb } = createTestEnv();
+    const ev = insertEvent(rawDb, { name: "LM Own", slug: "lm-own", date: "2099-01-01" });
+    publish(rawDb, ev.id);
+    const venueId = addVenue(rawDb, "Own Venue", "2027-06-01 00:00:00");
+    const bandId = addBand(rawDb, "Own Band", "2027-07-01 00:00:00");
+    addPerf(rawDb, ev.id, venueId, bandId, "2026-03-05 12:00:00");
+
+    const xml = await fetchSitemap(env);
+
+    expect(lastmodFor(xml, `https://settimes.ca/band/${bandId}`)).toBe("2027-07-01");
+    expect(lastmodFor(xml, `https://settimes.ca/venue/${venueId}`)).toBe("2027-06-01");
+  });
+
+  test("a performance in an unpublished (draft) event does not set band or venue lastmod", async () => {
+    const { env, rawDb } = createTestEnv();
+    const pub = insertEvent(rawDb, { name: "LM Live", slug: "lm-live", date: "2099-01-01" });
+    publish(rawDb, pub.id);
+    const draft = insertEvent(rawDb, { name: "LM Draft", slug: "lm-draft", date: "2099-02-01" });
+    const venueId = addVenue(rawDb, "Draft Venue", "2026-01-01 00:00:00");
+    const bandId = addBand(rawDb, "Draft Band", "2026-01-02 00:00:00");
+    addPerf(rawDb, pub.id, venueId, bandId, "2026-03-01 12:00:00");
+    addPerf(rawDb, draft.id, venueId, bandId, "2029-09-09 12:00:00");
+
+    const xml = await fetchSitemap(env);
+
+    expect(lastmodFor(xml, `https://settimes.ca/band/${bandId}`)).toBe("2026-03-01");
+    expect(lastmodFor(xml, `https://settimes.ca/venue/${venueId}`)).toBe("2026-03-01");
+    expect(xml).not.toContain("2029-09-09");
+  });
+
+  test("a venue with no usable timestamp omits lastmod rather than inventing one", async () => {
+    const { env, rawDb } = createTestEnv();
+    const ev = insertEvent(rawDb, { name: "LM Null", slug: "lm-null", date: "2099-01-01" });
+    publish(rawDb, ev.id);
+    const venueId = rawDb
+      .prepare("INSERT INTO venues (name, created_at, updated_at) VALUES ('Bare', NULL, NULL) RETURNING id")
+      .get().id;
+    const bandId = addBand(rawDb, "Bare Band", "2026-01-02 00:00:00");
+    rawDb
+      .prepare(
+        "INSERT INTO performances (event_id, venue_id, band_profile_id, created_at, updated_at) VALUES (?, ?, ?, '', NULL)",
+      )
+      .run(ev.id, venueId, bandId);
+
+    const xml = await fetchSitemap(env);
+    const block = xml.split("<url>").find((c) => c.includes(`/venue/${venueId}</loc>`));
+
+    expect(block).toBeDefined();
+    expect(block).not.toContain("<lastmod>");
+  });
+});
+
 /**
  * Crawl-priority signals (#1158).
  *

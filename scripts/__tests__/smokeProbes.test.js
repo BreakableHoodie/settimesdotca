@@ -1,4 +1,14 @@
-import { checkIcal, checkSitemap, checkSsrIdentity, retryFetch } from "../smoke-probes.mjs";
+import {
+  checkBandIcal,
+  checkIcal,
+  checkInvalidBandRefused,
+  checkRetired,
+  checkSitemap,
+  checkSsrIdentity,
+  RETIRED_PATHS,
+  retryFetch,
+  runProbes,
+} from "../smoke-probes.mjs";
 
 const homepageTitle = "SetTimes – Live Music Events & Show Schedules";
 const validIcal = [
@@ -116,5 +126,78 @@ describe("smoke probe checkers", () => {
     });
     expect(checkIcal(await result.text(), result.status).ok).toBe(false);
     expect(calls).toBe(5);
+  });
+});
+
+describe("per-artist iCal and retired-URL probes", () => {
+  it("accepts a text/calendar band feed and rejects another content type", () => {
+    expect(checkBandIcal(validIcal, 200, "text/calendar; charset=utf-8")).toEqual({ ok: true });
+    expect(checkBandIcal(validIcal, 200, "text/html").ok).toBe(false);
+    expect(checkBandIcal(validIcal, 404, "text/calendar").ok).toBe(false);
+  });
+
+  it("requires exactly 400 for an invalid band id and exactly 410 for retired URLs", () => {
+    expect(checkInvalidBandRefused("", 400)).toEqual({ ok: true });
+    expect(checkInvalidBandRefused("", 200).ok).toBe(false);
+    expect(checkRetired("", 410)).toEqual({ ok: true });
+    expect(checkRetired("", 200).ok).toBe(false);
+    expect(checkRetired("", 404).ok).toBe(false);
+  });
+
+  it("lists the six retired URLs", () => {
+    expect(RETIRED_PATHS).toHaveLength(6);
+  });
+
+  function fakeFetch({ retiredStatus = 410, bandIcalType = "text/calendar; charset=utf-8", sitemapBand = true } = {}) {
+    const calls = [];
+    const sitemap = `<urlset>${Array.from(
+      { length: 20 },
+      (_, i) => `<url><loc>https://settimes.ca/${i === 0 && sitemapBand ? "band/77" : `event/e${i}`}</loc></url>`,
+    ).join("")}</urlset>`;
+    const impl = async (url) => {
+      const u = new URL(url);
+      calls.push(u.pathname + u.search);
+      if (u.pathname === "/sitemap.xml") return new Response(sitemap, { status: 200 });
+      if (u.pathname === "/api/feeds/ical" && u.searchParams.get("band") === "abc") {
+        return new Response("Invalid band id", { status: 400 });
+      }
+      if (u.pathname === "/api/feeds/ical") {
+        const type = u.searchParams.has("band") ? bandIcalType : "text/calendar";
+        return new Response(validIcal, { status: 200, headers: { "Content-Type": type } });
+      }
+      if (RETIRED_PATHS.includes(u.pathname)) return new Response("gone", { status: retiredStatus });
+      return new Response(validSsr, { status: 200 });
+    };
+    return { impl, calls };
+  }
+  const named = (results, prefix) => results.filter(([name]) => name.startsWith(prefix));
+
+  it("derives the band id from the sitemap and probes every retired URL", async () => {
+    const { impl, calls } = fakeFetch();
+    const results = await runProbes("https://settimes.ca", { fetchImpl: impl, sleep: async () => {} });
+    expect(calls).toContain("/api/feeds/ical?band=77");
+    expect(calls).toContain("/api/feeds/ical?band=abc");
+    for (const path of RETIRED_PATHS) expect(calls).toContain(path);
+    expect(named(results, "per-artist iCal").every(([, r]) => r.ok)).toBe(true);
+    expect(named(results, "retired").filter(([, r]) => r.ok)).toHaveLength(6);
+  });
+
+  it("fails a retired URL that stopped answering 410", async () => {
+    const { impl } = fakeFetch({ retiredStatus: 200 });
+    const results = await runProbes("https://settimes.ca", { fetchImpl: impl, sleep: async () => {} });
+    expect(named(results, "retired").every(([, r]) => !r.ok)).toBe(true);
+  });
+
+  it("fails the per-artist feed on a wrong content type or a sitemap with no band", async () => {
+    let results = await runProbes("https://settimes.ca", {
+      fetchImpl: fakeFetch({ bandIcalType: "text/plain" }).impl,
+      sleep: async () => {},
+    });
+    expect(results.find(([n]) => n === "per-artist iCal")[1].ok).toBe(false);
+    results = await runProbes("https://settimes.ca", {
+      fetchImpl: fakeFetch({ sitemapBand: false }).impl,
+      sleep: async () => {},
+    });
+    expect(results.find(([n]) => n === "per-artist iCal")[1].ok).toBe(false);
   });
 });

@@ -9,7 +9,14 @@ import {
   concludedEventSql,
   publicEventStatusSql,
   publicRevealedPerformanceExistsSql,
+  revealedPerformanceSql,
 } from "./utils/eventVisibility.js";
+
+// "\n    <lastmod>YYYY-MM-DD</lastmod>", or nothing when there is no usable timestamp.
+function lastmodTag(value) {
+  const day = typeof value === "string" ? value.slice(0, 10) : "";
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) ? `\n    <lastmod>${day}</lastmod>` : "";
+}
 
 export async function onRequestGet(context) {
   const { env } = context;
@@ -55,12 +62,36 @@ export async function onRequestGet(context) {
         .bind(eventLocalFestivalToday())
         .all(),
       env.DB.prepare(
-        `SELECT bp.id
+        // lastmod = the newer of the profile's own edit and the newest edit of
+        // any performance that is PUBLIC and REVEALED (the same predicate that
+        // lets the URL be listed at all). A performance in a draft event, or an
+        // unannounced one under reveal_mode, must not leak its date into a
+        // public signal. One correlated aggregate per row of this single query.
+        `SELECT bp.id,
+                MAX(
+                  COALESCE(bp.updated_at, bp.created_at, ''),
+                  COALESCE((SELECT MAX(COALESCE(p.updated_at, p.created_at))
+                            FROM performances p JOIN events e ON e.id = p.event_id
+                            WHERE p.band_profile_id = bp.id
+                              AND ${publicEventStatusSql("e")}
+                              AND ${revealedPerformanceSql("e", "p")}), '')
+                ) AS last_modified
          FROM band_profiles bp
          WHERE ${publicRevealedPerformanceExistsSql("bp", "id", "band_profile_id")}`,
       ).all(),
       env.DB.prepare(
-        `SELECT v.id
+        // Same definition as bands. venues.created_at/updated_at are nullable,
+        // so a venue with neither and no public performance timestamp gets no
+        // <lastmod> at all rather than an invented date.
+        `SELECT v.id,
+                MAX(
+                  COALESCE(v.updated_at, v.created_at, ''),
+                  COALESCE((SELECT MAX(COALESCE(p.updated_at, p.created_at))
+                            FROM performances p JOIN events e ON e.id = p.event_id
+                            WHERE p.venue_id = v.id
+                              AND ${publicEventStatusSql("e")}
+                              AND ${revealedPerformanceSql("e", "p")}), '')
+                ) AS last_modified
          FROM venues v
          WHERE ${publicRevealedPerformanceExistsSql("v", "id", "venue_id")}`,
       ).all(),
@@ -170,7 +201,7 @@ export async function onRequestGet(context) {
 
     for (const band of bands) {
       rows.push(`  <url>
-    <loc>https://settimes.ca/band/${escapeXml(band.id)}</loc>
+    <loc>https://settimes.ca/band/${escapeXml(band.id)}</loc>${lastmodTag(band.last_modified)}
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>`);
@@ -178,7 +209,7 @@ export async function onRequestGet(context) {
 
     for (const venue of venues) {
       rows.push(`  <url>
-    <loc>https://settimes.ca/venue/${escapeXml(venue.id)}</loc>
+    <loc>https://settimes.ca/venue/${escapeXml(venue.id)}</loc>${lastmodTag(venue.last_modified)}
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>`);

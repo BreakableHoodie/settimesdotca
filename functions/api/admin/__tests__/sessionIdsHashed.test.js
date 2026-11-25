@@ -95,7 +95,7 @@ async function viaMiddleware(env, { token, method = "GET", csrf = null, url = "h
 
 describe("login and MFA verify store only digests (#1488)", () => {
   test("password login: the cookie holds the token, the row its digest, and only the token authenticates", async () => {
-    const { env, rawDb } = freshEnv();
+    const { env, rawDb, userId } = freshEnv();
     const response = await login(env);
     expect(response.status).toBe(200);
 
@@ -104,7 +104,9 @@ describe("login and MFA verify store only digests (#1488)", () => {
     expect(token).not.toMatch(/^sha256:/);
     expect(storedIds(rawDb)).toEqual([testSessionKey(token)]);
 
-    expect((await viaMiddleware(env, { token })).response.status).toBe(200);
+    const authed = await viaMiddleware(env, { token });
+    expect(authed.response.status).toBe(200);
+    expect(authed.context.data.user.userId).toBe(userId);
     const replay = await viaMiddleware(env, { token: testSessionKey(token) });
     expect(replay.response.status).toBe(401);
     expect(replay.next).not.toHaveBeenCalled();
@@ -113,7 +115,7 @@ describe("login and MFA verify store only digests (#1488)", () => {
   });
 
   test("MFA: the challenge is stored as a digest; the digest submitted back is refused, the token works", async () => {
-    const { env, rawDb } = freshEnv({ totp: true });
+    const { env, rawDb, userId } = freshEnv({ totp: true });
     const first = await login(env);
     const { mfaToken } = await first.json();
     expect(mfaToken).toBeTruthy();
@@ -135,7 +137,9 @@ describe("login and MFA verify store only digests (#1488)", () => {
     const token = cookieValue(ok, "session_token");
     expect(token).not.toMatch(/^sha256:/);
     expect(storedIds(rawDb)).toEqual([testSessionKey(token)]);
-    expect((await viaMiddleware(env, { token })).response.status).toBe(200);
+    const authed = await viaMiddleware(env, { token });
+    expect(authed.response.status).toBe(200);
+    expect(authed.context.data.user.userId).toBe(userId);
   });
 
   test("a second login still invalidates the first session before creating its own", async () => {

@@ -494,28 +494,28 @@ CREATE TABLE IF NOT EXISTS referrer_daily_stats (
 
 CREATE TRIGGER IF NOT EXISTS lucia_sessions_id_hashed_insert
 BEFORE INSERT ON lucia_sessions
-WHEN NOT (NEW.id GLOB 'sha256:*' AND length(NEW.id) = 71)
+WHEN NOT (NEW.id GLOB 'sha256:*' AND length(NEW.id) = 71 AND substr(NEW.id, 8) NOT GLOB '*[^0-9a-f]*')
 BEGIN
   SELECT RAISE(ABORT, 'lucia_sessions.id must be a sha256: digest');
 END;
 
 CREATE TRIGGER IF NOT EXISTS lucia_sessions_id_hashed_update
 BEFORE UPDATE OF id ON lucia_sessions
-WHEN NOT (NEW.id GLOB 'sha256:*' AND length(NEW.id) = 71)
+WHEN NOT (NEW.id GLOB 'sha256:*' AND length(NEW.id) = 71 AND substr(NEW.id, 8) NOT GLOB '*[^0-9a-f]*')
 BEGIN
   SELECT RAISE(ABORT, 'lucia_sessions.id must be a sha256: digest');
 END;
 
 CREATE TRIGGER IF NOT EXISTS mfa_challenges_token_hashed_insert
 BEFORE INSERT ON mfa_challenges
-WHEN NOT (NEW.token GLOB 'sha256:*' AND length(NEW.token) = 71)
+WHEN NOT (NEW.token GLOB 'sha256:*' AND length(NEW.token) = 71 AND substr(NEW.token, 8) NOT GLOB '*[^0-9a-f]*')
 BEGIN
   SELECT RAISE(ABORT, 'mfa_challenges.token must be a sha256: digest');
 END;
 
 CREATE TRIGGER IF NOT EXISTS mfa_challenges_token_hashed_update
 BEFORE UPDATE OF token ON mfa_challenges
-WHEN NOT (NEW.token GLOB 'sha256:*' AND length(NEW.token) = 71)
+WHEN NOT (NEW.token GLOB 'sha256:*' AND length(NEW.token) = 71 AND substr(NEW.token, 8) NOT GLOB '*[^0-9a-f]*')
 BEGIN
   SELECT RAISE(ABORT, 'mfa_challenges.token must be a sha256: digest');
 END;

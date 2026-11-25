@@ -20,7 +20,7 @@ import { buildBandProfileHref } from '../utils/bandProfileLink'
 import { safeExternalHref, safeInstagramHref } from '../utils/urlSafety'
 
 const PAGE_SIZE = 24
-const PAGE_TITLE = 'Artists – SetTimes'
+const PAGE_TITLE = 'Artists | SetTimes'
 
 // Platform descriptors for row icons and filter chips.
 // Order matches LINK_FIELDS in bandFields.js (Website first, Linktree last).

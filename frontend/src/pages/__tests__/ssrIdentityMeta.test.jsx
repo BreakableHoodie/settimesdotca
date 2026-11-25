@@ -169,7 +169,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
 
   it('ArtistsPage (/artists)', async () => {
     fetchPublicJson.mockResolvedValue({ artists: [], hasMore: false })
-    seedSsrHead('/artists', 'Artists – SetTimes')
+    seedSsrHead('/artists', 'Artists | SetTimes')
 
     render(
       withProviders(
@@ -182,12 +182,12 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
     await screen.findByRole('searchbox', { name: /search artists/i })
 
     expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
-    await waitFor(() => expect(document.title).toBe('Artists – SetTimes'))
+    await waitFor(() => expect(document.title).toBe('Artists | SetTimes'))
   })
 
   it('VenuesPage (/venues)', async () => {
     fetchPublicJson.mockResolvedValue({ venues: [], hasMore: false })
-    seedSsrHead('/venues', 'Venues – SetTimes')
+    seedSsrHead('/venues', 'Venues | SetTimes')
 
     render(
       withProviders(
@@ -200,7 +200,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
     await screen.findByRole('heading', { level: 1 })
 
     expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
-    await waitFor(() => expect(document.title).toBe('Venues – SetTimes'))
+    await waitFor(() => expect(document.title).toBe('Venues | SetTimes'))
   })
 
   it('AboutPage (/about)', async () => {
@@ -300,7 +300,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
       stats: { total_sets: 2, venue_count: 1, first_timers: 1, returning_acts: 1 },
       bands: [],
     })
-    seedSsrHead('/events/lwbc17/recap', 'LWBC Vol17 — Event Recap | SetTimes.ca')
+    seedSsrHead('/events/lwbc17/recap', 'LWBC Vol17 — Event Recap | SetTimes')
 
     render(
       withProviders(
@@ -314,7 +314,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
     await screen.findByText('LWBC Vol17')
 
     expect(countIdentityTags()).toEqual({ canonical: 1, ogUrl: 1 })
-    await waitFor(() => expect(document.title).toBe('LWBC Vol17 — Event Recap | SetTimes.ca'))
+    await waitFor(() => expect(document.title).toBe('LWBC Vol17 — Event Recap | SetTimes'))
   })
 
   it('VenuePage (/venue/:id)', async () => {
@@ -351,7 +351,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
   // loading early-return, so its <Helmet> renders on the very first paint.
   // React 19 hoists that <title> into document.title, which beats the
   // !loading guard on the effect — an ungated fallback here replaced the
-  // server-sent title with 'Venue – SetTimes' for the whole fetch window.
+  // server-sent title with 'Venue | SetTimes' for the whole fetch window.
   // The BandProfilePage deferred case below cannot catch this class: that
   // page has no <Helmet> at all.
   it('VenuePage keeps the SSR <title> while the venue fetch is in flight', async () => {

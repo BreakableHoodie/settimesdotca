@@ -134,7 +134,7 @@ export default function EventRecapPage() {
     // (functions/events/[slug]/recap.js swaps it into the raw HTML response)
     // is correct — don't clobber it with the generic recap title (#785).
     if (!loading) {
-      document.title = event ? `${event.name} — Event Recap | SetTimes.ca` : 'Event Recap | SetTimes.ca'
+      document.title = event ? `${event.name} — Event Recap | SetTimes` : 'Event Recap | SetTimes'
     }
   }, [event, loading])
 
@@ -179,7 +179,7 @@ export default function EventRecapPage() {
           (react-helmet-async can't adopt tags it didn't create). <title> stays
           client-owned, same as the direct document.title assignment above. */}
       <Helmet>
-        <title>{event.name} — Event Recap | SetTimes.ca</title>
+        <title>{event.name} — Event Recap | SetTimes</title>
       </Helmet>
 
       <main id="main-content" className="min-h-screen px-4 py-10">

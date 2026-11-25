@@ -6,6 +6,7 @@ import { eventLocalFestivalToday } from "../../utils/eventDay.js";
 import { publicEventStatusSql } from "../../utils/eventVisibility.js";
 import { BAND_LINK_FIELD_KEYS } from "../../utils/bandLinkFields.js";
 import { isCanonicalPositiveId } from "../../utils/validation/ids.js";
+import { formatOrigin, formatVenueAddress } from "../../utils/formatPlace.js";
 
 /**
  * Public API: Get band profile by name
@@ -14,20 +15,6 @@ import { isCanonicalPositiveId } from "../../utils/validation/ids.js";
  *
  * Returns band profile with performance history
  */
-
-function formatOrigin(profile) {
-  if (!profile) return null;
-  const parts = [profile.origin_city, profile.origin_region].filter(Boolean);
-  return parts.length ? parts.join(", ") : profile.origin || null;
-}
-
-function formatVenueAddress(venue) {
-  if (!venue) return null;
-  const line1 = [venue.address_line1, venue.address_line2].filter(Boolean).join(", ");
-  const line2 = [venue.city, venue.region].filter(Boolean).join(", ");
-  const line3 = [venue.postal_code, venue.country].filter(Boolean).join(" ").trim();
-  return [line1, line2, line3].filter(Boolean).join(", ");
-}
 
 export async function onRequestGet(context) {
   const { request, env } = context;

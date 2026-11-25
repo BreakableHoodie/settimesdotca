@@ -8,7 +8,7 @@ import { fetchPublicJson } from '../utils/publicApi'
 import { trackPageView } from '../utils/metrics'
 
 const PAGE_SIZE = 24
-const PAGE_TITLE = 'Venues – SetTimes'
+const PAGE_TITLE = 'Venues | SetTimes'
 
 function VenueCard({ venue }) {
   const counts = [

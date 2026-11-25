@@ -30,17 +30,17 @@ import { serveWithInjectedMeta, escapeAttr, CANONICAL_HOST, DEFAULT_OG_IMAGE } f
 
 export const STATIC_PAGES = {
   "/artists": {
-    title: "Artists – SetTimes",
+    title: "Artists | SetTimes",
     description:
       "Browse and search every artist who has played a SetTimes event — explore their profiles, past sets, and upcoming shows.",
-    ogTitle: "Artists – SetTimes",
+    ogTitle: "Artists | SetTimes",
     ogDescription: "Browse and search every artist who has played a SetTimes event.",
   },
   "/venues": {
-    title: "Venues – SetTimes",
+    title: "Venues | SetTimes",
     description:
       "Browse every venue that has hosted a SetTimes event — explore their lineups, past shows, and upcoming performances.",
-    ogTitle: "Venues – SetTimes",
+    ogTitle: "Venues | SetTimes",
     ogDescription: "Browse every venue that has hosted a SetTimes event.",
   },
   "/history": {

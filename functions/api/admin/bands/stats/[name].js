@@ -3,20 +3,7 @@
 
 import { checkPermission } from "../../_middleware.js";
 import { safeReflectSocialLinksString } from "../../../../utils/validation.js";
-
-function formatOrigin(profile) {
-  if (!profile) return null;
-  const parts = [profile.origin_city, profile.origin_region].filter(Boolean);
-  return parts.length ? parts.join(", ") : profile.origin || null;
-}
-
-function formatVenueAddress(venue) {
-  if (!venue) return null;
-  const line1 = [venue.address_line1, venue.address_line2].filter(Boolean).join(", ");
-  const line2 = [venue.venue_city, venue.venue_region].filter(Boolean).join(", ");
-  const line3 = [venue.postal_code, venue.country].filter(Boolean).join(" ").trim();
-  return [line1, line2, line3].filter(Boolean).join(", ");
-}
+import { formatOrigin, formatVenueAddress } from "../../../../utils/formatPlace.js";
 
 // Helper to extract band name from path
 function getBandName(request) {
@@ -147,7 +134,7 @@ export async function onRequestGet(context) {
             ? {
                 id: p.venue_id,
                 name: p.venue_name,
-                address: p.venue_address || formatVenueAddress(p),
+                address: p.venue_address || formatVenueAddress({ ...p, city: p.venue_city, region: p.venue_region }),
               }
             : null,
           startTime: p.start_time,

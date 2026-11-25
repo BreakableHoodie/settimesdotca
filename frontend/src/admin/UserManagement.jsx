@@ -172,7 +172,9 @@ export default function UserManagement({ showToast }) {
     setActionLoading(true)
     try {
       await usersApi.update(target.id, { isActive: !target.isActive })
-      setUsers(prev => prev.map(u => (u.id === target.id ? { ...u, isActive: !target.isActive } : u)))
+      // Reload rather than flip isActive locally: the server also sets activatedAt and
+      // deactivatedAt, which decide whether the row reads Invited, Inactive or revoked.
+      await fetchUsers({ quiet: true })
       showToast(`User ${target.email} ${target.isActive ? 'deactivated' : 'activated'}`, 'success')
     } catch {
       showToast('Failed to update user status', 'error')
@@ -633,7 +635,7 @@ export default function UserManagement({ showToast }) {
       <ConfirmDialog
         isOpen={!!pendingRevoke}
         title="Revoke Invite"
-        message={`Revoke the invite for ${pendingRevoke?.email}? Their invite link will stop working. You can invite them again later.`}
+        message={`Revoke the invite for ${pendingRevoke?.email}? Their invite link will stop working. To invite this address again, delete the user first.`}
         confirmText="Revoke invite"
         cancelText="Cancel"
         variant="danger"

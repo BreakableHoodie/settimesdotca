@@ -124,6 +124,26 @@ describe('UserManagement: invite states and revoke', () => {
     expect(within(active).queryByLabelText(/Revoke invite/)).toBeNull()
   })
 
+  // The server sets activatedAt/deactivatedAt on a toggle; the row must show the
+  // server's state, not a locally flipped isActive (CodeRabbit, #1506).
+  it('reloads after a status toggle so the row shows the state the server recorded', async () => {
+    render(<UserManagement showToast={vi.fn()} />)
+    await screen.findAllByText('pending@settimes.ca')
+    usersApi.getAll.mockResolvedValue({
+      users: roster.map(u =>
+        u.id === 3 ? { ...u, isActive: true, activatedAt: '2026-11-25 12:00:00', deactivatedAt: null } : u
+      ),
+    })
+
+    fireEvent.click(within(rowFor('pending@settimes.ca')).getByLabelText('Activate pending@settimes.ca'))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Activate' }))
+
+    await waitFor(() => expect(within(rowFor('pending@settimes.ca')).getByText('Active')).toBeInTheDocument())
+    expect(within(rowFor('pending@settimes.ca')).queryByLabelText(/Revoke invite/)).toBeNull()
+    expect(usersApi.getAll.mock.calls.length).toBeGreaterThanOrEqual(2)
+  })
+
   it('revokes only after confirmation, sending isActive: false', async () => {
     const showToast = vi.fn()
     render(<UserManagement showToast={showToast} />)

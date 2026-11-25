@@ -23,7 +23,7 @@ async function sessionRevocationToken(sessionId) {
 export async function onRequestGet(context) {
   const { env, data } = context;
   const { user, session } = data;
-  const currentSessionId = session?.id || session?.session_token || null;
+  const currentSessionId = session?.id || null;
 
   try {
     const result = await env.DB.prepare(

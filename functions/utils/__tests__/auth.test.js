@@ -242,6 +242,14 @@ describe("initializeLucia / session manager", () => {
           .prepare("INSERT INTO mfa_challenges (token, user_id, expires_at) VALUES (?, ?, ?)")
           .run("raw-uuid", mockUsers.admin.id, "2099-01-01 00:00:00"),
       ).toThrow(/sha256/);
+      // The prefix alone is not enough: case and length are pinned too.
+      for (const fake of ["SHA256:" + "a".repeat(64), "sha256:", "sha256:" + "a".repeat(63)]) {
+        expect(() =>
+          rawDb
+            .prepare("INSERT INTO lucia_sessions (id, user_id, expires_at) VALUES (?, ?, ?)")
+            .run(fake, mockUsers.admin.id, 9999999999),
+        ).toThrow(/sha256/);
+      }
     });
   });
 

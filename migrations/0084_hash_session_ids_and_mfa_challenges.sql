@@ -14,32 +14,33 @@ DELETE FROM mfa_challenges;
 DELETE FROM lucia_sessions;
 
 -- Refuse an unhashed value at the database, as 0069 does for roles. Triggers,
--- not a CHECK: a CHECK needs a table rebuild. The token UPDATE trigger covers
+-- not a CHECK: a CHECK needs a table rebuild. GLOB is case-sensitive and the
+-- length pins 'sha256:' + 64 hex characters (LIKE would accept 'SHA256:x'). The token UPDATE trigger covers
 -- login's ON CONFLICT ... DO UPDATE SET token = excluded.token.
 CREATE TRIGGER IF NOT EXISTS lucia_sessions_id_hashed_insert
 BEFORE INSERT ON lucia_sessions
-WHEN NEW.id NOT LIKE 'sha256:%'
+WHEN NOT (NEW.id GLOB 'sha256:*' AND length(NEW.id) = 71)
 BEGIN
   SELECT RAISE(ABORT, 'lucia_sessions.id must be a sha256: digest');
 END;
 
 CREATE TRIGGER IF NOT EXISTS lucia_sessions_id_hashed_update
 BEFORE UPDATE OF id ON lucia_sessions
-WHEN NEW.id NOT LIKE 'sha256:%'
+WHEN NOT (NEW.id GLOB 'sha256:*' AND length(NEW.id) = 71)
 BEGIN
   SELECT RAISE(ABORT, 'lucia_sessions.id must be a sha256: digest');
 END;
 
 CREATE TRIGGER IF NOT EXISTS mfa_challenges_token_hashed_insert
 BEFORE INSERT ON mfa_challenges
-WHEN NEW.token NOT LIKE 'sha256:%'
+WHEN NOT (NEW.token GLOB 'sha256:*' AND length(NEW.token) = 71)
 BEGIN
   SELECT RAISE(ABORT, 'mfa_challenges.token must be a sha256: digest');
 END;
 
 CREATE TRIGGER IF NOT EXISTS mfa_challenges_token_hashed_update
 BEFORE UPDATE OF token ON mfa_challenges
-WHEN NEW.token NOT LIKE 'sha256:%'
+WHEN NOT (NEW.token GLOB 'sha256:*' AND length(NEW.token) = 71)
 BEGIN
   SELECT RAISE(ABORT, 'mfa_challenges.token must be a sha256: digest');
 END;

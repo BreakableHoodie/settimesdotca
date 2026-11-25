@@ -92,9 +92,9 @@ export default function PrivacyPage() {
               account protection, abuse investigation, and session management. These records are retained for limited
               periods and deleted automatically according to our retention rules (see below). Organiser accounts and the
               event catalogue are also copied to a private monthly backup, and each copy is deleted after about 13
-              months, so a deleted organiser account can remain in a backup for that long. Pending invitations
-              (including the invited email address) are included until cleared, as described below. Login attempts,
-              security logs, sessions and visitor codes are left out of these copies.
+              months, so a deleted organiser account can remain in a backup for that long. A copy made before an invited
+              email address is cleared (see below) keeps that address for the life of the copy. Login attempts, security
+              logs, sessions and visitor codes are left out of these copies.
             </p>
           </section>
 

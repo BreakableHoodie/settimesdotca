@@ -162,8 +162,9 @@ export default function PrivacyPage() {
                       Email address of someone invited to be an organiser (whether or not they ever sign up)
                     </td>
                     <td className="py-2">
-                      Cleared 30 days after the invitation is used, revoked or expires; the invitation record itself
-                      (without the address) is kept as an account audit trail
+                      Cleared 30 days after the invitation is used or expires. An invitation revoked before it was used
+                      is cleared once it is 30 days old, so never more than 30 days after revoking and possibly sooner.
+                      The invitation record itself (without the address) is kept as an account audit trail
                     </td>
                   </tr>
                   <tr>

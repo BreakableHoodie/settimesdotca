@@ -24,10 +24,16 @@ Worker run is still covered, late. A double start is safe:
 - `site-health.yml` and `deploy-reconcile.yml` already had `concurrency` groups
   (`cancel-in-progress: false`); `deploy-reconcile` also re-reads existing
   deploy runs before dispatching anything.
-- `scheduled-jobs.yml` had none; it now has `scheduled-jobs`. Its handler is
-  idempotent: aggregation recomputes totals from source rows, retention and
+- `scheduled-jobs.yml` had none; it now has `scheduled-jobs`. A second run the
+  same day does no harm, but it is not strictly idempotent. Retention and
   anonymisation delete or relabel by age, and share-link expiry folds in one
-  batch under one cutoff.
+  batch under one cutoff. Aggregation sums `band_profiles.total_views` and
+  `total_social_clicks` over the `artist_daily_stats` rows it keeps, then
+  deletes rows older than 90 days, so those columns are a rolling 90-day
+  figure, not lifetime totals: a second run drops the day that just aged out
+  one run early. Their only reader is the artist shuffle's weighting
+  (`functions/api/artists/shuffle.js`). `popularity_score` (30 days) is
+  unaffected.
 
 A non-204 answer or a missing token makes the invocation throw, so Cloudflare
 marks the cron run failed (Workers dashboard, Triggers, Cron events).

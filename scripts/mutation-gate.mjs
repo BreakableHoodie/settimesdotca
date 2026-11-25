@@ -494,6 +494,52 @@ export const MUTATIONS = [
     tests: ["functions/api/admin/api-keys/__tests__/api-keys.test.js"],
   },
   {
+    id: "activation-signup-stores-hash",
+    invariant:
+      "CLAUDE.md 'Activation tokens are stored hashed' \u2014 signup stores the digest, never the token in the emailed link (#1482)",
+    file: "functions/api/admin/auth/signup.js",
+    find: "        activationTokenHash,\n        activationExpires,",
+    replace: "        activationToken,\n        activationExpires,",
+    tests: ["functions/api/admin/auth/__tests__/signup.test.js"],
+  },
+  {
+    id: "activation-resend-stores-hash",
+    invariant:
+      "CLAUDE.md 'Activation tokens are stored hashed' \u2014 resend-activation stores the digest, never the emailed token (#1482)",
+    file: "functions/api/auth/resend-activation.js",
+    find: ".bind(activationTokenHash, activationExpires, user.id)",
+    replace: ".bind(activationToken, activationExpires, user.id)",
+    tests: ["functions/api/auth/__tests__/activate.test.js"],
+  },
+  {
+    id: "activation-lookup-binds-hash",
+    invariant:
+      "CLAUDE.md 'Activation tokens are stored hashed' \u2014 activate hashes the submitted token before the lookup, so the stored value is never redeemable (#1482)",
+    file: "functions/api/auth/activate.js",
+    find: "      .bind(tokenHash)\n      .first();",
+    replace: "      .bind(token)\n      .first();",
+    tests: ["functions/api/auth/__tests__/activate.test.js"],
+  },
+  {
+    id: "activation-null-expiry-fails-closed-js",
+    invariant:
+      "CLAUDE.md 'Activation tokens are stored hashed' \u2014 a token with no expiry is refused, not treated as never expiring (#1482)",
+    file: "functions/api/auth/activate.js",
+    find: "    if (!expiresAt || expiresAt < new Date()) {",
+    replace: "    if (user.activation_token_expires_at && (!expiresAt || expiresAt < new Date())) {",
+    tests: ["functions/api/auth/__tests__/activate.test.js"],
+  },
+  {
+    id: "activation-null-expiry-fails-closed-sql",
+    invariant:
+      "CLAUDE.md 'Activation tokens are stored hashed' \u2014 the claim UPDATE refuses a NULL expiry too, independent of the JS check (#1482)",
+    file: "functions/api/auth/activate.js",
+    find: "        AND datetime(activation_token_expires_at) >= datetime('now')",
+    replace:
+      "        AND (activation_token_expires_at IS NULL OR datetime(activation_token_expires_at) >= datetime('now'))",
+    tests: ["functions/api/auth/__tests__/activate.test.js"],
+  },
+  {
     id: "reset-token-stored-hashed",
     invariant:
       "CLAUDE.md 'Password reset tokens are stored hashed' \u2014 the issuer stores the hash, never the token in the emailed link (#1354)",
@@ -614,8 +660,8 @@ export const MUTATIONS = [
     invariant:
       "CLAUDE.md 'Invite codes are stored hashed' — the claim UPDATE matches the digest too, so a redeemed invite is actually marked used (#1334)",
     file: "functions/api/admin/auth/signup.js",
-    find: ").bind(activationToken, inviteCodeHash, activationToken),",
-    replace: ").bind(activationToken, inviteCode, activationToken),",
+    find: ").bind(activationTokenHash, inviteCodeHash, activationTokenHash),",
+    replace: ").bind(activationTokenHash, inviteCode, activationTokenHash),",
     tests: ["functions/api/admin/invite-codes/__tests__/invite-codes.test.js"],
   },
   {

@@ -576,6 +576,10 @@ The same scheme as invite codes, for the same reason: a reset token sets the acc
 
 The admin issuer (`users/[id]/reset-password.js`) checks `isEmailConfigured` **before any side effect** (#1353): with no way to send the link, it answers 500 having minted nothing and signed nobody out. If the send then fails, it withdraws the token. It does **not** restore the user's sessions: an admin forcing a reset may be answering a compromise, and signing the user out must not depend on the email provider. All five behaviours are in the mutation gate.
 
+### Activation tokens are stored hashed (#1482)
+
+The same scheme again: an activation token activates an invitee's account, so `users.activation_token` holds `hashStoredToken(token)` (`functions/utils/tokens.js`) and the plaintext exists only in the emailed link. Signup and `resend-activation` store the digest; `activate.js` hashes what is submitted before the lookup and the claim `UPDATE`. **A missing expiry fails closed** in both the JS check and the SQL guard: every writer sets one, so a NULL is never "never expires". Migration 0083 cleared every plaintext token (none were pending); a pending invitee asks for a new link. All five behaviours are in the mutation gate.
+
 ### Time validation is shape AND range — `isValidTime()` is the only home (#1089)
 
 `isValidTime()` in `functions/utils/validation/datetime.js` checks the `HH:MM`

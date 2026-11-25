@@ -1,8 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createTestEnv } from "../../../test-utils";
 import * as signupHandler from "../signup.js";
 import { toSqliteDateTime } from "../../../../utils/authAttempts.js";
 import { hashInviteCode } from "../../../../utils/inviteCodes.js";
+import { hashStoredToken } from "../../../../utils/tokens.js";
+import * as activateHandler from "../../../auth/activate.js";
 
 // Production writes invite_codes.expires_at via toSqliteDateTime() (space
 // separator, no 'T') and compares it with `expires_at > datetime('now')`
@@ -77,7 +79,8 @@ describe("admin signup", () => {
     expect(usedInvite.used_by_user_id).toBe(createdUser.id);
     expect(usedInvite.used_at).toBeTruthy();
     expect(createdUser.is_active).toBe(0);
-    expect(createdUser.activation_token).toBeTruthy();
+    // Stored as a digest only (#1482): the plaintext is in the emailed link.
+    expect(createdUser.activation_token).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(createdUser.activation_token_expires_at).toBeTruthy();
     expect(createdUser.activated_at).toBeNull();
   });
@@ -338,5 +341,77 @@ describe("admin signup", () => {
     // must not contain provider internals
     const emailKeys = Object.keys(payload.email);
     expect(emailKeys).toEqual(["delivered"]);
+  });
+});
+
+// Captures the activation link the handler actually emails (Resend stubbed at
+// fetch), so the round trip redeems what the user receives, not a value the
+// test derived itself.
+function captureActivationEmails(env) {
+  const tokens = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url, init) => {
+      if (new URL(String(url)).hostname === "api.resend.com") {
+        const { text } = JSON.parse(init.body);
+        const link = text.match(/https?:\/\/\S+\/activate\?\S+/)?.[0];
+        if (link) tokens.push(new URL(link).searchParams.get("token"));
+        return new Response(JSON.stringify({ id: "x" }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ success: true }), { status: 200 });
+    }),
+  );
+  Object.assign(env, { EMAIL_PROVIDER: "resend", RESEND_API_KEY: "test-key", EMAIL_FROM: "noreply@example.test" });
+  return tokens;
+}
+
+describe("admin signup — activation token stored hashed (#1482)", () => {
+  it("stores the digest of the emailed token, and the emailed link activates the account", async () => {
+    const { env, rawDb } = createTestEnv({ role: "editor" });
+    env.ALLOW_ADMIN_SIGNUP = "true";
+    const emailed = captureActivationEmails(env);
+    const inviteCode = "TEST-INVITE-HASHED-ACT";
+    rawDb
+      .prepare("INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES (?, ?, ?, ?)")
+      .run(await hashInviteCode(inviteCode), "editor", toSqliteDateTime(new Date(Date.now() + 864e5)), 1);
+    try {
+      const response = await signupHandler.onRequestPost({
+        request: new Request("https://example.test/api/admin/auth/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: "hashed.act@example.com",
+            password: "StrongPass1!",
+            name: "Hashed Act",
+            inviteCode,
+          }),
+        }),
+        env,
+      });
+      expect(response.status).toBe(201);
+      expect(emailed).toHaveLength(1);
+      const [plaintext] = emailed;
+
+      const stored = rawDb.prepare("SELECT activation_token FROM users WHERE email = ?").get("hashed.act@example.com");
+      expect(stored.activation_token).not.toBe(plaintext);
+      expect(stored.activation_token).toBe(await hashStoredToken(plaintext));
+
+      const activated = await activateHandler.onRequestPost({
+        request: new Request("https://example.test/api/auth/activate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: plaintext }),
+        }),
+        env,
+      });
+      expect(activated.status).toBe(200);
+      const user = rawDb
+        .prepare("SELECT is_active, activation_token FROM users WHERE email = ?")
+        .get("hashed.act@example.com");
+      expect(user.is_active).toBe(1);
+      expect(user.activation_token).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

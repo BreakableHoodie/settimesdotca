@@ -1,5 +1,6 @@
 import { fromSqliteDateTime } from "../../utils/authAttempts.js";
 import { parseJsonObjectBody } from "../../utils/request.js";
+import { hashStoredToken } from "../../utils/tokens.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -28,6 +29,9 @@ export async function onRequestPost(context) {
   }
 
   try {
+    // The column holds a digest (#1482). Hash what was submitted, so neither a
+    // stored digest nor a cleared value can be replayed as a token.
+    const tokenHash = await hashStoredToken(token);
     const user = await DB.prepare(
       `
       SELECT id, email, first_name, last_name, is_active,
@@ -36,7 +40,7 @@ export async function onRequestPost(context) {
       WHERE activation_token = ?
     `,
     )
-      .bind(token)
+      .bind(tokenHash)
       .first();
 
     if (!user) {
@@ -52,11 +56,11 @@ export async function onRequestPost(context) {
       );
     }
 
-    // Fail closed on an unparseable expiry: fromSqliteDateTime returns null
-    // rather than an Invalid Date, and a stored value we cannot interpret is
-    // treated as expired instead of silently passing the check.
+    // Fail closed on a missing or unparseable expiry (#1482): every writer sets
+    // one, so a token without it is not a token that never expires.
+    // fromSqliteDateTime returns null rather than an Invalid Date.
     const expiresAt = fromSqliteDateTime(user.activation_token_expires_at);
-    if (user.activation_token_expires_at && (!expiresAt || expiresAt < new Date())) {
+    if (!expiresAt || expiresAt < new Date()) {
       return new Response(
         JSON.stringify({
           error: "Activation link expired",
@@ -97,10 +101,11 @@ export async function onRequestPost(context) {
         -- expiry date itself an already-expired legacy token compares as still
         -- valid. datetime() also yields NULL for an unparseable value, so a
         -- malformed expiry fails closed instead of matching.
-        AND (activation_token_expires_at IS NULL OR datetime(activation_token_expires_at) >= datetime('now'))
+        -- A NULL expiry yields NULL here too, so it fails closed (#1482).
+        AND datetime(activation_token_expires_at) >= datetime('now')
     `,
     )
-      .bind(token)
+      .bind(tokenHash)
       .run();
 
     if (!updateResult?.meta?.changes) {

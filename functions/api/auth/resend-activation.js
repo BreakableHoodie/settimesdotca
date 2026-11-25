@@ -3,6 +3,7 @@ import { isEmailConfigured, sendEmail } from "../../utils/email.js";
 import { buildActivationEmail } from "../../utils/emailTemplates.js";
 import { getPublicBaseUrl } from "../../utils/publicUrl.js";
 import { toSqliteDateTime } from "../../utils/authAttempts.js";
+import { hashStoredToken } from "../../utils/tokens.js";
 import { parseJsonObjectBody } from "../../utils/request.js";
 import { allowEmailToRecipient, logRecipientSuppression } from "../../utils/recipientEmailCap.js";
 
@@ -83,6 +84,8 @@ export async function onRequestPost(context) {
     }
 
     const activationToken = crypto.randomUUID() + crypto.randomUUID().replace(/-/g, "");
+    // Only the digest is stored (#1482); the plaintext goes out in the email.
+    const activationTokenHash = await hashStoredToken(activationToken);
     // SEC-F1 class (#670): must be space-separated to compare correctly
     // against D1's datetime('now') in activate.js's SQL expiry guard.
     const activationExpires = toSqliteDateTime(new Date(Date.now() + 24 * 60 * 60 * 1000));
@@ -96,7 +99,7 @@ export async function onRequestPost(context) {
       WHERE id = ?
     `,
       )
-        .bind(activationToken, activationExpires, user.id)
+        .bind(activationTokenHash, activationExpires, user.id)
         .run();
     } catch (writeErr) {
       // The generic response is intentionally returned for all paths (user

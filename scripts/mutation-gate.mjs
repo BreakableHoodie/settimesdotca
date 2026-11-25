@@ -2329,6 +2329,79 @@ export const MUTATIONS = [
     replace: "return true;",
     tests: ["workers-mcp-server/__tests__/auth.test.js"],
   },
+  {
+    id: "import-rollback-deletes-performances",
+    invariant:
+      "CLAUDE.md 'D1 transactions: no BEGIN/COMMIT, but DB.batch() is atomic' — the bulk import's compensating delete really removes the performances it created, so a mid-import failure never leaves a half-imported lineup",
+    file: "functions/api/admin/bands/import.js",
+    find: 'await DB.prepare("DELETE FROM performances WHERE id = ?").bind(id).run();',
+    replace: "void id;",
+    tests: ["functions/api/admin/bands/__tests__/import.test.js"],
+  },
+  {
+    id: "import-rollback-failure-is-logged",
+    invariant:
+      "CLAUDE.md 'D1 transactions: no BEGIN/COMMIT, but DB.batch() is atomic' — a failing rollback is caught and logged beside the original error; the import still answers 500",
+    file: "functions/api/admin/bands/import.js",
+    find: "if (rollbackErrors.length > 0) {",
+    replace: "if (false) {",
+    tests: ["functions/api/admin/bands/__tests__/import.test.js"],
+  },
+  {
+    id: "admin-handler-throw-is-not-an-auth-error",
+    invariant:
+      "CLAUDE.md 'The request path' — the admin middleware's auth try/catch does not wrap the handler: a handler throw propagates instead of being answered as an authentication failure",
+    file: "functions/api/admin/_middleware.js",
+    find: "  const response = await next();",
+    replace:
+      '  let response;\n  try {\n    response = await next();\n  } catch (error) {\n    log.error("Auth middleware error", { error });\n    return new Response(JSON.stringify({ error: "Authentication error" }), { status: 500 });\n  }',
+    tests: ["functions/api/admin/__tests__/middleware.test.js"],
+  },
+  {
+    id: "admin-session-validation-error-is-logged",
+    invariant:
+      "CLAUDE.md 'The request path' — a D1 or session-layer error while validating a session is denied (401) and logged at error level, never silent",
+    file: "functions/api/admin/_middleware.js",
+    find: '    logger.error("Session validation failed with an unexpected error; denying the request", { error });',
+    replace: "    void error;",
+    tests: ["functions/api/admin/__tests__/middleware.test.js"],
+  },
+  {
+    id: "csrf-identifier-ignores-api-key-bearer",
+    invariant:
+      "CLAUDE.md 'The request path' — csrf.js's session identifier never reads a bearer starting with API_KEY_PREFIX",
+    file: "functions/utils/csrf.js",
+    find: "bearer && !bearer.startsWith(API_KEY_PREFIX) ? bearer : null",
+    replace: "bearer ? bearer : null",
+    tests: ["functions/utils/__tests__/csrf.test.js"],
+  },
+  {
+    id: "import-rollback-deletes-profiles",
+    invariant:
+      "CLAUDE.md 'D1 transactions: no BEGIN/COMMIT, but DB.batch() is atomic' — the bulk import's compensating delete also removes the band profiles it created",
+    file: "functions/api/admin/bands/import.js",
+    find: 'await DB.prepare("DELETE FROM band_profiles WHERE id = ?").bind(id).run();',
+    replace: "void id;",
+    tests: ["functions/api/admin/bands/__tests__/import.test.js"],
+  },
+  {
+    id: "duplicate-rollback-failure-names-the-leftover-draft",
+    invariant:
+      "CLAUDE.md 'D1 transactions: no BEGIN/COMMIT, but DB.batch() is atomic' — when an event duplicate's copy AND rollback both fail, the answer says the draft may remain",
+    file: "functions/api/admin/events/[id]/duplicate.js",
+    find: "rollbackFailed = true;",
+    replace: "rollbackFailed = false;",
+    tests: ["functions/api/admin/events/__tests__/events.test.js"],
+  },
+  {
+    id: "duplicate-post-commit-failure-is-not-a-failure",
+    invariant:
+      "CLAUDE.md 'D1 transactions: no BEGIN/COMMIT, but DB.batch() is atomic' — a throw after the duplicate committed (the band count) is logged, never turned into a 500",
+    file: "functions/api/admin/events/[id]/duplicate.js",
+    find: "} catch (countError) {",
+    replace: "} catch (countError) {\n      throw countError;",
+    tests: ["functions/api/admin/events/__tests__/events.test.js"],
+  },
 ];
 
 // ============================================================================

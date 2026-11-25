@@ -311,6 +311,23 @@ export async function onRequestGet(context) {
 }
 
 // POST - Create new band (performance + profile)
+// Compensating delete: undo only a profile this request created, never a
+// pre-existing one. Guarded, because a throw here would replace the original
+// failure, which is the diagnosis (the same class as bands/import.js and
+// events/[id]/duplicate.js).
+async function undoCreatedProfile(DB, profileId, createdNewProfile, cause) {
+  if (!createdNewProfile) return;
+  try {
+    await DB.prepare("DELETE FROM band_profiles WHERE id = ?").bind(profileId).run();
+  } catch (rollbackError) {
+    console.error("Band create failed AND its rollback failed; an orphan profile may remain:", {
+      profileId,
+      error: cause,
+      rollbackError,
+    });
+  }
+}
+
 export async function onRequestPost(context) {
   const { request, env } = context;
   const { DB } = env;
@@ -614,18 +631,14 @@ export async function onRequestPost(context) {
           )
           .first();
       } catch (perfError) {
-        // Compensating delete: only undo profiles we just created, not pre-existing ones
-        if (createdNewProfile) {
-          await DB.prepare("DELETE FROM band_profiles WHERE id = ?").bind(bandProfile.id).run();
-        }
+        await undoCreatedProfile(DB, bandProfile.id, createdNewProfile, perfError);
         throw perfError;
       }
 
       if (!perfResult) {
-        if (createdNewProfile) {
-          await DB.prepare("DELETE FROM band_profiles WHERE id = ?").bind(bandProfile.id).run();
-        }
-        throw new Error("performances INSERT returned null");
+        const nullError = new Error("performances INSERT returned null");
+        await undoCreatedProfile(DB, bandProfile.id, createdNewProfile, nullError);
+        throw nullError;
       }
 
       result = perfResult;

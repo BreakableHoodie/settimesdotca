@@ -141,12 +141,48 @@ export async function onRequestPost(context) {
       insertedPerformanceIds.push(perf.id);
     }
   } catch (err) {
-    // Compensating delete — undo everything this import created.
+    // Compensating delete — undo everything this import created. The rollback
+    // has its own guard: if a DELETE throws, the ORIGINAL failure must still be
+    // logged (it is the diagnosis) and the caller still gets the failure
+    // response, not an unhandled throw from inside this catch.
+    // Every DELETE is attempted on its own: one failure must not leave later
+    // rows untouched. Performances first (profiles are referenced by them, so a
+    // profile whose performance survived fails its DELETE, which is correct and
+    // is reported). The log lists what FAILED to delete, not what was intended.
+    const failedPerformanceIds = [];
+    const failedProfileIds = [];
+    const rollbackErrors = [];
     for (const id of insertedPerformanceIds) {
-      await DB.prepare("DELETE FROM performances WHERE id = ?").bind(id).run();
+      try {
+        await DB.prepare("DELETE FROM performances WHERE id = ?").bind(id).run();
+      } catch (rollbackErr) {
+        failedPerformanceIds.push(id);
+        rollbackErrors.push(rollbackErr);
+      }
     }
     for (const id of createdProfileIds) {
-      await DB.prepare("DELETE FROM band_profiles WHERE id = ?").bind(id).run();
+      try {
+        await DB.prepare("DELETE FROM band_profiles WHERE id = ?").bind(id).run();
+      } catch (rollbackErr) {
+        failedProfileIds.push(id);
+        rollbackErrors.push(rollbackErr);
+      }
+    }
+    if (rollbackErrors.length > 0) {
+      console.error("Bulk import failed AND rollback failed; the lineup may be half-imported:", {
+        error: err,
+        rollbackError: rollbackErrors[0],
+        rollbackErrors,
+        failedPerformanceIds,
+        failedProfileIds,
+      });
+      return json(
+        {
+          error: "Import failed",
+          message: "The import failed and could not be fully undone. Check the lineup before retrying.",
+        },
+        500,
+      );
     }
     console.error("Bulk import failed, rolled back:", err);
     return json({ error: "Import failed", message: "No bands were imported" }, 500);

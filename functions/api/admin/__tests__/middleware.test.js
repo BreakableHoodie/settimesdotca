@@ -89,3 +89,91 @@ describe("auditLog (#671)", () => {
     expect(warnCalled, "the logger failure path was never reached").toBe(true);
   });
 });
+
+describe("handler failures are not authentication failures", () => {
+  test("a handler that throws after auth propagates; it is not logged or answered as an auth error", async () => {
+    const { env, headers } = createTestEnv({ role: "admin" });
+    const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+    const boom = new Error("handler exploded");
+
+    try {
+      await expect(
+        onRequest({
+          request: new Request(BASE_URL, { headers }),
+          env,
+          data: {},
+          next: async () => {
+            throw boom;
+          },
+        }),
+      ).rejects.toBe(boom);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  test("behind the top-level middleware that throw is a JSON 500 that is not the auth-error body", async () => {
+    const { onRequest: topLevel } = await import("../../../_middleware.js");
+    const { env, headers } = createTestEnv({ role: "admin" });
+    const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      const response = await topLevel({
+        request: new Request(BASE_URL, { headers }),
+        env,
+        data: {},
+        next: () =>
+          onRequest({
+            request: new Request(BASE_URL, { headers }),
+            env,
+            data: {},
+            next: async () => {
+              throw new Error("handler exploded");
+            },
+          }),
+      });
+
+      expect(response.status).toBe(500);
+      const body = await response.json();
+      expect(body.error).toBe("Internal server error");
+      expect(JSON.stringify(body)).not.toMatch(/Authentication error|credentials/i);
+      expect(errorSpy.mock.calls.map((c) => c[0])).not.toContain("Auth middleware error");
+    } finally {
+      errorSpy.mockRestore();
+      logSpy.mockRestore();
+    }
+  });
+});
+
+describe("session validation failures are logged (fail closed)", () => {
+  test("a D1 error while validating the session is a 401 and is logged at error level without the session id", async () => {
+    const { env, headers } = createTestEnv({ role: "admin" });
+    const sessionId = headers.Authorization.replace("Bearer ", "");
+    const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+    const realPrepare = env.DB.prepare.bind(env.DB);
+    env.DB = {
+      ...env.DB,
+      prepare(sql) {
+        if (sql.includes("lucia_sessions")) throw new Error("D1 unavailable");
+        return realPrepare(sql);
+      },
+    };
+
+    try {
+      const response = await onRequest({
+        request: new Request(BASE_URL, { headers }),
+        env,
+        data: {},
+        next: async () => new Response("should not run"),
+      });
+
+      expect(response.status).toBe(401);
+      const call = errorSpy.mock.calls.find((c) => /Session validation failed/.test(c[0]));
+      expect(call, "the D1 failure is logged").toBeTruthy();
+      expect(JSON.stringify(call)).not.toContain(sessionId);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+});

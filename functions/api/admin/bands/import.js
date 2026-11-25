@@ -141,14 +141,31 @@ export async function onRequestPost(context) {
       insertedPerformanceIds.push(perf.id);
     }
   } catch (err) {
-    // Compensating delete — undo everything this import created.
-    for (const id of insertedPerformanceIds) {
-      await DB.prepare("DELETE FROM performances WHERE id = ?").bind(id).run();
+    // Compensating delete — undo everything this import created. The rollback
+    // has its own guard: if a DELETE throws, the ORIGINAL failure must still be
+    // logged (it is the diagnosis) and the caller still gets the failure
+    // response, not an unhandled throw from inside this catch.
+    let rollbackError = null;
+    try {
+      for (const id of insertedPerformanceIds) {
+        await DB.prepare("DELETE FROM performances WHERE id = ?").bind(id).run();
+      }
+      for (const id of createdProfileIds) {
+        await DB.prepare("DELETE FROM band_profiles WHERE id = ?").bind(id).run();
+      }
+    } catch (rollbackErr) {
+      rollbackError = rollbackErr;
     }
-    for (const id of createdProfileIds) {
-      await DB.prepare("DELETE FROM band_profiles WHERE id = ?").bind(id).run();
+    if (rollbackError) {
+      console.error("Bulk import failed AND rollback failed; the lineup may be half-imported:", {
+        error: err,
+        rollbackError,
+        performanceIds: insertedPerformanceIds,
+        profileIds: createdProfileIds,
+      });
+    } else {
+      console.error("Bulk import failed, rolled back:", err);
     }
-    console.error("Bulk import failed, rolled back:", err);
     return json({ error: "Import failed", message: "No bands were imported" }, 500);
   }
 

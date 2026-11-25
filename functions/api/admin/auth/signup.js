@@ -190,7 +190,7 @@ export async function onRequestPost(context) {
 
     // Ignore any role parameter passed by client to prevent privilege escalation
     if (role === "admin") {
-      console.warn(`Signup attempt with admin role blocked for email: ${email}`);
+      logger.warn("Signup attempt with admin role blocked; role taken from the invite");
     }
 
     // Check if user already exists

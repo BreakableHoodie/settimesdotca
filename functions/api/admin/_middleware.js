@@ -204,8 +204,12 @@ async function resolveSession(request, env) {
       .first();
 
     return { lucia, sessionId, session, user, sessionMeta };
-  } catch (_error) {
-    // Log silently - session validation failures are common (expired, invalid)
+  } catch (error) {
+    // Expired or unknown sessions do NOT land here (validateSession returns a null
+    // session for those); a throw is a D1 or session-layer failure. Fail closed
+    // (the caller answers 401) but say so, or an outage looks like a mass sign-out
+    // with nothing in the logs. Never log the session id or cookie value.
+    logger.error("Session validation failed with an unexpected error; denying the request", { error });
     return { lucia, sessionId, session: null, user: null, sessionMeta: null };
   }
 }
@@ -588,6 +592,11 @@ export async function onRequest(context) {
 
   const ipAddress = getClientIP(request);
 
+  // Authentication runs inside this try; the handler does NOT. A handler's own
+  // throw used to land in the catch below and be logged and answered as an
+  // authentication failure, hiding the real error. It now propagates to
+  // functions/_middleware.js, which answers an /api throw with a JSON 500.
+  let authed;
   try {
     const auth = await enforceSession(request, env);
     if (auth.response) {
@@ -632,23 +641,7 @@ export async function onRequest(context) {
       lucia,
     };
 
-    const response = await next();
-
-    const headers = new Headers(response.headers);
-    pendingCookies.forEach((cookie) => headers.append("Set-Cookie", cookie));
-
-    if (timing) {
-      headers.set("X-Session-Expires-In", Math.floor(timing.timeRemaining / 1000).toString());
-      headers.set("X-Session-Idle-Expires-In", Math.floor(timing.idleRemaining / 1000).toString());
-      headers.set("X-Session-Absolute-Expires-In", Math.floor(timing.absoluteRemaining / 1000).toString());
-      headers.set("X-Session-Warning", timing.timeRemaining < 5 * 60 * 1000 ? "true" : "false");
-    }
-
-    return new Response(response.body, {
-      status: response.status,
-      statusText: response.statusText,
-      headers,
-    });
+    authed = { pendingCookies, timing };
   } catch (error) {
     log.error("Auth middleware error", { error });
 
@@ -663,4 +656,23 @@ export async function onRequest(context) {
       },
     );
   }
+
+  const { pendingCookies, timing } = authed;
+  const response = await next();
+
+  const headers = new Headers(response.headers);
+  pendingCookies.forEach((cookie) => headers.append("Set-Cookie", cookie));
+
+  if (timing) {
+    headers.set("X-Session-Expires-In", Math.floor(timing.timeRemaining / 1000).toString());
+    headers.set("X-Session-Idle-Expires-In", Math.floor(timing.idleRemaining / 1000).toString());
+    headers.set("X-Session-Absolute-Expires-In", Math.floor(timing.absoluteRemaining / 1000).toString());
+    headers.set("X-Session-Warning", timing.timeRemaining < 5 * 60 * 1000 ? "true" : "false");
+  }
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }

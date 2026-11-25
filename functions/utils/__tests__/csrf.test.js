@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { validateCSRFMiddleware } from "../csrf.js";
+import { validateCSRFMiddleware, generateCSRFToken } from "../csrf.js";
+import { API_KEY_PREFIX } from "../apiKeys.js";
 
 // Minimal env — local dev so CSRF_SECRET not required
 const devEnv = { ENVIRONMENT: "development" };
@@ -48,5 +49,36 @@ describe("CSRF middleware — rejection paths (T5)", () => {
     const req = makeRequest("https://settimes.ca/api/admin/auth/login", "GET");
     const result = validateCSRFMiddleware(req, devEnv);
     expect(result).toBeNull();
+  });
+});
+
+describe("CSRF session identifier ignores API keys", () => {
+  const url = "https://settimes.ca/api/admin/bands";
+  const keyLike = `${API_KEY_PREFIX}notarealkeyvalue0123456789`;
+
+  function post(authorization, token) {
+    return new Request(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${authorization}`,
+        Cookie: `csrf_token=${token}`,
+        "X-CSRF-Token": token,
+      },
+    });
+  }
+
+  it("accepts a token bound to a session-id bearer (control: the Bearer fallback works)", () => {
+    const sessionId = "11111111-2222-3333-4444-555555555555";
+    const token = generateCSRFToken(new Request(url), devEnv, sessionId);
+    expect(validateCSRFMiddleware(post(sessionId, token), devEnv)).toBeNull();
+  });
+
+  it("does not use a bearer starting with the API key prefix as the HMAC identifier", () => {
+    // A token bound to the key itself validates only if the key was read as the
+    // identifier. It must not: the request falls back to the csrf cookie instead.
+    const token = generateCSRFToken(new Request(url), devEnv, keyLike);
+    const result = validateCSRFMiddleware(post(keyLike, token), devEnv);
+    expect(result).not.toBeNull();
+    expect(result.status).toBe(403);
   });
 });

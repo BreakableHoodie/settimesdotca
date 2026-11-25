@@ -2829,7 +2829,10 @@ paths:
         Import many bands at once for one event. Every row is validated up front;
         if any row is invalid nothing is written (400 with per-row errors). Valid
         rows find-or-create band profiles by normalized name and create
-        performances. The whole import is rolled back on any write failure.
+        performances. On a write failure the import is rolled back (500, "No
+        bands were imported"). If the rollback itself cannot finish, the 500 says
+        the import could not be fully undone: some rows may remain, so check the
+        lineup before retrying.
       security:
         - AdminSessionCookie: []
           CsrfToken: []

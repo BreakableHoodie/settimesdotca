@@ -124,55 +124,51 @@ describe("deactivating an invitee who has not activated", () => {
   });
 });
 
-describe("reactivating a never-activated invitee", () => {
-  it.each([["PATCH", (ctx) => patch(ctx, { isActive: true })]])(
-    "%s clears deactivated_at/by, mints no token, and the invitee can resend and activate",
-    async (_name, reactivate) => {
-      const ctx = await setup();
-      ctx.rawDb
-        .prepare(
-          "UPDATE users SET deactivated_at = datetime('now'), deactivated_by = 1, activation_token = NULL, activation_token_expires_at = NULL WHERE id = ?",
-        )
-        .run(ctx.invitee.id);
+describe("PATCH isActive: true on a never-activated invitee is an admin activation", () => {
+  it("activates them: clears the stamp, sets activated_at, drops the link, and toggle-status treats them as activated", async () => {
+    const ctx = await setup();
+    ctx.rawDb
+      .prepare(
+        "UPDATE users SET deactivated_at = datetime('now'), deactivated_by = 1, activation_token = NULL, activation_token_expires_at = NULL WHERE id = ?",
+      )
+      .run(ctx.invitee.id);
 
-      const res = await reactivate(ctx);
-      expect(res.status).toBe(200);
-      let u = row(ctx.rawDb, ctx.invitee.id);
-      expect(u.deactivated_at).toBeNull();
-      expect(u.deactivated_by).toBeNull();
-      expect(u.activation_token).toBeNull();
+    const res = await patch(ctx, { isActive: true });
+    expect(res.status).toBe(200);
+    const u = row(ctx.rawDb, ctx.invitee.id);
+    expect(u.is_active).toBe(1);
+    expect(u.deactivated_at).toBeNull();
+    expect(u.deactivated_by).toBeNull();
+    expect(u.activated_at).toBeTruthy();
+    expect(u.activation_token).toBeNull();
 
-      // Back to "invited, never activated" so the invitee path runs end to end.
-      ctx.rawDb.prepare("UPDATE users SET is_active = 0, activated_at = NULL WHERE id = ?").run(ctx.invitee.id);
+    // An active account gets no activation email.
+    const sends = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url, init) => {
+        sends.push(init?.body);
+        return new Response(JSON.stringify({ id: "x" }), { status: 200 });
+      }),
+    );
+    Object.assign(ctx.env, {
+      EMAIL_PROVIDER: "resend",
+      RESEND_API_KEY: "test-key",
+      EMAIL_FROM: "noreply@example.test",
+    });
+    const resend = await post(
+      resendHandler,
+      "https://example.test/api/auth/resend-activation",
+      { email: "invitee@test.com" },
+      ctx.env,
+    );
+    expect(resend.status).toBe(200);
+    expect(sends).toHaveLength(0);
+    expect(row(ctx.rawDb, ctx.invitee.id).activation_token).toBeNull();
 
-      const tokens = [];
-      vi.stubGlobal(
-        "fetch",
-        vi.fn(async (url, init) => {
-          const link = JSON.parse(init.body).text.match(/https?:\/\/\S+\/activate\?\S+/)?.[0];
-          if (link) tokens.push(new URL(link).searchParams.get("token"));
-          return new Response(JSON.stringify({ id: "x" }), { status: 200 });
-        }),
-      );
-      Object.assign(ctx.env, {
-        EMAIL_PROVIDER: "resend",
-        RESEND_API_KEY: "test-key",
-        EMAIL_FROM: "noreply@example.test",
-      });
-
-      const resend = await post(
-        resendHandler,
-        "https://example.test/api/auth/resend-activation",
-        { email: "invitee@test.com" },
-        ctx.env,
-      );
-      expect(resend.status).toBe(200);
-      expect(tokens).toHaveLength(1);
-      const act = await post(activateHandler, "https://example.test/api/auth/activate", { token: tokens[0] }, ctx.env);
-      expect(act.status).toBe(200);
-      u = row(ctx.rawDb, ctx.invitee.id);
-      expect(u.is_active).toBe(1);
-      expect(u.activated_at).toBeTruthy();
-    },
-  );
+    // activated_at is set, so a later toggle deactivates instead of answering INVITE_PENDING.
+    const off = await toggle(ctx);
+    expect(off.status).toBe(200);
+    expect(row(ctx.rawDb, ctx.invitee.id).is_active).toBe(0);
+  });
 });

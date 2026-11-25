@@ -605,10 +605,19 @@ export const MUTATIONS = [
   {
     id: "patch-reactivation-clears-deactivated-at",
     invariant:
-      "CLAUDE.md 'Activation tokens are stored hashed' \u2014 PATCH reactivation clears deactivated_at so the invitee can activate (#1482)",
+      "CLAUDE.md 'Activation tokens are stored hashed' \u2014 PATCH activation clears deactivated_at (#1482)",
     file: "functions/api/admin/users/[id].js",
     find: '        updates.push("deactivated_at = NULL");',
     replace: "        void 0;",
+    tests: ["functions/api/admin/users/__tests__/deactivatedInvitee.test.js"],
+  },
+  {
+    id: "patch-activation-records-activated-at",
+    invariant:
+      "CLAUDE.md 'Activation tokens are stored hashed' \u2014 an admin PATCH activation records activated_at, so toggle-status does not mistake the account for a pending invitee (#1482)",
+    file: "functions/api/admin/users/[id].js",
+    find: 'updates.push("activated_at = COALESCE(activated_at, datetime(\'now\'))");',
+    replace: "void 0;",
     tests: ["functions/api/admin/users/__tests__/deactivatedInvitee.test.js"],
   },
   {

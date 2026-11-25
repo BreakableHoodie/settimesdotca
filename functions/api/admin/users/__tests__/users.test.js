@@ -20,6 +20,26 @@ describe("Admin users API", () => {
     expect(body.users.every((user) => typeof user.isActive === "boolean")).toBe(true);
   });
 
+  it("exposes activatedAt and deactivatedAt so the UI can tell invite states apart", async () => {
+    const { env, headers, rawDb, sessionId } = createTestEnv({ role: "admin" });
+    grantStepUp(rawDb, sessionId);
+    rawDb
+      .prepare(
+        `INSERT INTO users (email, password_hash, role, is_active, activated_at, deactivated_at)
+         VALUES (?, ?, 'viewer', 0, NULL, '2026-11-01 10:00:00')`,
+      )
+      .run("revoked@test", "x");
+
+    const request = new Request("https://example.test/api/admin/users", { headers });
+    const body = await (await usersHandler.onRequestGet({ request, env })).json();
+
+    const revoked = body.users.find((user) => user.email === "revoked@test");
+    expect(revoked.activatedAt).toBeNull();
+    expect(revoked.deactivatedAt).toBe("2026-11-01 10:00:00");
+    const admin = body.users.find((user) => user.email === "admin@test");
+    expect(admin.deactivatedAt).toBeNull();
+  });
+
   it("rejects non-admin list requests", async () => {
     const { env, headers } = createTestEnv({ role: "editor" });
 

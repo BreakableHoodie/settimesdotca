@@ -107,3 +107,30 @@ export function sortUsers(users, sortConfig) {
     return aVal.localeCompare(bVal) * direction
   })
 }
+
+/**
+ * The lifecycle state of an account, for the status label and its actions.
+ *
+ * - `active`: signed in as usable.
+ * - `invited`: a pending invitee, never activated and not revoked.
+ * - `revoked`: a never-activated invitee whose invite an admin revoked. The
+ *   server stamps `deactivatedAt` and clears the activation token. PATCH
+ *   `isActive: true` ACTIVATES such a user rather than restoring the invite,
+ *   so the UI offers no "restore"; a new invite is the way back.
+ * - `inactive`: an account that was activated once and later deactivated.
+ *
+ * @param {object|null|undefined} user
+ * @returns {'active'|'invited'|'revoked'|'inactive'}
+ */
+export function userStatus(user) {
+  if (user?.isActive) return 'active'
+  if (user?.activatedAt) return 'inactive'
+  return user?.deactivatedAt ? 'revoked' : 'invited'
+}
+
+export const USER_STATUS_LABELS = {
+  active: 'Active',
+  invited: 'Invited (pending)',
+  revoked: 'Invite revoked',
+  inactive: 'Inactive',
+}

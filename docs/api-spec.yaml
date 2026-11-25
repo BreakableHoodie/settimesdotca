@@ -5012,6 +5012,14 @@ components:
           type: string
         isActive:
           type: boolean
+        activatedAt:
+          type: string
+          nullable: true
+          description: Null for an invitee who has never activated their account.
+        deactivatedAt:
+          type: string
+          nullable: true
+          description: Set when an admin deactivates the account or revokes a pending invite.
         created_at:
           type: string
           nullable: true

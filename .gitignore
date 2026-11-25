@@ -68,6 +68,9 @@ workers-mcp-server/node_modules/
 workers-mcp-server/dist/
 workers-mcp-server/.dev.vars
 workers-mcp-server/.wrangler/
+workers-cron/node_modules/
+workers-cron/.dev.vars
+workers-cron/.wrangler/
 chatmodes/
 claudedocs/
 # Root-level only — .github/instructions/ is tracked (Copilot path instructions)

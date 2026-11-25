@@ -65,6 +65,7 @@ export default defineConfig({
       "functions/**/__tests__/**/*.test.js",
       "scripts/**/__tests__/**/*.test.js",
       "workers-mcp-server/__tests__/**/*.test.js",
+      "workers-cron/__tests__/**/*.test.js",
     ],
   },
 });

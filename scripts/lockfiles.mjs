@@ -7,7 +7,12 @@
 // (its .npmrc, the override guard, the digest), and no rule could see it,
 // because a rule can flag a file with a bad value, never a file it was not
 // told about.
-export const LOCKFILES = ["package-lock.json", "frontend/package-lock.json", "workers-mcp-server/package-lock.json"];
+export const LOCKFILES = [
+  "package-lock.json",
+  "frontend/package-lock.json",
+  "workers-mcp-server/package-lock.json",
+  "workers-cron/package-lock.json",
+];
 
 /** The directory a lockfile lives in, relative to the repo root ("" for the root). */
 export const lockfileDir = (lockfile) => (lockfile.includes("/") ? lockfile.slice(0, lockfile.lastIndexOf("/")) : "");

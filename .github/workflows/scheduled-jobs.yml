@@ -18,6 +18,13 @@ on:
 permissions:
   contents: read
 
+# The Cloudflare cron Worker (workers-cron/, #1489) dispatches this on time and
+# the schedule above stays as the fallback, so two starts can land together.
+# The handler is idempotent; the group keeps them from overlapping anyway.
+concurrency:
+  group: scheduled-jobs
+  cancel-in-progress: false
+
 jobs:
   run-scheduled:
     name: Run scheduled handler

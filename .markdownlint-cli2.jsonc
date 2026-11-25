@@ -34,6 +34,7 @@
   "ignores": [
     "**/node_modules/**",
     "workers-mcp-server/node_modules/**",
+    "workers-cron/node_modules/**",
     ".agents/**",
     ".wrangler/**",
     "frontend/dist/**",

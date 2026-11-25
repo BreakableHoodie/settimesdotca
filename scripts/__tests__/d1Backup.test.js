@@ -3,7 +3,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { BACKED_UP_TABLES, buildBackup, EXCLUDED_TABLES, restoreSql, unclassifiedTables } from "../d1-backup.mjs";
+import {
+  BACKED_UP_TABLES,
+  buildBackup,
+  EXCLUDED_TABLES,
+  restoreSql,
+  SCRUB_UPDATES,
+  unclassifiedTables,
+} from "../d1-backup.mjs";
 
 const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
 const SCHEMA_SQL = read("database/setup-complete.sql");
@@ -109,6 +116,46 @@ describe("buildBackup", () => {
 
     // VACUUM INTO rewrites live pages only: the deleted row's bytes are gone.
     expect(readFileSync(out).includes(PRIVATE_EMAIL)).toBe(false);
+  });
+
+  // #1498: the 400-day copy must never hold an invitee address the live table
+  // would already have dropped, and the scrub must use retention.js's predicate.
+  it("clears finished invitees' addresses, keeping live ones, with retention.js's predicate", () => {
+    const out = join(dir, "backup.db");
+    buildBackup(
+      exportWith(`${SEED}
+        INSERT INTO invite_codes (id, code, email, role, created_at, used_at, expires_at, is_active)
+          VALUES (1, 'sha256:a', 'used-long-ago@example.test', 'editor', datetime('now', '-60 days'), datetime('now', '-40 days'), datetime('now', '-33 days'), 1),
+                 (2, 'sha256:b', 'live@example.test', 'editor', datetime('now', '-60 days'), NULL, datetime('now', '+7 days'), 1),
+                 (3, 'sha256:c', 'used-recently@example.test', 'editor', datetime('now', '-20 days'), datetime('now', '-10 days'), datetime('now', '-3 days'), 1);
+      `),
+      out,
+    );
+    const db = new DatabaseSync(out, { readOnly: true });
+    const emails = db
+      .prepare("SELECT id, email FROM invite_codes ORDER BY id")
+      .all()
+      .map((r) => [r.id, r.email]);
+    db.close();
+    expect(emails).toEqual([
+      [1, null],
+      [2, "live@example.test"],
+      [3, "used-recently@example.test"],
+    ]);
+    expect(readFileSync(out).includes(Buffer.from("used-long-ago@example.test"))).toBe(false);
+
+    const where = (sql) =>
+      sql
+        .replace(/\s+/g, " ")
+        .replace(/\( /g, "(")
+        .replace(/ \)/g, ")")
+        .match(/WHERE (email IS NOT NULL AND .*\))/)[1]
+        .trim();
+    const retention = read("functions/api/admin/maintenance/retention.js").match(
+      /UPDATE invite_codes SET email = NULL[\s\S]*?`/,
+    )[0];
+    const scrub = SCRUB_UPDATES.find((u) => u.sql.startsWith("UPDATE invite_codes SET email = NULL")).sql;
+    expect(where(scrub)).toBe(where(retention.slice(0, -1)));
   });
 
   it("clears credentials inside backed-up users, keeping encrypted TOTP secrets", () => {

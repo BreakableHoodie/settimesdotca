@@ -208,8 +208,11 @@ function sqlLiteral(value) {
 // Tables ordered so each comes after every table its foreign keys reference.
 // A self-reference is ignored (rows keep rowid order); a cycle between
 // tables, which this schema does not have, falls back to creation order.
+// SQLite keeps a REFERENCES target as typed but matches table names
+// case-insensitively (ASCII only), so targets are folded the same way.
+const asciiFold = (s) => s.replace(/[A-Z]/g, (c) => c.toLowerCase());
 function parentsFirst(db, tables) {
-  const names = new Set(tables.map((t) => t.name));
+  const declared = new Map(tables.map((t) => [asciiFold(t.name), t.name]));
   const parents = new Map(
     tables.map(({ name }) => [
       name,
@@ -217,8 +220,8 @@ function parentsFirst(db, tables) {
         db
           .prepare('SELECT DISTINCT "table" AS t FROM pragma_foreign_key_list(?)')
           .all(name)
-          .map((r) => r.t)
-          .filter((t) => t !== name && names.has(t)),
+          .map((r) => declared.get(asciiFold(r.t)))
+          .filter((t) => t !== undefined && t !== name),
       ),
     ]),
   );

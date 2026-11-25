@@ -280,11 +280,11 @@ describe("restoreSql", () => {
   // D1's remote import does not apply the file as one transaction, so the
   // deferral cannot be relied on (#1486). Without it, every statement checks
   // its foreign keys at once: the worst case of D1 committing in pieces.
-  it("restores with no deferred foreign keys, a child table created before its parent", () => {
+  it("restores with no deferred foreign keys, a child table created before its parent and naming it in another case", () => {
     const path = join(dir, "order.db");
     const db = new DatabaseSync(path);
     db.exec(`
-      CREATE TABLE events (id INTEGER PRIMARY KEY, created_by INTEGER REFERENCES users(id));
+      CREATE TABLE events (id INTEGER PRIMARY KEY, created_by INTEGER REFERENCES USERS(id));
       CREATE TABLE users (id INTEGER PRIMARY KEY, invited_by INTEGER REFERENCES users(id));
       CREATE TABLE performances (id INTEGER PRIMARY KEY, event_id INTEGER REFERENCES events(id));
       INSERT INTO users VALUES (1, NULL), (2, 1);

@@ -549,7 +549,6 @@ export const MUTATIONS = [
     tests: ["functions/api/auth/__tests__/activate.test.js"],
   },
   {
-<<<<<<< HEAD
     id: "activation-claim-refuses-deactivated",
     invariant:
       "CLAUDE.md 'Activation tokens are stored hashed' \u2014 the claim UPDATE refuses a deactivated invitee even when the lookup passed (#1482)",
@@ -646,7 +645,8 @@ export const MUTATIONS = [
     find: "deactivated_at = CASE WHEN ? = 0 THEN datetime('now') ELSE NULL END,",
     replace: "deactivated_at = CASE WHEN ? = 0 THEN datetime('now') ELSE deactivated_at END,",
     tests: ["functions/api/admin/users/__tests__/deactivatedInvitee.test.js"],
-=======
+  },
+  {
     id: "session-lookup-binds-hash",
     invariant:
       "CLAUDE.md 'Session ids and MFA challenges are stored hashed' — validateSession hashes the cookie before the lookup, so only the raw token authenticates and a stored digest replayed as a cookie does not (#1488)",
@@ -690,7 +690,6 @@ export const MUTATIONS = [
     find: "      const csrfToken = generateCSRFToken(request, env, sessionId);",
     replace: "      const csrfToken = generateCSRFToken(request, env, session.id);",
     tests: ["functions/api/admin/__tests__/sessionIdsHashed.test.js"],
->>>>>>> 3f214709 (security(auth): store session ids and MFA challenge tokens hashed (#1488))
   },
   {
     id: "reset-token-stored-hashed",

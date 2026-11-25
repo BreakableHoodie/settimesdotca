@@ -65,16 +65,31 @@ function post(handler, url, body, env) {
 }
 
 describe("deactivating an invitee who has not activated", () => {
-  it("PATCH isActive=false clears the activation token and stamps the deactivation", async () => {
+  // The real revoke case: the invitee is ALREADY is_active = 0 (never activated).
+  // A same-state shortcut must not skip clearing the link.
+  it("PATCH isActive=false on a pending invitee (already inactive) revokes the invitation", async () => {
     const ctx = await setup();
-    // Seeded inactive already; reactivate first so the PATCH is a real deactivation.
-    ctx.rawDb.prepare("UPDATE users SET is_active = 1 WHERE id = ?").run(ctx.invitee.id);
+    const before = row(ctx.rawDb, ctx.invitee.id);
+    expect(before.is_active).toBe(0);
+    expect(before.activation_token).toBeTruthy();
     const res = await patch(ctx, { isActive: false });
     expect(res.status).toBe(200);
     const u = row(ctx.rawDb, ctx.invitee.id);
     expect(u.is_active).toBe(0);
     expect(u.activation_token).toBeNull();
     expect(u.activation_token_expires_at).toBeNull();
+    expect(u.deactivated_at).toBeTruthy();
+    expect(u.deactivated_by).toBeTruthy();
+  });
+
+  it("PATCH isActive=false on an active account clears any leftover link and stamps the deactivation", async () => {
+    const ctx = await setup();
+    ctx.rawDb.prepare("UPDATE users SET is_active = 1 WHERE id = ?").run(ctx.invitee.id);
+    const res = await patch(ctx, { isActive: false });
+    expect(res.status).toBe(200);
+    const u = row(ctx.rawDb, ctx.invitee.id);
+    expect(u.is_active).toBe(0);
+    expect(u.activation_token).toBeNull();
     expect(u.deactivated_at).toBeTruthy();
   });
 

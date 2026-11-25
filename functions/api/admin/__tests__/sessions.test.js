@@ -1,12 +1,13 @@
 import { describe, expect, test } from "vitest";
-import { createTestEnv, mockUsers } from "../../test-utils.js";
+import { createTestEnv, mockUsers, testSessionKey } from "../../test-utils.js";
 import { onRequest } from "../_middleware.js";
 import { onRequestGet, onRequestDelete } from "../sessions.js";
 
 const BASE_URL = "https://example.test/api/admin/sessions";
 
+// Rows are keyed by the token's digest (#1488).
 function insertSession(rawDb, { userId, ipAddress = "127.0.0.1", userAgent = "test-agent" } = {}) {
-  const sessionId = crypto.randomUUID();
+  const sessionId = testSessionKey(crypto.randomUUID());
   const expiresAt = Math.floor(Date.now() / 1000) + 60 * 60;
 
   rawDb

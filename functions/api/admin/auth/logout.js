@@ -4,7 +4,7 @@
 
 import { deleteCSRFCookie } from "../../../utils/csrf.js";
 import { getClientIP } from "../../../utils/request.js";
-import { initializeLucia, isDevRequest } from "../../../utils/auth.js";
+import { hashSessionToken, initializeLucia, isDevRequest } from "../../../utils/auth.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -28,9 +28,11 @@ export async function onRequestPost(context) {
 
     if (sessionToken) {
       // Get user ID from session before deleting
-      const session = await DB.prepare(`SELECT user_id FROM lucia_sessions WHERE id = ?`).bind(sessionToken).first();
+      // Rows are keyed by the token's digest (#1488).
+      const sessionKey = await hashSessionToken(sessionToken);
+      const session = await DB.prepare(`SELECT user_id FROM lucia_sessions WHERE id = ?`).bind(sessionKey).first();
 
-      await lucia.invalidateSession(sessionToken);
+      await lucia.invalidateSession(sessionKey);
 
       // Log logout
       if (session) {

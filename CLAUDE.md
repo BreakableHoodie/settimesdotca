@@ -285,7 +285,7 @@ Every other `expires_at` column in the schema is `TEXT` (ISO-8601 / space-separa
 
 Password hashing uses PBKDF2-SHA256 via the Web Crypto API (`functions/utils/crypto.js`). Current format is `pbkdf2$iterations$salt$hash` and is self-describing — `verifyPassword` reads the iteration count from the string itself. A second, older `salt:hash` format (no `pbkdf2$` prefix, predating the versioned format entirely) carries no iteration count at all; it's verified against the hardcoded `LEGACY_ITERATIONS` (100,000) fallback instead.
 
-**`DEFAULT_ITERATIONS` is capped at 100,000, because production refuses more.** The live Workers runtime throws `NotSupportedError: Pbkdf2 failed: iteration counts above 100000 are not supported` (measured on the edge 2026-10-10). **Node and local `wrangler dev` do not enforce it**, so no local run can catch a higher value. #426 raised the default to 600,000 anyway, and from 2026-06-28 to 2026-10-10 every `hashPassword` call in production threw: **signup and password reset were broken**, and login's "best-effort" rehash failed on every login inside a `catch` that only logged a warning, which is why nobody noticed. ADR 0005 and `scripts/reset-admin-password.js` already recorded the cap; this file claimed 600,000 as fact. OWASP's 600k is not reachable on this platform.
+**`DEFAULT_ITERATIONS` is capped at 100,000, because production refuses more.** The live Workers runtime throws `NotSupportedError: Pbkdf2 failed: iteration counts above 100000 are not supported`. **Node and local `wrangler dev` do not enforce it**, so no local run can catch a higher value. #426 raised the default to 600,000 anyway, and from 2026-06-28 to 2026-10-10 every `hashPassword` call in production threw: **signup and password reset were broken**, and login's "best-effort" rehash failed on every login inside a `catch` that only logged a warning, which is why nobody noticed. OWASP's 600k is not reachable on this platform.
 
 The cap is `WORKERS_PBKDF2_MAX_ITERATIONS`, and callers import `DEFAULT_ITERATIONS`; never re-type a count (login's literal `600000` was half the bug). `functions/utils/__tests__/crypto.test.js` emulates the production refusal and scans `functions/` for any over-cap iteration literal; both are in the mutation gate.
 
@@ -297,21 +297,7 @@ MFA TOTP follows the same rule: `functions/utils/totp.js` computes HMAC-SHA1 dir
 
 The Cloudflare Workers D1 binding does not support explicit `BEGIN`/`COMMIT` transaction syntax. However, `env.DB.batch([stmt1, stmt2, ...])` executes all statements atomically — if any fails, all are rolled back. Prefer `DB.batch()` for multi-statement mutations.
 
-**Until #1146 that atomicity was UNVERIFIABLE here**, which is worth knowing
-because it means every batch-dependent test written before then proved less
-than it appeared to. `createDBEnv`'s `batch()` in `functions/api/test-utils.js`
-ran a plain sequential loop with no transaction, so a mid-batch failure left
-earlier statements committed — the opposite of production. A test asserting "on
-failure, nothing was written" would have failed against the harness while
-passing against real D1, so nobody wrote one, and code depending on rollback
-could have been broken in production and green in CI.
-
-It is now wrapped in `db.transaction()` (better-sqlite3 is synchronous, so the
-whole loop fits inside one; nested calls become SAVEPOINTs).
-`functions/api/__tests__/testHarnessBatchAtomicity.test.js` is what makes every
-other batch-related test worth trusting — it asserts rollback on failure,
-commit on success, and that the per-statement result shape is unchanged, and it
-goes red against the old loop.
+**The test harness's `batch()` is atomic too:** `createDBEnv` (`functions/api/test-utils.js`) wraps it in `db.transaction()`. Before #1146 it was a plain loop, so no rollback test could be trusted. `functions/api/__tests__/testHarnessBatchAtomicity.test.js` pins rollback, commit and the result shape. History: `docs/field-notes/testing-gates.md`.
 
 **A failure must occur at EXECUTION time to test this.** A bad table name throws
 while the statement array is being built, before `batch()` is ever called, so it
@@ -534,7 +520,7 @@ Changing who can sign in, or as what, needs a fresh second factor on top of the 
 
 Three traps here, each of which was live:
 
-- **`toggle-status.js` is a second, separate deactivation endpoint.** It is not a thin wrapper over the PATCH path — it has its own handler, and it deactivated accounts and deleted their sessions for months while leaving keys untouched. Grep `is_active =` rather than assuming one path; it matches ~20 files, but only four WRITE it, three on `users`: the two above plus `api/auth/activate.js`, which only ever writes `1`. The fourth, `utils/bandProfileFields.js`, writes `band_profiles.is_active` and is unrelated.
+- **`toggle-status.js` is a second, separate deactivation endpoint.** It deactivated accounts and deleted their sessions for months while leaving keys untouched. Grep `is_active =` rather than assuming one path; it matches ~20 files, but only four WRITE it, three on `users`: the two above plus `api/auth/activate.js`, which only ever writes `1`. The fourth, `utils/bandProfileFields.js`, writes `band_profiles.is_active` and is unrelated.
 - **`isActive` is read by truthiness at every other site in `users/[id].js`** — the last-admin guard, the `is_active` write, and the `deactivated_at` stamp all use `!isActive`. A revocation gated on `isActive === false` therefore misses `{"isActive": 0}`, which deactivates the user everywhere else. Match the surrounding convention.
 - **`verifyApiKey` INNER JOINs `users` and requires `is_active = 1`.** That is a backstop for a fourth path nobody has written yet, not the primary control — the explicit revocations above are. Do not delete it as redundant; it exists precisely because "every path remembers" was already false once.
 
@@ -572,13 +558,17 @@ An invite code is a bearer credential that mints an account, possibly an admin o
 
 ### Password reset tokens are stored hashed (#1354)
 
-The same scheme as invite codes, for the same reason: a reset token sets the account's password, so **the plaintext exists only in the emailed link.** `password_reset_tokens.token` holds `'sha256:' || hex(SHA-256(token))` (`hashResetToken` in `functions/utils/tokens.js`), and both readers, `reset-password-complete.js` and `reset-password/validate.js`, hash what is submitted before the lookup, so the stored value itself is never redeemable. Migration 0074 retired every pre-existing row (`'retired:<id>'`, marked used) instead of converting it: SQLite cannot compute SHA-256, and the tokens live two hours.
+The same scheme as invite codes, for the same reason: a reset token sets the account's password, so **the plaintext exists only in the emailed link.** `password_reset_tokens.token` holds `'sha256:' || hex(SHA-256(token))` (`hashResetToken` in `functions/utils/tokens.js`), and both readers, `reset-password-complete.js` and `reset-password/validate.js`, hash what is submitted before the lookup, so the stored value itself is never redeemable. Migration 0074 retired every pre-existing row (`'retired:<id>'`, marked used): SQLite cannot compute SHA-256.
 
 The admin issuer (`users/[id]/reset-password.js`) checks `isEmailConfigured` **before any side effect** (#1353): with no way to send the link, it answers 500 having minted nothing and signed nobody out. If the send then fails, it withdraws the token. It does **not** restore the user's sessions: an admin forcing a reset may be answering a compromise, and signing the user out must not depend on the email provider. All five behaviours are in the mutation gate.
 
 ### Activation tokens are stored hashed (#1482)
 
 The same scheme again: an activation token activates an invitee's account, so `users.activation_token` holds `hashStoredToken(token)` (`functions/utils/tokens.js`) and the plaintext exists only in the emailed link. Signup and `resend-activation` store the digest; `activate.js` hashes what is submitted before the lookup and the claim `UPDATE`. **A missing expiry fails closed** in both the JS check and the SQL guard: every writer sets one, so a NULL is never "never expires". **A deactivated invitee cannot activate:** `activate.js` and `resend-activation.js` refuse a row with `deactivated_at` set, both deactivation paths (PATCH and `toggle-status`) stamp it and clear the token, reactivation clears it and mints none, and `toggle-status` refuses a pending invitee (409 `INVITE_PENDING`). Migration 0083 cleared all plaintext tokens; a pending invitee asks for a new link. All behaviours are in the mutation gate.
+
+### Session ids and MFA challenges are stored hashed (#1488)
+
+Again: `lucia_sessions.id` and `mfa_challenges.token` hold `hashStoredToken(value)`; the cookie and login's `mfaToken` carry the raw value, and every lookup hashes what was submitted. In `auth.js`, `session.id` (also `context.data.session.id`) is the stored **key**, used by every `WHERE id = ?`, `invalidateSession` and step-up; `session.token` is the raw **token**, used only by the cookie and the CSRF binding. `invalidateSession` and `createSessionCookie` throw on the wrong kind. Migration 0084 signed everyone out; its triggers refuse an unhashed value. In the mutation gate.
 
 ### Time validation is shape AND range — `isValidTime()` is the only home (#1089)
 

@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeEach, afterEach, vi } from "vitest";
-import { createTestEnv, grantStepUp } from "../../../test-utils.js";
+import { createTestEnv, grantStepUp, testSessionKey } from "../../../test-utils.js";
 import * as resetHandler from "../[id]/reset-password.js";
 import { hashResetToken } from "../../../../utils/tokens.js";
 
@@ -25,7 +25,9 @@ async function resetFreshUser({ emailConfigured = true, delivered = true } = {})
     .run("resetme@test.com", "viewer", "Reset Me", "oldhash");
   const user = rawDb.prepare("SELECT id FROM users WHERE email = ?").get("resetme@test.com");
   rawDb
-    .prepare("INSERT INTO lucia_sessions (id, user_id, expires_at) VALUES ('target-session', ?, ?)")
+    .prepare(
+      "INSERT INTO lucia_sessions (id, user_id, expires_at) VALUES ('sha256:7461726765742d73657373696f6e000000000000000000000000000000000000', ?, ?)",
+    )
     .run(user.id, Math.floor(Date.now() / 1000) + 3600);
   const response = await resetHandler.onRequestPost({
     request: new Request(`https://example.test/api/admin/users/${user.id}/reset-password`, {
@@ -35,7 +37,10 @@ async function resetFreshUser({ emailConfigured = true, delivered = true } = {})
     }),
     env,
     params: { id: String(user.id) },
-    data: { user: { userId: 1, role: "admin", email: "admin@test" }, session: { id: sessionId, user_id: 1 } },
+    data: {
+      user: { userId: 1, role: "admin", email: "admin@test" },
+      session: { id: testSessionKey(sessionId), user_id: 1 },
+    },
   });
   const tokens = rawDb.prepare("SELECT token, used FROM password_reset_tokens WHERE user_id = ?").all(user.id);
   const sessions = rawDb.prepare("SELECT id FROM lucia_sessions WHERE user_id = ?").all(user.id);
@@ -59,7 +64,7 @@ describe("no side effects before the email can be sent (#1353)", () => {
     const { response, tokens, sessions, sent } = await resetFreshUser({ emailConfigured: false });
     expect(response.status).toBe(500);
     expect(tokens).toEqual([]);
-    expect(sessions).toEqual([{ id: "target-session" }]);
+    expect(sessions).toEqual([{ id: "sha256:7461726765742d73657373696f6e000000000000000000000000000000000000" }]);
     expect(sent).toEqual([]);
   });
 
@@ -115,7 +120,10 @@ describe("Admin user password reset API", () => {
       request,
       env,
       params: { id: String(user.id) },
-      data: { user: { userId: 1, role: "admin", email: "admin@test" }, session: { id: sessionId, user_id: 1 } },
+      data: {
+        user: { userId: 1, role: "admin", email: "admin@test" },
+        session: { id: testSessionKey(sessionId), user_id: 1 },
+      },
     });
     expect(response.status).toBe(200);
     const payload = await response.json();
@@ -170,7 +178,10 @@ describe("Admin user password reset API", () => {
       request,
       env,
       params: { id: "1;DROP TABLE users" },
-      data: { user: { userId: 1, role: "admin", email: "admin@test" }, session: { id: sessionId, user_id: 1 } },
+      data: {
+        user: { userId: 1, role: "admin", email: "admin@test" },
+        session: { id: testSessionKey(sessionId), user_id: 1 },
+      },
     });
     expect(response.status).toBe(400);
   });
@@ -191,7 +202,10 @@ describe("Admin user password reset API", () => {
       request,
       env,
       params: { id: String(user.id) },
-      data: { user: { userId: 1, role: "admin", email: "admin@test" }, session: { id: sessionId, user_id: 1 } },
+      data: {
+        user: { userId: 1, role: "admin", email: "admin@test" },
+        session: { id: testSessionKey(sessionId), user_id: 1 },
+      },
     });
     expect(response.status).toBe(400);
   });

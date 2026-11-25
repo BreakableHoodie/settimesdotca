@@ -4,7 +4,7 @@
 // Every "refused" test asserts the DATABASE is unchanged, not just the status:
 // a refusal that still stored a pending secret would pass a status-only check.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createTestEnv, grantStepUp } from "../../../test-utils.js";
+import { createTestEnv, grantStepUp, testSessionKey } from "../../../test-utils.js";
 import { generateTotpCode, hashBackupCode } from "../../../../utils/totp.js";
 import { decryptTotpSecret, isEncryptedTotpSecret } from "../../../../utils/mfaSecrets.js";
 import { AUTH_ATTEMPT_TYPES, MFA_GUESS_LIMIT } from "../../../../utils/authAttempts.js";
@@ -82,7 +82,7 @@ function seedChallenge(rawDb, userId = 1) {
       `INSERT INTO mfa_challenges (token, user_id, ip_address, user_agent, expires_at)
        VALUES (?, ?, '127.0.0.1', 'test-agent', datetime('now', '+5 minutes'))`,
     )
-    .run(token, userId);
+    .run(testSessionKey(token), userId);
   return token;
 }
 
@@ -201,7 +201,9 @@ describe("mfa/setup while 2FA is on (#1318)", () => {
     const locked = await post(backupHandler, env, headers, { code: await generateTotpCode(SECRET) });
     expect(locked.status).toBe(401);
     expect((await locked.json()).code).toBe("STEP_UP_LOCKED");
-    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM lucia_sessions WHERE id = ?").get(sessionId).n).toBe(0);
+    expect(
+      rawDb.prepare("SELECT COUNT(*) AS n FROM lucia_sessions WHERE id = ?").get(testSessionKey(sessionId)).n,
+    ).toBe(0);
   });
 
   it("a replayed step is refused as already used and stores nothing", async () => {
@@ -263,7 +265,9 @@ describe("mfa/enable while re-enrolling (#1318)", () => {
     const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
     rawDb.prepare("UPDATE users SET backup_codes = ? WHERE id = 1").run(JSON.stringify(["old-hash"]));
     rawDb
-      .prepare("INSERT INTO lucia_sessions (id, user_id, expires_at) VALUES ('other-session', 1, ?)")
+      .prepare(
+        "INSERT INTO lucia_sessions (id, user_id, expires_at) VALUES ('sha256:6f746865722d73657373696f6e00000000000000000000000000000000000000', 1, ?)",
+      )
       .run(Math.floor(Date.now() / 1000) + 3600);
     const newSecret = await startReenrol(env, headers);
 
@@ -281,8 +285,8 @@ describe("mfa/enable while re-enrolling (#1318)", () => {
     expect(stored.backup_codes).not.toContain("old-hash");
 
     const sessions = rawDb.prepare("SELECT id FROM lucia_sessions WHERE user_id = 1").all();
-    expect(sessions).toEqual([{ id: sessionIdFrom(response) }]);
-    expect(sessions.map((s) => s.id)).not.toContain(sessionId);
+    expect(sessions).toEqual([{ id: testSessionKey(sessionIdFrom(response)) }]);
+    expect(sessions.map((s) => s.id)).not.toContain(testSessionKey(sessionId));
 
     // The old app is dead; the new one logs in.
     advanceOneStep();

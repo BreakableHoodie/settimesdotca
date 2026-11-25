@@ -8,7 +8,7 @@
 // parseJsonObjectBody contract for a null/malformed body.
 
 import { describe, expect, test, beforeAll } from "vitest";
-import { createTestEnv, mockUsers } from "../../test-utils.js";
+import { createTestEnv, mockUsers, testSessionKey } from "../../test-utils.js";
 import { onRequestPost } from "../reset-password-complete.js";
 import { hashPassword, verifyPassword } from "../../../utils/crypto.js";
 import { hashResetToken } from "../../../utils/tokens.js";
@@ -53,7 +53,7 @@ function insertSession(rawDb, userId) {
   const id = crypto.randomUUID();
   rawDb
     .prepare("INSERT INTO lucia_sessions (id, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)")
-    .run(id, userId, Math.floor(Date.now() / 1000) + 3600, "127.0.0.1", "test-agent");
+    .run(testSessionKey(id), userId, Math.floor(Date.now() / 1000) + 3600, "127.0.0.1", "test-agent");
   return id;
 }
 

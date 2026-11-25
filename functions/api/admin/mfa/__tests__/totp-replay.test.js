@@ -4,7 +4,7 @@
 // is about to accept). The success half alone proves nothing: it is satisfied
 // by an endpoint that never records the step.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createTestEnv, grantStepUp } from "../../../test-utils.js";
+import { createTestEnv, grantStepUp, testSessionKey } from "../../../test-utils.js";
 import { generateTotpCode, hashBackupCode } from "../../../../utils/totp.js";
 import { isEncryptedTotpSecret } from "../../../../utils/mfaSecrets.js";
 import * as stepUpHandler from "../step-up.js";
@@ -73,7 +73,7 @@ function seedChallenge(rawDb, userId = 1) {
       `INSERT INTO mfa_challenges (token, user_id, ip_address, user_agent, expires_at)
        VALUES (?, ?, '127.0.0.1', 'test-agent', datetime('now', '+5 minutes'))`,
     )
-    .run(mfaToken, userId);
+    .run(testSessionKey(mfaToken), userId);
   return mfaToken;
 }
 
@@ -175,11 +175,13 @@ describe("step-up (mfa/step-up)", () => {
     expect((await postTo(stepUpHandler, "step-up", env, headers, { code })).status).toBe(200);
     expect(lastStep(rawDb, 1)).toBe(currentStep());
 
-    rawDb.prepare("UPDATE lucia_sessions SET step_up_at = NULL WHERE id = ?").run(sessionId);
+    rawDb.prepare("UPDATE lucia_sessions SET step_up_at = NULL WHERE id = ?").run(testSessionKey(sessionId));
     const replay = await postTo(stepUpHandler, "step-up", env, headers, { code });
     expect(replay.status).toBe(400);
     expect(await replay.json()).toMatchObject({ code: "TOTP_CODE_ALREADY_USED", message: ALREADY_USED });
-    expect(rawDb.prepare("SELECT step_up_at FROM lucia_sessions WHERE id = ?").get(sessionId).step_up_at).toBeNull();
+    expect(
+      rawDb.prepare("SELECT step_up_at FROM lucia_sessions WHERE id = ?").get(testSessionKey(sessionId)).step_up_at,
+    ).toBeNull();
     expect(
       rawDb
         .prepare("SELECT failure_reason FROM auth_attempts WHERE attempt_type = 'mfa_step_up' AND success = 0")
@@ -216,7 +218,7 @@ describe("step-up (mfa/step-up)", () => {
     const prepare = env.DB.prepare.bind(env.DB);
     env.DB.prepare = (sql) => {
       if (sql.startsWith("UPDATE lucia_sessions SET step_up_at")) {
-        rawDb.prepare("DELETE FROM lucia_sessions WHERE id = ?").run(sessionId);
+        rawDb.prepare("DELETE FROM lucia_sessions WHERE id = ?").run(testSessionKey(sessionId));
       }
       return prepare(sql);
     };

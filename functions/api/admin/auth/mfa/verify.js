@@ -6,6 +6,7 @@ import { generateCSRFToken, setCSRFCookie } from "../../../../utils/csrf.js";
 import { verifyTotpStep, totpStepIsFresh, verifyBackupCode, TOTP_CODE_ALREADY_USED } from "../../../../utils/totp.js";
 import { getClientIP, parseJsonObjectBody } from "../../../../utils/request.js";
 import { initializeLucia } from "../../../../utils/auth.js";
+import { hashStoredToken } from "../../../../utils/tokens.js";
 import { AUTH_ATTEMPT_TYPES, checkAuthRateLimit, writeAuthAttempt } from "../../../../utils/authAttempts.js";
 import { loadTotpSecret } from "../../../../utils/mfaSecrets.js";
 import { createTrustedDevice, createTrustedDeviceCookie } from "../../../../utils/trustedDevice.js";
@@ -70,7 +71,9 @@ export async function onRequestPost(context) {
       WHERE c.token = ? AND c.used = 0 AND c.expires_at > datetime('now')
     `,
     )
-      .bind(mfaToken)
+      // Hash what was submitted (#1488): a stored digest sent back is hashed
+      // again and matches nothing.
+      .bind(await hashStoredToken(mfaToken))
       .first();
 
     if (!challenge) {
@@ -412,11 +415,11 @@ export async function onRequestPost(context) {
       userId: challenge.user_id,
     });
 
-    const csrfToken = generateCSRFToken(request, env, session.id);
+    const csrfToken = generateCSRFToken(request, env, session.token);
     const headers = new Headers({
       "Content-Type": "application/json",
     });
-    headers.append("Set-Cookie", lucia.createSessionCookie(session.id).serialize());
+    headers.append("Set-Cookie", lucia.createSessionCookie(session.token).serialize());
     headers.append("Set-Cookie", setCSRFCookie(csrfToken, request));
 
     // Create trusted device if requested

@@ -4,7 +4,7 @@
 // attempt recorded before verifying, a per-USER limit across every guessing
 // endpoint (no IP) that ends the session, and a per-IP limit.
 import { describe, expect, it } from "vitest";
-import { createTestEnv } from "../../../test-utils.js";
+import { createTestEnv, testSessionKey } from "../../../test-utils.js";
 import { generateTotpCode } from "../../../../utils/totp.js";
 import * as backupHandler from "../backup-codes.js";
 import * as disableHandler from "../disable.js";
@@ -20,7 +20,7 @@ const ENDPOINTS = [
   { name: "setup", handler: setupHandler, type: "mfa_reenrol" },
 ];
 
-const call = (handler, env, headers, code, ip) =>
+const call = (handler, env, headers, code, ip, data) =>
   handler.onRequestPost({
     request: new Request("https://example.test/api/admin/mfa/x", {
       method: "POST",
@@ -28,10 +28,11 @@ const call = (handler, env, headers, code, ip) =>
       body: JSON.stringify({ code }),
     }),
     env,
+    ...(data ? { data } : {}),
   });
 
 const sessionCount = (rawDb, sessionId) =>
-  rawDb.prepare("SELECT COUNT(*) AS n FROM lucia_sessions WHERE id = ?").get(sessionId).n;
+  rawDb.prepare("SELECT COUNT(*) AS n FROM lucia_sessions WHERE id = ?").get(testSessionKey(sessionId)).n;
 
 async function wrongCode() {
   const good = await generateTotpCode(SECRET);
@@ -73,10 +74,19 @@ for (const { name, handler, type } of ENDPOINTS) {
     });
 
     it("concurrent wrong guesses are all counted", async () => {
-      const { env, rawDb, headers, sessionId } = setup();
+      const { env, rawDb, headers, sessionId, sessionKey } = setup();
       const { wrong } = await wrongCode();
+      // Authenticated as the middleware does it, once per request before the
+      // handler, so the burst exercises the guess gate itself. Without this each
+      // request re-validates its session, which now hashes the cookie first
+      // (#1488, an async digest), so requests landing after a lockout are refused
+      // at authentication instead of reaching the gate and the count is timing.
+      const data = {
+        user: { userId: 3, role: "viewer", email: "viewer@test" },
+        session: { id: sessionKey, user_id: 3 },
+      };
       const results = await Promise.all(
-        Array.from({ length: 14 }, (_, i) => call(handler, env, headers, wrong, `192.0.2.${i + 1}`)),
+        Array.from({ length: 14 }, (_, i) => call(handler, env, headers, wrong, `192.0.2.${i + 1}`, { ...data })),
       );
       expect(results.filter((r) => r.status === 401).length).toBeGreaterThanOrEqual(4);
       expect(rawDb.prepare("SELECT COUNT(*) AS n FROM auth_attempts WHERE attempt_type = ?").get(type).n).toBe(14);

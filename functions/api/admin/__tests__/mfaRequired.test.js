@@ -3,7 +3,7 @@
 // except the enrolment set answers 403 MFA_SETUP_REQUIRED, on BOTH session
 // paths (the middleware, and checkPermission's own enforceSession fallback).
 import { describe, expect, it, vi } from "vitest";
-import { createTestEnv } from "../../test-utils.js";
+import { createTestEnv, testSessionKey } from "../../test-utils.js";
 import { checkPermission, onRequest } from "../_middleware.js";
 import * as meHandler from "../me.js";
 import * as mfaSetupHandler from "../mfa/setup.js";
@@ -116,7 +116,7 @@ describe("2FA is required for admins and editors (#1253)", () => {
       .prepare(
         "INSERT INTO lucia_sessions (id, user_id, expires_at, ip_address, user_agent) VALUES (?, 2, ?, '6.6.6.6', 'x')",
       )
-      .run(attackerSessionId, Math.floor(Date.now() / 1000) + 3600);
+      .run(testSessionKey(attackerSessionId), Math.floor(Date.now() / 1000) + 3600);
     const attackerHeaders = { ...headers, Authorization: `Bearer ${attackerSessionId}` };
 
     // The real editor enrols through their own session.

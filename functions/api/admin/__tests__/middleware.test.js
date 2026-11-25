@@ -8,8 +8,7 @@ const BASE_URL = "https://example.test/api/admin/me";
 
 describe("admin auth middleware", () => {
   test("reports remaining idle time instead of the full idle timeout", async () => {
-    const { env, rawDb, headers } = createTestEnv({ role: "admin" });
-    const sessionId = headers.Authorization.replace("Bearer ", "");
+    const { env, rawDb, headers, sessionKey } = createTestEnv({ role: "admin" });
 
     rawDb
       .prepare(
@@ -18,7 +17,7 @@ describe("admin auth middleware", () => {
              last_activity_at = datetime('now', '-14 minutes')
          WHERE id = ?`,
       )
-      .run(sessionId);
+      .run(sessionKey);
 
     const response = await onRequest({
       request: new Request(BASE_URL, { headers }),

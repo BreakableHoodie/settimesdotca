@@ -48,10 +48,10 @@ export async function onRequestPost(context) {
     .bind(request.headers.get("CF-Connecting-IP"), request.headers.get("User-Agent"), 0, newSession.id)
     .run();
 
-  const csrfToken = generateCSRFToken(request, env, newSession.id);
+  const csrfToken = generateCSRFToken(request, env, newSession.token);
 
   const headers = new Headers({ "Content-Type": "application/json" });
-  headers.append("Set-Cookie", lucia.createSessionCookie(newSession.id).serialize());
+  headers.append("Set-Cookie", lucia.createSessionCookie(newSession.token).serialize());
   headers.append("Set-Cookie", setCSRFCookie(csrfToken, request, env));
 
   return new Response(

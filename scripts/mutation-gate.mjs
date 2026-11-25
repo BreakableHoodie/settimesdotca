@@ -647,6 +647,51 @@ export const MUTATIONS = [
     tests: ["functions/api/admin/users/__tests__/deactivatedInvitee.test.js"],
   },
   {
+    id: "session-lookup-binds-hash",
+    invariant:
+      "CLAUDE.md 'Session ids and MFA challenges are stored hashed' — validateSession hashes the cookie before the lookup, so only the raw token authenticates and a stored digest replayed as a cookie does not (#1488)",
+    file: "functions/utils/auth.js",
+    find: "        .bind(sessionKey)\n        .first();",
+    replace: "        .bind(sessionToken)\n        .first();",
+    tests: ["functions/api/admin/__tests__/sessionIdsHashed.test.js", "functions/utils/__tests__/auth.test.js"],
+  },
+  {
+    id: "session-creation-stores-hash",
+    invariant:
+      "CLAUDE.md 'Session ids and MFA challenges are stored hashed' — createSession stores the digest of the cookie token, never the token (#1488)",
+    file: "functions/utils/auth.js",
+    find: "      const id = await hashSessionToken(token);",
+    replace: "      const id = token;",
+    tests: ["functions/api/admin/__tests__/sessionIdsHashed.test.js", "functions/utils/__tests__/auth.test.js"],
+  },
+  {
+    id: "mfa-challenge-stored-hashed",
+    invariant:
+      "CLAUDE.md 'Session ids and MFA challenges are stored hashed' — login stores the MFA challenge token's digest; the raw token goes only to the client (#1488)",
+    file: "functions/api/admin/auth/login.js",
+    find: ".bind(await hashStoredToken(mfaToken), user.id, ipAddress, userAgent, expiresAt)",
+    replace: ".bind(mfaToken, user.id, ipAddress, userAgent, expiresAt)",
+    tests: ["functions/api/admin/__tests__/sessionIdsHashed.test.js"],
+  },
+  {
+    id: "mfa-challenge-lookup-binds-hash",
+    invariant:
+      "CLAUDE.md 'Session ids and MFA challenges are stored hashed' — MFA verify hashes the submitted challenge token before the lookup, so a stored digest is not redeemable (#1488)",
+    file: "functions/api/admin/auth/mfa/verify.js",
+    find: ".bind(await hashStoredToken(mfaToken))",
+    replace: ".bind(mfaToken)",
+    tests: ["functions/api/admin/__tests__/sessionIdsHashed.test.js", "functions/api/admin/auth/__tests__/mfa.test.js"],
+  },
+  {
+    id: "session-csrf-bound-to-cookie-token",
+    invariant:
+      "CLAUDE.md 'Session ids and MFA challenges are stored hashed' — the middleware binds a fresh CSRF token to the raw cookie token, the value csrf.js reads back, never the stored digest (#1488)",
+    file: "functions/api/admin/_middleware.js",
+    find: "      const csrfToken = generateCSRFToken(request, env, sessionId);",
+    replace: "      const csrfToken = generateCSRFToken(request, env, session.id);",
+    tests: ["functions/api/admin/__tests__/sessionIdsHashed.test.js"],
+  },
+  {
     id: "reset-token-stored-hashed",
     invariant:
       "CLAUDE.md 'Password reset tokens are stored hashed' \u2014 the issuer stores the hash, never the token in the emailed link (#1354)",

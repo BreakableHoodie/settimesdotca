@@ -341,3 +341,21 @@ Node and local `wrangler` do not enforce the Workers runtime's limits, which is 
 - **Ready means the alias serves THIS RUN'S deployment** (`scripts/wait-for-preview.mjs`, #1340), three times running: it serves the `edge-e2e-deployment.txt` marker the workflow writes into `dist` (`run_id-attempt`), `/api/events/timeline` answers JSON, `/admin` loads the local dist's hashed entry script, and the local dist's hashed `AdminApp` chunk comes back as JavaScript. **Only the marker names the deployment:** Vite hashes come from frontend source, so a functions-only PR or a re-run serves byte-identical names from the previous deployment. Functions alone were not enough: `/` once returned 200 while the alias still pointed at the previous run's deleted deployment, and `/admin` once rendered the admin error boundary while Functions answered. **A missing chunk is not a 404 on Pages:** the SPA fallback answers `200 text/html`, so the chunk check is on content-type. Phase 2 runs after a phase-1 test failure but never when reset, deploy or readiness failed, and the reset retries as a whole (D1 code 7500 has failed it).
 - **Queueing and teardown:** one shared database, so runs queue (`cancel-in-progress: false`). Every run deletes its deployment, and a failed delete fails the job, so stale previews (#1295) cannot pile up.
 - **Not run** for fork or Dependabot PRs, which get no secrets. The job says so; it never passes silently.
+
+## The test harness's `batch()` was not atomic until #1146 — `CLAUDE.md` text as of 2026-11-25
+
+**Until #1146 that atomicity was UNVERIFIABLE here**, which is worth knowing
+because it means every batch-dependent test written before then proved less
+than it appeared to. `createDBEnv`'s `batch()` in `functions/api/test-utils.js`
+ran a plain sequential loop with no transaction, so a mid-batch failure left
+earlier statements committed — the opposite of production. A test asserting "on
+failure, nothing was written" would have failed against the harness while
+passing against real D1, so nobody wrote one, and code depending on rollback
+could have been broken in production and green in CI.
+
+It is now wrapped in `db.transaction()` (better-sqlite3 is synchronous, so the
+whole loop fits inside one; nested calls become SAVEPOINTs).
+`functions/api/__tests__/testHarnessBatchAtomicity.test.js` is what makes every
+other batch-related test worth trusting — it asserts rollback on failure,
+commit on success, and that the per-statement result shape is unchanged, and it
+goes red against the old loop.

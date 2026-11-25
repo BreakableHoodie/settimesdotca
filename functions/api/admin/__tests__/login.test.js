@@ -4,7 +4,7 @@
 
 import { describe, test, expect, beforeAll } from "vitest";
 import { onRequestPost } from "../auth/login.js";
-import { createTestDB, createDBEnv } from "../../test-utils.js";
+import { createTestDB, createDBEnv, testSessionKey } from "../../test-utils.js";
 import { hashPassword } from "../../../utils/crypto.js";
 
 // Non-secret unit-test fixtures (the "test" marker keeps secret scanners quiet).
@@ -197,7 +197,9 @@ describe("login — MFA challenge branch", () => {
       },
     });
 
-    const challenge = rawDb.prepare("SELECT * FROM mfa_challenges WHERE token = ?").get(body.mfaToken);
+    // Stored as its digest, never the token the client holds (#1488).
+    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM mfa_challenges WHERE token = ?").get(body.mfaToken).n).toBe(0);
+    const challenge = rawDb.prepare("SELECT * FROM mfa_challenges WHERE token = ?").get(testSessionKey(body.mfaToken));
     expect(challenge).toBeTruthy();
     expect(challenge.used).toBe(0);
 

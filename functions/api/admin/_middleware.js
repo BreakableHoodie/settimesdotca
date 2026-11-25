@@ -199,8 +199,10 @@ async function resolveSession(request, env) {
       return { lucia, sessionId, session: null, user: null, sessionMeta: null };
     }
 
+    // session.id is the stored key (the digest, #1488); sessionId stays the raw
+    // cookie token, which only the CSRF binding and the cookie itself use.
     const sessionMeta = await env.DB.prepare("SELECT created_at, last_activity_at FROM lucia_sessions WHERE id = ?")
-      .bind(sessionId)
+      .bind(session.id)
       .first();
 
     return { lucia, sessionId, session, user, sessionMeta };
@@ -254,7 +256,7 @@ async function enforceSession(request, env) {
   // absolute-expiry clocks and grant a session with unverifiable metadata an
   // indefinite extension instead of catching the corruption.
   if (!createdAt) {
-    await lucia.invalidateSession(sessionId);
+    await lucia.invalidateSession(session.id);
     const headers = new Headers({ "Content-Type": "application/json" });
     headers.append("Set-Cookie", lucia.createBlankSessionCookie().serialize());
     return {
@@ -275,7 +277,7 @@ async function enforceSession(request, env) {
   const absoluteElapsed = now.getTime() - createdAt.getTime();
 
   if (idleElapsed > idleTimeout || absoluteElapsed > absoluteTimeout) {
-    await lucia.invalidateSession(sessionId);
+    await lucia.invalidateSession(session.id);
     const headers = new Headers({ "Content-Type": "application/json" });
     headers.append("Set-Cookie", lucia.createBlankSessionCookie().serialize());
 
@@ -292,7 +294,7 @@ async function enforceSession(request, env) {
   }
 
   await env.DB.prepare("UPDATE lucia_sessions SET last_activity_at = datetime('now') WHERE id = ?")
-    .bind(sessionId)
+    .bind(session.id)
     .run();
 
   const idleRemaining = Math.max(0, idleTimeout - idleElapsed);
@@ -306,7 +308,7 @@ async function enforceSession(request, env) {
 
   return {
     result,
-    pendingCookie: session.fresh ? lucia.createSessionCookie(session.id).serialize() : null,
+    pendingCookie: session.fresh ? lucia.createSessionCookie(sessionId).serialize() : null,
     timing: refreshedTiming,
   };
 }
@@ -614,7 +616,9 @@ export async function onRequest(context) {
     }
 
     const sessionData = {
-      id: sessionId,
+      // The stored key, never the cookie token: every consumer (step-up,
+      // mfaGuessGate, the sessions list) uses it in `WHERE id = ?` (#1488).
+      id: session.id,
       user_id: normalizedUser.userId,
       expires_at: session.expiresAt?.toISOString?.() || null,
       created_at: sessionMeta?.created_at || null,
@@ -628,7 +632,9 @@ export async function onRequest(context) {
 
     const csrfCookie = getCookie(request, "csrf_token");
     if (!csrfCookie) {
-      const csrfToken = generateCSRFToken(request, env, sessionId || session.id);
+      // Bound to the raw cookie token, the same value csrf.js reads from the cookie
+      // when it validates. Never the stored key.
+      const csrfToken = generateCSRFToken(request, env, sessionId);
       pendingCookies.push(setCSRFCookie(csrfToken, request));
     }
 

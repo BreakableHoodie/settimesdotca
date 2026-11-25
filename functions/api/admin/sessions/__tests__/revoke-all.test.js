@@ -8,7 +8,7 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, test } from "vitest";
 import { onRequestPost } from "../revoke-all.js";
-import { createTestEnv, mockUsers } from "../../../test-utils.js";
+import { createTestEnv, mockUsers, testSessionKey } from "../../../test-utils.js";
 import { initializeLucia } from "../../../../utils/auth.js";
 
 const REVOKE_ALL_URL = "https://example.test/api/admin/sessions/revoke-all";
@@ -38,9 +38,9 @@ describe("POST /api/admin/sessions/revoke-all", () => {
   test("invalidates every prior session for the caller and mints exactly one new one", async () => {
     const { env, rawDb, headers } = createTestEnv({ role: "viewer" });
     const userId = mockUsers.viewer.id;
-    const originalSessionId = headers.Authorization.replace("Bearer ", "");
+    const originalSessionId = testSessionKey(headers.Authorization.replace("Bearer ", ""));
     // A second "device" session for the same user.
-    const secondSessionId = crypto.randomUUID();
+    const secondSessionId = testSessionKey(crypto.randomUUID());
     rawDb
       .prepare("INSERT INTO lucia_sessions (id, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)")
       .run(secondSessionId, userId, Math.floor(Date.now() / 1000) + 3600, "9.9.9.9", "device-2");
@@ -80,11 +80,19 @@ describe("POST /api/admin/sessions/revoke-all", () => {
     expect(hmac).toBeTruthy();
     expect(randomValue).toBeTruthy();
 
+    // The cookie carries the raw token and the row its digest (#1488); CSRF
+    // binds the raw token, the same value csrf.js reads back from the cookie.
+    const newToken = cookies
+      .find((c) => /session_token=/.test(c))
+      .split(";")[0]
+      .split("=")[1];
     const newSession = rawDb.prepare("SELECT id FROM lucia_sessions WHERE user_id = ?").get(userId);
-    expect(newSession.id).not.toBe(oldSessionId);
+    expect(newSession.id).toBe(testSessionKey(newToken));
+    expect(newToken).not.toBe(oldSessionId);
 
     const secret = env.CSRF_SECRET;
-    expect(csrfHmac(secret, newSession.id, randomValue)).toBe(hmac);
+    expect(csrfHmac(secret, newToken, randomValue)).toBe(hmac);
+    expect(csrfHmac(secret, newSession.id, randomValue)).not.toBe(hmac);
     expect(csrfHmac(secret, oldSessionId, randomValue)).not.toBe(hmac);
   });
 

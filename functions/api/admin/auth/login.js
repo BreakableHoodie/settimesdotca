@@ -7,6 +7,7 @@ import { verifyPassword, hashPassword, DEFAULT_ITERATIONS } from "../../../utils
 import { generateCSRFToken, setCSRFCookie } from "../../../utils/csrf.js";
 import { getClientIP, parseJsonObjectBody } from "../../../utils/request.js";
 import { initializeLucia } from "../../../utils/auth.js";
+import { hashStoredToken } from "../../../utils/tokens.js";
 import {
   AUTH_ATTEMPT_TYPES,
   checkAuthRateLimit,
@@ -316,7 +317,8 @@ export async function onRequestPost(context) {
            used_at = NULL,
            created_at = datetime('now')`,
       )
-        .bind(mfaToken, user.id, ipAddress, userAgent, expiresAt)
+        // Stored as its digest (#1488); the raw token goes only to the client.
+        .bind(await hashStoredToken(mfaToken), user.id, ipAddress, userAgent, expiresAt)
         .run();
 
       await writeAuthAttempt(DB, {
@@ -373,13 +375,13 @@ export async function onRequestPost(context) {
     });
 
     // Generate CSRF token
-    const csrfToken = generateCSRFToken(request, env, session.id);
+    const csrfToken = generateCSRFToken(request, env, session.token);
 
     // Set secure HTTPOnly session cookie and CSRF cookie
     const headers = new Headers({
       "Content-Type": "application/json",
     });
-    headers.append("Set-Cookie", lucia.createSessionCookie(session.id).serialize());
+    headers.append("Set-Cookie", lucia.createSessionCookie(session.token).serialize());
     headers.append("Set-Cookie", setCSRFCookie(csrfToken, request));
 
     return new Response(

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createTestEnv } from "../../../test-utils";
+import { createTestEnv, testSessionKey } from "../../../test-utils";
 import { hashPassword } from "../../../../utils/crypto.js";
 import { generateTotpCode, generateTotpSecret, hashBackupCode } from "../../../../utils/totp.js";
 import { AUTH_ATTEMPT_TYPES } from "../../../../utils/authAttempts.js";
@@ -30,7 +30,9 @@ describe("admin mfa", () => {
     expect(payload.mfaRequired).toBe(true);
     expect(payload.mfaToken).toBeTruthy();
 
-    const challenge = rawDb.prepare("SELECT * FROM mfa_challenges WHERE token = ?").get(payload.mfaToken);
+    const challenge = rawDb
+      .prepare("SELECT * FROM mfa_challenges WHERE token = ?")
+      .get(testSessionKey(payload.mfaToken));
     expect(challenge).toBeTruthy();
 
     const user = rawDb.prepare("SELECT totp_secret FROM users WHERE id = ?").get(1);
@@ -50,7 +52,7 @@ describe("admin mfa", () => {
         `INSERT INTO mfa_challenges (token, user_id, ip_address, user_agent, expires_at)
          VALUES (?, ?, ?, ?, ?)`,
       )
-      .run(mfaToken, 1, "127.0.0.1", "test-agent", expiresAt);
+      .run(testSessionKey(mfaToken), 1, "127.0.0.1", "test-agent", expiresAt);
 
     const code = await generateTotpCode(secret);
     const request = new Request("https://example.test/api/admin/auth/mfa/verify", {
@@ -71,7 +73,7 @@ describe("admin mfa", () => {
     const session = rawDb.prepare("SELECT * FROM lucia_sessions WHERE user_id = ?").get(1);
     expect(session).toBeTruthy();
 
-    const challenge = rawDb.prepare("SELECT used FROM mfa_challenges WHERE token = ?").get(mfaToken);
+    const challenge = rawDb.prepare("SELECT used FROM mfa_challenges WHERE token = ?").get(testSessionKey(mfaToken));
     expect(challenge.used).toBe(1);
   });
 
@@ -92,7 +94,7 @@ describe("admin mfa", () => {
         `INSERT INTO mfa_challenges (token, user_id, ip_address, user_agent, expires_at)
          VALUES (?, ?, ?, ?, ?)`,
       )
-      .run(mfaToken, 1, "127.0.0.1", "test-agent", expiresAt);
+      .run(testSessionKey(mfaToken), 1, "127.0.0.1", "test-agent", expiresAt);
 
     const request = new Request("https://example.test/api/admin/auth/mfa/verify", {
       method: "POST",
@@ -128,7 +130,7 @@ describe("admin mfa", () => {
         `INSERT INTO mfa_challenges (token, user_id, ip_address, user_agent, expires_at)
          VALUES (?, ?, ?, ?, ?)`,
       )
-      .run(mfaToken, 1, "127.0.0.1", "test-agent", expiresAt);
+      .run(testSessionKey(mfaToken), 1, "127.0.0.1", "test-agent", expiresAt);
 
     env.MFA_TOTP_ENCRYPTION_KEY = "";
 
@@ -164,7 +166,7 @@ describe("admin mfa", () => {
         `INSERT INTO mfa_challenges (token, user_id, ip_address, user_agent, expires_at)
          VALUES (?, 1, '127.0.0.1', 'test-agent', ?)`,
       )
-      .run(mfaToken, new Date(Date.now() + 5 * 60 * 1000).toISOString());
+      .run(testSessionKey(mfaToken), new Date(Date.now() + 5 * 60 * 1000).toISOString());
     env.MFA_TOTP_ENCRYPTION_KEY = "";
     const errors = vi.spyOn(console, "error").mockImplementation(() => {});
 
@@ -200,7 +202,7 @@ describe("admin mfa", () => {
         `INSERT INTO mfa_challenges (token, user_id, ip_address, user_agent, expires_at)
          VALUES (?, ?, ?, ?, ?)`,
       )
-      .run(staleToken, 1, "127.0.0.1", "test-agent", expiresAt);
+      .run(testSessionKey(staleToken), 1, "127.0.0.1", "test-agent", expiresAt);
 
     const request = new Request("https://example.test/api/admin/auth/login", {
       method: "POST",
@@ -217,9 +219,11 @@ describe("admin mfa", () => {
 
     const activeChallenges = rawDb.prepare("SELECT token FROM mfa_challenges WHERE user_id = ? AND used = 0").all(1);
     expect(activeChallenges).toHaveLength(1);
-    expect(activeChallenges[0].token).toBe(payload.mfaToken);
+    expect(activeChallenges[0].token).toBe(testSessionKey(payload.mfaToken));
 
-    const staleChallenge = rawDb.prepare("SELECT COUNT(*) as c FROM mfa_challenges WHERE token = ?").get(staleToken);
+    const staleChallenge = rawDb
+      .prepare("SELECT COUNT(*) as c FROM mfa_challenges WHERE token = ?")
+      .get(testSessionKey(staleToken));
     expect(staleChallenge.c).toBe(0);
   });
 
@@ -288,7 +292,7 @@ describe("admin mfa", () => {
         `INSERT INTO mfa_challenges (token, user_id, ip_address, user_agent, expires_at)
          VALUES (?, ?, ?, ?, ?)`,
       )
-      .run(mfaToken, 1, "127.0.0.1", "test-agent", new Date(Date.now() + 300000).toISOString());
+      .run(testSessionKey(mfaToken), 1, "127.0.0.1", "test-agent", new Date(Date.now() + 300000).toISOString());
 
     // The other login spent EFGH-34 and committed first.
     const prepare = env.DB.prepare.bind(env.DB);

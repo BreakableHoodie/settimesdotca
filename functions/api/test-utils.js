@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -296,12 +297,15 @@ export function createTestEnv({ role = "editor", mfaEnrolled = role === "admin" 
     // loadTotpSecret still accepts.
     rawDb.prepare("UPDATE users SET totp_enabled = 1, totp_secret = 'JBSWY3DPEHPK3PXP' WHERE id = ?").run(userId);
   }
+  // sessionId is the raw token a client holds (cookie / Bearer); the row is
+  // keyed by its digest, as in production (#1488). sessionKey is that digest.
   const sessionId = crypto.randomUUID();
+  const sessionKey = testSessionKey(sessionId);
   const expiresAt = Math.floor(Date.now() / 1000) + 24 * 60 * 60;
 
   rawDb
     .prepare("INSERT INTO lucia_sessions (id, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)")
-    .run(sessionId, userId, expiresAt, "127.0.0.1", "test-agent");
+    .run(sessionKey, userId, expiresAt, "127.0.0.1", "test-agent");
 
   return {
     env: {
@@ -314,6 +318,7 @@ export function createTestEnv({ role = "editor", mfaEnrolled = role === "admin" 
     rawDb,
     role,
     sessionId,
+    sessionKey,
     headers: {
       "x-test-role": role,
       Authorization: `Bearer ${sessionId}`,
@@ -325,8 +330,18 @@ export function createTestEnv({ role = "editor", mfaEnrolled = role === "admin" 
 // createTestEnv: a default stamp would let every identity-route test pass
 // without the step-up the route requires, which is the guard's whole point.
 // `secondsAgo` backdates the stamp to test the window edge.
+// Takes the raw token (createTestEnv's sessionId), as a client holds it.
 export function grantStepUp(rawDb, sessionId, secondsAgo = 0) {
-  rawDb.prepare("UPDATE lucia_sessions SET step_up_at = unixepoch() - ? WHERE id = ?").run(secondsAgo, sessionId);
+  rawDb
+    .prepare("UPDATE lucia_sessions SET step_up_at = unixepoch() - ? WHERE id = ?")
+    .run(secondsAgo, testSessionKey(sessionId));
+}
+
+// The stored key for a session token: hashStoredToken (functions/utils/tokens.js),
+// computed synchronously for raw better-sqlite3 fixtures. auth.test.js pins
+// that the two agree.
+export function testSessionKey(token) {
+  return `sha256:${createHash("sha256").update(String(token)).digest("hex")}`;
 }
 
 export function insertShareLink(

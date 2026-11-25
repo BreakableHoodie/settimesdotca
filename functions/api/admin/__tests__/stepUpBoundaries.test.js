@@ -21,7 +21,7 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createTestEnv, grantStepUp } from "../../test-utils.js";
+import { createTestEnv, grantStepUp, testSessionKey } from "../../test-utils.js";
 import { onRequest } from "../_middleware.js";
 import { generateCSRFToken } from "../../../utils/csrf.js";
 import { STEP_UP_WINDOW_SECONDS } from "../../../utils/stepUp.js";
@@ -333,7 +333,7 @@ describe("step-up routes refuse a session that has not stepped up, and write not
         const otherSession = crypto.randomUUID();
         s.rawDb
           .prepare("INSERT INTO lucia_sessions (id, user_id, expires_at) VALUES (?, 1, ?)")
-          .run(otherSession, Math.floor(Date.now() / 1000) + 3600);
+          .run(testSessionKey(otherSession), Math.floor(Date.now() / 1000) + 3600);
         grantStepUp(s.rawDb, otherSession);
         const before = tableSnapshot(s.rawDb);
         const { response, after } = await call(s.route, key, s);
@@ -499,8 +499,8 @@ describe("step-up through the real admin middleware", () => {
     const key = "POST /api/admin/users/[id]/reset-mfa";
     const s = setup(key);
     s.rawDb
-      .prepare("INSERT INTO lucia_sessions (id, user_id, expires_at) VALUES ('other-session', 1, ?)")
-      .run(Math.floor(Date.now() / 1000) + 3600);
+      .prepare("INSERT INTO lucia_sessions (id, user_id, expires_at) VALUES (?, 1, ?)")
+      .run(testSessionKey("other-session"), Math.floor(Date.now() / 1000) + 3600);
     grantStepUp(s.rawDb, "other-session");
     const denied = await viaMiddleware(key, s);
     expect(denied.status).toBe(403);
@@ -515,7 +515,7 @@ describe("API keys never satisfy step-up (#1324)", () => {
     grantStepUp(s.rawDb, s.sessionId);
     const denied = await requireRecentStepUp({
       env: s.env,
-      data: { apiKey: { id: 1 }, session: { id: s.sessionId, user_id: 1 } },
+      data: { apiKey: { id: 1 }, session: { id: s.sessionKey, user_id: 1 } },
     });
     expect(denied.status).toBe(403);
     expect((await denied.json()).code).toBe("STEP_UP_KEY_FORBIDDEN");

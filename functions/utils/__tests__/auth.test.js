@@ -1,7 +1,8 @@
 // functions/utils/__tests__/auth.test.js
 import { describe, test, expect, beforeEach } from "vitest";
-import { createTestDB, createDBEnv, mockUsers } from "../../api/test-utils.js";
+import { createTestDB, createDBEnv, mockUsers, testSessionKey } from "../../api/test-utils.js";
 import { initializeLucia, isDevRequest } from "../auth.js";
+import { hashStoredToken } from "../tokens.js";
 
 function makeEnv(rawDb, opts = {}) {
   return {
@@ -132,6 +133,7 @@ describe("initializeLucia / session manager", () => {
   // ── validateSession ───────────────────────────────────────────────────────
 
   describe("validateSession", () => {
+    // Returns the raw token; the row is keyed by its digest (#1488).
     async function seedSession(rawDb, userId = 1, offsetSeconds = 20 * 86400) {
       const id = crypto.randomUUID();
       const expiresAt = Math.floor(Date.now() / 1000) + offsetSeconds;
@@ -139,7 +141,7 @@ describe("initializeLucia / session manager", () => {
         .prepare(
           "INSERT INTO lucia_sessions (id, user_id, expires_at, created_at, last_activity_at) VALUES (?, ?, ?, datetime('now'), datetime('now'))",
         )
-        .run(id, userId, expiresAt);
+        .run(testSessionKey(id), userId, expiresAt);
       return id;
     }
 
@@ -151,7 +153,8 @@ describe("initializeLucia / session manager", () => {
       const { session, user } = await manager.validateSession(sessionId);
 
       expect(session).not.toBeNull();
-      expect(session.id).toBe(sessionId);
+      // session.id is the stored key, never the token.
+      expect(session.id).toBe(testSessionKey(sessionId));
       expect(session.userId).toBe(mockUsers.admin.id);
       expect(session.fresh).toBe(false);
       expect(session.expiresAt).toBeInstanceOf(Date);
@@ -178,8 +181,81 @@ describe("initializeLucia / session manager", () => {
       expect(session).toBeNull();
       expect(user).toBeNull();
 
-      const row = rawDb.prepare("SELECT id FROM lucia_sessions WHERE id = ?").get(id);
+      const row = rawDb.prepare("SELECT id FROM lucia_sessions WHERE id = ?").get(testSessionKey(id));
       expect(row).toBeUndefined();
+    });
+  });
+
+  // ── stored hashed (#1488) ─────────────────────────────────────────────────
+
+  describe("session ids are stored hashed (#1488)", () => {
+    test("the test fixture's key is exactly hashStoredToken", async () => {
+      expect(testSessionKey("abc")).toBe(await hashStoredToken("abc"));
+    });
+
+    test("createSession stores only the digest; the cookie token is never a row id", async () => {
+      const env = makeEnv(rawDb);
+      const manager = initializeLucia(env.DB, makeRequest(), env);
+      const session = await manager.createSession(mockUsers.admin.id, {});
+
+      expect(session.token).not.toMatch(/^sha256:/);
+      expect(session.id).toBe(await hashStoredToken(session.token));
+      const ids = rawDb
+        .prepare("SELECT id FROM lucia_sessions")
+        .all()
+        .map((r) => r.id);
+      expect(ids).toEqual([session.id]);
+      expect(ids).not.toContain(session.token);
+    });
+
+    test("the raw token validates; the stored digest submitted as a token is refused", async () => {
+      const env = makeEnv(rawDb);
+      const manager = initializeLucia(env.DB, makeRequest(), env);
+      const session = await manager.createSession(mockUsers.admin.id, {});
+
+      const good = await manager.validateSession(session.token);
+      expect(good.session?.id).toBe(session.id);
+
+      const replay = await manager.validateSession(session.id);
+      expect(replay.session).toBeNull();
+      expect(replay.user).toBeNull();
+    });
+
+    test("invalidateSession refuses a token and createSessionCookie refuses a key", async () => {
+      const env = makeEnv(rawDb);
+      const manager = initializeLucia(env.DB, makeRequest(), env);
+      const session = await manager.createSession(mockUsers.admin.id, {});
+
+      await expect(manager.invalidateSession(session.token)).rejects.toThrow(/stored session key/);
+      expect(() => manager.createSessionCookie(session.id)).toThrow(/session token/);
+      expect(rawDb.prepare("SELECT COUNT(*) AS n FROM lucia_sessions").get().n).toBe(1);
+    });
+
+    test("the database refuses an unhashed session id or challenge token (migration 0084)", () => {
+      expect(() =>
+        rawDb
+          .prepare("INSERT INTO lucia_sessions (id, user_id, expires_at) VALUES (?, ?, ?)")
+          .run("raw-uuid", mockUsers.admin.id, 9999999999),
+      ).toThrow(/sha256/);
+      expect(() =>
+        rawDb
+          .prepare("INSERT INTO mfa_challenges (token, user_id, expires_at) VALUES (?, ?, ?)")
+          .run("raw-uuid", mockUsers.admin.id, "2099-01-01 00:00:00"),
+      ).toThrow(/sha256/);
+      // The prefix alone is not enough: case and length are pinned too.
+      for (const fake of [
+        "SHA256:" + "a".repeat(64),
+        "sha256:",
+        "sha256:" + "a".repeat(63),
+        "sha256:" + "z".repeat(64),
+        "sha256:" + "A".repeat(64),
+      ]) {
+        expect(() =>
+          rawDb
+            .prepare("INSERT INTO lucia_sessions (id, user_id, expires_at) VALUES (?, ?, ?)")
+            .run(fake, mockUsers.admin.id, 9999999999),
+        ).toThrow(/sha256/);
+      }
     });
   });
 

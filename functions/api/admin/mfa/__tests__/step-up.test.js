@@ -1,6 +1,6 @@
 // POST /api/admin/mfa/step-up (#1324)
 import { describe, expect, it, vi } from "vitest";
-import { createTestEnv } from "../../../test-utils.js";
+import { createTestEnv, testSessionKey } from "../../../test-utils.js";
 import { generateTotpCode, hashBackupCode } from "../../../../utils/totp.js";
 import { onRequest } from "../../_middleware.js";
 import { generateApiKey } from "../../../../utils/apiKeys.js";
@@ -21,14 +21,14 @@ async function post(env, headers, body, data) {
 }
 
 const stamp = (rawDb, sessionId) =>
-  rawDb.prepare("SELECT step_up_at FROM lucia_sessions WHERE id = ?").get(sessionId).step_up_at;
+  rawDb.prepare("SELECT step_up_at FROM lucia_sessions WHERE id = ?").get(testSessionKey(sessionId)).step_up_at;
 
 describe("POST /api/admin/mfa/step-up", () => {
   it("a valid TOTP stamps this session, and only this session", async () => {
     const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
     rawDb
-      .prepare("INSERT INTO lucia_sessions (id, user_id, expires_at) VALUES ('other', 1, ?)")
-      .run(Math.floor(Date.now() / 1000) + 3600);
+      .prepare("INSERT INTO lucia_sessions (id, user_id, expires_at) VALUES (?, 1, ?)")
+      .run(testSessionKey("other"), Math.floor(Date.now() / 1000) + 3600);
     expect(stamp(rawDb, sessionId)).toBeNull();
 
     const before = Math.floor(Date.now() / 1000);
@@ -39,6 +39,8 @@ describe("POST /api/admin/mfa/step-up", () => {
     expect(new Date(payload.stepUpExpiresAt).getTime()).toBeGreaterThan(Date.now() + 290_000);
     expect(stamp(rawDb, sessionId)).toBeGreaterThanOrEqual(before);
     expect(stamp(rawDb, "other")).toBeNull();
+    // The stamp landed on the stored key, and the database holds no raw token (#1488).
+    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM lucia_sessions WHERE id NOT LIKE 'sha256:%'").get().n).toBe(0);
     expect(rawDb.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action = 'mfa.step_up'").get().n).toBe(1);
   });
 
@@ -76,7 +78,7 @@ describe("POST /api/admin/mfa/step-up", () => {
       spare,
     ]);
 
-    rawDb.prepare("UPDATE lucia_sessions SET step_up_at = NULL WHERE id = ?").run(sessionId);
+    rawDb.prepare("UPDATE lucia_sessions SET step_up_at = NULL WHERE id = ?").run(testSessionKey(sessionId));
     const replay = await post(env, headers, { code: "ABCD1234EF" });
     expect(replay.status).toBe(400);
     expect(stamp(rawDb, sessionId)).toBeNull();
@@ -193,7 +195,7 @@ describe("POST /api/admin/mfa/step-up", () => {
       {
         user: { userId: 1, role: "admin" },
         apiKey: { id: 1 },
-        session: { id: sessionId, user_id: 1 },
+        session: { id: testSessionKey(sessionId), user_id: 1 },
       },
     );
     expect(response.status).toBe(403);
@@ -221,13 +223,17 @@ describe("POST /api/admin/mfa/step-up", () => {
       );
       expect(response.status).toBe(400);
     }
-    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM lucia_sessions WHERE id = ?").get(sessionId).n).toBe(1);
+    expect(
+      rawDb.prepare("SELECT COUNT(*) AS n FROM lucia_sessions WHERE id = ?").get(testSessionKey(sessionId)).n,
+    ).toBe(1);
 
     // The eleventh, from yet another address and with the RIGHT code, is locked out.
     const locked = await post(env, { ...headers, "CF-Connecting-IP": "198.51.100.77" }, { code: good });
     expect(locked.status).toBe(401);
     expect((await locked.json()).code).toBe("STEP_UP_LOCKED");
-    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM lucia_sessions WHERE id = ?").get(sessionId).n).toBe(0);
+    expect(
+      rawDb.prepare("SELECT COUNT(*) AS n FROM lucia_sessions WHERE id = ?").get(testSessionKey(sessionId)).n,
+    ).toBe(0);
   });
 
   it("the per-user limit counts failures across step-up, backup-codes and disable together", async () => {
@@ -242,7 +248,9 @@ describe("POST /api/admin/mfa/step-up", () => {
     const response = await post(env, headers, { code: await generateTotpCode(SECRET) });
     expect(response.status).toBe(401);
     expect((await response.json()).code).toBe("STEP_UP_LOCKED");
-    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM lucia_sessions WHERE id = ?").get(sessionId).n).toBe(0);
+    expect(
+      rawDb.prepare("SELECT COUNT(*) AS n FROM lucia_sessions WHERE id = ?").get(testSessionKey(sessionId)).n,
+    ).toBe(0);
   });
 
   it("successes and other users' failures do not count toward the per-user limit", async () => {
@@ -258,12 +266,18 @@ describe("POST /api/admin/mfa/step-up", () => {
   });
 
   it("concurrent wrong guesses are all counted, so a parallel burst cannot out-run the limit", async () => {
-    const { env, rawDb, headers, sessionId } = createTestEnv({ role: "admin" });
+    const { env, rawDb, headers, sessionId, sessionKey } = createTestEnv({ role: "admin" });
     const good = await generateTotpCode(SECRET);
     const wrong = good === "000000" ? "111111" : "000000";
+    // Authenticated as the middleware does it, once per request before the
+    // handler, so the burst exercises the guess gate itself. Without this each
+    // request re-validates its session, which now hashes the cookie first
+    // (#1488, an async digest), so requests landing after a lockout are refused
+    // at authentication instead of reaching the gate and the count is timing.
+    const data = { user: { userId: 1, role: "admin", email: "admin@test" }, session: { id: sessionKey, user_id: 1 } };
     const results = await Promise.all(
       Array.from({ length: 14 }, (_, i) =>
-        post(env, { ...headers, "CF-Connecting-IP": `192.0.2.${i + 1}` }, { code: wrong }),
+        post(env, { ...headers, "CF-Connecting-IP": `192.0.2.${i + 1}` }, { code: wrong }, { ...data }),
       ),
     );
     const statuses = results.map((r) => r.status);
@@ -272,7 +286,9 @@ describe("POST /api/admin/mfa/step-up", () => {
     expect(rawDb.prepare("SELECT COUNT(*) AS n FROM auth_attempts WHERE attempt_type = 'mfa_step_up'").get().n).toBe(
       14,
     );
-    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM lucia_sessions WHERE id = ?").get(sessionId).n).toBe(0);
+    expect(
+      rawDb.prepare("SELECT COUNT(*) AS n FROM lucia_sessions WHERE id = ?").get(testSessionKey(sessionId)).n,
+    ).toBe(0);
   });
 
   it("a wrong code from one address is stopped by the per-IP limit with 429", async () => {
@@ -325,7 +341,7 @@ describe("POST /api/admin/mfa/step-up", () => {
       ...env.DB,
       prepare(sql) {
         if (/^\s*UPDATE lucia_sessions SET step_up_at/.test(sql)) {
-          rawDb.prepare("DELETE FROM lucia_sessions WHERE id = ?").run(sessionId);
+          rawDb.prepare("DELETE FROM lucia_sessions WHERE id = ?").run(testSessionKey(sessionId));
         }
         return realPrepare(sql);
       },

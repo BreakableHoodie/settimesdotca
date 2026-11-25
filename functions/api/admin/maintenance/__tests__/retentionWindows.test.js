@@ -64,7 +64,7 @@ describe("retention windows published in the privacy policy", () => {
     const { env, rawDb } = createTestEnv({ role: "admin" });
     rawDb
       .prepare("INSERT INTO lucia_sessions (id, user_id, expires_at) VALUES (?, 1, ?)")
-      .run("expired-retention-session", 0);
+      .run("sha256:657870697265642d726574656e74696f6e2d73657373696f6e00000000000000", 0);
 
     const originalPrepare = env.DB.prepare.bind(env.DB);
     const prepareSpy = vi.spyOn(env.DB, "prepare").mockImplementation((sql) => {
@@ -91,7 +91,11 @@ describe("retention windows published in the privacy policy", () => {
   // that throw aborted the list before later tables were even started.
   test("a delete that throws while being prepared does not stop later tables", async () => {
     const { env, rawDb } = createTestEnv({ role: "admin" });
-    rawDb.prepare("INSERT INTO lucia_sessions (id, user_id, expires_at) VALUES ('expired-prep', 1, 0)").run();
+    rawDb
+      .prepare(
+        "INSERT INTO lucia_sessions (id, user_id, expires_at) VALUES ('sha256:657870697265642d707265700000000000000000000000000000000000000000', 1, 0)",
+      )
+      .run();
 
     const originalPrepare = env.DB.prepare.bind(env.DB);
     const prepareSpy = vi.spyOn(env.DB, "prepare").mockImplementation((sql) => {
@@ -101,7 +105,13 @@ describe("retention windows published in the privacy policy", () => {
 
     await expect(runRetentionCleanup(env)).rejects.toThrow("retention failed for: mfa_challenges");
     // lucia_sessions comes first and rate_limits last: both still ran.
-    expect(rawDb.prepare("SELECT COUNT(*) AS n FROM lucia_sessions WHERE id = 'expired-prep'").get().n).toBe(0);
+    expect(
+      rawDb
+        .prepare(
+          "SELECT COUNT(*) AS n FROM lucia_sessions WHERE id = 'sha256:657870697265642d707265700000000000000000000000000000000000000000'",
+        )
+        .get().n,
+    ).toBe(0);
     expect(prepareSpy.mock.calls.some(([sql]) => sql.includes("DELETE FROM rate_limits"))).toBe(true);
     prepareSpy.mockRestore();
   });

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createTestEnv } from "../../test-utils.js";
 import * as resendActivationHandler from "../resend-activation.js";
 
@@ -103,6 +103,37 @@ describe("POST /api/auth/resend-activation", () => {
     expect(user.activation_token).toBeNull();
   });
 
+  it("sends no email and rotates no token for an invitee an admin deactivated", async () => {
+    const { env, rawDb } = createTestEnv();
+    const email = "deactivated-invitee@example.com";
+    const { id } = insertInactiveUser(rawDb, { email });
+    rawDb
+      .prepare("UPDATE users SET activation_token = 'old-digest', deactivated_at = datetime('now') WHERE id = ?")
+      .run(id);
+    const fetchSpy = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchSpy);
+    Object.assign(env, { EMAIL_PROVIDER: "resend", RESEND_API_KEY: "test-key", EMAIL_FROM: "noreply@example.test" });
+
+    const response = await resendActivationHandler.onRequestPost({
+      request: new Request(BASE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      }),
+      env,
+    });
+    vi.unstubAllGlobals();
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).success).toBe(true);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    // The early refusal also leaves the per-recipient cap unspent (it runs before the cap).
+    expect(rawDb.prepare("SELECT COUNT(*) AS c FROM rate_limits WHERE key LIKE 'email-recipient:%'").get().c).toBe(0);
+    expect(rawDb.prepare("SELECT activation_token FROM users WHERE id = ?").get(id).activation_token).toBe(
+      "old-digest",
+    );
+  });
+
   it("returns the generic response for an unknown email (user-enumeration resistance)", async () => {
     const { env } = createTestEnv();
 
@@ -116,5 +147,39 @@ describe("POST /api/auth/resend-activation", () => {
     expect(response.status).toBe(200);
     const payload = await response.json();
     expect(payload.success).toBe(true);
+  });
+});
+
+describe("POST /api/auth/resend-activation — the token write is pinned to the state it read", () => {
+  it("sends no email and stores no token when the row is deactivated between the read and the write", async () => {
+    const { env, rawDb } = createTestEnv();
+    const email = "race-invitee@example.com";
+    const { id } = insertInactiveUser(rawDb, { email });
+    const fetchSpy = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchSpy);
+    Object.assign(env, { EMAIL_PROVIDER: "resend", RESEND_API_KEY: "test-key", EMAIL_FROM: "noreply@example.test" });
+    const realPrepare = env.DB.prepare.bind(env.DB);
+    env.DB.prepare = (sql) => {
+      // The admin's deactivate lands after the SELECT and before the UPDATE runs.
+      if (/^\s*UPDATE users/.test(sql)) {
+        rawDb.prepare("UPDATE users SET deactivated_at = datetime('now') WHERE id = ?").run(id);
+      }
+      return realPrepare(sql);
+    };
+
+    const response = await resendActivationHandler.onRequestPost({
+      request: new Request(BASE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      }),
+      env,
+    });
+    vi.unstubAllGlobals();
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).success).toBe(true);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(rawDb.prepare("SELECT activation_token FROM users WHERE id = ?").get(id).activation_token).toBeNull();
   });
 });

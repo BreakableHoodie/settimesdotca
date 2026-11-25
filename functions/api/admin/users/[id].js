@@ -230,6 +230,14 @@ export async function onRequestPatch(context) {
         updates.push("deactivated_at = datetime('now')");
         updates.push("deactivated_by = ?");
         values.push(currentUser.userId);
+        // An invitee deactivated before activating must not keep a redeemable link.
+        updates.push("activation_token = NULL");
+        updates.push("activation_token_expires_at = NULL");
+      } else {
+        // Reactivation clears the stamp (activate.js and resend-activation.js refuse a
+        // stamped row) and mints no token; the invitee asks for a new link.
+        updates.push("deactivated_at = NULL");
+        updates.push("deactivated_by = NULL");
       }
     }
 

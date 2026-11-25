@@ -38,6 +38,7 @@ export async function onRequestPost(context) {
              activation_token_expires_at, activated_at
       FROM users
       WHERE activation_token = ?
+        AND deactivated_at IS NULL
     `,
     )
       .bind(tokenHash)
@@ -95,6 +96,7 @@ export async function onRequestPost(context) {
           activation_token_expires_at = NULL
       WHERE activation_token = ?
         AND is_active = 0
+        AND deactivated_at IS NULL
         -- datetime() normalises BOTH storage formats before comparing. A raw
         -- text compare is wrong for legacy ISO-'T' rows written before the
         -- SEC-F1 write-side fix: 'T' (0x54) sorts above ' ' (0x20), so on the

@@ -549,6 +549,96 @@ export const MUTATIONS = [
     tests: ["functions/api/auth/__tests__/activate.test.js"],
   },
   {
+    id: "activation-claim-refuses-deactivated",
+    invariant:
+      "CLAUDE.md 'Activation tokens are stored hashed' \u2014 the claim UPDATE refuses a deactivated invitee even when the lookup passed (#1482)",
+    file: "functions/api/auth/activate.js",
+    find: "        AND is_active = 0\n        AND deactivated_at IS NULL\n",
+    replace: "        AND is_active = 0\n",
+    tests: ["functions/api/auth/__tests__/activate.test.js"],
+  },
+  {
+    id: "resend-refuses-deactivated",
+    invariant:
+      "CLAUDE.md 'Activation tokens are stored hashed' \u2014 resend-activation mints no token and sends no email for a deactivated invitee (#1482)",
+    file: "functions/api/auth/resend-activation.js",
+    find: "    if (user.deactivated_at) {",
+    replace: "    if (false) {",
+    tests: ["functions/api/auth/__tests__/resend-activation.test.js"],
+  },
+  {
+    id: "resend-token-write-pinned-to-read-state",
+    invariant:
+      "CLAUDE.md 'Activation tokens are stored hashed' \u2014 resend-activation's token UPDATE is pinned to the state it read, so a concurrent deactivate stores nothing (#1482)",
+    file: "functions/api/auth/resend-activation.js",
+    find: "        AND deactivated_at IS NULL\n    `,",
+    replace: "    `,",
+    tests: ["functions/api/auth/__tests__/resend-activation.test.js"],
+  },
+  {
+    id: "resend-no-email-when-write-not-applied",
+    invariant:
+      "CLAUDE.md 'Activation tokens are stored hashed' \u2014 resend-activation sends no email when its token write matched no row (#1482)",
+    file: "functions/api/auth/resend-activation.js",
+    find: "    if (writeResult?.meta?.changes === 0) {",
+    replace: "    if (false) {",
+    tests: ["functions/api/auth/__tests__/resend-activation.test.js"],
+  },
+  {
+    id: "toggle-refuses-pending-invitee",
+    invariant:
+      "CLAUDE.md 'Activation tokens are stored hashed' \u2014 toggle-status refuses a never-activated invitee instead of activating them without the emailed link (#1482)",
+    file: "functions/api/admin/users/[id]/toggle-status.js",
+    find: "    if (Number(targetUser.is_active) === 0 && !targetUser.activated_at) {",
+    replace: "    if (false) {",
+    tests: ["functions/api/admin/users/__tests__/deactivatedInvitee.test.js"],
+  },
+  {
+    id: "patch-deactivation-clears-activation-token",
+    invariant:
+      "CLAUDE.md 'Activation tokens are stored hashed' \u2014 PATCH deactivation clears the activation token (#1482)",
+    file: "functions/api/admin/users/[id].js",
+    find: '        updates.push("activation_token = NULL");',
+    replace: "        void 0;",
+    tests: ["functions/api/admin/users/__tests__/deactivatedInvitee.test.js"],
+  },
+  {
+    id: "patch-reactivation-clears-deactivated-at",
+    invariant:
+      "CLAUDE.md 'Activation tokens are stored hashed' \u2014 PATCH reactivation clears deactivated_at so the invitee can activate (#1482)",
+    file: "functions/api/admin/users/[id].js",
+    find: '        updates.push("deactivated_at = NULL");',
+    replace: "        void 0;",
+    tests: ["functions/api/admin/users/__tests__/deactivatedInvitee.test.js"],
+  },
+  {
+    id: "toggle-deactivation-clears-activation-token",
+    invariant:
+      "CLAUDE.md 'Activation tokens are stored hashed' \u2014 toggle-status deactivation clears the activation token (#1482)",
+    file: "functions/api/admin/users/[id]/toggle-status.js",
+    find: "activation_token = CASE WHEN ? = 0 THEN NULL ELSE activation_token END,",
+    replace: "activation_token = CASE WHEN ? = 0 THEN activation_token ELSE activation_token END,",
+    tests: ["functions/api/admin/users/__tests__/deactivatedInvitee.test.js"],
+  },
+  {
+    id: "toggle-deactivation-stamps-deactivated-at",
+    invariant:
+      "CLAUDE.md 'Activation tokens are stored hashed' \u2014 toggle-status deactivation stamps deactivated_at (#1482)",
+    file: "functions/api/admin/users/[id]/toggle-status.js",
+    find: "deactivated_at = CASE WHEN ? = 0 THEN datetime('now') ELSE NULL END,",
+    replace: "deactivated_at = CASE WHEN ? = 0 THEN NULL ELSE NULL END,",
+    tests: ["functions/api/admin/users/__tests__/deactivatedInvitee.test.js"],
+  },
+  {
+    id: "toggle-reactivation-clears-deactivated-at",
+    invariant:
+      "CLAUDE.md 'Activation tokens are stored hashed' \u2014 toggle-status reactivation clears deactivated_at (#1482)",
+    file: "functions/api/admin/users/[id]/toggle-status.js",
+    find: "deactivated_at = CASE WHEN ? = 0 THEN datetime('now') ELSE NULL END,",
+    replace: "deactivated_at = CASE WHEN ? = 0 THEN datetime('now') ELSE deactivated_at END,",
+    tests: ["functions/api/admin/users/__tests__/deactivatedInvitee.test.js"],
+  },
+  {
     id: "reset-token-stored-hashed",
     invariant:
       "CLAUDE.md 'Password reset tokens are stored hashed' \u2014 the issuer stores the hash, never the token in the emailed link (#1354)",

@@ -317,3 +317,42 @@ describe("POST /api/auth/activate — tokens are stored hashed (#1482)", () => {
     }
   });
 });
+
+describe("POST /api/auth/activate — a deactivated invitee cannot activate", () => {
+  it("refuses a valid, unexpired token once an admin has deactivated the invitee", async () => {
+    const { env, rawDb } = createTestEnv();
+    const expiresAt = toSqliteDateTime(new Date(Date.now() + 60 * 60 * 1000));
+    const { id } = await insertPendingUser(rawDb, { expiresAt });
+    rawDb.prepare("UPDATE users SET deactivated_at = datetime('now') WHERE id = ?").run(id);
+
+    const response = await activateHandler.onRequestPost({ request: activateRequest("tok-123"), env });
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(JSON.stringify(body)).not.toMatch(/deactivat/i);
+    const user = rawDb.prepare("SELECT is_active, activated_at FROM users WHERE id = ?").get(id);
+    expect(user.is_active).toBe(0);
+    expect(user.activated_at).toBeNull();
+  });
+
+  it("the claim UPDATE alone refuses a deactivated invitee, independent of the lookup", async () => {
+    // Race: the lookup saw an undeactivated row, then an admin deactivated it
+    // before the claim ran. Simulate by deactivating inside the lookup's window.
+    const { env, rawDb } = createTestEnv();
+    const expiresAt = toSqliteDateTime(new Date(Date.now() + 60 * 60 * 1000));
+    const { id } = await insertPendingUser(rawDb, { expiresAt });
+    const realPrepare = env.DB.prepare.bind(env.DB);
+    env.DB.prepare = (sql) => {
+      const stmt = realPrepare(sql);
+      if (/^\s*UPDATE users/.test(sql)) {
+        rawDb.prepare("UPDATE users SET deactivated_at = datetime('now') WHERE id = ?").run(id);
+      }
+      return stmt;
+    };
+
+    const response = await activateHandler.onRequestPost({ request: activateRequest("tok-123"), env });
+
+    expect(response.status).toBe(400);
+    expect(rawDb.prepare("SELECT is_active FROM users WHERE id = ?").get(id).is_active).toBe(0);
+  });
+});

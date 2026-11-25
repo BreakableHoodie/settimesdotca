@@ -56,7 +56,7 @@ export async function onRequestPost(context) {
   try {
     const user = await DB.prepare(
       `
-      SELECT id, first_name, last_name, is_active, activated_at
+      SELECT id, first_name, last_name, is_active, activated_at, deactivated_at
       FROM users
       WHERE email = ?
     `,
@@ -69,6 +69,11 @@ export async function onRequestPost(context) {
     }
 
     if (user.activated_at) {
+      return genericResponse;
+    }
+
+    // An admin deactivated this invitee before they activated: no new link.
+    if (user.deactivated_at) {
       return genericResponse;
     }
 
@@ -90,13 +95,17 @@ export async function onRequestPost(context) {
     // against D1's datetime('now') in activate.js's SQL expiry guard.
     const activationExpires = toSqliteDateTime(new Date(Date.now() + 24 * 60 * 60 * 1000));
 
+    let writeResult;
     try {
-      await DB.prepare(
+      writeResult = await DB.prepare(
         `
       UPDATE users
       SET activation_token = ?,
           activation_token_expires_at = ?
       WHERE id = ?
+        AND is_active = 0
+        AND activated_at IS NULL
+        AND deactivated_at IS NULL
     `,
       )
         .bind(activationTokenHash, activationExpires, user.id)
@@ -107,6 +116,13 @@ export async function onRequestPost(context) {
       // not a benign not-found/already-active branch — log it distinctly so it
       // is alertable rather than hidden behind the generic 200.
       console.error("[ResendActivation] activation token write failed:", writeErr);
+      return genericResponse;
+    }
+
+    // The row changed state between the read and this write (e.g. an admin deactivated
+    // it): nothing was stored, so nothing is sent. Only an EXPLICIT 0 counts as not
+    // applied; an absent meta must not suppress a committed write's email.
+    if (writeResult?.meta?.changes === 0) {
       return genericResponse;
     }
 

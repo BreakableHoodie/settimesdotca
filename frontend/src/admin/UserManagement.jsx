@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { Key, Pencil, Plus, ShieldOff, Trash, UserCheck, UserX } from 'lucide-react'
+import { Ban, Key, Pencil, Plus, ShieldOff, Trash, UserCheck, UserX } from 'lucide-react'
 import LoadError from './components/LoadError'
 import RetryRegion from '../components/RetryRegion'
 import useRetryFocus from '../hooks/useRetryFocus'
@@ -7,7 +7,7 @@ import RoleBadge from './components/RoleBadge'
 import UserFormModal from './components/UserFormModal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { usersApi } from '../utils/adminApi'
-import { filterUsers, resolveUserDisplayName, sortUsers } from './utils/userRoster'
+import { filterUsers, resolveUserDisplayName, sortUsers, userStatus, USER_STATUS_LABELS } from './utils/userRoster'
 
 function SortIcon({ col, sortConfig }) {
   return (
@@ -33,6 +33,7 @@ export default function UserManagement({ showToast }) {
   const [statusFilter, setStatusFilter] = useState('all')
   const [pendingDelete, setPendingDelete] = useState(null)
   const [pendingToggle, setPendingToggle] = useState(null)
+  const [pendingRevoke, setPendingRevoke] = useState(null)
   const [pendingMfaReset, setPendingMfaReset] = useState(null)
   const [pendingInviteUrl, setPendingInviteUrl] = useState(null)
 
@@ -177,6 +178,24 @@ export default function UserManagement({ showToast }) {
       showToast('Failed to update user status', 'error')
       await fetchUsers()
     } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleRevokeInvite = async () => {
+    if (!pendingRevoke) return
+
+    const target = pendingRevoke
+    setPendingRevoke(null)
+    setActionLoading(true)
+    try {
+      await usersApi.update(target.id, { isActive: false })
+      showToast(`Invite revoked for ${target.email}`, 'success')
+    } catch (error) {
+      showToast(error.details?.message || error.message || 'Failed to revoke invite', 'error')
+    } finally {
+      // Reload either way: the server stamps deactivatedAt, which decides the label.
+      await fetchUsers({ quiet: true })
       setActionLoading(false)
     }
   }
@@ -341,7 +360,7 @@ export default function UserManagement({ showToast }) {
                               user.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
                             }`}
                           >
-                            {user.isActive ? 'Active' : 'Inactive'}
+                            {USER_STATUS_LABELS[userStatus(user)]}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
@@ -382,6 +401,17 @@ export default function UserManagement({ showToast }) {
                             >
                               <ShieldOff size={14} />
                             </button>
+                            {userStatus(user) === 'invited' && (
+                              <button
+                                type="button"
+                                onClick={() => setPendingRevoke(user)}
+                                className="text-yellow-400 hover:text-yellow-300 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
+                                aria-label={`Revoke invite for ${user.email}`}
+                                disabled={actionLoading}
+                              >
+                                <Ban size={14} />
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => setPendingToggle(user)}
@@ -431,7 +461,7 @@ export default function UserManagement({ showToast }) {
                     </div>
                     <div className="flex flex-wrap gap-3 text-sm text-gray-300">
                       <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-white/10 text-white">
-                        {user.isActive ? 'Active' : 'Inactive'}
+                        {USER_STATUS_LABELS[userStatus(user)]}
                       </span>
                       <span>
                         Last Login: {user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never'}
@@ -468,6 +498,16 @@ export default function UserManagement({ showToast }) {
                       >
                         Reset 2FA
                       </button>
+                      {userStatus(user) === 'invited' && (
+                        <button
+                          type="button"
+                          onClick={() => setPendingRevoke(user)}
+                          className="px-4 py-2 min-h-[44px] bg-yellow-600 hover:bg-yellow-700 text-white rounded text-sm"
+                          disabled={actionLoading}
+                        >
+                          Revoke invite
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => setPendingToggle(user)}
@@ -587,6 +627,18 @@ export default function UserManagement({ showToast }) {
         variant="danger"
         onConfirm={handleResetMfa}
         onCancel={() => setPendingMfaReset(null)}
+      />
+
+      {/* Revoke a pending invite */}
+      <ConfirmDialog
+        isOpen={!!pendingRevoke}
+        title="Revoke Invite"
+        message={`Revoke the invite for ${pendingRevoke?.email}? Their invite link will stop working. You can invite them again later.`}
+        confirmText="Revoke invite"
+        cancelText="Cancel"
+        variant="danger"
+        onConfirm={handleRevokeInvite}
+        onCancel={() => setPendingRevoke(null)}
       />
 
       {/* Toggle status confirmation */}

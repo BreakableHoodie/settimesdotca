@@ -37,6 +37,8 @@ export async function onRequestGet(context) {
         is_active,
         created_at,
         last_login,
+        activated_at,
+        deactivated_at,
         updated_at
       FROM users
       ORDER BY created_at DESC
@@ -51,6 +53,10 @@ export async function onRequestGet(context) {
           lastName: u.last_name || null,
           name: u.name || [u.first_name, u.last_name].filter(Boolean).join(" ") || null,
           isActive: u.is_active === 1, // Convert to camelCase boolean
+          // Lets the admin UI tell a pending invitee (never activated) from a
+          // revoked invite and from a deactivated account.
+          activatedAt: u.activated_at || null,
+          deactivatedAt: u.deactivated_at || null,
         })),
       }),
       {

@@ -2,16 +2,20 @@ import { describe, expect, it, vi } from "vitest";
 import { createTestEnv } from "../../test-utils.js";
 import * as activateHandler from "../activate.js";
 import { toSqliteDateTime } from "../../../utils/authAttempts.js";
+import { hashStoredToken } from "../../../utils/tokens.js";
+import * as resendActivationHandler from "../resend-activation.js";
 
 const BASE_URL = "https://example.test/api/auth/activate";
 
-function insertPendingUser(rawDb, { email = "pending@example.com", token = "tok-123", expiresAt } = {}) {
+// The column holds the digest (#1482); tests submit the plaintext.
+async function insertPendingUser(rawDb, { email = "pending@example.com", token = "tok-123", expiresAt } = {}) {
+  const stored = await hashStoredToken(token);
   rawDb
     .prepare(
       `INSERT INTO users (email, password_hash, name, role, is_active, activation_token, activation_token_expires_at)
        VALUES (?, ?, ?, ?, 0, ?, ?)`,
     )
-    .run(email, "hash", "Pending User", "editor", token, expiresAt);
+    .run(email, "hash", "Pending User", "editor", stored, expiresAt);
   return rawDb.prepare("SELECT id FROM users WHERE email = ?").get(email);
 }
 
@@ -34,7 +38,7 @@ describe("POST /api/auth/activate — expiry guards fail closed", () => {
     // caller treats null as expired; datetime() yields NULL in SQL so the
     // UPDATE matches no row.
     const { env, rawDb } = createTestEnv();
-    insertPendingUser(rawDb, { expiresAt: "not-a-date" });
+    await insertPendingUser(rawDb, { expiresAt: "not-a-date" });
 
     const response = await activateHandler.onRequestPost({ request: activateRequest("tok-123"), env });
 
@@ -79,7 +83,7 @@ describe("POST /api/auth/activate — expiry guards fail closed", () => {
 
       const { env, rawDb } = createTestEnv();
       const expiredLegacy = new Date(Date.now() - 60 * 60 * 1000).toISOString(); // expired, legacy 'T'+'Z' format
-      insertPendingUser(rawDb, { expiresAt: expiredLegacy });
+      await insertPendingUser(rawDb, { expiresAt: expiredLegacy });
 
       const response = await onRequestPost({ request: activateRequest("tok-123"), env });
 
@@ -97,7 +101,7 @@ describe("POST /api/auth/activate", () => {
   it("activates a pending user with a valid, non-expired (SQLite-format) token", async () => {
     const { env, rawDb } = createTestEnv();
     const expiresAt = toSqliteDateTime(new Date(Date.now() + 60 * 60 * 1000)); // 1h from now
-    insertPendingUser(rawDb, { expiresAt });
+    await insertPendingUser(rawDb, { expiresAt });
 
     const response = await activateHandler.onRequestPost({ request: activateRequest("tok-123"), env });
 
@@ -122,7 +126,7 @@ describe("POST /api/auth/activate", () => {
     try {
       const { env, rawDb } = createTestEnv();
       const expiresAt = toSqliteDateTime(new Date(Date.now() - 60 * 60 * 1000)); // 1h ago
-      insertPendingUser(rawDb, { expiresAt });
+      await insertPendingUser(rawDb, { expiresAt });
 
       const response = await activateHandler.onRequestPost({ request: activateRequest("tok-123"), env });
 
@@ -140,7 +144,7 @@ describe("POST /api/auth/activate", () => {
   it("still activates a valid, non-expired LEGACY ISO ('T'+'Z') token (backward compat, no migration needed)", async () => {
     const { env, rawDb } = createTestEnv();
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-    insertPendingUser(rawDb, { expiresAt });
+    await insertPendingUser(rawDb, { expiresAt });
 
     const response = await activateHandler.onRequestPost({ request: activateRequest("tok-123"), env });
 
@@ -150,7 +154,7 @@ describe("POST /api/auth/activate", () => {
   it("still rejects an expired LEGACY ISO ('T'+'Z') token (backward compat)", async () => {
     const { env, rawDb } = createTestEnv();
     const expiresAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    insertPendingUser(rawDb, { expiresAt });
+    await insertPendingUser(rawDb, { expiresAt });
 
     const response = await activateHandler.onRequestPost({ request: activateRequest("tok-123"), env });
 
@@ -171,15 +175,119 @@ describe("POST /api/auth/activate", () => {
     const { env, rawDb } = createTestEnv();
     rawDb
       .prepare(
-        `INSERT INTO users (email, password_hash, name, role, is_active, activation_token, activated_at)
-         VALUES (?, ?, ?, ?, 1, ?, datetime('now'))`,
+        `INSERT INTO users (email, password_hash, name, role, is_active, activation_token, activation_token_expires_at, activated_at)
+         VALUES (?, ?, ?, ?, 1, ?, ?, datetime('now'))`,
       )
-      .run("already@example.com", "hash", "Already Active", "editor", "tok-already");
+      .run(
+        "already@example.com",
+        "hash",
+        "Already Active",
+        "editor",
+        await hashStoredToken("tok-already"),
+        toSqliteDateTime(new Date(Date.now() + 60 * 60 * 1000)),
+      );
 
     const response = await activateHandler.onRequestPost({ request: activateRequest("tok-already"), env });
 
     expect(response.status).toBe(400);
     const payload = await response.json();
     expect(payload.error).toBe("Already activated");
+  });
+});
+
+describe("POST /api/auth/activate — tokens are stored hashed (#1482)", () => {
+  const future = () => toSqliteDateTime(new Date(Date.now() + 60 * 60 * 1000));
+
+  it("the stored value is not redeemable: submitting the digest itself is refused", async () => {
+    const { env, rawDb } = createTestEnv();
+    await insertPendingUser(rawDb, { expiresAt: future() });
+    const stored = rawDb.prepare("SELECT activation_token FROM users WHERE email = ?").get("pending@example.com");
+    expect(stored.activation_token).toMatch(/^sha256:[0-9a-f]{64}$/);
+
+    const response = await activateHandler.onRequestPost({ request: activateRequest(stored.activation_token), env });
+
+    expect(response.status).toBe(400);
+    const user = rawDb.prepare("SELECT is_active FROM users WHERE email = ?").get("pending@example.com");
+    expect(user.is_active).toBe(0);
+  });
+
+  it("a plaintext token left in the column (pre-migration) is not redeemable", async () => {
+    const { env, rawDb } = createTestEnv();
+    rawDb
+      .prepare(
+        `INSERT INTO users (email, password_hash, name, role, is_active, activation_token, activation_token_expires_at)
+         VALUES (?, ?, ?, ?, 0, ?, ?)`,
+      )
+      .run("legacy@example.com", "hash", "Legacy", "editor", "plain-legacy-token", future());
+
+    const response = await activateHandler.onRequestPost({ request: activateRequest("plain-legacy-token"), env });
+
+    expect(response.status).toBe(400);
+    expect(rawDb.prepare("SELECT is_active FROM users WHERE email = ?").get("legacy@example.com").is_active).toBe(0);
+  });
+
+  it("a token with NO expiry is refused, not treated as never expiring", async () => {
+    const { env, rawDb } = createTestEnv();
+    await insertPendingUser(rawDb, { expiresAt: null });
+
+    const response = await activateHandler.onRequestPost({ request: activateRequest("tok-123"), env });
+
+    expect(response.status).toBe(400);
+    // Refused by the JS check, not only by the SQL guard behind it.
+    expect((await response.json()).error).toBe("Activation link expired");
+    expect(rawDb.prepare("SELECT is_active FROM users WHERE email = ?").get("pending@example.com").is_active).toBe(0);
+  });
+
+  it("the SQL guard alone refuses a NULL expiry, independent of the JS check", async () => {
+    vi.resetModules();
+    vi.doMock("../../../utils/authAttempts.js", async () => {
+      const actual = await vi.importActual("../../../utils/authAttempts.js");
+      return { ...actual, fromSqliteDateTime: () => new Date(Date.now() + 60 * 60 * 1000) };
+    });
+    try {
+      const { onRequestPost } = await import("../activate.js");
+      const { env, rawDb } = createTestEnv();
+      await insertPendingUser(rawDb, { expiresAt: null });
+
+      const response = await onRequestPost({ request: activateRequest("tok-123"), env });
+
+      expect(response.status).toBe(400);
+      expect(rawDb.prepare("SELECT is_active FROM users WHERE email = ?").get("pending@example.com").is_active).toBe(0);
+    } finally {
+      vi.doUnmock("../../../utils/authAttempts.js");
+      vi.resetModules();
+    }
+  });
+
+  it("resend-activation stores only the digest, and the emailed plaintext activates the account", async () => {
+    const { env, rawDb } = createTestEnv();
+    rawDb
+      .prepare(
+        "INSERT INTO users (email, password_hash, name, role, is_active, activated_at) VALUES (?, ?, ?, ?, 0, NULL)",
+      )
+      .run("roundtrip@example.com", "hash", "Round Trip", "editor");
+    const uuid = "11111111-2222-4333-8444-555555555555";
+    const spy = vi.spyOn(crypto, "randomUUID").mockReturnValue(uuid);
+    const plaintext = uuid + uuid.replace(/-/g, "");
+    try {
+      const response = await resendActivationHandler.onRequestPost({
+        request: new Request("https://example.test/api/auth/resend-activation", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: "roundtrip@example.com" }),
+        }),
+        env,
+      });
+      expect(response.status).toBe(200);
+    } finally {
+      spy.mockRestore();
+    }
+
+    const stored = rawDb.prepare("SELECT activation_token FROM users WHERE email = ?").get("roundtrip@example.com");
+    expect(stored.activation_token).not.toBe(plaintext);
+    expect(stored.activation_token).toBe(await hashStoredToken(plaintext));
+
+    const activated = await activateHandler.onRequestPost({ request: activateRequest(plaintext), env });
+    expect(activated.status).toBe(200);
   });
 });

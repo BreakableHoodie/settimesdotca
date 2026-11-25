@@ -95,7 +95,7 @@ export async function onRequestPost(context) {
     const user = await DB.prepare(
       `
       SELECT id, email, password_hash, name, first_name, last_name, role, is_active,
-             activation_token, activation_token_expires_at, activated_at,
+             activated_at,
              totp_enabled, totp_secret
       FROM users
       WHERE LOWER(email) = ?

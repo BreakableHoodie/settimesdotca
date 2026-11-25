@@ -1,8 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createTestEnv } from "../../../test-utils";
 import * as signupHandler from "../signup.js";
 import { toSqliteDateTime } from "../../../../utils/authAttempts.js";
 import { hashInviteCode } from "../../../../utils/inviteCodes.js";
+import { hashStoredToken } from "../../../../utils/tokens.js";
+import * as activateHandler from "../../../auth/activate.js";
 
 // Production writes invite_codes.expires_at via toSqliteDateTime() (space
 // separator, no 'T') and compares it with `expires_at > datetime('now')`
@@ -77,7 +79,8 @@ describe("admin signup", () => {
     expect(usedInvite.used_by_user_id).toBe(createdUser.id);
     expect(usedInvite.used_at).toBeTruthy();
     expect(createdUser.is_active).toBe(0);
-    expect(createdUser.activation_token).toBeTruthy();
+    // Stored as a digest only (#1482): the plaintext is in the emailed link.
+    expect(createdUser.activation_token).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(createdUser.activation_token_expires_at).toBeTruthy();
     expect(createdUser.activated_at).toBeNull();
   });
@@ -338,5 +341,51 @@ describe("admin signup", () => {
     // must not contain provider internals
     const emailKeys = Object.keys(payload.email);
     expect(emailKeys).toEqual(["delivered"]);
+  });
+});
+
+describe("admin signup — activation token stored hashed (#1482)", () => {
+  it("stores the digest of the emailed token, and that token activates the account", async () => {
+    const { env, rawDb } = createTestEnv({ role: "editor" });
+    env.ALLOW_ADMIN_SIGNUP = "true";
+    const inviteCode = "TEST-INVITE-HASHED-ACT";
+    rawDb
+      .prepare("INSERT INTO invite_codes (code, role, expires_at, is_active) VALUES (?, ?, ?, ?)")
+      .run(await hashInviteCode(inviteCode), "editor", toSqliteDateTime(new Date(Date.now() + 864e5)), 1);
+    const uuid = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+    const plaintext = uuid + uuid.replace(/-/g, "");
+    const spy = vi.spyOn(crypto, "randomUUID").mockReturnValue(uuid);
+    try {
+      const response = await signupHandler.onRequestPost({
+        request: new Request("https://example.test/api/admin/auth/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: "hashed.act@example.com",
+            password: "StrongPass1!",
+            name: "Hashed Act",
+            inviteCode,
+          }),
+        }),
+        env,
+      });
+      expect(response.status).toBe(201);
+    } finally {
+      spy.mockRestore();
+    }
+
+    const stored = rawDb.prepare("SELECT activation_token FROM users WHERE email = ?").get("hashed.act@example.com");
+    expect(stored.activation_token).not.toBe(plaintext);
+    expect(stored.activation_token).toBe(await hashStoredToken(plaintext));
+
+    const activated = await activateHandler.onRequestPost({
+      request: new Request("https://example.test/api/auth/activate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: plaintext }),
+      }),
+      env,
+    });
+    expect(activated.status).toBe(200);
   });
 });

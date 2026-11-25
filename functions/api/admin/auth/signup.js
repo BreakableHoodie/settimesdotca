@@ -13,6 +13,7 @@ import { logger } from "../../../utils/logger.js";
 import { getPublicBaseUrl } from "../../../utils/publicUrl.js";
 import { auditLog } from "../_middleware.js";
 import { hashInviteCode } from "../../../utils/inviteCodes.js";
+import { hashStoredToken } from "../../../utils/tokens.js";
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -241,6 +242,10 @@ export async function onRequestPost(context) {
     const passwordHash = await hashPassword(password);
 
     const activationToken = crypto.randomUUID() + crypto.randomUUID().replace(/-/g, "");
+    // Stored hashed (#1482), like invite codes and reset tokens: the plaintext
+    // exists only in the emailed link, so a read of `users` cannot activate
+    // anyone.
+    const activationTokenHash = await hashStoredToken(activationToken);
     // SEC-F1 class (#670): must be space-separated to compare correctly
     // against D1's datetime('now') in activate.js's SQL expiry guard.
     const activationExpires = toSqliteDateTime(new Date(Date.now() + 24 * 60 * 60 * 1000));
@@ -279,7 +284,7 @@ export async function onRequestPost(context) {
         resolvedLastName || null,
         userRole,
         0,
-        activationToken,
+        activationTokenHash,
         activationExpires,
         inviteCodeHash,
       ),
@@ -293,7 +298,7 @@ export async function onRequestPost(context) {
          SET used_by_user_id = (SELECT id FROM users WHERE activation_token = ?), used_at = datetime('now')
          WHERE code = ? AND used_by_user_id IS NULL AND used_at IS NULL
            AND EXISTS (SELECT 1 FROM users WHERE activation_token = ?)`,
-      ).bind(activationToken, inviteCodeHash, activationToken),
+      ).bind(activationTokenHash, inviteCodeHash, activationTokenHash),
     ]);
 
     // Only an EXPLICIT changes === 0 means "lost the race" (CLAUDE.md: an

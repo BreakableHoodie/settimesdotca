@@ -681,7 +681,7 @@ Requires a running wrangler dev server or uses it automatically via `playwright.
 ### Post-deploy probes are read-only (#1292)
 
 Post-deploy probes check iCal, sitemap, and SSR identity metadata without writing; `/s/` is excluded because share links expire via cron and no fixed slug is safe to probe. They run after **production** deploys only: a `dev` deploy goes to a Pages preview, which binds no D1 (#1295), so they would fail on missing data rather than on a broken release.
-The same probes also run hourly from `.github/workflows/site-health.yml`; failures open or update one `Site down: production smoke probes failing` issue, and a passing run comments recovery and closes it.
+The same probes also run hourly from `.github/workflows/site-health.yml`; failures open or update one `Site down: production smoke probes failing` issue, and a passing run comments recovery and closes it. GitHub's cron runs hours late, so the `settimes-cron` Worker (`workers-cron/`) dispatches `site-health`, `deploy-reconcile` and `scheduled-jobs` on time; their `schedule:` is only a fallback (#1489).
 
 ### Edge E2E against a preview (#1292)
 

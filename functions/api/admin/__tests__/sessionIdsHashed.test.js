@@ -264,7 +264,10 @@ describe("session management by stored key (#1488)", () => {
     const newToken = cookieValue(response, "session_token");
     expect(storedIds(rawDb)).toEqual([testSessionKey(newToken)]);
     expect((await viaMiddleware(env, { token: sessionId })).response.status).toBe(401);
-    expect((await viaMiddleware(env, { token: newToken })).response.status).toBe(200);
+    const renewed = await viaMiddleware(env, { token: newToken });
+    expect(renewed.response.status).toBe(200);
+    // The replacement session belongs to the caller, not to some other account.
+    expect(renewed.context.data.user.userId).toBe(mockUsers.viewer.id);
   });
 });
 

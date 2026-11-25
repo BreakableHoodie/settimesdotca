@@ -492,6 +492,34 @@ CREATE TABLE IF NOT EXISTS referrer_daily_stats (
   PRIMARY KEY (date, bucket)
 );
 
+CREATE TRIGGER IF NOT EXISTS lucia_sessions_id_hashed_insert
+BEFORE INSERT ON lucia_sessions
+WHEN NEW.id NOT LIKE 'sha256:%'
+BEGIN
+  SELECT RAISE(ABORT, 'lucia_sessions.id must be a sha256: digest');
+END;
+
+CREATE TRIGGER IF NOT EXISTS lucia_sessions_id_hashed_update
+BEFORE UPDATE OF id ON lucia_sessions
+WHEN NEW.id NOT LIKE 'sha256:%'
+BEGIN
+  SELECT RAISE(ABORT, 'lucia_sessions.id must be a sha256: digest');
+END;
+
+CREATE TRIGGER IF NOT EXISTS mfa_challenges_token_hashed_insert
+BEFORE INSERT ON mfa_challenges
+WHEN NEW.token NOT LIKE 'sha256:%'
+BEGIN
+  SELECT RAISE(ABORT, 'mfa_challenges.token must be a sha256: digest');
+END;
+
+CREATE TRIGGER IF NOT EXISTS mfa_challenges_token_hashed_update
+BEFORE UPDATE OF token ON mfa_challenges
+WHEN NEW.token NOT LIKE 'sha256:%'
+BEGIN
+  SELECT RAISE(ABORT, 'mfa_challenges.token must be a sha256: digest');
+END;
+
 -- ============================================
 -- TEST ACCOUNTS (passwords set by scripts/setup-local-db.sh)
 -- ============================================

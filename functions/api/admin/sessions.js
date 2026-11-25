@@ -6,10 +6,12 @@ import { parseJsonObjectBody } from "../../utils/request.js";
 import { auditLog } from "./_middleware.js";
 import { getClientIP } from "../../utils/request.js";
 
-// Derive a stable, opaque revocation handle from a raw Lucia session id.
-// The raw id is an auth credential and must never leave the server; returning
-// SHA-256(id) lets clients target a specific session for deletion without
-// being able to forge or replay the underlying credential.
+// Derive a stable, opaque revocation handle from a session's stored key.
+// Since #1488 the key is already a digest of the cookie token (a stored key
+// sent back as a cookie is hashed again and matches nothing), and the handle
+// hashes it once more so the client never sees the stored value at all.
+// context.data.session.id is that same stored key, so `current` compares
+// like with like.
 async function sessionRevocationToken(sessionId) {
   const data = new TextEncoder().encode(sessionId);
   const hash = await crypto.subtle.digest("SHA-256", data);

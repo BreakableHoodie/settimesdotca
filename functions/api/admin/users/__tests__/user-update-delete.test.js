@@ -1,17 +1,19 @@
 import { describe, expect, test } from "vitest";
-import { createTestEnv, grantStepUp } from "../../../test-utils.js";
+import { createTestEnv, grantStepUp, testSessionKey } from "../../../test-utils.js";
 import * as userItemHandler from "../[id].js";
 
 // One stamped session per acting admin: step-up is per session (#1324).
+// Takes and stamps the raw token; returns the context session, keyed like
+// production by the token's digest (#1488).
 function stepUpSessionFor(rawDb, userId, sessionId) {
   const id = sessionId ?? crypto.randomUUID();
   if (sessionId === undefined) {
     rawDb
       .prepare("INSERT INTO lucia_sessions (id, user_id, expires_at) VALUES (?, ?, ?)")
-      .run(id, userId, Math.floor(Date.now() / 1000) + 3600);
+      .run(testSessionKey(id), userId, Math.floor(Date.now() / 1000) + 3600);
   }
   grantStepUp(rawDb, id);
-  return { id, user_id: userId };
+  return { id: testSessionKey(id), user_id: userId };
 }
 
 describe("Admin user item API", () => {
@@ -146,7 +148,7 @@ describe("Admin user item API", () => {
       }),
       env,
       params: { id: String(dormant.id) },
-      data: { user: { userId: 1, role: "admin" }, session: { id: sessionId, user_id: 1 } },
+      data: { user: { userId: 1, role: "admin" }, session: { id: testSessionKey(sessionId), user_id: 1 } },
     });
 
     expect(response.status).toBe(200);

@@ -1,4 +1,5 @@
 import { parseCookies } from "./cookies.js";
+import { hashStoredToken, STORED_TOKEN_HASH_PREFIX } from "./tokens.js";
 
 export const SESSION_CONFIG = {
   absoluteTimeout: 30 * 24 * 60 * 60 * 1000,
@@ -34,6 +35,20 @@ export const SESSION_COOKIE_NAME_DEV = "session_token";
 export const SESSION_COOKIE_NAME_PROD = "__Host-session_token";
 export const SESSION_COOKIE_NAMES = [SESSION_COOKIE_NAME_DEV, SESSION_COOKIE_NAME_PROD];
 
+// Session ids are stored hashed (#1488). The cookie holds the raw token; the
+// lucia_sessions row is keyed by hashStoredToken(token). So there are two values
+// and they must never be swapped:
+//   - the TOKEN (raw): only in the cookie, the CSRF binding and createSessionCookie.
+//   - the KEY (digest): session.id, context.data.session.id, every
+//     `WHERE id = ?` on lucia_sessions, and invalidateSession.
+// validateSession hashes what it is given, so a stored key submitted as a cookie
+// is hashed again and matches nothing. invalidateSession and createSessionCookie
+// throw on the wrong kind, because a mix-up would otherwise be a silent no-op
+// DELETE or a cookie that can never authenticate.
+export const hashSessionToken = hashStoredToken;
+
+const isSessionKey = (value) => typeof value === "string" && value.startsWith(STORED_TOKEN_HASH_PREFIX);
+
 export function initializeLucia(DB, request = null, env = null) {
   const isDev = request ? isDevRequest(request, env) : false;
   const cookieName = isDev ? SESSION_COOKIE_NAME_DEV : SESSION_COOKIE_NAME_PROD;
@@ -50,7 +65,8 @@ export function initializeLucia(DB, request = null, env = null) {
       return parseCookies(cookieHeader)[cookieName] || null;
     },
 
-    async validateSession(sessionId) {
+    async validateSession(sessionToken) {
+      const sessionKey = await hashSessionToken(sessionToken);
       const row = await DB.prepare(
         `SELECT s.id, s.user_id, s.expires_at,
                 u.email, u.role, u.name, u.first_name, u.last_name, u.is_active, u.totp_enabled
@@ -58,13 +74,13 @@ export function initializeLucia(DB, request = null, env = null) {
          JOIN users u ON u.id = s.user_id
          WHERE s.id = ?`,
       )
-        .bind(sessionId)
+        .bind(sessionKey)
         .first();
 
       if (!row) return { session: null, user: null };
 
       if (row.expires_at * 1000 < Date.now()) {
-        await DB.prepare("DELETE FROM lucia_sessions WHERE id = ?").bind(sessionId).run();
+        await DB.prepare("DELETE FROM lucia_sessions WHERE id = ?").bind(sessionKey).run();
         return { session: null, user: null };
       }
 
@@ -88,8 +104,10 @@ export function initializeLucia(DB, request = null, env = null) {
       };
     },
 
+    // Returns { id: the stored key, token: the raw value for the cookie }.
     async createSession(userId, _attributes = {}) {
-      const id = crypto.randomUUID();
+      const token = crypto.randomUUID();
+      const id = await hashSessionToken(token);
       const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
       await DB.prepare(
         `INSERT INTO lucia_sessions (id, user_id, expires_at, created_at, last_activity_at)
@@ -97,20 +115,26 @@ export function initializeLucia(DB, request = null, env = null) {
       )
         .bind(id, userId, expiresAt)
         .run();
-      return { id, userId, fresh: true, expiresAt: new Date(expiresAt * 1000) };
+      return { id, token, userId, fresh: true, expiresAt: new Date(expiresAt * 1000) };
     },
 
-    async invalidateSession(sessionId) {
-      await DB.prepare("DELETE FROM lucia_sessions WHERE id = ?").bind(sessionId).run();
+    // Takes the stored KEY (session.id), never the cookie token.
+    async invalidateSession(sessionKey) {
+      if (!isSessionKey(sessionKey)) throw new Error("invalidateSession takes a stored session key, not a token");
+      await DB.prepare("DELETE FROM lucia_sessions WHERE id = ?").bind(sessionKey).run();
     },
 
     async invalidateUserSessions(userId) {
       await DB.prepare("DELETE FROM lucia_sessions WHERE user_id = ?").bind(userId).run();
     },
 
-    createSessionCookie(sessionId) {
+    // Takes the raw TOKEN (session.token), never the stored key.
+    createSessionCookie(sessionToken) {
+      if (typeof sessionToken !== "string" || !sessionToken || isSessionKey(sessionToken)) {
+        throw new Error("createSessionCookie takes a session token, not a stored key");
+      }
       return {
-        serialize: () => serializeCookie(cookieName, sessionId, { ...cookieOpts, maxAge: SESSION_TTL_SECONDS }),
+        serialize: () => serializeCookie(cookieName, sessionToken, { ...cookieOpts, maxAge: SESSION_TTL_SECONDS }),
       };
     },
 

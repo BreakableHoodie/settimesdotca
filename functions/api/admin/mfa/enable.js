@@ -313,8 +313,8 @@ export async function onRequestPost(context) {
     return mfaSetupChangedResponse();
   }
   const sessionHeaders = new Headers({ "Content-Type": "application/json" });
-  sessionHeaders.append("Set-Cookie", lucia.createSessionCookie(newSession.id).serialize());
-  sessionHeaders.append("Set-Cookie", setCSRFCookie(generateCSRFToken(request, env, newSession.id), request, env));
+  sessionHeaders.append("Set-Cookie", lucia.createSessionCookie(newSession.token).serialize());
+  sessionHeaders.append("Set-Cookie", setCSRFCookie(generateCSRFToken(request, env, newSession.token), request, env));
 
   // The factor is live and the new backup codes exist only in this response:
   // failing to RECORD the success must never turn it into a 500.

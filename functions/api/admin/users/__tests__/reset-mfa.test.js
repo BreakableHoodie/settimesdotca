@@ -1,7 +1,7 @@
 // #1253 review: admins and editors cannot turn their own 2FA off, so an admin
 // must be able to reset a colleague's lost authenticator without a D1 write.
 import { describe, expect, it } from "vitest";
-import { createTestEnv, grantStepUp } from "../../../test-utils.js";
+import { createTestEnv, grantStepUp, testSessionKey } from "../../../test-utils.js";
 import * as resetMfa from "../[id]/reset-mfa.js";
 
 function seedFactorState(rawDb, userId) {
@@ -12,7 +12,7 @@ function seedFactorState(rawDb, userId) {
     .run(userId);
   rawDb
     .prepare("INSERT INTO lucia_sessions (id, user_id, expires_at) VALUES (?, ?, ?)")
-    .run(crypto.randomUUID(), userId, Math.floor(Date.now() / 1000) + 3600);
+    .run(testSessionKey(crypto.randomUUID()), userId, Math.floor(Date.now() / 1000) + 3600);
   rawDb
     .prepare("INSERT INTO trusted_devices (user_id, token, expires_at) VALUES (?, ?, '2099-01-01 00:00:00')")
     .run(userId, `test-device-${userId}`);

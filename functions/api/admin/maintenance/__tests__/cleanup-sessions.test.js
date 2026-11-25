@@ -11,12 +11,12 @@ describe("POST /api/admin/maintenance/cleanup-sessions", () => {
     // Expired session
     rawDb
       .prepare("INSERT INTO lucia_sessions (id, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)")
-      .run("expired-token", 1, expiredAt, "127.0.0.1", "test-agent");
+      .run("sha256:expired-token", 1, expiredAt, "127.0.0.1", "test-agent");
 
     // Active session — should survive
     rawDb
       .prepare("INSERT INTO lucia_sessions (id, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)")
-      .run("active-token", 1, activeAt, "127.0.0.1", "test-agent");
+      .run("sha256:active-token", 1, activeAt, "127.0.0.1", "test-agent");
 
     // Old auth_audit row (>90 days)
     rawDb
@@ -51,14 +51,14 @@ describe("POST /api/admin/maintenance/cleanup-sessions", () => {
       .prepare(
         "INSERT INTO mfa_challenges (token, user_id, ip_address, user_agent, expires_at, used, used_at) VALUES (?, ?, ?, ?, datetime('now', '+1 day'), 1, datetime('now', '-1 minute'))",
       )
-      .run("used-mfa-token", 1, "1.2.3.4", "test-agent");
+      .run("sha256:used-mfa-token", 1, "1.2.3.4", "test-agent");
 
     // Active MFA challenge — should survive
     rawDb
       .prepare(
         "INSERT INTO mfa_challenges (token, user_id, ip_address, user_agent, expires_at, used) VALUES (?, ?, ?, ?, datetime('now', '+1 day'), 0)",
       )
-      .run("active-mfa-token", 1, "1.2.3.4", "test-agent");
+      .run("sha256:active-mfa-token", 1, "1.2.3.4", "test-agent");
 
     // Expired email OTP — should be deleted
     rawDb
@@ -134,10 +134,16 @@ describe("POST /api/admin/maintenance/cleanup-sessions", () => {
     expect(payload.rate_limits_deleted).toBe(1);
 
     // Active rows must survive
-    expect(rawDb.prepare("SELECT COUNT(*) as c FROM lucia_sessions WHERE id = ?").get("active-token").c).toBe(1);
-    expect(rawDb.prepare("SELECT COUNT(*) as c FROM lucia_sessions WHERE id = ?").get("expired-token").c).toBe(0);
-    expect(rawDb.prepare("SELECT COUNT(*) as c FROM mfa_challenges WHERE token = ?").get("active-mfa-token").c).toBe(1);
-    expect(rawDb.prepare("SELECT COUNT(*) as c FROM mfa_challenges WHERE token = ?").get("used-mfa-token").c).toBe(0);
+    expect(rawDb.prepare("SELECT COUNT(*) as c FROM lucia_sessions WHERE id = ?").get("sha256:active-token").c).toBe(1);
+    expect(rawDb.prepare("SELECT COUNT(*) as c FROM lucia_sessions WHERE id = ?").get("sha256:expired-token").c).toBe(
+      0,
+    );
+    expect(
+      rawDb.prepare("SELECT COUNT(*) as c FROM mfa_challenges WHERE token = ?").get("sha256:active-mfa-token").c,
+    ).toBe(1);
+    expect(
+      rawDb.prepare("SELECT COUNT(*) as c FROM mfa_challenges WHERE token = ?").get("sha256:used-mfa-token").c,
+    ).toBe(0);
     expect(
       rawDb.prepare("SELECT COUNT(*) as c FROM email_otp_codes WHERE code_hash = ?").get("test-hash-654321").c,
     ).toBe(1);

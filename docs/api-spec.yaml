@@ -4524,6 +4524,8 @@ components:
           $ref: "#/components/schemas/GenericRecord"
         bands_copied:
           type: integer
+          nullable: true
+          description: Number of sets copied; null when the duplicate committed but the count could not be read.
         message:
           type: string
 

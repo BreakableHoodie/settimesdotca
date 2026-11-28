@@ -33,8 +33,8 @@ for (const [path, loaded] of Object.entries(PAGES)) {
   test(`${path} does not shift once its data loads`, async ({ page }) => {
     await page.addInitScript(() => {
       window.__layoutShift = { total: 0, sources: [] };
-      new PerformanceObserver((list) => {
-        for (const entry of list.getEntries()) {
+      const accumulate = (entries) => {
+        for (const entry of entries) {
           if (entry.hadRecentInput) continue;
           window.__layoutShift.total += entry.value;
           for (const s of entry.sources) {
@@ -44,7 +44,11 @@ for (const [path, loaded] of Object.entries(PAGES)) {
             );
           }
         }
-      }).observe({ type: "layout-shift", buffered: true });
+      };
+      const observer = new PerformanceObserver((list) => accumulate(list.getEntries()));
+      observer.observe({ type: "layout-shift", buffered: true });
+      // The browser may hold records back from the callback; take them directly.
+      window.__flushLayoutShift = () => accumulate(observer.takeRecords());
     });
     let delayed = 0;
     await page.route("**/api/**", async (route) => {
@@ -55,13 +59,15 @@ for (const [path, loaded] of Object.entries(PAGES)) {
 
     await page.goto(path, { waitUntil: "domcontentloaded" });
     await expect(loaded(page)).toBeVisible({ timeout: 15000 });
-    // Two frames after the content is visible, so the layout it caused has
-    // been reported to the observer.
+    // Two frames after the content is visible, so the layout it caused has run.
     await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 
     // A page that requested no /api data exercised nothing here.
     expect(delayed, `${path} made no /api request, so the delay tested nothing`).toBeGreaterThan(0);
-    const { total, sources } = await page.evaluate(() => window.__layoutShift);
+    const { total, sources } = await page.evaluate(() => {
+      window.__flushLayoutShift();
+      return window.__layoutShift;
+    });
     expect(
       total,
       `${path} layout shift ${total.toFixed(4)} from: ${[...new Set(sources)].join(" ; ")}`,

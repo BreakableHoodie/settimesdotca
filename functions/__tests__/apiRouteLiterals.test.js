@@ -100,8 +100,9 @@ function isReference(n, parent) {
     parent.key === n
   )
     return !!parent.shorthand && !parent.computed;
-  if (FUNCTIONS.has(parent.type) || parent.type === "ClassDeclaration" || parent.type === "ClassExpression")
-    return false;
+  if (FUNCTIONS.has(parent.type)) return parent.id !== n && !parent.params.includes(n); // `() => B` reads B
+  if ((parent.type === "ClassDeclaration" || parent.type === "ClassExpression") && parent.id === n) return false;
+  if (parent.type === "AssignmentExpression" && parent.left === n) return false; // a write, not a read
   if (/^(Import|Export)/.test(parent.type) || parent.type === "CatchClause") return false;
   if (/Statement$/.test(parent.type) && parent.label === n) return false;
   return true;
@@ -115,12 +116,16 @@ const isStringish = (n) =>
   n.type === "TemplateLiteral" ||
   (n.type === "BinaryExpression" && n.operator === "+");
 
+// Stands for a part this scan cannot know; reported as "x". A distinct
+// character, so a literal "x" in a URL is never mistaken for an unknown part.
+const UNKNOWN = "\u0000";
+
 // The URL an expression builds. A literal is its text, a name bound to a
-// declaration is that declaration's value, and anything else (a call, a
-// parameter, an `a ?? b`) is one unknown segment, "x".
+// declaration that is never reassigned is that declaration's value, and anything
+// else (a call, a parameter, an `a ?? b`, a reassigned `let`) is UNKNOWN.
 function evaluate(n, scope, depth = 0) {
-  if (depth > 20) return "x";
-  if (n.type === "Literal") return typeof n.value === "string" ? n.value : "x";
+  if (depth > 20) return UNKNOWN;
+  if (n.type === "Literal") return typeof n.value === "string" ? n.value : UNKNOWN;
   if (n.type === "TemplateLiteral")
     return n.quasis
       .map((q, i) => q.value.cooked + (i < n.expressions.length ? evaluate(n.expressions[i], scope, depth + 1) : ""))
@@ -129,9 +134,10 @@ function evaluate(n, scope, depth = 0) {
     return evaluate(n.left, scope, depth + 1) + evaluate(n.right, scope, depth + 1);
   if (n.type === "Identifier") {
     const b = lookup(scope, n.name);
-    if (b && !b.shadow && b.decl.init && isStringish(b.decl.init)) return evaluate(b.decl.init, b.scope, depth + 1);
+    if (b && !b.shadow && !b.reassigned && b.decl.init && isStringish(b.decl.init))
+      return evaluate(b.decl.init, b.scope, depth + 1);
   }
-  return "x";
+  return UNKNOWN;
 }
 
 // The /api URLs a source file requests, read from its syntax tree (so comments
@@ -146,6 +152,7 @@ export function apiLiterals(src) {
   const candidates = [];
   const visit = (n, parent, scope) => {
     if (!n || typeof n.type !== "string") return;
+    const outer = scope;
     if (SCOPED.has(n.type) || FUNCTIONS.has(n.type) || LOOPS.has(n.type)) {
       scope = { vars: new Map(), parent: scope };
       declare(n, scope);
@@ -154,11 +161,18 @@ export function apiLiterals(src) {
       const b = lookup(scope, n.name);
       if (b && !b.shadow) b.direct = true;
     }
+    const target = n.type === "AssignmentExpression" ? n.left : n.type === "UpdateExpression" ? n.argument : null;
+    if (target?.type === "Identifier") {
+      const b = lookup(scope, target.name);
+      if (b && !b.shadow) b.reassigned = true; // its initializer is no longer its value
+    }
     if (isStringish(n) && !composes(parent)) candidates.push({ n, parent, scope });
     for (const [key, value] of Object.entries(n)) {
       if (key === "type" || key === "start" || key === "end") continue;
       for (const child of Array.isArray(value) ? value : [value])
-        if (child && typeof child === "object") visit(child, n, scope);
+        // a switch's discriminant runs before its cases' bindings exist
+        if (child && typeof child === "object")
+          visit(child, n, n.type === "SwitchStatement" && key === "discriminant" ? outer : scope);
     }
   };
   visit(ast, null, null);
@@ -169,7 +183,9 @@ export function apiLiterals(src) {
       if (b && !b.shadow && b.decl === parent && !b.direct) continue; // a base, checked where it is used
     }
     // An unknown first part (`origin + "/api/x"`, `${BASE}/api/x`) is an origin.
-    const value = evaluate(n, scope).replace(/^x(?=\/api\/)/, "");
+    let value = evaluate(n, scope);
+    if (value.startsWith(`${UNKNOWN}/api/`)) value = value.slice(UNKNOWN.length);
+    value = value.replaceAll(UNKNOWN, "x");
     if (!value.startsWith("/api/")) continue;
     out.push(value.split(/[?#:\s]/)[0].replace(/\/+$/, ""));
   }
@@ -218,8 +234,23 @@ describe("every /api literal in a caller resolves to a handler file (#1491)", ()
     expect(apiLiterals('fetch("/api/events/timeline" + "/missing-handler")')).toEqual([
       "/api/events/timeline/missing-handler",
     ]);
-    // an unknown origin before the path is dropped, not the path
+    // an unknown origin before the path is dropped, not the path; a literal "x/" is a path
     expect(apiLiterals('fetch(origin + "/api/zzz")')).toEqual(["/api/zzz"]);
+    expect(apiLiterals('fetch("x/api/missing-handler")')).toEqual([]);
+    // a constant read in an arrow body is a direct use
+    expect(apiLiterals("const e = '/api/missing-handler'; const g = () => e; fetch(g())")).toEqual([
+      "/api/missing-handler",
+    ]);
+    // a reassigned binding is unknown, not its stale initializer
+    expect(apiLiterals('let B = "/api/bands"; B = "/api/events/timeline"; fetch(`${B}/missing-handler`)')).toEqual([
+      "/api/events/timeline",
+    ]);
+    // a switch's discriminant resolves outside the case scope
+    expect(
+      apiLiterals(
+        'const B = "/api/events/timeline"; switch (fetch(`${B}/missing-handler`)) { default: { } const B = "/api/bands"; }',
+      ),
+    ).toEqual(["/api/events/timeline/missing-handler"]);
     // a name resolves to the declaration in its own scope, not a same-named one elsewhere
     const scoped = apiLiterals(
       'function a() { const B = "/api/events/timeline"; fetch(`${B}/missing-handler`); }\n' +

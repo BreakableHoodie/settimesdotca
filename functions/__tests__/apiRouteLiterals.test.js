@@ -49,7 +49,7 @@ export function apiLiterals(src) {
     const [decl, name, value] = b;
     src = src.replaceAll("${" + name + "}", value);
     const rest = src.replace(decl, "");
-    const directUse = new RegExp("\\b" + name + "\\b").test(rest);
+    const directUse = new Set(rest.match(/\w+/g)).has(name);
     if (!directUse) src = rest;
   }
   for (const m of src.matchAll(/["'`](\/api\/[^"'`?#:\s]*)/g)) {

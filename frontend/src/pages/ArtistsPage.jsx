@@ -322,7 +322,6 @@ export default function ArtistsPage() {
   const offsetRef = useRef(0)
 
   useEffect(() => {
-    document.title = PAGE_TITLE
     trackPageView('/artists')
   }, [])
 

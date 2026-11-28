@@ -1,15 +1,8 @@
-import { useEffect } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 export default function ContactPage() {
-  // react-helmet-async does not reliably set document.title in React 19 — set it
-  // directly to match the <Helmet> title below. See BandProfilePage.jsx.
-  useEffect(() => {
-    document.title = 'Contact | SetTimes'
-  }, [])
-
   return (
     <div className="min-h-screen">
       {/* description/canonical are SSR-owned for this route --

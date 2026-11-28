@@ -21,6 +21,7 @@ import {
   YouTubeIcon,
 } from '../components/ui/SocialIcons'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Helmet } from 'react-helmet-async'
 import { renderMarkdownToSafeHtml } from '../utils/markdown'
 import { BAND_PHOTO_CROP } from '../utils/bandPhoto'
 import { useNoindex } from '../utils/useNoindex'
@@ -299,14 +300,6 @@ export default function BandProfilePage() {
 
   useNoindex(!loading && isNotFoundError)
 
-  useEffect(() => {
-    // While the fetch is in flight, the SSR-injected <title> (already in the
-    // DOM) is correct — don't clobber it with a generic loading title (#785).
-    if (!loading) {
-      document.title = pageTitle
-    }
-  }, [pageTitle, loading])
-
   if (loading) {
     return <BandProfileSkeleton />
   }
@@ -314,6 +307,9 @@ export default function BandProfilePage() {
   if (error || !profile) {
     return (
       <div className="min-h-screen bg-bg-navy">
+        <Helmet>
+          <title>{pageTitle}</title>
+        </Helmet>
         <div className="container mx-auto px-4 py-12 max-w-2xl">
           <Alert variant="error" className="mb-6">
             <h2 className="text-xl font-bold mb-2">
@@ -358,7 +354,12 @@ export default function BandProfilePage() {
           profile.photo_url-only conditionals, and with an untruncated
           MusicGroup.description -- #790). Declaring any of them here too
           would duplicate them on mount instead of replacing them. The client
-          owns no identity meta on this route. */}
+          owns no identity meta on this route except <title>, which repeats the
+          SSR string exactly and renders only once loaded, so the server's title
+          stays in place while the fetch is in flight (#785). */}
+      <Helmet>
+        <title>{pageTitle}</title>
+      </Helmet>
 
       {/* Sticky Navigation Header */}
       <header className="sticky top-0 z-50 border-b border-text-primary/10 bg-bg-navy">

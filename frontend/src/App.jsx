@@ -425,20 +425,6 @@ function App() {
     saveSelectedBands(slug || 'default', selectedBands, eventData?.end_date || eventData?.date)
   }, [selectedBands, slug, eventData?.end_date, eventData?.date])
 
-  // react-helmet-async does not reliably set document.title in React 19 — set it
-  // directly. Mirrors the <Helmet> <title> below AND the <title>
-  // functions/event/[slug].js injects server-side (#785) — after hydration the
-  // DOM title must equal the one the server sent. See BandProfilePage.jsx.
-  useEffect(() => {
-    // While the fetch is in flight, the SSR-injected <title> (already in the
-    // DOM) is correct — don't clobber it with the generic 'SetTimes' fallback.
-    if (!loading) {
-      document.title = eventData?.name
-        ? `${eventData.name} — Set Times & Lineup${eventData.city ? ` in ${eventData.city}` : ''} | SetTimes`
-        : 'SetTimes'
-    }
-  }, [loading, eventData?.name, eventData?.city])
-
   const clearScheduleToast = useCallback(({ clearUndoState = false } = {}) => {
     if (scheduleToastTimeoutRef.current) {
       window.clearTimeout(scheduleToastTimeoutRef.current)
@@ -835,10 +821,7 @@ function App() {
           duplicate them on mount instead of replacing them (react-helmet-async
           can't adopt tags it didn't create). <title> also has an SSR
           counterpart (same function swaps it into the raw HTML response), so
-          this client <title> must reproduce that exact string (#785), backed
-          by the direct document.title assignment above -- react-helmet-async
-          does not reliably set document.title in React 19, so the assignment,
-          not Helmet, is load-bearing. */}
+          this client <title> must reproduce that exact string (#785). */}
       <Helmet>
         <title>
           {eventData?.name

@@ -133,12 +133,6 @@ export default function SharePreviewPage() {
         ? `Shared Route — ${shareData.event_name} | SetTimes`
         : 'Shared Route | SetTimes'
 
-  // react-helmet-async does not reliably set document.title in React 19 — set it
-  // directly to match the <Helmet> titles below. See BandProfilePage.jsx.
-  useEffect(() => {
-    document.title = pageTitle
-  }, [pageTitle])
-
   const handleImport = () => {
     if (!shareData) return
     navigate(`/event/${shareData.event_slug}?share=${slug}`)
@@ -147,6 +141,10 @@ export default function SharePreviewPage() {
   if (loading) {
     return (
       <div className="min-h-screen px-4 py-8">
+        {/* /s/:slug has no server-sent <title>, so the loading state names the page too. */}
+        <Helmet>
+          <title>{pageTitle}</title>
+        </Helmet>
         <div className="mx-auto max-w-2xl">
           <Link
             to="/"
@@ -169,7 +167,7 @@ export default function SharePreviewPage() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center px-4 text-center">
         <Helmet>
-          <title>Shared Route Not Found | SetTimes</title>
+          <title>{pageTitle}</title>
         </Helmet>
         <p className="text-2xl font-semibold text-text-primary">This route has expired or doesn&apos;t exist.</p>
         <p className="mt-2 text-text-secondary">Share links are valid for 30 days.</p>
@@ -184,7 +182,7 @@ export default function SharePreviewPage() {
     return (
       <div className="min-h-screen p-6">
         <Helmet>
-          <title>Error | SetTimes</title>
+          <title>{pageTitle}</title>
         </Helmet>
         <Alert variant="error">Unable to load this shared route. Please try again later.</Alert>
       </div>
@@ -216,7 +214,7 @@ export default function SharePreviewPage() {
   return (
     <div className="min-h-screen">
       <Helmet>
-        <title>Shared Route — {shareData.event_name} | SetTimes</title>
+        <title>{pageTitle}</title>
       </Helmet>
 
       <div className="mx-auto max-w-2xl px-4 py-8">

@@ -133,11 +133,6 @@ export default function VenuePage() {
         setVenue(data.venue)
         setUpcoming(data.upcoming || [])
         setPast(data.past || [])
-        // Mirrors the <title> functions/venue/[id].js injects server-side
-        // (#785) — after hydration the DOM title must equal the server's.
-        document.title = `${data.venue?.name || 'Venue'} — Live Music Venue${
-          data.venue?.city ? ` in ${data.venue.city}, ON` : ''
-        } | SetTimes`
       })
       .catch(err => {
         if (active && seq === requestSeqRef.current) setError(err)
@@ -218,15 +213,12 @@ export default function VenuePage() {
           duplicate them on mount instead of replacing them. <title> also has
           an SSR counterpart (same function swaps it into the raw HTML
           response), so this client <title> must reproduce that exact string
-          (#785), backed by the direct document.title assignment in the effect
-          above -- react-helmet-async does not reliably set document.title in
-          React 19, so the assignment, not Helmet, is load-bearing. */}
+          (#785). */}
       {/* Rendered only once the venue has loaded. This page has no loading
           early-return (unlike App.jsx:604 and EventRecapPage.jsx:134, whose
           skeletons happen to sit above their own <Helmet>), so an ungated
           <title> here renders its fallback on the very first paint — and React
-          19 hoists it straight into document.title, beating the !loading guard
-          on the effect above. That silently replaced the server-sent title with
+          19 hoists it straight into document.title. That silently replaced the server-sent title with
           'Venue | SetTimes' for the whole fetch window (#785, caught in review
           on #859). Emitting no <title> while loading leaves the SSR one intact,
           which is exactly what it is there for. */}

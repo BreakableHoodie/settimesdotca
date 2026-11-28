@@ -78,7 +78,6 @@ export default function HistoryPage() {
   const retry = useRetryFocus({ what: 'the editions', error })
 
   useEffect(() => {
-    document.title = PAGE_TITLE
     trackPageView('/history')
   }, [])
 

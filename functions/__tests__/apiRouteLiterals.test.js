@@ -40,12 +40,17 @@ export function resolves(literal, routes) {
 
 // Literals: a quote, then /api/..., up to the closing quote, ?, # or whitespace.
 // Each ${...} becomes "x"; a literal ending in "/" is a prefix a variable completes.
-// A file-level `const API_BASE = "/api/admin"` is a base, not a call: its uses
-// (`${API_BASE}/bands`) are expanded and checked instead.
+// A file-level `const API_BASE = "/api/admin"` used only as `${API_BASE}/bands` is a
+// base: its uses are expanded and checked and its own value is dropped. Any other
+// use of the constant (`fetch(endpoint)`) keeps its value as a literal to check.
 export function apiLiterals(src) {
   const out = [];
   for (const b of src.matchAll(/\bconst\s+(\w+)\s*=\s*["'`](\/api(?:\/[^"'`$]*)?)["'`]/g)) {
-    src = src.replace(b[0], "").replaceAll("${" + b[1] + "}", b[2]);
+    const [decl, name, value] = b;
+    src = src.replaceAll("${" + name + "}", value);
+    const rest = src.replace(decl, "");
+    const directUse = new RegExp("\\b" + name + "\\b").test(rest);
+    if (!directUse) src = rest;
   }
   for (const m of src.matchAll(/["'`](\/api\/[^"'`?#:\s]*)/g)) {
     let lit = m[1].replace(/\$\{[^}]*\}?/g, "x");
@@ -57,6 +62,8 @@ export function apiLiterals(src) {
 
 // Deliberately unowned: the smoke probe asserts this path answers a JSON 404.
 const INTENTIONALLY_UNKNOWN = new Set(["/api/zzz-nope"]);
+// Specs that call an unknown route on purpose, as "relative/path /api/literal": reason.
+const SPEC_EXEMPTIONS = new Map([]);
 
 function sourceFiles(dir) {
   const out = [];
@@ -64,7 +71,7 @@ function sourceFiles(dir) {
     if (["node_modules", "__tests__", "test", "dist"].includes(e.name) || e.name === "mutation-gate.mjs") continue;
     const full = path.join(dir, e.name);
     if (e.isDirectory()) out.push(...sourceFiles(full));
-    else if (/\.(js|jsx|mjs|ts|tsx)$/.test(e.name) && !/\.(test|spec)\./.test(e.name)) out.push(full);
+    else if (/\.(js|jsx|mjs|ts|tsx)$/.test(e.name) && !/\.test\./.test(e.name)) out.push(full);
   }
   return out;
 }
@@ -80,6 +87,9 @@ describe("every /api literal in a caller resolves to a handler file (#1491)", ()
     expect(apiLiterals("fetch(`/api/events/${id}/details?x=1`)")).toEqual(["/api/events/x/details"]);
     expect(apiLiterals('fetch("/api/admin/bands/" + id)')).toEqual(["/api/admin/bands/x"]);
     expect(apiLiterals("const B = '/api/admin'; f(`${B}/zzz`)")).toEqual(["/api/admin/zzz"]);
+    // a constant used directly keeps its value as a literal to check
+    expect(apiLiterals("const endpoint = '/api/missing-handler'; fetch(endpoint)")).toEqual(["/api/missing-handler"]);
+    expect(apiLiterals("const B = '/api/admin'; f(B); g(`${B}/zzz`)")).toEqual(["/api/admin", "/api/admin/zzz"]);
   });
 
   test("frontend, e2e and scripts only call routes that exist", () => {
@@ -92,7 +102,8 @@ describe("every /api literal in a caller resolves to a handler file (#1491)", ()
         const key = `${path.relative(root, file)} ${lit}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        if (!INTENTIONALLY_UNKNOWN.has(lit) && !resolves(lit, routes)) unresolved.push(key);
+        if (!INTENTIONALLY_UNKNOWN.has(lit) && !SPEC_EXEMPTIONS.has(key) && !resolves(lit, routes))
+          unresolved.push(key);
       }
     }
     expect(unresolved, `no handler under functions/api/ for:\n${unresolved.join("\n")}`).toEqual([]);

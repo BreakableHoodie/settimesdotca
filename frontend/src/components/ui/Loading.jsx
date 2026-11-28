@@ -1,5 +1,4 @@
 import { memo } from 'react'
-import PropTypes from 'prop-types'
 
 /**
  * Loading Component - Design System v1.0
@@ -75,12 +74,5 @@ const Loading = memo(function Loading({ size = 'md', text = '', className = '', 
     </div>
   )
 })
-
-Loading.propTypes = {
-  size: PropTypes.oneOf(['sm', 'md', 'lg', 'xl']),
-  text: PropTypes.string,
-  className: PropTypes.string,
-  fullScreen: PropTypes.bool,
-}
 
 export default Loading

@@ -1,5 +1,4 @@
 import { memo, useCallback, useRef } from 'react'
-import PropTypes from 'prop-types'
 import { formatFestivalDate } from '../../utils/festivalDays'
 
 /**
@@ -74,12 +73,5 @@ const DayTabs = memo(function DayTabs({ days, activeDayNumber, onSelectDay, clas
     </div>
   )
 })
-
-DayTabs.propTypes = {
-  days: PropTypes.arrayOf(PropTypes.string).isRequired,
-  activeDayNumber: PropTypes.number,
-  onSelectDay: PropTypes.func.isRequired,
-  className: PropTypes.string,
-}
 
 export default DayTabs

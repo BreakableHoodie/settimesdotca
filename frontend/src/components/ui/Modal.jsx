@@ -1,5 +1,4 @@
 import { useEffect, useRef, useCallback } from 'react'
-import PropTypes from 'prop-types'
 import { X } from 'lucide-react'
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock'
 
@@ -262,27 +261,4 @@ export default function Modal({
       </div>
     </div>
   )
-}
-
-Modal.propTypes = {
-  /** Whether the modal is open */
-  isOpen: PropTypes.bool.isRequired,
-  /** Callback when modal should close */
-  onClose: PropTypes.func.isRequired,
-  /** Modal title displayed in header */
-  title: PropTypes.string,
-  /** Modal content */
-  children: PropTypes.node.isRequired,
-  /** Optional footer content (e.g., action buttons) */
-  footer: PropTypes.node,
-  /** Modal width size */
-  size: PropTypes.oneOf(['sm', 'md', 'lg', 'xl', 'full']),
-  /** Whether clicking backdrop closes modal */
-  closeOnBackdropClick: PropTypes.bool,
-  /** Whether to show the close button */
-  showCloseButton: PropTypes.bool,
-  /** Additional CSS classes */
-  className: PropTypes.string,
-  /** 'sheet' docks to the bottom edge on phones; 'center' (default) always centres */
-  placement: PropTypes.oneOf(['center', 'sheet']),
 }

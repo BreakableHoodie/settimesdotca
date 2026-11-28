@@ -1,5 +1,4 @@
 import { memo } from 'react'
-import PropTypes from 'prop-types'
 
 /**
  * Badge Component - Design System v1.0
@@ -57,13 +56,5 @@ const Badge = memo(function Badge({
     </Component>
   )
 })
-
-Badge.propTypes = {
-  children: PropTypes.node.isRequired,
-  variant: PropTypes.oneOf(['default', 'primary', 'success', 'warning', 'error', 'info']),
-  size: PropTypes.oneOf(['sm', 'md', 'lg']),
-  className: PropTypes.string,
-  as: PropTypes.elementType,
-}
 
 export default Badge

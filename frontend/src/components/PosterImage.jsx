@@ -1,5 +1,4 @@
 import { useCallback, useRef, useState } from 'react'
-import PropTypes from 'prop-types'
 import { posterImageUrl, posterImageSrcSet } from '../utils/posterImage'
 
 /**
@@ -83,19 +82,4 @@ export default function PosterImage({
       onError={handleError}
     />
   )
-}
-
-PosterImage.propTypes = {
-  /** Original (untransformed) poster URL. */
-  src: PropTypes.string,
-  alt: PropTypes.string,
-  /** Target render width in CSS pixels — used to pick the transform width and the 2x srcset candidate. */
-  width: PropTypes.number,
-  className: PropTypes.string,
-  loading: PropTypes.string,
-  decoding: PropTypes.string,
-  /** Optional caller error handler. Composed with the internal fallback, not replaced by it. */
-  onError: PropTypes.func,
-  /** Called once when the original also fails: the caller should hide its wrapper (#1368). */
-  onUnavailable: PropTypes.func,
 }

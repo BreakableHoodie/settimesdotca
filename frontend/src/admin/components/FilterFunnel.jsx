@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types'
 import { ListFilter } from 'lucide-react'
 
 // Both class strings are complete literals -- Tailwind v4 scans source text
@@ -39,13 +38,4 @@ export default function FilterFunnel({ label, active = false, open = false, pane
       <ListFilter size={16} className="shrink-0" aria-hidden="true" />
     </button>
   )
-}
-
-FilterFunnel.propTypes = {
-  label: PropTypes.string.isRequired,
-  active: PropTypes.bool,
-  open: PropTypes.bool,
-  panelId: PropTypes.string,
-  onClick: PropTypes.func.isRequired,
-  triggerRef: PropTypes.oneOfType([PropTypes.func, PropTypes.shape({ current: PropTypes.any })]),
 }

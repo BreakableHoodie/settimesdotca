@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import PropTypes from 'prop-types'
 import { X } from 'lucide-react'
 import PosterImage from '../PosterImage'
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock'
@@ -174,18 +173,4 @@ export default function ImageLightbox({ src, alt, isOpen, onClose, width = 1600 
       </div>
     </div>
   )
-}
-
-ImageLightbox.propTypes = {
-  /** Image URL to display enlarged. Required — there is nothing to show without it. */
-  src: PropTypes.string.isRequired,
-  /** Alt text — also used as the dialog's accessible name. Optional: both the
-      dialog label and the <img> alt fall back to a generic description. */
-  alt: PropTypes.string,
-  /** Whether the lightbox is open. */
-  isOpen: PropTypes.bool.isRequired,
-  /** Callback when the lightbox should close. */
-  onClose: PropTypes.func.isRequired,
-  /** Target render width in CSS pixels for the Cloudflare image transform (#659). Defaults to 1600 — full-viewport, so the poster stays readable. */
-  width: PropTypes.number,
 }

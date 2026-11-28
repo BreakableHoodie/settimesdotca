@@ -1,5 +1,3 @@
-import PropTypes from 'prop-types'
-
 const HELP_CONTENT = {
   events: {
     title: 'Event Management Tips',
@@ -67,10 +65,4 @@ export default function HelpPanel({ topic = 'events', isOpen, onClose }) {
       </div>
     </div>
   )
-}
-
-HelpPanel.propTypes = {
-  topic: PropTypes.oneOf(['events', 'bands']),
-  isOpen: PropTypes.bool,
-  onClose: PropTypes.func,
 }

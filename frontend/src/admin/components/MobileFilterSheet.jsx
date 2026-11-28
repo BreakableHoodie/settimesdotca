@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-import PropTypes from 'prop-types'
 import Modal from '../../components/ui/Modal'
 import ColumnFilter from './ColumnFilter'
 import LinksColumnFilter from './LinksColumnFilter'
@@ -88,12 +87,4 @@ export default function MobileFilterSheet({ isOpen, onClose, columnFilters, setC
       </div>
     </Modal>
   )
-}
-
-MobileFilterSheet.propTypes = {
-  isOpen: PropTypes.bool.isRequired,
-  onClose: PropTypes.func.isRequired,
-  columnFilters: PropTypes.object.isRequired,
-  setColumnFilters: PropTypes.func.isRequired,
-  searchFiltered: PropTypes.array.isRequired,
 }

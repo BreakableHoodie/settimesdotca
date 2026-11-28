@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useState } from 'react'
-import PropTypes from 'prop-types'
 import { detectConflicts, formatTimeRangeLabel, sortBandsByStart } from '../utils/timeUtils'
 
 // A band's draft schedule values, derived from the last-known-good server
@@ -293,29 +292,4 @@ export default function ScheduleGrid({ bands, venues, eventDate, onSave, saving 
       </div>
     </div>
   )
-}
-
-ScheduleGrid.propTypes = {
-  bands: PropTypes.arrayOf(
-    PropTypes.shape({
-      id: PropTypes.number.isRequired,
-      name: PropTypes.string.isRequired,
-      event_id: PropTypes.number,
-      venue_id: PropTypes.number,
-      start_time: PropTypes.string,
-      end_time: PropTypes.string,
-      performance_date: PropTypes.string,
-      is_cancelled: PropTypes.oneOfType([PropTypes.number, PropTypes.bool]),
-    })
-  ).isRequired,
-  venues: PropTypes.arrayOf(
-    PropTypes.shape({
-      id: PropTypes.number.isRequired,
-      name: PropTypes.string.isRequired,
-    })
-  ).isRequired,
-  eventDate: PropTypes.string,
-  onSave: PropTypes.func.isRequired,
-  saving: PropTypes.bool,
-  readOnly: PropTypes.bool,
 }

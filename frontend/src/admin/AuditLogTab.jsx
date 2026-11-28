@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import PropTypes from 'prop-types'
 import { auditLogApi, usersApi } from '../utils/adminApi'
 
 /**
@@ -296,10 +295,6 @@ function AuditLogTab({ showToast }) {
       )}
     </div>
   )
-}
-
-AuditLogTab.propTypes = {
-  showToast: PropTypes.func,
 }
 
 export default AuditLogTab

@@ -1,5 +1,4 @@
 import { useContext } from 'react'
-import PropTypes from 'prop-types'
 import { RetryContext } from '../../hooks/useRetryFocus'
 
 /**
@@ -28,9 +27,4 @@ export default function LoadError({ what, onRetry }) {
       </button>
     </div>
   )
-}
-
-LoadError.propTypes = {
-  what: PropTypes.string.isRequired,
-  onRetry: PropTypes.func.isRequired,
 }

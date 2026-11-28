@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types'
 import { Card } from '../components/ui'
 
 export default function PlatformSettings({ isAdmin }) {
@@ -43,8 +42,4 @@ export default function PlatformSettings({ isAdmin }) {
       </Card>
     </div>
   )
-}
-
-PlatformSettings.propTypes = {
-  isAdmin: PropTypes.bool.isRequired,
 }

@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import PropTypes from 'prop-types'
 import { copyToClipboard } from '../../utils/clipboard'
 
 /**
@@ -78,11 +77,4 @@ export default function EmbedCodeGenerator({ event }) {
       </div>
     </div>
   )
-}
-
-EmbedCodeGenerator.propTypes = {
-  event: PropTypes.shape({
-    slug: PropTypes.string,
-    name: PropTypes.string,
-  }).isRequired,
 }

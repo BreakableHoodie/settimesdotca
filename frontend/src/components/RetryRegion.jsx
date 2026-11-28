@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types'
 import { RetryContext } from '../hooks/useRetryFocus'
 
 /**
@@ -24,15 +23,4 @@ export default function RetryRegion({ retry, label, className = '', children }) 
       <RetryContext.Provider value={retried}>{children}</RetryContext.Provider>
     </div>
   )
-}
-
-RetryRegion.propTypes = {
-  retry: PropTypes.shape({
-    regionRef: PropTypes.shape({ current: PropTypes.any }).isRequired,
-    statusText: PropTypes.string.isRequired,
-    retried: PropTypes.bool.isRequired,
-  }).isRequired,
-  label: PropTypes.string.isRequired,
-  className: PropTypes.string,
-  children: PropTypes.node,
 }

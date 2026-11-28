@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import PropTypes from 'prop-types'
 import { BLANK } from '../utils/rosterColumns'
 
 const ROW_CLASS =
@@ -185,15 +184,4 @@ export default function ColumnFilter({
       </div>
     </div>
   )
-}
-
-ColumnFilter.propTypes = {
-  column: PropTypes.shape({ key: PropTypes.string.isRequired, label: PropTypes.string.isRequired }).isRequired,
-  counts: PropTypes.instanceOf(Map).isRequired,
-  value: PropTypes.arrayOf(PropTypes.string),
-  onChange: PropTypes.func.isRequired,
-  onClear: PropTypes.func.isRequired,
-  onClose: PropTypes.func,
-  triggerRef: PropTypes.oneOfType([PropTypes.func, PropTypes.shape({ current: PropTypes.any })]),
-  panelId: PropTypes.string,
 }

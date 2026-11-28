@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types'
 import FilterFunnel from './FilterFunnel'
 import { isColumnFiltered } from '../utils/rosterColumns'
 
@@ -18,14 +17,6 @@ function SortIcon({ col, sortConfig }) {
       {sortConfig.key === col ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
     </span>
   )
-}
-
-SortIcon.propTypes = {
-  col: PropTypes.string.isRequired,
-  sortConfig: PropTypes.shape({
-    key: PropTypes.string,
-    direction: PropTypes.string,
-  }).isRequired,
 }
 
 // Single definition shared by every sortable + filterable Roster table
@@ -87,21 +78,4 @@ export default function FilterableHeader({
       {renderColumnFilterPanel(sortKey, triggerRef)}
     </th>
   )
-}
-
-FilterableHeader.propTypes = {
-  sortKey: PropTypes.string.isRequired,
-  label: PropTypes.string.isRequired,
-  align: PropTypes.oneOf(['left', 'right']),
-  sortConfig: PropTypes.shape({
-    key: PropTypes.string,
-    direction: PropTypes.string,
-  }).isRequired,
-  columnFilters: PropTypes.object.isRequired,
-  openFilterKey: PropTypes.string,
-  onSort: PropTypes.func.isRequired,
-  onToggleFilter: PropTypes.func.isRequired,
-  triggerRef: PropTypes.oneOfType([PropTypes.func, PropTypes.shape({ current: PropTypes.any })]),
-  renderColumnFilterPanel: PropTypes.func.isRequired,
-  stickyClassName: PropTypes.string,
 }

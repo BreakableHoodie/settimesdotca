@@ -1,5 +1,4 @@
 import { Lightbulb } from 'lucide-react'
-import PropTypes from 'prop-types'
 import { Card } from './ui'
 
 function buildFacts(band = {}, stats = {}) {
@@ -61,9 +60,4 @@ export default function BandFacts({ band, stats }) {
       </ul>
     </Card>
   )
-}
-
-BandFacts.propTypes = {
-  band: PropTypes.object,
-  stats: PropTypes.object,
 }

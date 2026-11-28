@@ -227,6 +227,31 @@ jobs:
               sys.exit(1)
           PY
 
+      # `semgrep ci` keeps a `nosemgrep`-suppressed finding in the SARIF, marked
+      # `suppressions: [{kind: inSource}]`, and code scanning opened an alert
+      # for each one anyway (dismissed by hand five times: #54, #106-#109). The
+      # PR gate reads the JSON, which already omits them, so a suppression is
+      # still reviewed in its PR. Dropping them here only stops the duplicate
+      # alert. A SARIF this cannot parse fails the job; it is never uploaded
+      # unfiltered or skipped.
+      - name: Drop in-source suppressions from the SARIF
+        if: steps.token.outputs.present == 'true' && (github.event_name == 'push' || github.event_name == 'schedule') && hashFiles('semgrep.sarif') != ''
+        run: |
+          python3 - <<'PY'
+          import json
+
+          with open("semgrep.sarif") as f:
+              sarif = json.load(f)
+          dropped = 0
+          for run in sarif["runs"]:
+              kept = [r for r in run.get("results", []) if not any(s.get("kind") == "inSource" for s in r.get("suppressions", []))]
+              dropped += len(run.get("results", [])) - len(kept)
+              run["results"] = kept
+          with open("semgrep.sarif", "w") as f:
+              json.dump(sarif, f)
+          print(f"dropped {dropped} in-source suppressed result(s) from the SARIF")
+          PY
+
       - name: Upload Semgrep SARIF
         if: steps.token.outputs.present == 'true' && (github.event_name == 'push' || github.event_name == 'schedule') && hashFiles('semgrep.sarif') != ''
         uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4

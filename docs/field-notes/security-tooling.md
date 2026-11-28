@@ -64,6 +64,13 @@ How the rebuilt `semgrep.yml` works (#1173):
   out; `SEMGREP_*` variables restore the metadata. On a PR it checks out the
   **head** commit, not GitHub's merge commit, so commits landed on `main` after
   the PR opened are not scanned as this PR's.
+- **A `nosemgrep` suppression is reviewed in its PR, and never becomes an
+  alert.** The JSON the gate reads omits suppressed findings, but `semgrep ci`
+  keeps them in the SARIF, marked `suppressions: [{kind: inSource}]`, and code
+  scanning opened an alert for each one anyway (dismissed by hand five times:
+  #54, #106-#109, all test fixtures). The workflow drops those results before
+  uploading, and fails on a SARIF it cannot parse rather than uploading it
+  unfiltered. Suppressions triaged on semgrep.dev (`kind: external`) are kept.
 - **Dependabot and fork PRs skip, loudly.** Neither receives Actions secrets;
   the job posts a notice and a "NOT SCANNED" summary rather than passing
   silently. Any other run without the token **fails**: an OSS-only scan reports

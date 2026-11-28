@@ -68,7 +68,16 @@ function declare(node, scope) {
         else for (const name of patternNames(d.id)) scope.vars.set(name, SHADOW);
     else if ((decl.type === "FunctionDeclaration" || decl.type === "ClassDeclaration") && decl.id)
       scope.vars.set(decl.id.name, SHADOW);
-    else if (decl.type === "ImportDeclaration") for (const sp of decl.specifiers) scope.vars.set(sp.local.name, SHADOW);
+    else if (decl.type === "ImportDeclaration")
+      for (const sp of decl.specifiers)
+        // A named import can be linked to the exporting file's binding
+        // (apiLiteralsAcross); a default or namespace import stays opaque.
+        scope.vars.set(
+          sp.local.name,
+          sp.type === "ImportSpecifier"
+            ? { importOf: { source: decl.source.value, name: sp.imported.name ?? sp.imported.value }, direct: false }
+            : SHADOW,
+        );
     else if (decl.type === "ExportNamedDeclaration" && decl.declaration) bind(decl.declaration);
   };
   if (FUNCTIONS.has(node.type)) {
@@ -83,6 +92,14 @@ function declare(node, scope) {
 function lookup(scope, name) {
   for (let s = scope; s; s = s.parent) if (s.vars.has(name)) return s.vars.get(name);
   return null;
+}
+
+// The declaration a binding stands for: itself, or, for an import linked by
+// apiLiteralsAcross, the exporting file's declaration. Null when opaque.
+function target(b, depth = 0) {
+  if (!b || b.shadow || depth > 10) return null;
+  if (b.importOf) return target(b.linked, depth + 1);
+  return b.decl ? b : null;
 }
 
 // A name in this position is a binding or a label, not a read of a variable.
@@ -133,9 +150,8 @@ function evaluate(n, scope, depth = 0) {
   if (n.type === "BinaryExpression" && n.operator === "+")
     return evaluate(n.left, scope, depth + 1) + evaluate(n.right, scope, depth + 1);
   if (n.type === "Identifier") {
-    const b = lookup(scope, n.name);
-    if (b && !b.shadow && !b.reassigned && b.decl.init && isStringish(b.decl.init))
-      return evaluate(b.decl.init, b.scope, depth + 1);
+    const b = target(lookup(scope, n.name));
+    if (b && !b.reassigned && b.decl.init && isStringish(b.decl.init)) return evaluate(b.decl.init, b.scope, depth + 1);
   }
   return UNKNOWN;
 }
@@ -147,23 +163,29 @@ function evaluate(n, scope, depth = 0) {
 // both). A declaration whose every use is inside a `+` or a `${...}` is a base:
 // its uses are checked, its own value is not. Any other use (`fetch(endpoint)`)
 // checks its value too. Names resolve by lexical scope.
-export function apiLiterals(src) {
+function analyse(src) {
   const ast = JsxParser.parse(src, { ecmaVersion: "latest", sourceType: "module", allowHashBang: true });
   const candidates = [];
+  const imports = [];
+  let program = null;
   const visit = (n, parent, scope) => {
     if (!n || typeof n.type !== "string") return;
     const outer = scope;
     if (SCOPED.has(n.type) || FUNCTIONS.has(n.type) || LOOPS.has(n.type)) {
       scope = { vars: new Map(), parent: scope };
       declare(n, scope);
+      if (n.type === "Program") {
+        program = scope;
+        for (const b of scope.vars.values()) if (b.importOf) imports.push(b);
+      }
     }
     if (n.type === "Identifier" && isReference(n, parent) && !composes(parent)) {
       const b = lookup(scope, n.name);
       if (b && !b.shadow) b.direct = true;
     }
-    const target = n.type === "AssignmentExpression" ? n.left : n.type === "UpdateExpression" ? n.argument : null;
-    if (target?.type === "Identifier") {
-      const b = lookup(scope, target.name);
+    const written = n.type === "AssignmentExpression" ? n.left : n.type === "UpdateExpression" ? n.argument : null;
+    if (written?.type === "Identifier") {
+      const b = lookup(scope, written.name);
       if (b && !b.shadow) b.reassigned = true; // its initializer is no longer its value
     }
     if (isStringish(n) && !composes(parent)) candidates.push({ n, parent, scope });
@@ -176,6 +198,22 @@ export function apiLiterals(src) {
     }
   };
   visit(ast, null, null);
+  // What this module exports, by exported name: `export const X = ...` and
+  // `export { X }` / `export { X as Y }` of a local binding. Re-exports from
+  // another module (`export { X } from "./y"`) are not followed.
+  const exports = new Map();
+  for (const node of ast.body) {
+    if (node.type !== "ExportNamedDeclaration" || node.source) continue;
+    if (node.declaration?.type === "VariableDeclaration")
+      for (const d of node.declaration.declarations)
+        if (d.id.type === "Identifier") exports.set(d.id.name, program.vars.get(d.id.name));
+    for (const sp of node.specifiers ?? [])
+      exports.set(sp.exported.name ?? sp.exported.value, program.vars.get(sp.local.name ?? sp.local.value));
+  }
+  return { candidates, imports, exports };
+}
+
+function report({ candidates }) {
   const out = [];
   for (const { n, parent, scope } of candidates) {
     if (parent?.type === "VariableDeclarator" && parent.init === n && parent.id.type === "Identifier") {
@@ -190,6 +228,41 @@ export function apiLiterals(src) {
     out.push(value.split(/[?#:\s]/)[0].replace(/\/+$/, ""));
   }
   return out;
+}
+
+// The /api URLs a source file requests, read from its syntax tree (so comments
+// never count). Each whole string expression (a literal, a template, a `+`
+// chain) is evaluated as one URL; it counts when it starts with /api/, ends at a
+// query, fragment, colon or whitespace, and drops a trailing "/" (Pages accepts
+// both). A declaration whose every use is inside a `+` or a `${...}` is a base:
+// its uses are checked, its own value is not. Any other use (`fetch(endpoint)`)
+// checks its value too. Names resolve by lexical scope; imports are opaque here.
+export function apiLiterals(src) {
+  return report(analyse(src));
+}
+
+const EXTENSIONS = ["", ".js", ".jsx", ".mjs", ".ts", ".tsx", "/index.js", "/index.jsx"];
+
+// apiLiterals over a set of files, with named imports between them linked: an
+// imported constant has the exporter's value, and a direct use of it in the
+// importer makes the exporter's own value a URL to check (#1522). `files` maps
+// an absolute path to its source. Returns path -> literals.
+export function apiLiteralsAcross(files) {
+  const analysed = new Map([...files].map(([file, src]) => [file, analyse(src)]));
+  for (const [file, a] of analysed)
+    for (const b of a.imports) {
+      if (!b.importOf.source.startsWith(".")) continue;
+      const base = path.resolve(path.dirname(file), b.importOf.source);
+      const from = EXTENSIONS.map((ext) => base + ext).find((f) => analysed.has(f));
+      b.linked = from ? analysed.get(from).exports.get(b.importOf.name) : undefined;
+    }
+  // A direct use anywhere along an import chain is a direct use of the declaration.
+  for (const a of analysed.values())
+    for (const b of a.imports) {
+      const decl = b.direct ? target(b) : null;
+      if (decl) decl.direct = true;
+    }
+  return new Map([...analysed].map(([file, a]) => [file, report(a)]));
 }
 
 // Deliberately unowned: the smoke probe asserts this path answers a JSON 404.
@@ -259,6 +332,30 @@ describe("every /api literal in a caller resolves to a handler file (#1491)", ()
     expect(scoped).toEqual(["/api/events/timeline/missing-handler", "/api/bands/x"]);
     const synthetic = ["/api/events/timeline", "/api/bands/[name]"];
     expect(scoped.map((l) => resolves(l, synthetic))).toEqual([false, true]);
+    // across modules (#1522): a named import of an exported constant has its value
+    const across = (mods) =>
+      Object.fromEntries(
+        [...apiLiteralsAcross(new Map(Object.entries(mods).map(([f, src]) => [`/m/${f}`, src])))].map(([f, l]) => [
+          f.slice(3),
+          l,
+        ]),
+      );
+    // used directly in the importer: the exporter's value is checked
+    expect(
+      across({
+        "api.js": 'export const endpoint = "/api/missing-handler";',
+        "page.jsx": 'import { endpoint } from "./api"; fetch(endpoint);',
+      }),
+    ).toEqual({ "api.js": ["/api/missing-handler"], "page.jsx": [] });
+    // used as a prefix in the importer: the composed URL is checked where it is built
+    expect(
+      across({
+        "api.js": "const BASE = '/api/bands'; export { BASE as BANDS };",
+        "page.jsx": 'import { BANDS } from "./api.js"; fetch(`${BANDS}/${id}/stats`);',
+      }),
+    ).toEqual({ "api.js": [], "page.jsx": ["/api/bands/x/stats"] });
+    // a single-file scan still treats the import as unknown
+    expect(apiLiterals('import { endpoint } from "./api"; fetch(`${endpoint}/x`)')).toEqual([]);
     // JSX parses, and a URL in an attribute counts
     expect(apiLiterals('const a = <a href="/api/feeds/ical?band=1">x</a>;')).toEqual(["/api/feeds/ical"]);
   });
@@ -268,8 +365,9 @@ describe("every /api literal in a caller resolves to a handler file (#1491)", ()
     expect(files.length).toBeGreaterThan(50);
     const seen = new Set();
     const unresolved = [];
-    for (const file of files) {
-      for (const lit of apiLiterals(readFileSync(file, "utf8"))) {
+    const literals = apiLiteralsAcross(new Map(files.map((f) => [f, readFileSync(f, "utf8")])));
+    for (const [file, lits] of literals) {
+      for (const lit of lits) {
         const key = `${path.relative(root, file)} ${lit}`;
         if (seen.has(key)) continue;
         seen.add(key);

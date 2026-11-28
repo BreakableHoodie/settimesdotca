@@ -3,6 +3,7 @@ import {
   checkIcal,
   checkInvalidBandRefused,
   checkRetired,
+  checkUnknownApiNotFound,
   checkSitemap,
   checkSsrIdentity,
   RETIRED_PATHS,
@@ -146,6 +147,12 @@ describe("per-artist iCal and retired-URL probes", () => {
     expect(checkRetired("", 404).ok).toBe(false);
   });
 
+  it("requires a JSON NOT_FOUND 404 for an unknown /api path, not the shell", () => {
+    expect(checkUnknownApiNotFound('{"error":"Not found","code":"NOT_FOUND"}', 404)).toEqual({ ok: true });
+    expect(checkUnknownApiNotFound("<!doctype html>", 200).ok).toBe(false);
+    expect(checkUnknownApiNotFound("<!doctype html>", 404).ok).toBe(false);
+  });
+
   it("lists the six retired URLs", () => {
     expect(RETIRED_PATHS).toHaveLength(6);
   });
@@ -166,6 +173,9 @@ describe("per-artist iCal and retired-URL probes", () => {
       if (u.pathname === "/api/feeds/ical") {
         const type = u.searchParams.has("band") ? bandIcalType : "text/calendar";
         return new Response(validIcal, { status: 200, headers: { "Content-Type": type } });
+      }
+      if (u.pathname === "/api/zzz-nope") {
+        return new Response(JSON.stringify({ error: "Not found", code: "NOT_FOUND" }), { status: 404 });
       }
       if (RETIRED_PATHS.includes(u.pathname)) return new Response("gone", { status: retiredStatus });
       return new Response(validSsr, { status: 200 });

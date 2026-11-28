@@ -117,6 +117,70 @@ export async function loadEventLinks(env, event) {
 
 const HUB_LOADERS = { "/history": historyLinks, "/artists": artistLinks, "/venues": venueLinks };
 
+// Band and venue pages link outward too (#1494): an artist to the editions and
+// venues it played, a venue to its editions and artists. Same gates as the
+// hubs: public event status, the reveal gate, and cancelled sets are not
+// "played". Each loader returns plain rows, or null on a failed read (logged at
+// error) so the page is served with no links and its old description.
+const PAGE_LINK_CAP = 50;
+
+async function loadEntityContext(env, label, entityId, queries) {
+  try {
+    const results = await Promise.all(queries.map((sql) => env.DB.prepare(sql).bind(entityId).all()));
+    return results.map((r) => r.results ?? []);
+  } catch (err) {
+    console.error("Crawlable entity link read failed:", label, entityId, err);
+    return null;
+  }
+}
+
+const PUBLIC_SET = `${publicEventStatusSql("e")} AND ${REVEAL_GATE} AND p.is_cancelled = 0`;
+
+const editionsSql = (column) =>
+  `SELECT e.id, e.slug, e.name, MAX(COALESCE(p.performance_date, e.date)) AS last_date
+   FROM performances p JOIN events e ON e.id = p.event_id
+   WHERE p.${column} = ? AND ${PUBLIC_SET}
+   GROUP BY e.id ORDER BY last_date DESC, e.id DESC`;
+
+const editionItems = (editions) =>
+  editions.slice(0, PAGE_LINK_CAP).map((e) => ({ href: `/event/${e.slug}`, text: e.name }));
+
+/** Editions + venues for an artist page, or null when the read failed. */
+export async function loadBandPageContext(env, bandId) {
+  const rows = await loadEntityContext(env, "band", bandId, [
+    editionsSql("band_profile_id"),
+    `SELECT v.id, v.name FROM performances p
+     JOIN events e ON e.id = p.event_id JOIN venues v ON v.id = p.venue_id
+     WHERE p.band_profile_id = ? AND ${PUBLIC_SET}
+     GROUP BY v.id ORDER BY v.name COLLATE NOCASE LIMIT ${PAGE_LINK_CAP}`,
+  ]);
+  if (!rows) return null;
+  const [editions, venues] = rows;
+  return {
+    editions,
+    venues,
+    linksHtml: renderLinkList(editionItems(editions), "Editions") + renderLinkList(venueLinkItems(venues), "Venues"),
+  };
+}
+
+/** Editions + artists for a venue page, or null when the read failed. */
+export async function loadVenuePageContext(env, venueId) {
+  const rows = await loadEntityContext(env, "venue", venueId, [
+    editionsSql("venue_id"),
+    `SELECT bp.id, bp.name FROM performances p
+     JOIN events e ON e.id = p.event_id JOIN band_profiles bp ON bp.id = p.band_profile_id
+     WHERE p.venue_id = ? AND ${PUBLIC_SET}
+     GROUP BY bp.id ORDER BY bp.name COLLATE NOCASE LIMIT ${PAGE_LINK_CAP}`,
+  ]);
+  if (!rows) return null;
+  const [editions, artists] = rows;
+  return {
+    editions,
+    artists,
+    linksHtml: renderLinkList(editionItems(editions), "Editions") + renderLinkList(bandLinkItems(artists), "Artists"),
+  };
+}
+
 /**
  * Link markup for a hub path, or "" for any other path, a closed public-data
  * gate, or a failed read (logged at error; the page still renders).

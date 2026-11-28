@@ -1,6 +1,6 @@
 # CLAUDE.md — settimesdotca
 
-AI assistant context for this codebase. Captures non-obvious invariants, known gotchas, and conventions that aren't derivable from reading the code.
+AI assistant context for this codebase: non-obvious invariants, known gotchas and conventions not derivable from the code.
 
 **This file has a 125,000-character budget** (`scripts/__tests__/claudeMdBudget.test.js`), because Claude Code warns past 150k across all loaded instruction files. Rules live here; incidents, measurements and history go verbatim into `docs/field-notes/`.
 
@@ -363,7 +363,7 @@ Until #1159 no page emitted a crawlable `<a>` in raw HTML (`serveWithInjectedMet
 
 - `frontend/index.html` ships a `<noscript>` nav of parameterless routes: `<noscript>`, so JS visitors do not get a second nav. Every href must be a real `<Route path>` in `main.jsx`. `/events` is **not** one (the list is `/`). `frontend/src/__tests__/crawlableLinks.test.js` enforces this.
 - `functions/index.js` adds current public event links to that nav at request time (#1163).
-- **The hub pages server-render their entity links (#1447).** `/history`, `/artists`, `/venues`, and every event and recap page splice a plain escaped `<ul>` of links into the shell's `<noscript>` at `<!-- page-links -->`, through `functions/utils/crawlableLinks.js` and `serveWithInjectedMeta`'s `pageLinks`. They use the visibility helpers and the reveal gate, link canonical `/band/<id>`, and a failed read serves the page with no links (logged at `error`). Between seasons this is the only crawlable path to those pages.
+- **Hub pages server-render entity links (#1447).** `/history`, `/artists`, `/venues`, and every event, recap, band and venue page (#1494) splice an escaped `<ul>` of links into the shell's `<noscript>` at `<!-- page-links -->`, through `functions/utils/crawlableLinks.js` and `serveWithInjectedMeta`'s `pageLinks`. They use the visibility helpers and reveal gate, link canonical `/band/<id>`, and a failed read serves the page with no links (logged at `error`). Between seasons, the only crawlable path.
 - `functions/sitemap.xml.js` is the primary event-discovery signal, in two states:
 
 | event state          | priority | changefreq |

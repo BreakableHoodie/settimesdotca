@@ -1309,6 +1309,33 @@ export const MUTATIONS = [
     tests: ["functions/__tests__/crawlableHubLinks.test.js"],
   },
   {
+    id: "band-venue-links-respect-reveal-gate",
+    invariant:
+      "CLAUDE.md 'Pulling a band from a live lineup' — a band or venue page never links an edition, venue or artist reached only through an unannounced set on a reveal-mode event (#1494)",
+    file: "functions/utils/crawlableLinks.js",
+    find: "AND ${REVEAL_GATE} AND p.is_cancelled = 0`;",
+    replace: "AND (1 = 1) AND p.is_cancelled = 0`;",
+    tests: ["functions/__tests__/crawlableBandVenueLinks.test.js"],
+  },
+  {
+    id: "band-venue-links-public-events-only",
+    invariant:
+      "CLAUDE.md 'Public event visibility is `status`, never `is_published` (#800) — history, guards still live' — band and venue page links name only public (published or archived) editions, never a draft (#1494)",
+    file: "functions/utils/crawlableLinks.js",
+    find: 'const PUBLIC_SET = `${publicEventStatusSql("e")} AND',
+    replace: "const PUBLIC_SET = `(1 = 1) AND",
+    tests: ["functions/__tests__/crawlableBandVenueLinks.test.js"],
+  },
+  {
+    id: "band-venue-links-skip-cancelled-sets",
+    invariant:
+      "CLAUDE.md 'Pulling a band from a live lineup' — a cancelled set is not played: band and venue page links and the venue's edition count ignore it (#1494)",
+    file: "functions/utils/crawlableLinks.js",
+    find: "AND ${REVEAL_GATE} AND p.is_cancelled = 0`;",
+    replace: "AND ${REVEAL_GATE}`;",
+    tests: ["functions/__tests__/crawlableBandVenueLinks.test.js"],
+  },
+  {
     id: "event-jsonld-price-zero",
     invariant:
       "CLAUDE.md 'SSR owns identity meta and JSON-LD' — a stored free-event price is emitted as 0 rather than omitted by a truthiness check",

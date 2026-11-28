@@ -14,6 +14,7 @@ beforeAll(() => {
   dist = mkdtempSync(path.join(tmpdir(), "bundle-size-"));
   mkdirSync(path.join(dist, "assets"));
   writeFileSync(
+    // nosemgrep: unknown-value-with-script-tag -- fixture HTML written to a mkdtemp directory; nothing serves it
     path.join(dist, "index.html"),
     '<script>x</script><script type="module" crossorigin src="/assets/index-abc.js"></script>',
   );
@@ -40,6 +41,7 @@ describe("check-bundle-size (#1499)", () => {
     const bloated = mkdtempSync(path.join(tmpdir(), "bundle-size-big-"));
     try {
       mkdirSync(path.join(bloated, "assets"));
+      // nosemgrep: unknown-value-with-script-tag -- fixture HTML written to a mkdtemp directory; nothing serves it
       writeFileSync(path.join(bloated, "index.html"), '<script type="module" src="/assets/e.js"></script>');
       writeFileSync(path.join(bloated, "assets", "e.js"), randomBytes(ENTRY_GZIP_BUDGET_BYTES + 5000));
       const r = spawnSync("node", [SCRIPT, bloated], { encoding: "utf8" });

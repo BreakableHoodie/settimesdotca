@@ -249,10 +249,9 @@ function App() {
         // discarded, and `loading` stays true for the life of the effect.
         //
         // DEFENSIVE, not a fixed bug -- stated plainly because an unfalsifiable
-        // claim in a comment is how this file grows wrong ones. Both current
-        // readers of `loading` mask that state: `shouldShowLoading` also
-        // requires `bands.length === 0`, and the ungated <Helmet> <title>
-        // covers the title effect. So no test here can fail on it today, and
+        // claim in a comment is how this file grows wrong ones. The one current
+        // reader of `loading` masks that state: `shouldShowLoading` also
+        // requires `bands.length === 0`. So no test here can fail on it today, and
         // none was written -- a passing test would have proved nothing. The
         // line stays because the next reader of `loading` would inherit the
         // stuck state for free.
@@ -751,9 +750,19 @@ function App() {
     return <ScheduleSkeleton />
   }
 
+  // Mirrors the <title> functions/event/[slug].js injects (#785). Every branch
+  // past the loading return renders it, error states included, so a client-side
+  // navigation never leaves the previous page's title in the tab.
+  const eventTitle = eventData?.name
+    ? `${eventData.name} — Set Times & Lineup${eventData.city ? ` in ${eventData.city}` : ''} | SetTimes`
+    : 'SetTimes'
+
   if (error && isOfflineError) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
+        <Helmet>
+          <title>{eventTitle}</title>
+        </Helmet>
         <div className="max-w-md text-center">
           <div className="text-warning-400 mb-4" aria-hidden="true">
             <WifiOff size={64} />
@@ -777,6 +786,9 @@ function App() {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
+        <Helmet>
+          <title>{eventTitle}</title>
+        </Helmet>
         <div className="max-w-md text-center">
           <div className="text-error-400 mb-4" aria-hidden="true">
             <CircleAlert size={64} />
@@ -823,11 +835,7 @@ function App() {
           counterpart (same function swaps it into the raw HTML response), so
           this client <title> must reproduce that exact string (#785). */}
       <Helmet>
-        <title>
-          {eventData?.name
-            ? `${eventData.name} — Set Times & Lineup${eventData.city ? ` in ${eventData.city}` : ''} | SetTimes`
-            : 'SetTimes'}
-        </title>
+        <title>{eventTitle}</title>
       </Helmet>
       <OfflineIndicator />
       {isArchived ? (

@@ -138,6 +138,9 @@ export default function EventRecapPage() {
   if (error) {
     return (
       <div className="min-h-screen p-6">
+        <Helmet>
+          <title>Event Recap | SetTimes</title>
+        </Helmet>
         <Alert variant="error">{error}</Alert>
       </div>
     )
@@ -146,6 +149,9 @@ export default function EventRecapPage() {
   if (!event || !stats || !Array.isArray(bands)) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
+        <Helmet>
+          <title>Event Recap | SetTimes</title>
+        </Helmet>
         <Alert variant="error">Event recap data is unavailable.</Alert>
       </div>
     )

@@ -2300,6 +2300,26 @@ export const MUTATIONS = [
   // to frontend/, and vitest runs from there with the frontend's own config.
   // ==========================================================================
   {
+    id: "fe-event-page-helmet-title",
+    invariant:
+      "CLAUDE.md 'Page titles come from <Helmet><title>; never assign document.title' — the event page's own <title> replaces a stale one once loaded (no direct document.title backs it up)",
+    stack: "frontend",
+    file: "src/App.jsx",
+    find: "        <title>{eventTitle}</title>\n      </Helmet>\n      <OfflineIndicator />",
+    replace: "      </Helmet>\n      <OfflineIndicator />",
+    tests: ["src/pages/__tests__/ssrIdentityMeta.test.jsx"],
+  },
+  {
+    id: "fe-static-page-helmet-title",
+    invariant:
+      "CLAUDE.md 'Page titles come from <Helmet><title>; never assign document.title' — a static page's <title> replaces a stale one",
+    stack: "frontend",
+    file: "src/pages/AboutPage.jsx",
+    find: "<title>About | SetTimes</title>",
+    replace: "",
+    tests: ["src/pages/__tests__/ssrIdentityMeta.test.jsx"],
+  },
+  {
     id: "fe-after-midnight-threshold",
     invariant:
       "CLAUDE.md 'After-midnight band sorting' — the frontend threshold is 6 AM and is never removed or lowered",

@@ -226,6 +226,12 @@ export default function VenuePage() {
         <Helmet>
           <title>{`${venue.name} — Live Music Venue${venue.city ? ` in ${venue.city}, ON` : ''} | SetTimes`}</title>
         </Helmet>
+      ) : error ? (
+        // A failed fetch has no SSR title to keep; without this, a client-side
+        // navigation leaves the previous page's title in the tab.
+        <Helmet>
+          <title>{error.status === 404 ? 'Venue Not Found | SetTimes' : 'Venue | SetTimes'}</title>
+        </Helmet>
       ) : null}
 
       <header className="border-b border-accent-500/30 px-4 py-6">

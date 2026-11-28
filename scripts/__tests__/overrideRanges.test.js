@@ -34,14 +34,12 @@ const KNOWN_OVERRIDE_CONFLICTS = {
     "audit alerts (#327); @lhci 0.15.1 is the latest and still declares ^3 (#1208)",
   "frontend/package-lock.json|node_modules/@tailwindcss/typography|postcss-selector-parser":
     "GHSA-rj75-hqrm-r3gf (<6.1.5); typography 0.5.20 pins 6.0.10 exactly, 6.1.5 is a minor bump and the built CSS is byte-identical (#1267)",
-  "frontend/package-lock.json|node_modules/miniflare|undici":
-    "GHSA-4qv8-2p9j-2685 + GHSA-f72v-6w45-q472 (undici <=7.30.0); miniflare pins 7.29.1 exactly, 7.30.1 is a patch bump (2026-10-25)",
   "frontend/package-lock.json|node_modules/puppeteer-core|@puppeteer/browsers":
     "drops extract-zip (#819); puppeteer-core 24.43.1 pins 2.13.2 exactly (#1208)",
   "frontend/package-lock.json|node_modules/puppeteer-core|ws": "audit alerts (#327), via the lighthouse ws override",
   // The MCP Worker's lockfile needs none: its tsx > esbuild edge left with
-  // workers-mcp (#1413), and its undici override went once wrangler, miniflare
-  // and workers-utils all pinned the patched 7.30.1 (#1510).
+  // workers-mcp (#1413). Both undici@7 overrides went once wrangler, miniflare
+  // and workers-utils pinned a patched 7.30.x (#1510, #1520).
 };
 
 const conflictKey = (v) => `${v.lockfile}|${v.dependent}|${v.dependency}`;

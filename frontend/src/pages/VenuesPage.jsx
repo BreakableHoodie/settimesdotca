@@ -43,7 +43,6 @@ export default function VenuesPage() {
   const offsetRef = useRef(0)
 
   useEffect(() => {
-    document.title = PAGE_TITLE
     trackPageView('/venues')
   }, [])
 

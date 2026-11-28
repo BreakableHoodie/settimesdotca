@@ -81,9 +81,11 @@ function seedSsrHead(path, title) {
   document.head.appendChild(ogUrl)
 
   // #785: the SSR layer (functions/utils/ssrMeta.js serveWithInjectedMeta)
-  // swaps the route's <title> into the raw HTML response. Seed that title too
-  // and assert the client keeps it (never clobbers it with a loading/fallback
-  // title, and reproduces its exact string once data arrives). Marked with
+  // swaps the route's <title> into the raw HTML response. Most cases seed a
+  // STALE title, so the final assertion proves the page's own <Helmet> title
+  // replaced it (seeding the expected string would pass with no client title
+  // at all). The two in-flight cases seed the real SSR string and assert the
+  // client keeps it while loading. Marked with
   // data-seeded so afterEach can remove exactly this node — a React-managed
   // <title> (react-helmet-async renders one via React 19 head hoisting,
   // carrying no data-rh) must be left for React's own unmount cleanup.
@@ -169,7 +171,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
 
   it('ArtistsPage (/artists)', async () => {
     fetchPublicJson.mockResolvedValue({ artists: [], hasMore: false })
-    seedSsrHead('/artists', 'Artists | SetTimes')
+    seedSsrHead('/artists', 'Stale Title | SetTimes')
 
     render(
       withProviders(
@@ -187,7 +189,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
 
   it('VenuesPage (/venues)', async () => {
     fetchPublicJson.mockResolvedValue({ venues: [], hasMore: false })
-    seedSsrHead('/venues', 'Venues | SetTimes')
+    seedSsrHead('/venues', 'Stale Title | SetTimes')
 
     render(
       withProviders(
@@ -204,7 +206,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
   })
 
   it('AboutPage (/about)', async () => {
-    seedSsrHead('/about', 'About | SetTimes')
+    seedSsrHead('/about', 'Stale Title | SetTimes')
 
     render(
       withProviders(
@@ -220,7 +222,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
   })
 
   it('ContactPage (/contact)', async () => {
-    seedSsrHead('/contact', 'Contact | SetTimes')
+    seedSsrHead('/contact', 'Stale Title | SetTimes')
 
     render(
       withProviders(
@@ -246,7 +248,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
       page_views: 500,
       top_bands: [],
     })
-    seedSsrHead('/stats', 'Stats | SetTimes')
+    seedSsrHead('/stats', 'Stale Title | SetTimes')
 
     render(
       withProviders(
@@ -263,7 +265,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
   })
 
   it('PrivacyPage (/privacy)', async () => {
-    seedSsrHead('/privacy', 'Privacy Policy | SetTimes')
+    seedSsrHead('/privacy', 'Stale Title | SetTimes')
 
     render(
       withProviders(
@@ -279,7 +281,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
   })
 
   it('TermsPage (/terms)', async () => {
-    seedSsrHead('/terms', 'Terms of Service | SetTimes')
+    seedSsrHead('/terms', 'Stale Title | SetTimes')
 
     render(
       withProviders(
@@ -300,7 +302,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
       stats: { total_sets: 2, venue_count: 1, first_timers: 1, returning_acts: 1 },
       bands: [],
     })
-    seedSsrHead('/events/lwbc17/recap', 'LWBC Vol17 — Event Recap | SetTimes')
+    seedSsrHead('/events/lwbc17/recap', 'Stale Title | SetTimes')
 
     render(
       withProviders(
@@ -323,7 +325,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
       upcoming: [],
       past: [],
     })
-    seedSsrHead('/venue/3', 'Room 47 — Live Music Venue in Waterloo, ON | SetTimes')
+    seedSsrHead('/venue/3', 'Stale Title | SetTimes')
     // Mirrors functions/venue/[id].js's jsonLd: [musicVenue, breadcrumb] (#790).
     seedSsrJsonLd([
       { '@context': 'https://schema.org', '@type': 'MusicVenue', name: 'Room 47', url: 'https://settimes.ca/venue/3' },
@@ -402,7 +404,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
       upcoming: [],
       past: [],
     })
-    seedSsrHead('/band/206', 'ALL — Punk | SetTimes')
+    seedSsrHead('/band/206', 'Stale Title | SetTimes')
     // Mirrors functions/band/[id].js's jsonLd: [musicGroup, breadcrumb] (#790).
     seedSsrJsonLd([
       { '@context': 'https://schema.org', '@type': 'MusicGroup', name: 'ALL', url: 'https://settimes.ca/band/206' },
@@ -541,7 +543,7 @@ describe('SSR-injected routes — client Helmet must not duplicate canonical/og:
       headers: { get: () => 'application/json' },
       json: async () => schedulePayload,
     })
-    seedSsrHead('/event/lwbc17', 'LWBC Vol17 — Set Times & Lineup in Kitchener | SetTimes')
+    seedSsrHead('/event/lwbc17', 'Stale Title | SetTimes')
 
     try {
       render(

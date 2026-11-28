@@ -127,17 +127,6 @@ export default function EventRecapPage() {
     }
   }, [slug])
 
-  // react-helmet-async does not reliably set document.title in React 19 — set it
-  // directly to match the <Helmet> title below. See BandProfilePage.jsx.
-  useEffect(() => {
-    // While the fetch is in flight, the SSR-injected <title>
-    // (functions/events/[slug]/recap.js swaps it into the raw HTML response)
-    // is correct — don't clobber it with the generic recap title (#785).
-    if (!loading) {
-      document.title = event ? `${event.name} — Event Recap | SetTimes` : 'Event Recap | SetTimes'
-    }
-  }, [event, loading])
-
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -149,6 +138,9 @@ export default function EventRecapPage() {
   if (error) {
     return (
       <div className="min-h-screen p-6">
+        <Helmet>
+          <title>Event Recap | SetTimes</title>
+        </Helmet>
         <Alert variant="error">{error}</Alert>
       </div>
     )
@@ -157,6 +149,9 @@ export default function EventRecapPage() {
   if (!event || !stats || !Array.isArray(bands)) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
+        <Helmet>
+          <title>Event Recap | SetTimes</title>
+        </Helmet>
         <Alert variant="error">Event recap data is unavailable.</Alert>
       </div>
     )
@@ -177,7 +172,7 @@ export default function EventRecapPage() {
           -- functions/events/[slug]/recap.js injects it server-side. Declaring
           it here too would duplicate it on mount instead of replacing it
           (react-helmet-async can't adopt tags it didn't create). <title> stays
-          client-owned, same as the direct document.title assignment above. */}
+          client-owned, rendered only after the loading return above (#785). */}
       <Helmet>
         <title>{event.name} — Event Recap | SetTimes</title>
       </Helmet>

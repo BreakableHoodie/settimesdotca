@@ -21,7 +21,7 @@ Invoke these without being asked — don't wait for the user to request them:
 | After writing or modifying error handling (`catch` blocks, `.catch()`, `try/finally`) in `functions/`   | Invoke `pr-review-toolkit:silent-failure-hunter` agent                                                                                                                                             |
 | After editing `frontend/src/` public pages (outside `admin/`)                                           | Scan for `text-white`/`bg-white` theme violations before finishing                                                                                                                                 |
 | After adding/editing anything in `migrations/`                                                          | Run `node scripts/regenerate-setup-complete.mjs` then `node scripts/check-schema-drift.mjs` — `setup-complete.sql`'s schema section is generated, never hand-edit it (CI enforces via quality.yml) |
-| When SEO-relevant pages change (band pages, event pages, venue pages)                                   | Check structured data and `document.title` assignments                                                                                                                                             |
+| When SEO-relevant pages change (band pages, event pages, venue pages)                                   | Check structured data and each page's `<Helmet><title>`                                                                                                                                            |
 | **Start of a release cycle, or ~quarterly**                                                             | Run the codebase report card — `docs/REPORT_CARD_REVIEW.md` (see below)                                                                                                                            |
 
 The `hooks` in `.claude/settings.local.json` automate the mechanical parts (prettier, ESLint, pre-PR gate). The triggers above require judgment — apply them proactively.
@@ -334,11 +334,9 @@ This env var bypasses the invite-code requirement for signup. It must never be s
 
 ## React 19 Known Issues
 
-### `react-helmet-async` `<Helmet>` does not reliably set `document.title` in React 19
+### Page titles come from `<Helmet><title>`; never assign `document.title`
 
-Use `document.title = pageTitle` directly in a `useEffect` within the page component. Do NOT remove the direct assignment in favour of `<Helmet>` until react-helmet-async ships a React 19 compatible release.
-
-Example: `frontend/src/pages/EventRecapPage.jsx` — uses both `<Helmet>` (for other meta) and `document.title = ...` for the title.
+`react-helmet-async` 3.x on React 19 is reliable: 30 full and client-side loads in Chromium matched the old direct assignments title for title (#1497, 2026-11-28). On an SSR route, render the `<title>` only once data has loaded, or it replaces the server's title mid-fetch (#785).
 
 ### SSR owns identity meta and JSON-LD where it emits either; the client `<Helmet>` owns only what SSR does not emit
 

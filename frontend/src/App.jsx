@@ -249,10 +249,9 @@ function App() {
         // discarded, and `loading` stays true for the life of the effect.
         //
         // DEFENSIVE, not a fixed bug -- stated plainly because an unfalsifiable
-        // claim in a comment is how this file grows wrong ones. Both current
-        // readers of `loading` mask that state: `shouldShowLoading` also
-        // requires `bands.length === 0`, and the ungated <Helmet> <title>
-        // covers the title effect. So no test here can fail on it today, and
+        // claim in a comment is how this file grows wrong ones. The one current
+        // reader of `loading` masks that state: `shouldShowLoading` also
+        // requires `bands.length === 0`. So no test here can fail on it today, and
         // none was written -- a passing test would have proved nothing. The
         // line stays because the next reader of `loading` would inherit the
         // stuck state for free.
@@ -424,20 +423,6 @@ function App() {
     // "not stale" for its whole run.
     saveSelectedBands(slug || 'default', selectedBands, eventData?.end_date || eventData?.date)
   }, [selectedBands, slug, eventData?.end_date, eventData?.date])
-
-  // react-helmet-async does not reliably set document.title in React 19 — set it
-  // directly. Mirrors the <Helmet> <title> below AND the <title>
-  // functions/event/[slug].js injects server-side (#785) — after hydration the
-  // DOM title must equal the one the server sent. See BandProfilePage.jsx.
-  useEffect(() => {
-    // While the fetch is in flight, the SSR-injected <title> (already in the
-    // DOM) is correct — don't clobber it with the generic 'SetTimes' fallback.
-    if (!loading) {
-      document.title = eventData?.name
-        ? `${eventData.name} — Set Times & Lineup${eventData.city ? ` in ${eventData.city}` : ''} | SetTimes`
-        : 'SetTimes'
-    }
-  }, [loading, eventData?.name, eventData?.city])
 
   const clearScheduleToast = useCallback(({ clearUndoState = false } = {}) => {
     if (scheduleToastTimeoutRef.current) {
@@ -765,9 +750,19 @@ function App() {
     return <ScheduleSkeleton />
   }
 
+  // Mirrors the <title> functions/event/[slug].js injects (#785). Every branch
+  // past the loading return renders it, error states included, so a client-side
+  // navigation never leaves the previous page's title in the tab.
+  const eventTitle = eventData?.name
+    ? `${eventData.name} — Set Times & Lineup${eventData.city ? ` in ${eventData.city}` : ''} | SetTimes`
+    : 'SetTimes'
+
   if (error && isOfflineError) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
+        <Helmet>
+          <title>{eventTitle}</title>
+        </Helmet>
         <div className="max-w-md text-center">
           <div className="text-warning-400 mb-4" aria-hidden="true">
             <WifiOff size={64} />
@@ -791,6 +786,9 @@ function App() {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
+        <Helmet>
+          <title>{eventTitle}</title>
+        </Helmet>
         <div className="max-w-md text-center">
           <div className="text-error-400 mb-4" aria-hidden="true">
             <CircleAlert size={64} />
@@ -835,16 +833,9 @@ function App() {
           duplicate them on mount instead of replacing them (react-helmet-async
           can't adopt tags it didn't create). <title> also has an SSR
           counterpart (same function swaps it into the raw HTML response), so
-          this client <title> must reproduce that exact string (#785), backed
-          by the direct document.title assignment above -- react-helmet-async
-          does not reliably set document.title in React 19, so the assignment,
-          not Helmet, is load-bearing. */}
+          this client <title> must reproduce that exact string (#785). */}
       <Helmet>
-        <title>
-          {eventData?.name
-            ? `${eventData.name} — Set Times & Lineup${eventData.city ? ` in ${eventData.city}` : ''} | SetTimes`
-            : 'SetTimes'}
-        </title>
+        <title>{eventTitle}</title>
       </Helmet>
       <OfflineIndicator />
       {isArchived ? (

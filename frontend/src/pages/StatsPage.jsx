@@ -57,12 +57,6 @@ export default function StatsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  // react-helmet-async does not reliably set document.title in React 19 — set it
-  // directly to match the <Helmet> title below. See BandProfilePage.jsx.
-  useEffect(() => {
-    document.title = 'Stats | SetTimes'
-  }, [])
-
   useEffect(() => {
     let active = true
     setLoading(true)

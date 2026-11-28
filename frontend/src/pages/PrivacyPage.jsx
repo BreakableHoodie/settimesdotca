@@ -1,16 +1,9 @@
-import { useEffect } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import DownloadPdfButton from '../components/DownloadPdfButton'
 
 export default function PrivacyPage() {
-  // react-helmet-async does not reliably set document.title in React 19 — set it
-  // directly to match the <Helmet> title below. See BandProfilePage.jsx.
-  useEffect(() => {
-    document.title = 'Privacy Policy | SetTimes'
-  }, [])
-
   return (
     <div className="min-h-screen">
       {/* description/canonical are SSR-owned for this route --

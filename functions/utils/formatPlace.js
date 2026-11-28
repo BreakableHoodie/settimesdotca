@@ -24,3 +24,16 @@ export function formatVenueAddress(venue) {
   const line3 = joinParts([venue.postal_code, venue.country], " ");
   return [line1, line2, line3].filter(Boolean).join(", ");
 }
+
+/**
+ * Splits a free-text "City, ON" (how events.city is stored, #1495) into its
+ * locality and a trailing two-letter region. Text with no such suffix is all
+ * locality and region is null; blank input yields both null.
+ */
+export function splitCityRegion(text) {
+  const value = clean(text);
+  if (!value) return { locality: null, region: null };
+  const match = /^(.*\S)\s*,\s*([A-Za-z]{2})$/.exec(value);
+  if (!match) return { locality: value, region: null };
+  return { locality: match[1], region: match[2].toUpperCase() };
+}

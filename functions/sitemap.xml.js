@@ -66,9 +66,12 @@ export async function onRequestGet(context) {
         // any performance that is PUBLIC and REVEALED (the same predicate that
         // lets the URL be listed at all). A performance in a draft event, or an
         // unannounced one under reveal_mode, must not leak its date into a
-        // public signal. NOT bp.updated_at: a trigger stamps it on every UPDATE
-        // and the daily aggregate-stats job rewrites every profile's counters,
-        // so it reads "today" for all of them (measured 2026-11-24: 228 of 228).
+        // public signal. NOT bp.updated_at YET: until migration 0085 (#1501) a
+        // trigger stamped it on every UPDATE and the daily aggregate-stats job
+        // rewrote every profile's counters, so all 228 read "today". It is
+        // content-only now, but the stored values stay polluted until each
+        // profile is next edited; fold it in once that backlog no longer
+        // matters (or after a deliberate reset).
         `SELECT bp.id,
                 MAX(
                   COALESCE(bp.created_at, ''),

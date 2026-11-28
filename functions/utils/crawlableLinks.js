@@ -129,7 +129,7 @@ async function loadEntityContext(env, label, entityId, queries) {
     const results = await Promise.all(queries.map((sql) => env.DB.prepare(sql).bind(entityId).all()));
     return results.map((r) => r.results ?? []);
   } catch (err) {
-    console.error(`Crawlable ${label} link read failed:`, entityId, err);
+    console.error("Crawlable entity link read failed:", label, entityId, err);
     return null;
   }
 }

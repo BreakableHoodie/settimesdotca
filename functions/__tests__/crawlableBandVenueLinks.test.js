@@ -38,7 +38,19 @@ function setup() {
   const draftBand = insertBand(db, { name: "Draft Band", event_id: draft.id, venue_id: hall.id });
   const unannounced = insertBand(db, { name: "Unannounced Band", event_id: reveal.id, venue_id: hall.id });
   db.prepare("UPDATE performances SET is_announced = 0 WHERE id = ?").run(unannounced.id);
-  return { env, db, hall, other, draftOnly, star, plain, draftBand, unannounced };
+  // Cancelled sets are not "played": an edition, venue or artist reached only
+  // through one must not be linked or counted.
+  const cancelledEvent = insertEvent(db, {
+    name: "Cancelled Only Fest",
+    slug: "cancelled-only-fest",
+    date: "2025-11-01",
+    status: "archived",
+  });
+  const cancelledRoom = insertVenue(db, { name: "Cancelled Room" });
+  const cancelledSet = insertBand(db, { name: "Cancelled Band", event_id: cancelledEvent.id, venue_id: hall.id });
+  const cancelledStar = insertBand(db, { name: "Star Act", event_id: cancelledEvent.id, venue_id: cancelledRoom.id });
+  db.prepare("UPDATE performances SET is_cancelled = 1 WHERE id IN (?, ?)").run(cancelledSet.id, cancelledStar.id);
+  return { env, db, cancelledSet, cancelledRoom, hall, other, draftOnly, star, plain, draftBand, unannounced };
 }
 
 const run = (handler, env, url, id) => handler({ request: new Request(url), env, params: { id: String(id) } });
@@ -56,6 +68,8 @@ describe("/band/<id> links its editions and venues", () => {
     expect(links).not.toContain(`/venue/${s.draftOnly.id}`);
     expect(html).not.toContain("secret-draft");
     expect(html).not.toContain("reveal-fest");
+    expect(html).not.toContain("cancelled-only-fest");
+    expect(links).not.toContain(`/venue/${s.cancelledRoom.id}`);
     expect(html).toContain("Newer &lt;Fest&gt;");
     expect(html).not.toContain("page-links");
   });
@@ -96,13 +110,15 @@ describe("/venue/<id> links its editions and artists", () => {
     expect(bands).not.toContain(`/band/${s.unannounced.band_profile_id}`);
     expect(html).not.toContain("secret-draft");
     expect(html).not.toContain("reveal-fest");
+    expect(html).not.toContain("cancelled-only-fest");
+    expect(bands).not.toContain(`/band/${s.cancelledSet.band_profile_id}`);
   });
 
-  test("description carries city, edition count, latest edition and address", async () => {
+  test("description carries city, edition count (cancelled sets excluded), latest edition and address", async () => {
     const s = setup();
     const html = await (await run(venuePage, s.env, "https://settimes.ca/venue/x", s.hall.id)).text();
     expect(description(html)).toBe(
-      "Rock &amp; Roll Hall in Kitchener: 2 SetTimes editions, most recently Newer &lt;Fest&gt; (Sep 2025). 1 King St",
+      "Rock &amp; Roll Hall in Kitchener: 2 SetTimes editions, latest: Newer &lt;Fest&gt; (Sep 2025). 1 King St",
     );
     expect(description(html).length).toBeLessThanOrEqual(220); // escaped form; raw text is capped at 160
   });

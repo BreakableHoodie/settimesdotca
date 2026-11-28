@@ -16,7 +16,7 @@ import { publicRevealedPerformanceExistsSql } from "../utils/eventVisibility.js"
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const DESCRIPTION_MAX_LENGTH = 160;
 
-// "<Venue> in <City>: N SetTimes editions, most recently <Event> (Mon YYYY). <address>".
+// "<Venue> in <City>: N SetTimes editions, latest: <Event> (Mon YYYY). <address>".
 // Only facts from D1; with no editions read (a failed read) it falls back to the
 // name + address line. The month comes from the YYYY-MM-DD text, never a Date
 // (UTC parsing shifts a first-of-month date back a month in Toronto).
@@ -33,7 +33,7 @@ function buildVenueDescription(venue, editions) {
   const monthName = MONTHS[Number(month) - 1];
   const when = monthName && year ? ` (${monthName} ${year})` : "";
   const city = venue.city ? ` in ${venue.city}` : "";
-  const head = `${venue.name}${city}: ${n} SetTimes ${n === 1 ? "edition" : "editions"}, most recently ${latest.name}${when}.`;
+  const head = `${venue.name}${city}: ${n} SetTimes ${n === 1 ? "edition" : "editions"}, latest: ${latest.name}${when}.`;
   return truncatePlainText(venue.address ? `${head} ${venue.address}` : head, DESCRIPTION_MAX_LENGTH);
 }
 

@@ -62,6 +62,7 @@ install: ## Install root + frontend dependencies
 
 build: ## Frontend production build (also what E2E serves)
 	npm run build --prefix frontend
+	node scripts/check-bundle-size.mjs
 
 dev: ## Serve the built app + functions on :8788 against local D1 (foreground)
 	$(WRANGLER) pages dev frontend/dist --port 8788 --persist-to .wrangler/state

@@ -18,6 +18,7 @@ import {
   publicRevealedPerformanceExistsSql,
   revealedPerformanceSql,
 } from "../utils/eventVisibility.js";
+import { loadBandPageContext } from "../utils/crawlableLinks.js";
 import { buildBandFallbackDescription, buildBandTitle } from "../utils/bandMeta.js";
 
 /**
@@ -268,5 +269,9 @@ export async function onRequest(context) {
 
   const title = buildBandTitle(band);
 
-  return serveWithInjectedMeta(context, { title, metaTags, jsonLd: [musicGroup, breadcrumb] });
+  // Editions and venues as crawlable links (#1494); a failed read gives none.
+  const linkContext = await loadBandPageContext(env, Number(id));
+  const pageLinks = linkContext?.linksHtml ?? "";
+
+  return serveWithInjectedMeta(context, { title, metaTags, jsonLd: [musicGroup, breadcrumb], pageLinks });
 }

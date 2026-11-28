@@ -4,12 +4,38 @@
 import { isPublicDataEnabled } from "../utils/publicGate.js";
 import {
   escapeAttr,
+  truncatePlainText,
   serveWithInjectedMeta,
   serveNotFound,
   CANONICAL_HOST,
   DEFAULT_OG_IMAGE,
 } from "../utils/ssrMeta.js";
+import { loadVenuePageContext } from "../utils/crawlableLinks.js";
 import { publicRevealedPerformanceExistsSql } from "../utils/eventVisibility.js";
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const DESCRIPTION_MAX_LENGTH = 160;
+
+// "<Venue> in <City>: N SetTimes editions, most recently <Event> (Mon YYYY). <address>".
+// Only facts from D1; with no editions read (a failed read) it falls back to the
+// name + address line. The month comes from the YYYY-MM-DD text, never a Date
+// (UTC parsing shifts a first-of-month date back a month in Toronto).
+function buildVenueDescription(venue, editions) {
+  const [latest] = editions;
+  if (!latest) {
+    return (
+      [venue.name, venue.address].filter(Boolean).join(" — ") ||
+      `${venue.name} — a live music venue${venue.city ? ` in ${venue.city}, ON` : ""} on SetTimes.`
+    );
+  }
+  const n = editions.length;
+  const [year, month] = String(latest.last_date ?? "").split("-");
+  const monthName = MONTHS[Number(month) - 1];
+  const when = monthName && year ? ` (${monthName} ${year})` : "";
+  const city = venue.city ? ` in ${venue.city}` : "";
+  const head = `${venue.name}${city}: ${n} SetTimes ${n === 1 ? "edition" : "editions"}, most recently ${latest.name}${when}.`;
+  return truncatePlainText(venue.address ? `${head} ${venue.address}` : head, DESCRIPTION_MAX_LENGTH);
+}
 
 export async function onRequest(context) {
   const { params, env, request } = context;
@@ -51,9 +77,11 @@ export async function onRequest(context) {
   // Pin to the production host — preview deploys must not self-canonicalise.
   const url = `${CANONICAL_HOST}/venue/${id}`;
   const locality = venue.city;
-  const description =
-    [venue.name, venue.address].filter(Boolean).join(" — ") ||
-    `${venue.name} — a live music venue${locality ? ` in ${locality}, ON` : ""} on SetTimes.`;
+  // Editions and artists as crawlable links (#1494). A failed read gives no
+  // links and the plain name + address description.
+  const linkContext = await loadVenuePageContext(env, Number(id));
+  const pageLinks = linkContext?.linksHtml ?? "";
+  const description = buildVenueDescription(venue, linkContext?.editions ?? []);
 
   const metaTags = [
     `<meta name="description" content="${escapeAttr(description)}" />`,
@@ -120,5 +148,5 @@ export async function onRequest(context) {
 
   const title = `${venue.name} — Live Music Venue${locality ? ` in ${locality}, ON` : ""} | SetTimes`;
 
-  return serveWithInjectedMeta(context, { title, metaTags, jsonLd: [musicVenue, breadcrumb] });
+  return serveWithInjectedMeta(context, { title, metaTags, jsonLd: [musicVenue, breadcrumb], pageLinks });
 }

@@ -1366,6 +1366,24 @@ export const MUTATIONS = [
     tests: ["functions/utils/__tests__/crypto.test.js"],
   },
   {
+    id: "band-profile-updated-at-content-only",
+    invariant:
+      "CLAUDE.md 'Metrics & Analytics' — band_profiles.updated_at is stamped only by a content edit, never by the daily aggregate-stats counter rewrite (#1501)",
+    file: "database/setup-complete.sql",
+    find: "AFTER UPDATE OF name, name_normalized, description, photo_url, genre, social_links,\n  origin, origin_city, origin_region, contact_email, photo_alt_text, members,\n  for_fans_of, is_active ON band_profiles",
+    replace: "AFTER UPDATE ON band_profiles",
+    tests: ["functions/utils/__tests__/bandProfileUpdatedAt.test.js"],
+  },
+  {
+    id: "band-profile-updated-at-skips-unchanged-values",
+    invariant:
+      "CLAUDE.md 'Metrics & Analytics' — re-saving identical content values (every admin save sends them all) does not stamp band_profiles.updated_at (#1501)",
+    file: "database/setup-complete.sql",
+    find: "WHEN OLD.name IS NOT NEW.name\n",
+    replace: "WHEN 1 OR OLD.name IS NOT NEW.name\n",
+    tests: ["functions/utils/__tests__/bandProfileUpdatedAt.test.js"],
+  },
+  {
     id: "users-role-trigger-refuses-unknown-role",
     invariant:
       "CLAUDE.md 'RBAC Roles' — users.role outside viewer/editor/admin is refused at the database, so an inherited-key role like 'constructor' can never be stored (#1287)",

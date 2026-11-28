@@ -50,12 +50,6 @@ CREATE INDEX IF NOT EXISTS idx_band_profiles_genre ON band_profiles(genre);
 
 CREATE INDEX IF NOT EXISTS idx_band_profiles_name ON band_profiles(name);
 
-CREATE TRIGGER IF NOT EXISTS update_band_profile_timestamp
-AFTER UPDATE ON band_profiles
-BEGIN
-  UPDATE band_profiles SET updated_at = datetime('now') WHERE id = NEW.id;
-END;
-
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   email TEXT UNIQUE NOT NULL,
@@ -518,6 +512,28 @@ BEFORE UPDATE OF token ON mfa_challenges
 WHEN NOT (NEW.token GLOB 'sha256:*' AND length(NEW.token) = 71 AND substr(NEW.token, 8) NOT GLOB '*[^0-9a-f]*')
 BEGIN
   SELECT RAISE(ABORT, 'mfa_challenges.token must be a sha256: digest');
+END;
+
+CREATE TRIGGER IF NOT EXISTS update_band_profile_timestamp
+AFTER UPDATE OF name, name_normalized, description, photo_url, genre, social_links,
+  origin, origin_city, origin_region, contact_email, photo_alt_text, members,
+  for_fans_of, is_active ON band_profiles
+WHEN OLD.name IS NOT NEW.name
+  OR OLD.name_normalized IS NOT NEW.name_normalized
+  OR OLD.description IS NOT NEW.description
+  OR OLD.photo_url IS NOT NEW.photo_url
+  OR OLD.genre IS NOT NEW.genre
+  OR OLD.social_links IS NOT NEW.social_links
+  OR OLD.origin IS NOT NEW.origin
+  OR OLD.origin_city IS NOT NEW.origin_city
+  OR OLD.origin_region IS NOT NEW.origin_region
+  OR OLD.contact_email IS NOT NEW.contact_email
+  OR OLD.photo_alt_text IS NOT NEW.photo_alt_text
+  OR OLD.members IS NOT NEW.members
+  OR OLD.for_fans_of IS NOT NEW.for_fans_of
+  OR OLD.is_active IS NOT NEW.is_active
+BEGIN
+  UPDATE band_profiles SET updated_at = datetime('now') WHERE id = NEW.id;
 END;
 
 -- ============================================

@@ -438,6 +438,8 @@ Metrics write to D1 daily-aggregate tables (`page_views_daily`, `artist_daily_st
 
 **Referrer buckets (#1246 Q3).** `referrer_daily_stats` answers "how do fans find us?". The browser reduces `document.referrer` to one of six labels (`referrerBucket()`, `frontend/src/utils/metrics.js`), one `visit` per session; no URL or host is sent, and the embed page sends none. The server drops any label outside the six, counts one visit per request, keys by festival day, and writes in its own try/catch. Site-wide, no event key. Indicative: unauthenticated endpoint. In the mutation gate.
 
+**`band_profiles.updated_at` is content-only (#1501, 0085):** `UPDATE OF <content columns> WHEN OLD.c IS NOT NEW.c`, so neither `aggregate-stats` nor an unchanged re-save stamps it. Classify a new column in `bandProfileUpdatedAt.test.js`. Old values stay polluted; the sitemap ignores it.
+
 **Share metrics come from `share_links`, not telemetry.** A create is a `share_links` row; add no share telemetry event.
 
 The expiry cron folds expired links into `event_share_totals` in the same batch, under one bound cutoff; readers add live and folded totals. Per-route detail is not kept.
@@ -656,7 +658,7 @@ settimes.ca no longer emails fans. Band follows, event subscriptions and announc
 npm test         # from repo root
 ```
 
-Runs fine locally, including on Apple Silicon (`better-sqlite3` loads natively on arm64) — the full suite completes in a few seconds. Prefer running it locally over waiting on CI.
+Runs locally in a few seconds, Apple Silicon included; prefer it over waiting on CI.
 
 ### Frontend unit tests
 
@@ -791,7 +793,7 @@ npm run format && npm run format:check && npm run lint && npm test
 npm run validate:openapi    # if docs/api-spec.yaml changed
 ```
 
-Run `--write` before `--check` (CI's check never fixes), and `npm run build` because E2E runs the built app. Run E2E only when changing routes, auth flows, or what the suite targets.
+Run `--write` before `--check` (CI's check never fixes), and `npm run build` (E2E runs the built app). Run E2E only when changing routes, auth, or what the suite targets.
 
 ### Before opening a PR — AI review gate
 
@@ -826,7 +828,7 @@ git fetch origin
 git rebase origin/main      # keep branch current with main
 ```
 
-Do this **every time you push**, not just when opening the PR: Dependabot moves `main` often, and a stale branch needs an "Update branch" round-trip before it can merge.
+Do this **every time you push**, not just at PR open: Dependabot moves `main` often, and a stale branch needs an "Update branch" round-trip.
 
 ### Opening a pull request
 
@@ -932,7 +934,7 @@ For the `_headers` document CSP:
 - **No `'unsafe-inline'`** in `script-src`; the one inline script is allowed by hash (next bullet). The only third-party script origin is Cloudflare Web Analytics, and no third-party frame origin is allowed (#1431).
 - **`Cross-Origin-Embedder-Policy: require-corp` must NOT be set** — it blocks cross-origin subresources that send no `Cross-Origin-Resource-Policy`, and band photos are served from another origin (`BAND_PHOTOS_PUBLIC_URL`, `band-photos.settimes.ca`). The app also needs no cross-origin isolation.
 - **The inline theme-flash `<script>` in `frontend/index.html`** is allowed by a `'sha256-…'` hash in `script-src`. **If you edit that script, regenerate the hash** (sha256 of the exact built script body, base64) or it silently stops running and a theme flash returns. No test covers this — verify by building and hashing `dist/index.html`.
-- **Cloudflare Rocket Loader must stay DISABLED** for the zone. It rewrites/inline-executes `<script>` tags, which strict CSP blocks ("Refused to execute inline script"). A modern code-split Vite SPA gains nothing from it.
+- **Cloudflare Rocket Loader must stay DISABLED** for the zone. It inline-executes `<script>` tags, which strict CSP blocks. A code-split Vite SPA gains nothing from it.
 
 ### Where Cloudflare-facing settings actually live
 
@@ -947,7 +949,6 @@ Most of this is Cloudflare-side state that can be silently undone, with nothing 
 | **This repository**      | `frontend/public/_headers`                                                          | **HSTS** — listed only because the zone toggle reading "off" is correct and looks like a gap |
 
 - **Preview deployments bind only the scratch D1** via `[env.preview]` in `wrangler.toml`; without it previews inherit production D1 and R2. Never bind a production resource there (`scripts/__tests__/previewBindings.test.js`).
-- **Rocket Loader stays disabled**; strict CSP blocks the scripts it rewrites.
 - **`www` → apex is a zone _dynamic_ 301** preserving path and query (#984); a static redirect would send every deep path to `/`. Keep `www` as a Pages custom domain, or old links become TLS errors. `/` emits no raw-HTML canonical, so if `www` stops redirecting the duplicate-host problem returns.
 - **SSL/TLS is Full (strict), minimum TLS 1.2.**
 - **HSTS is served from `frontend/public/_headers`**; do not also enable the zone toggle.

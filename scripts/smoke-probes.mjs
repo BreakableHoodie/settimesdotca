@@ -72,6 +72,16 @@ export function checkRetired(_body, status) {
   return status === 410 ? pass() : fail(`expected HTTP 410, got ${status}`);
 }
 
+// An /api path no handler owns must be a JSON 404, not the SPA shell with 200 (#1491).
+export function checkUnknownApiNotFound(body, status) {
+  if (status !== 404) return fail(`expected HTTP 404, got ${status}`);
+  try {
+    return JSON.parse(body)?.code === "NOT_FOUND" ? pass() : fail("404 body is not the NOT_FOUND JSON error");
+  } catch {
+    return fail("404 body is not JSON");
+  }
+}
+
 export function extractSitemapUrls(body) {
   return [...body.matchAll(/<loc>\s*([^<]+?)\s*<\/loc>/gi)].map((match) => match[1]);
 }
@@ -189,6 +199,11 @@ export async function runProbes(baseUrl, options = {}) {
   results.push([
     "per-artist iCal rejects invalid band",
     await fetchChecked(new URL("/api/feeds/ical?band=abc", base), checkInvalidBandRefused, options),
+  ]);
+
+  results.push([
+    "unknown /api path is a JSON 404",
+    await fetchChecked(new URL("/api/zzz-nope", base), checkUnknownApiNotFound, options),
   ]);
 
   for (const retiredPath of RETIRED_PATHS) {

@@ -113,10 +113,20 @@ describe("functions/[[path]].js catch-all", () => {
     }
   });
 
-  test("/api/ paths are passed through unchanged", async () => {
+  test("unknown /api paths (any case, directory-only, any method) answer a JSON 404, never the shell (#1491)", async () => {
     const { env } = createTestEnv();
-    const response = await catchAll(ctx(env, "https://settimes.ca/api/whatever"));
-    expect(response.status).toBe(200);
+    for (const p of ["/api/zzz-nope", "/api/bands", "/API/Zzz-Nope", "/api/zzz/", "/api", "/%61pi/x"]) {
+      for (const method of ["GET", "HEAD", "POST"]) {
+        const c = ctx(env, `https://settimes.ca${p}`);
+        c.request = new Request(`https://settimes.ca${p}`, { method });
+        const response = await catchAll(c);
+        expect(response.status, `${method} ${p}`).toBe(404);
+        expect(response.headers.get("Content-Type"), p).toBe("application/json");
+        expect(response.headers.get("Cache-Control"), p).toBe("no-store");
+        expect(response.headers.get("X-Robots-Tag"), p).toBe("noindex");
+        if (method !== "HEAD") expect(await response.json(), p).toEqual({ error: "Not found", code: "NOT_FOUND" });
+      }
+    }
   });
 });
 

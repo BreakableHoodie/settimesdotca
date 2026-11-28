@@ -176,6 +176,15 @@ export const MUTATIONS = [
     tests: ["functions/__tests__/middlewareApiCaseInsensitive.test.js"],
   },
   {
+    id: "unknown-api-path-is-json-404",
+    invariant:
+      "CLAUDE.md 'SSR owns identity meta and JSON-LD' — an /api path no handler owns answers a JSON 404, not the SPA shell with 200 (#1491)",
+    file: "functions/[[path]].js",
+    find: "  if (isApiRoute(context.request)) {",
+    replace: "  if (false) {",
+    tests: ["functions/__tests__/notFound.test.js"],
+  },
+  {
     id: "band-missing-entity-is-404",
     invariant:
       "CLAUDE.md 'SSR owns identity meta and JSON-LD' — a band id that does not exist answers 404 with noindex, not a soft-404 200 shell (#1446)",

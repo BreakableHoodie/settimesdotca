@@ -127,19 +127,13 @@ export default function HistoryPage() {
               <ArrowLeft size={14} aria-hidden="true" /> SetTimes
             </Link>
             <h1 className="font-display text-4xl font-bold text-text-primary">Every edition</h1>
-            {oldest && (
-              <p className="mt-1 text-lg text-accent-400">
-                {editions.length} editions since{' '}
-                {parseLocalDate(oldest.date)?.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}, from{' '}
-                {oldest.name} to {newest.name}.
-              </p>
-            )}
           </div>
           <ThemeToggle />
         </div>
       </header>
 
-      <main id="main-content" className="container mx-auto max-w-7xl space-y-12 px-4 py-8">
+      {/* min-h-screen keeps the footer below the fold while editions load (CLS). */}
+      <main id="main-content" className="container mx-auto min-h-screen max-w-7xl space-y-12 px-4 py-8">
         <RetryRegion retry={retry} label="Editions" className="space-y-12">
           {error ? (
             <div role={retry.retried ? undefined : 'alert'} className="py-16 text-center text-text-secondary">
@@ -156,6 +150,15 @@ export default function HistoryPage() {
             <p className="py-16 text-center text-text-tertiary">Loading editions…</p>
           ) : (
             <>
+              {/* In the loaded content, not the header: added to the header on
+                  load, it pushed the whole page down (CLS 0.11 on mobile). */}
+              {oldest && (
+                <p className="text-lg text-accent-400">
+                  {editions.length} editions since{' '}
+                  {parseLocalDate(oldest.date)?.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}, from{' '}
+                  {oldest.name} to {newest.name}.
+                </p>
+              )}
               <section aria-labelledby="wall-heading">
                 <h2 id="wall-heading" className="sr-only">
                   Posters

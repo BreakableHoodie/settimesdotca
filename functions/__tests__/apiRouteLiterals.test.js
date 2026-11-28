@@ -184,8 +184,9 @@ function analyse(src) {
       if (b && !b.shadow) b.direct = true;
     }
     const written = n.type === "AssignmentExpression" ? n.left : n.type === "UpdateExpression" ? n.argument : null;
-    if (written?.type === "Identifier") {
-      const b = lookup(scope, written.name);
+    // Every name the write targets, destructuring included (`[A] = ...`, `({ A } = ...)`).
+    for (const name of written ? patternNames(written) : []) {
+      const b = lookup(scope, name);
       if (b && !b.shadow) b.reassigned = true; // its initializer is no longer its value
     }
     if (isStringish(n) && !composes(parent)) candidates.push({ n, parent, scope });
@@ -354,6 +355,13 @@ describe("every /api literal in a caller resolves to a handler file (#1491)", ()
         "page.jsx": 'import { BANDS } from "./api.js"; fetch(`${BANDS}/${id}/stats`);',
       }),
     ).toEqual({ "api.js": [], "page.jsx": ["/api/bands/x/stats"] });
+    // a destructured write in the exporter makes the binding unknown, not its stale value
+    expect(
+      across({
+        "api.js": 'export let BASE = "/api/old"; [BASE] = ["/api/new"];',
+        "page.jsx": 'import { BASE } from "./api"; fetch(`${BASE}/stats`);',
+      })["page.jsx"],
+    ).toEqual([]);
     // a single-file scan still treats the import as unknown
     expect(apiLiterals('import { endpoint } from "./api"; fetch(`${endpoint}/x`)')).toEqual([]);
     // JSX parses, and a URL in an attribute counts

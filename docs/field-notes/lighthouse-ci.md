@@ -83,3 +83,33 @@ perf score ranged 0.63 → 0.96 on identical code, **correlating with** host loa
 correlation rather than a demonstrated cause. It is still enough to act on:
 measure perf on an idle host or take CI's number, and never re-baseline it from
 a laptop doing other work.
+
+## Entity pages and the entry-chunk budget (#1499)
+
+Until #1499 the harness collected only `/`, while search traffic lands on the
+band, event, venue and recap pages. `frontend/lighthouserc.json` now also
+collects, from the CI-seeded D1 (`database/seed-test-data.sql`):
+
+| URL | Row | Why |
+|---|---|---|
+| `/event/future-fest-e2e` | event 28, published, +14 days | the row `public-timeline.spec.js` depends on |
+| `/band/2` | "Future Sound" | the richest profile (all eight links); the a11y sweep scans it |
+| `/venue/1` | "Waterloo Music Hall" | has sets on events 28, 29 and 30 |
+| `/events/past-fest-e2e/recap` | event 30, published, -30 days | concluded, so the recap gate serves it |
+
+All five URLs share the existing assertions (performance 0.90 `optimistic`, CLS
+0.1 `pessimistic`, the other categories 0.90). No new floor was set. **The new
+URLs' scores have never been read from CI: read several CI samples before
+changing any floor or adding a per-URL `assertMatrix`.** A local run says nothing
+about them (see above). The seed is relative to `now`, so a slug above vanishing
+would show as a 404 page scored as a page; if a URL starts failing SEO, check
+that it still returns 200.
+
+**Script size is a build check, not a Lighthouse score.** Vite's
+`chunkSizeWarningLimit` only warns. `scripts/check-bundle-size.mjs` (run by
+`make build`, so `make gate` and E2E builds) gzips the module script named in
+`dist/index.html` and fails above `ENTRY_GZIP_BUDGET_BYTES` (134,000 B). Measured
+2026-11-27: 121,703 B (gzip level 9; Vite's report says 123.2 kB). A size is
+deterministic, so unlike a score the budget may come from a local build; it is
+about 10% headroom. `scripts/__tests__/checkBundleSize.test.js` runs the CLI on
+a bloated entry and on an index.html with no module script, and both exit 1.

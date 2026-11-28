@@ -1,7 +1,13 @@
 {
   "ci": {
     "collect": {
-      "url": ["http://localhost:8788"],
+      "url": [
+        "http://localhost:8788",
+        "http://localhost:8788/event/future-fest-e2e",
+        "http://localhost:8788/band/2",
+        "http://localhost:8788/venue/1",
+        "http://localhost:8788/events/past-fest-e2e/recap"
+      ],
       "numberOfRuns": 3,
       "wait": "3000"
     },

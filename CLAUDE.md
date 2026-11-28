@@ -725,10 +725,11 @@ The page then runs without CSP, so this harness cannot test anything CSP governs
 
 ### Lighthouse CI performance assertion (#728, #854, #851)
 
-`lighthouserc.json` measures the **served app** (`http://localhost:8788`, wrangler + seeded D1 via `.github/actions/e2e-env`), never a static `dist` — the static harness produced a fake 0.2 CLS and a ~0.10 perf deficit that drove two unjustified budget cuts (#869). Measurements and history: `docs/field-notes/lighthouse-ci.md`.
+`lighthouserc.json` measures the **served app** (`http://localhost:8788`, wrangler + seeded D1 via `.github/actions/e2e-env`), never a static `dist` — the static harness produced a fake 0.2 CLS and a ~0.10 perf deficit that drove two unjustified budget cuts (#869). History: `docs/field-notes/lighthouse-ci.md`.
 
 - **Performance floor 0.90, `aggregationMethod: "optimistic"`.** Do not switch to `median` (only ever stricter → flakes) and do not raise it to the observed ceiling (~5 points of headroom absorbs runner noise).
 - **`cumulative-layout-shift` ≤ 0.1 with `"pessimistic"`** — load-bearing: `optimistic` would have passed the very artifact it guards against. Safe because CLS is stable under load; do **not** copy `pessimistic` onto performance.
+- Data arriving must not shift layout: `e2e/layout-shift.spec.js`.
 - **Never move a floor from a local number.** Perf is contention-sensitive (0.63 → 0.96 on identical code); local `lhci` is not comparable to CI. Only CI samples count.
 
 ### The mutation gate — documented invariants, proven executable

@@ -248,7 +248,9 @@ export default function VenuePage() {
         </div>
       </header>
 
-      <div className="container mx-auto max-w-5xl px-4 py-8">
+      {/* min-h-screen keeps the footer below the fold while the venue loads, so the
+          content arriving cannot shift it (Lighthouse CLS 0.30 on /venue/1). */}
+      <div className="container mx-auto min-h-screen max-w-5xl px-4 py-8">
         {loading ? (
           <p className="py-16 text-center text-text-tertiary">Loading venue…</p>
         ) : error ? (

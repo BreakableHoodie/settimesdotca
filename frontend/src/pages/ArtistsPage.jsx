@@ -420,7 +420,8 @@ export default function ArtistsPage() {
         </div>
       </header>
 
-      <div className="container mx-auto max-w-7xl px-4 py-8">
+      {/* min-h-screen keeps the footer below the fold while artists load (CLS). */}
+      <div className="container mx-auto min-h-screen max-w-7xl px-4 py-8">
         {/* Shuffle and one-of-one blocks live above search, untouched below */}
         <ShuffleBlock />
         <OneOfOneCallout />

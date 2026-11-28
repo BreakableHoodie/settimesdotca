@@ -117,7 +117,8 @@ export default function VenuesPage() {
         </div>
       </header>
 
-      <div className="container mx-auto max-w-7xl px-4 py-8">
+      {/* min-h-screen keeps the footer below the fold while the list loads (CLS). */}
+      <div className="container mx-auto min-h-screen max-w-7xl px-4 py-8">
         <div className="relative mb-8 max-w-md">
           <Search
             size={18}

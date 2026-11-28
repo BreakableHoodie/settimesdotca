@@ -42,73 +42,138 @@ export function resolves(literal, routes) {
 
 const JsxParser = acorn.Parser.extend(acornJsx());
 
-function* nodes(node, parent = null) {
-  if (!node || typeof node.type !== "string") return;
-  yield [node, parent];
-  for (const [key, value] of Object.entries(node)) {
-    if (key === "type" || key === "start" || key === "end") continue;
-    for (const child of Array.isArray(value) ? value : [value])
-      if (child && typeof child === "object") yield* nodes(child, node);
-  }
-}
+const SCOPED = new Set(["Program", "BlockStatement", "StaticBlock", "SwitchStatement", "CatchClause"]);
+const FUNCTIONS = new Set(["FunctionDeclaration", "FunctionExpression", "ArrowFunctionExpression"]);
+const LOOPS = new Set(["ForStatement", "ForInStatement", "ForOfStatement"]);
+const SHADOW = { shadow: true }; // a name bound to something this scan cannot evaluate
 
-// The /api URLs a source file requests, read from its syntax tree (so comments
-// never count). A string or template is a URL when its value starts with /api/;
-// it ends at a query, fragment, colon or whitespace. A `${...}` expression stands for one
-// segment ("x"). A trailing "/" is a prefix only when `+` completes it (an "x"
-// is appended); otherwise it is the optional slash Pages accepts, and dropped.
-// A `const NAME = "/api/..."` used only as `${NAME}` in templates is a base: its
-// uses are expanded and its own value is not checked. Any other reference to
-// NAME (`fetch(endpoint)`) checks its value as a literal.
-export function apiLiterals(src) {
-  const ast = JsxParser.parse(src, { ecmaVersion: "latest", sourceType: "module", allowHashBang: true });
-  const all = [...nodes(ast)];
-  const consts = new Map();
-  for (const [n] of all)
-    if (n.type === "VariableDeclarator" && n.id.type === "Identifier" && n.init) {
-      const v = staticString(n.init);
-      if (v !== null && /^\/api(\/|$)/.test(v)) consts.set(n.id.name, { value: v, init: n.init, direct: false });
-    }
-  const isBase = (expr) => expr.type === "Identifier" && consts.has(expr.name);
-  for (const [n, parent] of all) {
-    if (n.type !== "Identifier" || !consts.has(n.name)) continue;
-    if (parent?.type === "VariableDeclarator" && parent.id === n) continue;
-    if (parent?.type === "TemplateLiteral") continue; // `${NAME}`: expanded below
-    if (parent?.type === "MemberExpression" && parent.property === n && !parent.computed) continue;
-    if (parent?.type === "Property" && parent.key === n && !parent.computed && !parent.shorthand) continue;
-    consts.get(n.name).direct = true;
-  }
-  const baseInits = new Set([...consts.values()].filter((c) => !c.direct).map((c) => c.init));
-  const out = [];
-  for (const [n, parent] of all) {
-    let value;
-    if (n.type === "Literal" && typeof n.value === "string" && !baseInits.has(n)) value = n.value;
-    else if (n.type === "TemplateLiteral" && !baseInits.has(n))
-      value = n.quasis
-        .map(
-          (q, i) =>
-            q.value.cooked +
-            (i < n.expressions.length
-              ? isBase(n.expressions[i])
-                ? consts.get(n.expressions[i].name).value
-                : "x"
-              : ""),
-        )
-        .join("");
-    else continue;
-    if (!value.startsWith("/api/")) continue;
-    let lit = value.split(/[?#:\s]/)[0];
-    const completed = parent?.type === "BinaryExpression" && parent.operator === "+" && parent.left === n;
-    if (lit.endsWith("/")) lit = completed ? lit + "x" : lit.replace(/\/+$/, "");
-    out.push(lit);
-  }
+function patternNames(p, out = []) {
+  if (!p) return out;
+  if (p.type === "Identifier") out.push(p.name);
+  else if (p.type === "ObjectPattern")
+    for (const q of p.properties) patternNames(q.type === "RestElement" ? q.argument : q.value, out);
+  else if (p.type === "ArrayPattern") for (const q of p.elements) patternNames(q, out);
+  else if (p.type === "RestElement") patternNames(p.argument, out);
+  else if (p.type === "AssignmentPattern") patternNames(p.left, out);
   return out;
 }
 
-function staticString(node) {
-  if (node.type === "Literal" && typeof node.value === "string") return node.value;
-  if (node.type === "TemplateLiteral" && node.expressions.length === 0) return node.quasis[0].value.cooked;
+// The bindings a scope-creating node introduces, so a reference resolves to the
+// declaration it lexically means even when another scope reuses the name.
+function declare(node, scope) {
+  const bind = (decl) => {
+    if (decl.type === "VariableDeclaration")
+      for (const d of decl.declarations)
+        if (d.id.type === "Identifier") scope.vars.set(d.id.name, { decl: d, scope, direct: false });
+        else for (const name of patternNames(d.id)) scope.vars.set(name, SHADOW);
+    else if ((decl.type === "FunctionDeclaration" || decl.type === "ClassDeclaration") && decl.id)
+      scope.vars.set(decl.id.name, SHADOW);
+    else if (decl.type === "ImportDeclaration") for (const sp of decl.specifiers) scope.vars.set(sp.local.name, SHADOW);
+    else if (decl.type === "ExportNamedDeclaration" && decl.declaration) bind(decl.declaration);
+  };
+  if (FUNCTIONS.has(node.type)) {
+    for (const prm of node.params) for (const name of patternNames(prm)) scope.vars.set(name, SHADOW);
+    if (node.type === "FunctionExpression" && node.id) scope.vars.set(node.id.name, SHADOW);
+  } else if (node.type === "CatchClause") for (const name of patternNames(node.param)) scope.vars.set(name, SHADOW);
+  else if (LOOPS.has(node.type)) bind((node.init ?? node.left) || {});
+  else if (node.type === "SwitchStatement") for (const c of node.cases) c.consequent.forEach(bind);
+  else node.body.forEach(bind);
+}
+
+function lookup(scope, name) {
+  for (let s = scope; s; s = s.parent) if (s.vars.has(name)) return s.vars.get(name);
   return null;
+}
+
+// A name in this position is a binding or a label, not a read of a variable.
+function isReference(n, parent) {
+  if (!parent) return true;
+  if (parent.type === "VariableDeclarator" && parent.id === n) return false;
+  if (
+    (parent.type === "MemberExpression" || parent.type === "PropertyDefinition") &&
+    parent.property === n &&
+    !parent.computed
+  )
+    return false;
+  if (
+    (parent.type === "Property" || parent.type === "MethodDefinition" || parent.type === "PropertyDefinition") &&
+    parent.key === n
+  )
+    return !!parent.shorthand && !parent.computed;
+  if (FUNCTIONS.has(parent.type) || parent.type === "ClassDeclaration" || parent.type === "ClassExpression")
+    return false;
+  if (/^(Import|Export)/.test(parent.type) || parent.type === "CatchClause") return false;
+  if (/Statement$/.test(parent.type) && parent.label === n) return false;
+  return true;
+}
+
+// `+` and `${...}` build one URL out of their parts.
+const composes = (parent) =>
+  (parent?.type === "BinaryExpression" && parent.operator === "+") || parent?.type === "TemplateLiteral";
+const isStringish = (n) =>
+  (n.type === "Literal" && typeof n.value === "string") ||
+  n.type === "TemplateLiteral" ||
+  (n.type === "BinaryExpression" && n.operator === "+");
+
+// The URL an expression builds. A literal is its text, a name bound to a
+// declaration is that declaration's value, and anything else (a call, a
+// parameter, an `a ?? b`) is one unknown segment, "x".
+function evaluate(n, scope, depth = 0) {
+  if (depth > 20) return "x";
+  if (n.type === "Literal") return typeof n.value === "string" ? n.value : "x";
+  if (n.type === "TemplateLiteral")
+    return n.quasis
+      .map((q, i) => q.value.cooked + (i < n.expressions.length ? evaluate(n.expressions[i], scope, depth + 1) : ""))
+      .join("");
+  if (n.type === "BinaryExpression" && n.operator === "+")
+    return evaluate(n.left, scope, depth + 1) + evaluate(n.right, scope, depth + 1);
+  if (n.type === "Identifier") {
+    const b = lookup(scope, n.name);
+    if (b && !b.shadow && b.decl.init && isStringish(b.decl.init)) return evaluate(b.decl.init, b.scope, depth + 1);
+  }
+  return "x";
+}
+
+// The /api URLs a source file requests, read from its syntax tree (so comments
+// never count). Each whole string expression (a literal, a template, a `+`
+// chain) is evaluated as one URL; it counts when it starts with /api/, ends at a
+// query, fragment, colon or whitespace, and drops a trailing "/" (Pages accepts
+// both). A declaration whose every use is inside a `+` or a `${...}` is a base:
+// its uses are checked, its own value is not. Any other use (`fetch(endpoint)`)
+// checks its value too. Names resolve by lexical scope.
+export function apiLiterals(src) {
+  const ast = JsxParser.parse(src, { ecmaVersion: "latest", sourceType: "module", allowHashBang: true });
+  const candidates = [];
+  const visit = (n, parent, scope) => {
+    if (!n || typeof n.type !== "string") return;
+    if (SCOPED.has(n.type) || FUNCTIONS.has(n.type) || LOOPS.has(n.type)) {
+      scope = { vars: new Map(), parent: scope };
+      declare(n, scope);
+    }
+    if (n.type === "Identifier" && isReference(n, parent) && !composes(parent)) {
+      const b = lookup(scope, n.name);
+      if (b && !b.shadow) b.direct = true;
+    }
+    if (isStringish(n) && !composes(parent)) candidates.push({ n, parent, scope });
+    for (const [key, value] of Object.entries(n)) {
+      if (key === "type" || key === "start" || key === "end") continue;
+      for (const child of Array.isArray(value) ? value : [value])
+        if (child && typeof child === "object") visit(child, n, scope);
+    }
+  };
+  visit(ast, null, null);
+  const out = [];
+  for (const { n, parent, scope } of candidates) {
+    if (parent?.type === "VariableDeclarator" && parent.init === n && parent.id.type === "Identifier") {
+      const b = lookup(scope, parent.id.name);
+      if (b && !b.shadow && b.decl === parent && !b.direct) continue; // a base, checked where it is used
+    }
+    // An unknown first part (`origin + "/api/x"`, `${BASE}/api/x`) is an origin.
+    const value = evaluate(n, scope).replace(/^x(?=\/api\/)/, "");
+    if (!value.startsWith("/api/")) continue;
+    out.push(value.split(/[?#:\s]/)[0].replace(/\/+$/, ""));
+  }
+  return out;
 }
 
 // Deliberately unowned: the smoke probe asserts this path answers a JSON 404.
@@ -149,6 +214,20 @@ describe("every /api literal in a caller resolves to a handler file (#1491)", ()
     expect(apiLiterals('fetch("/api/events/timeline/")')).toEqual(["/api/events/timeline"]);
     // a comment naming a base constant is not a use of it
     expect(apiLiterals("const base = '/api/bands'; fetch(`${base}/${name}`); // base path")).toEqual(["/api/bands/x"]);
+    // a static suffix after "+" is part of the URL
+    expect(apiLiterals('fetch("/api/events/timeline" + "/missing-handler")')).toEqual([
+      "/api/events/timeline/missing-handler",
+    ]);
+    // an unknown origin before the path is dropped, not the path
+    expect(apiLiterals('fetch(origin + "/api/zzz")')).toEqual(["/api/zzz"]);
+    // a name resolves to the declaration in its own scope, not a same-named one elsewhere
+    const scoped = apiLiterals(
+      'function a() { const B = "/api/events/timeline"; fetch(`${B}/missing-handler`); }\n' +
+        'function b() { const B = "/api/bands"; fetch(`${B}/x`); }',
+    );
+    expect(scoped).toEqual(["/api/events/timeline/missing-handler", "/api/bands/x"]);
+    const synthetic = ["/api/events/timeline", "/api/bands/[name]"];
+    expect(scoped.map((l) => resolves(l, synthetic))).toEqual([false, true]);
     // JSX parses, and a URL in an attribute counts
     expect(apiLiterals('const a = <a href="/api/feeds/ical?band=1">x</a>;')).toEqual(["/api/feeds/ical"]);
   });

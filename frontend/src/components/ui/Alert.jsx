@@ -1,5 +1,4 @@
 import { CircleAlert, CircleCheck, Info, TriangleAlert, X } from 'lucide-react'
-import PropTypes from 'prop-types'
 
 /**
  * Alert Component - Design System v1.0
@@ -67,13 +66,4 @@ export default function Alert({
       )}
     </div>
   )
-}
-
-Alert.propTypes = {
-  children: PropTypes.node.isRequired,
-  variant: PropTypes.oneOf(['success', 'warning', 'error', 'info']),
-  dismissible: PropTypes.bool,
-  onClose: PropTypes.func,
-  className: PropTypes.string,
-  icon: PropTypes.elementType,
 }

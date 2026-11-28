@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types'
 import { LINK_BASE_CLASS, LINK_FIELDS, hasAnyLink, parseSocialLinks } from '../utils/bandFields'
 
 export default function SocialLinksIcons({ band }) {
@@ -28,8 +27,4 @@ export default function SocialLinksIcons({ band }) {
       })}
     </div>
   )
-}
-
-SocialLinksIcons.propTypes = {
-  band: PropTypes.object.isRequired,
 }

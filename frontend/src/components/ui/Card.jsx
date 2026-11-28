@@ -1,5 +1,3 @@
-import PropTypes from 'prop-types'
-
 /**
  * Card Component - Design System v1.0
  *
@@ -62,13 +60,4 @@ export default function Card({
       {children}
     </Component>
   )
-}
-
-Card.propTypes = {
-  children: PropTypes.node.isRequired,
-  variant: PropTypes.oneOf(['default', 'elevated', 'outlined', 'flat', 'gradient', 'glow']),
-  padding: PropTypes.oneOf(['none', 'sm', 'md', 'lg']),
-  hoverable: PropTypes.bool,
-  className: PropTypes.string,
-  as: PropTypes.elementType,
 }

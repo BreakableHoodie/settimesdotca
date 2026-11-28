@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react'
-import PropTypes from 'prop-types'
 import { Button, Card } from '../components/ui'
 import RoleBadge from './components/RoleBadge'
 import { trustedDevicesApi } from '../utils/adminApi'
@@ -145,13 +144,4 @@ export default function UserSettings({ user, onOpenMfa }) {
       </Card>
     </div>
   )
-}
-
-UserSettings.propTypes = {
-  user: PropTypes.shape({
-    name: PropTypes.string,
-    email: PropTypes.string,
-    role: PropTypes.string,
-  }),
-  onOpenMfa: PropTypes.func.isRequired,
 }

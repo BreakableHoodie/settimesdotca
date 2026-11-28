@@ -1,5 +1,4 @@
 import { useEffect, useRef, useCallback } from 'react'
-import PropTypes from 'prop-types'
 import Button from './Button'
 import { TriangleAlert } from 'lucide-react'
 
@@ -118,15 +117,4 @@ export default function ConfirmDialog({
       </div>
     </div>
   )
-}
-
-ConfirmDialog.propTypes = {
-  isOpen: PropTypes.bool.isRequired,
-  onConfirm: PropTypes.func.isRequired,
-  onCancel: PropTypes.func.isRequired,
-  title: PropTypes.string,
-  message: PropTypes.string.isRequired,
-  confirmText: PropTypes.string,
-  cancelText: PropTypes.string,
-  variant: PropTypes.oneOf(['danger', 'primary']),
 }

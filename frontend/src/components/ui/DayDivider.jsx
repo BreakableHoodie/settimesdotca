@@ -1,6 +1,5 @@
 import { DoorOpen } from 'lucide-react'
 import { memo } from 'react'
-import PropTypes from 'prop-types'
 import { getDoorsTimeForDate } from '../../utils/doorsTime'
 import { formatFestivalDate } from '../../utils/festivalDays'
 import { formatTime } from '../../utils/timeFormat'
@@ -45,12 +44,5 @@ const DayDivider = memo(function DayDivider({ date, dayNumber, doorsJson = null,
     </div>
   )
 })
-
-DayDivider.propTypes = {
-  date: PropTypes.string.isRequired,
-  dayNumber: PropTypes.number,
-  doorsJson: PropTypes.string,
-  className: PropTypes.string,
-}
 
 export default DayDivider

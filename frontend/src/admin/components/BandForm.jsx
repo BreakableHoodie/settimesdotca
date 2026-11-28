@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types'
 import { lazy, Suspense } from 'react'
 import PhotoUpload from './PhotoUpload'
 import { Input, Button, Tooltip } from '../../components/ui'
@@ -676,59 +675,4 @@ export default function BandForm({
       </div>
     </form>
   )
-}
-
-BandForm.propTypes = {
-  events: PropTypes.arrayOf(PropTypes.object).isRequired,
-  venues: PropTypes.arrayOf(PropTypes.object).isRequired,
-  formData: PropTypes.shape({
-    name: PropTypes.string.isRequired,
-    event_id: PropTypes.string,
-    venue_id: PropTypes.string,
-    start_time: PropTypes.string,
-    end_time: PropTypes.string,
-    duration: PropTypes.string,
-    performance_date: PropTypes.string,
-    notes: PropTypes.string,
-    url: PropTypes.string,
-    origin: PropTypes.string,
-    origin_city: PropTypes.string,
-    origin_region: PropTypes.string,
-    genre: PropTypes.string,
-    photo_url: PropTypes.string,
-    description: PropTypes.string,
-    website: PropTypes.string,
-    instagram: PropTypes.string,
-    bandcamp: PropTypes.string,
-    facebook: PropTypes.string,
-    youtube: PropTypes.string,
-    spotify: PropTypes.string,
-    apple_music: PropTypes.string,
-    linktree: PropTypes.string,
-    contact_email: PropTypes.string,
-    is_active: PropTypes.oneOfType([PropTypes.number, PropTypes.bool, PropTypes.string]),
-  }).isRequired,
-  submitting: PropTypes.bool.isRequired,
-  mode: PropTypes.oneOf(['create', 'edit']).isRequired,
-  showEventIntro: PropTypes.bool,
-  onChange: PropTypes.func.isRequired,
-  onSubmit: PropTypes.func.isRequired,
-  onCancel: PropTypes.func.isRequired,
-  onPhotoPersisted: PropTypes.func,
-  conflicts: PropTypes.shape({
-    overlaps: PropTypes.arrayOf(PropTypes.string),
-    conflicts: PropTypes.arrayOf(PropTypes.string),
-  }),
-  globalView: PropTypes.bool,
-  selectedProfile: PropTypes.object,
-  originCitySuggestions: PropTypes.arrayOf(PropTypes.string),
-  originRegionSuggestions: PropTypes.arrayOf(PropTypes.string),
-  genreSuggestions: PropTypes.arrayOf(PropTypes.string),
-  isMultiDay: PropTypes.bool,
-  dayOptions: PropTypes.arrayOf(
-    PropTypes.shape({
-      value: PropTypes.string,
-      label: PropTypes.string,
-    })
-  ),
 }

@@ -1,5 +1,3 @@
-import PropTypes from 'prop-types'
-
 /**
  * Button Component - Design System v1.0
  *
@@ -101,28 +99,4 @@ export default function Button({
       )}
     </Component>
   )
-}
-
-Button.propTypes = {
-  children: PropTypes.node.isRequired,
-  variant: PropTypes.oneOf([
-    'primary',
-    'primary-gradient',
-    'secondary',
-    'danger',
-    'ghost',
-    'success',
-    'warning',
-    'link',
-  ]),
-  size: PropTypes.oneOf(['sm', 'md', 'lg']),
-  fullWidth: PropTypes.bool,
-  disabled: PropTypes.bool,
-  loading: PropTypes.bool,
-  icon: PropTypes.node,
-  iconPosition: PropTypes.oneOf(['left', 'right']),
-  type: PropTypes.oneOf(['button', 'submit', 'reset']),
-  as: PropTypes.elementType,
-  className: PropTypes.string,
-  onClick: PropTypes.func,
 }

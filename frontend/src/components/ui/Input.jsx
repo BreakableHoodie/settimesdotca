@@ -1,5 +1,3 @@
-import PropTypes from 'prop-types'
-
 /**
  * Input Component - Design System v1.0
  *
@@ -107,21 +105,4 @@ export default function Input({
       )}
     </div>
   )
-}
-
-Input.propTypes = {
-  label: PropTypes.string,
-  type: PropTypes.string,
-  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  onChange: PropTypes.func.isRequired,
-  placeholder: PropTypes.string,
-  error: PropTypes.string,
-  helperText: PropTypes.string,
-  required: PropTypes.bool,
-  disabled: PropTypes.bool,
-  id: PropTypes.string,
-  name: PropTypes.string,
-  className: PropTypes.string,
-  icon: PropTypes.node,
-  iconPosition: PropTypes.oneOf(['left', 'right']),
 }

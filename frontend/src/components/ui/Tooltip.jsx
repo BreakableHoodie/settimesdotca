@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import PropTypes from 'prop-types'
 
 /**
  * Tooltip - Contextual help text component
@@ -55,10 +54,4 @@ export default function Tooltip({ children, content, position = 'top' }) {
       )}
     </div>
   )
-}
-
-Tooltip.propTypes = {
-  children: PropTypes.node.isRequired,
-  content: PropTypes.string.isRequired,
-  position: PropTypes.oneOf(['top', 'bottom', 'left', 'right']),
 }

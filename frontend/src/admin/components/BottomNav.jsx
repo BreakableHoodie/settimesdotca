@@ -1,5 +1,4 @@
 import { CalendarDays, Guitar, List, Settings, SlidersHorizontal, Users, Warehouse, ScrollText } from 'lucide-react'
-import PropTypes from 'prop-types'
 
 const buildNavItems = ({ showLineup, showUsers, showAudit, showPlatform }) => [
   { id: 'events', label: 'Events', icon: CalendarDays },
@@ -44,13 +43,4 @@ export default function BottomNav({
       </div>
     </nav>
   )
-}
-
-BottomNav.propTypes = {
-  activeTab: PropTypes.string.isRequired,
-  onTabChange: PropTypes.func.isRequired,
-  showLineup: PropTypes.bool,
-  showUsers: PropTypes.bool,
-  showAudit: PropTypes.bool,
-  showPlatform: PropTypes.bool,
 }

@@ -1,5 +1,4 @@
 import { CalendarRange, MapPin, Music2, TrendingUp } from 'lucide-react'
-import PropTypes from 'prop-types'
 import { Card } from './ui'
 import { parseLocalDate } from '../utils/timeFormat'
 
@@ -134,8 +133,4 @@ export default function BandStats({ stats }) {
       </div>
     </Card>
   )
-}
-
-BandStats.propTypes = {
-  stats: PropTypes.object,
 }

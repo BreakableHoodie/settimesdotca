@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react'
-import PropTypes from 'prop-types'
 import { LINK_FIELDS, NO_LINKS_KEY } from '../utils/bandFields'
 
 const ROW_CLASS =
@@ -35,14 +34,6 @@ function LinkCheckbox({ field, counts, checked, onToggle, mode }) {
       <span className="text-xs text-white/50 tabular-nums">{count}</span>
     </label>
   )
-}
-
-LinkCheckbox.propTypes = {
-  field: PropTypes.shape({ key: PropTypes.string, label: PropTypes.string }).isRequired,
-  counts: PropTypes.object.isRequired,
-  checked: PropTypes.bool.isRequired,
-  onToggle: PropTypes.func.isRequired,
-  mode: PropTypes.oneOf(['missing', 'has']).isRequired,
 }
 
 // The Links column's filter dropdown: Missing/Has mode, the 8 LINK_FIELDS
@@ -159,19 +150,4 @@ export default function LinksColumnFilter({
       </div>
     </div>
   )
-}
-
-LinksColumnFilter.propTypes = {
-  value: PropTypes.shape({
-    mode: PropTypes.oneOf(['missing', 'has']).isRequired,
-    keys: PropTypes.arrayOf(PropTypes.string).isRequired,
-    noLinks: PropTypes.bool.isRequired,
-  }).isRequired,
-  counts: PropTypes.object.isRequired,
-  onChange: PropTypes.func.isRequired,
-  onClear: PropTypes.func.isRequired,
-  onClose: PropTypes.func,
-  triggerRef: PropTypes.oneOfType([PropTypes.func, PropTypes.shape({ current: PropTypes.any })]),
-  panelId: PropTypes.string,
-  closeOnEscape: PropTypes.bool,
 }

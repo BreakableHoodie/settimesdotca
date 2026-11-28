@@ -2,7 +2,6 @@ import React, { useState, useMemo, useEffect, useRef } from 'react'
 import LoadError from './LoadError'
 import RetryRegion from '../../components/RetryRegion'
 import useRetryFocus from '../../hooks/useRetryFocus'
-import PropTypes from 'prop-types'
 import { BAND_PHOTO_CROP } from '../../utils/bandPhoto'
 
 export default function ArtistPicker({
@@ -220,15 +219,4 @@ export default function ArtistPicker({
       )}
     </div>
   )
-}
-
-ArtistPicker.propTypes = {
-  artists: PropTypes.array.isRequired,
-  onSelect: PropTypes.func.isRequired,
-  onBulkSelect: PropTypes.func.isRequired,
-  onCancel: PropTypes.func.isRequired,
-  venues: PropTypes.array,
-  loading: PropTypes.bool,
-  loadError: PropTypes.bool,
-  onRetry: PropTypes.func,
 }

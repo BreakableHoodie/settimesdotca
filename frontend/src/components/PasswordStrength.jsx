@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types'
 import { FIELD_LIMITS } from '../utils/validation'
 
 const buildChecks = password => {
@@ -49,8 +48,4 @@ export default function PasswordStrength({ password }) {
       </div>
     </div>
   )
-}
-
-PasswordStrength.propTypes = {
-  password: PropTypes.string.isRequired,
 }

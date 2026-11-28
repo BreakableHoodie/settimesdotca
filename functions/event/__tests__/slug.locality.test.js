@@ -105,7 +105,7 @@ describe("SSR /event/[slug] — venue city threading (#840)", () => {
     const [musicEvent] = extractJsonLd(html);
 
     expect(musicEvent.location["@type"]).toBe("Place");
-    expect(musicEvent.location.address.addressLocality).toBe("Tillsonburg, ON");
+    expect(musicEvent.location.address.addressLocality).toBe("Tillsonburg"); // city alone (#1495)
     expect(html).toContain("Lineup TBA — Set Times &amp; Lineup in Tillsonburg, ON | SetTimes");
     expect(html).not.toContain('"addressLocality":"Waterloo"');
 
@@ -123,5 +123,20 @@ describe("SSR /event/[slug] — venue city threading (#840)", () => {
     expect(citylessMusicEvent.location.address).not.toHaveProperty("addressLocality");
     expect(citylessHtml).toContain("Cityless Event — Set Times &amp; Lineup | SetTimes");
     expect(citylessHtml).not.toContain('"addressLocality":"Waterloo"');
+  });
+
+  test("no stored venues: the Place's locality is the city alone, not 'Waterloo, ON' (#1495)", async () => {
+    const { env, rawDb } = createTestEnv();
+    env.PUBLIC_DATA_PUBLISH_ENABLED = "true";
+    const event = insertEvent(rawDb, { name: "Vol. 3", slug: "slug-1495-no-venues", date: "2010-10-09" });
+    rawDb.prepare("UPDATE events SET status = 'archived', city=? WHERE id=?").run("Waterloo, ON", event.id);
+
+    const response = await onRequest(makeContext({ env, slug: "slug-1495-no-venues" }));
+    expect(response.status).toBe(200);
+    const [musicEvent] = extractJsonLd(await response.text());
+    expect(musicEvent.location["@type"]).toBe("Place");
+    expect(musicEvent.location.name).toBe("Waterloo, ON");
+    expect(musicEvent.location.address.addressLocality).toBe("Waterloo");
+    expect(musicEvent.location.address.addressRegion).toBe("ON");
   });
 });

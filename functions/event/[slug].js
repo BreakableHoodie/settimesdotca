@@ -12,6 +12,7 @@ import {
 } from "../utils/ssrMeta.js";
 import { normalizeHttpUrl } from "../utils/validation.js";
 import { sortableName } from "../utils/sortableName.js";
+import { splitCityRegion } from "../utils/formatPlace.js";
 import {
   torontoUtcOffsetAt,
   eventLocalFestivalToday,
@@ -349,6 +350,7 @@ export async function onRequest(context) {
   // `location` is a Google-required Event property, and the Rich Results Test
   // validates each nested subEvent node too, so omitting it there is a
   // "Missing field 'location'" failure (Vera, #542 PR-4).
+  const eventPlace = splitCityRegion(event.city);
   const location =
     venues.length > 0
       ? venues.map((v) => ({
@@ -368,8 +370,10 @@ export async function onRequest(context) {
           name: event.city || "Waterloo Region, ON",
           address: {
             "@type": "PostalAddress",
-            ...(event.city ? { addressLocality: event.city } : {}),
-            addressRegion: "ON",
+            // events.city is stored as "City, ON": the locality is the city
+            // alone, never a second copy of the region (#1495).
+            ...(eventPlace.locality ? { addressLocality: eventPlace.locality } : {}),
+            addressRegion: eventPlace.region || "ON",
             addressCountry: "CA",
           },
         };

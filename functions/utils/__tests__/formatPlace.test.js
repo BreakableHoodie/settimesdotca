@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { formatOrigin, formatVenueAddress } from "../formatPlace.js";
+import { formatOrigin, formatVenueAddress, splitCityRegion } from "../formatPlace.js";
 
 describe("formatOrigin", () => {
   it("joins trimmed city and region", () => {
@@ -74,5 +74,21 @@ describe("place formatting has one home", () => {
       .filter((f) => DECLARATION.test(readFileSync(f, "utf8")))
       .map((f) => path.relative(FUNCTIONS_DIR, f));
     expect(offenders).toEqual([]);
+  });
+});
+
+describe("splitCityRegion (#1495)", () => {
+  it.each([
+    ["Waterloo, ON", { locality: "Waterloo", region: "ON" }],
+    ["West Grey, ON", { locality: "West Grey", region: "ON" }],
+    ["  Tillsonburg ,on ", { locality: "Tillsonburg", region: "ON" }],
+    ["Waterloo Region, ON", { locality: "Waterloo Region", region: "ON" }],
+    ["Waterloo", { locality: "Waterloo", region: null }],
+    ["Kitchener-Waterloo", { locality: "Kitchener-Waterloo", region: null }],
+    [", ON", { locality: ", ON", region: null }],
+    ["   ", { locality: null, region: null }],
+    [null, { locality: null, region: null }],
+  ])("%j -> %j", (input, expected) => {
+    expect(splitCityRegion(input)).toEqual(expected);
   });
 });
